@@ -1,4 +1,4 @@
-package uy.morso;
+package uy.miga;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import uy.morso.users.JwtService;
+import uy.miga.users.JwtService;
 
 @Configuration
 class SecurityConfig {

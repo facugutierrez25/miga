@@ -10,11 +10,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>uy.morso</groupId>
-    <artifactId>morso-backend</artifactId>
+    <groupId>uy.miga</groupId>
+    <artifactId>miga-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>morso-backend</name>
-    <description>Backend de Morso: monolito modular con Spring Boot</description>
+    <name>miga-backend</name>
+    <description>Backend de Miga: monolito modular con Spring Boot</description>
 
     <properties>
         <java.version>21</java.version>

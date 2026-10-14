@@ -1,4 +1,4 @@
-package uy.morso.status;
+package uy.miga.status;
 
 import java.time.OffsetDateTime;
 

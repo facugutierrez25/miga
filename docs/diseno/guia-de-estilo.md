@@ -1,4 +1,4 @@
-# Guía de estilo — Morso (v0 a v2)
+# Guía de estilo — Miga (v0 a v2)
 
 Estilo acordado para las primeras versiones: **sobrio, profesional y con poco texto**.
 Paleta "Azul noche", IBM Plex Sans y esquinas casi rectas. Funciona en modo claro y oscuro.
@@ -106,7 +106,7 @@ Inputs siempre a 16 px para que el celular no haga zoom.
 
 **Navegación lateral (nutricionista).** Ancho ~232 px, fondo `--surface`. Ítem activo con fondo `--selected` y texto `--primary`. Badge numérico para mensajes sin leer.
 
-**Logo.** Monograma "M" en un cuadrado de radio 6 px con fondo `--primary`, junto a "Morso" en peso 600.
+**Logo.** Monograma "M" en un cuadrado de radio 6 px con fondo `--primary`, junto a "Miga" en peso 600.
 
 **Íconos.** De línea, trazo 1,75, sin emoji. Decorativos con `aria-hidden="true"`; los botones solo-ícono llevan `aria-label`.
 

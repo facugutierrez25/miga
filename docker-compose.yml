@@ -5,15 +5,15 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME:-morso}
-      POSTGRES_USER: ${DB_USER:-morso}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-morso}
+      POSTGRES_DB: ${DB_NAME:-miga}
+      POSTGRES_USER: ${DB_USER:-miga}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-miga}
     ports:
       - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-morso} -d ${DB_NAME:-morso}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-miga} -d ${DB_NAME:-miga}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -21,9 +21,9 @@ services:
   backend:
     build: ./backend
     environment:
-      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-morso}
-      DB_USER: ${DB_USER:-morso}
-      DB_PASSWORD: ${DB_PASSWORD:-morso}
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-miga}
+      DB_USER: ${DB_USER:-miga}
+      DB_PASSWORD: ${DB_PASSWORD:-miga}
       CORS_ALLOWED_ORIGINS: http://localhost:5173
     ports:
       - "8080:8080"

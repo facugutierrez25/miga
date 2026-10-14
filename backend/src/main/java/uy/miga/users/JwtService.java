@@ -1,4 +1,4 @@
-package uy.morso.users;
+package uy.miga.users;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;

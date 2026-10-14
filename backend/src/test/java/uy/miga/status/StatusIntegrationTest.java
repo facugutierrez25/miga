@@ -1,4 +1,4 @@
-package uy.morso.status;
+package uy.miga.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,7 +31,7 @@ class StatusIntegrationTest {
     void statusRespondsWithDatabaseConnected() {
         var response = statusController.status();
 
-        assertThat(response.app()).isEqualTo("morso-backend");
+        assertThat(response.app()).isEqualTo("miga-backend");
         assertThat(response.database()).isEqualTo("OK");
         assertThat(response.serverTime()).isNotNull();
     }
