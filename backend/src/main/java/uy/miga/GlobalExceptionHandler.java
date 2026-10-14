@@ -1,10 +1,10 @@
-package uy.nutriplan;
+package uy.miga;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
-import uy.nutriplan.users.EmailAlreadyExistsException;
-import uy.nutriplan.users.InvalidCredentialsException;
+import uy.miga.users.EmailAlreadyExistsException;
+import uy.miga.users.InvalidCredentialsException;
 
 import java.util.Map;
 

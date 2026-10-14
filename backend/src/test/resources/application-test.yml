@@ -1,7 +1,7 @@
 # Testcontainers levanta un PostgreSQL real y descartable para cada corrida de tests.
 spring:
   datasource:
-    url: jdbc:tc:postgresql:17-alpine:///nutriplan
+    url: jdbc:tc:postgresql:17-alpine:///miga
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     username: test
     password: test

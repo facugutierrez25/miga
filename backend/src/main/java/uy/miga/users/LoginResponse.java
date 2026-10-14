@@ -1,3 +1,3 @@
-package uy.nutriplan.users;
+package uy.miga.users;
 
 record LoginResponse(String token) {}

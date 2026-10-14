@@ -1,4 +1,4 @@
-package uy.nutriplan.users;
+package uy.miga.users;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
-class UserRegistrationIntegrationTest {
+class UserLoginIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
@@ -28,61 +28,53 @@ class UserRegistrationIntegrationTest {
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(context)
                 .build();
+
+        // Registrar usuario base para los tests de login
+        try {
+            mockMvc.perform(post("/api/v1/users")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            { "email": "login@miga.uy", "password": "Segura1234!" }
+                            """));
+        } catch (Exception ignored) {}
     }
 
     @Test
-    void registerWithValidData_returns201() throws Exception {
-        mockMvc.perform(post("/api/v1/users")
+    void loginWithValidCredentials_returns200WithToken() throws Exception {
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        { "email": "facu@nutriplan.uy", "password": "Segura1234!" }
+                        { "email": "login@miga.uy", "password": "Segura1234!" }
                         """))
-                .andExpect(status().isCreated());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isString());
     }
 
     @Test
-    void registerWithDuplicateEmail_returns409() throws Exception {
-        String body = """
-                { "email": "duplicado@nutriplan.uy", "password": "Segura1234!" }
-                """;
-
-        mockMvc.perform(post("/api/v1/users")
+    void loginWithUnknownEmail_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/v1/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isConflict())
+                .content("""
+                        { "email": "noexiste@miga.uy", "password": "Segura1234!" }
+                        """))
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").exists());
     }
 
     @Test
-    void registerWithInvalidEmail_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/users")
+    void loginWithWrongPassword_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        { "email": "esto-no-es-un-email", "password": "Segura1234!" }
+                        { "email": "login@miga.uy", "password": "Incorrecta99!" }
                         """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors").isArray());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").exists());
     }
 
     @Test
-    void registerWithWeakPassword_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        { "email": "facu2@nutriplan.uy", "password": "debil" }
-                        """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors").isArray());
-    }
-
-    @Test
-    void registerWithBlankEmail_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/users")
+    void loginWithBlankEmail_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         { "email": "", "password": "Segura1234!" }

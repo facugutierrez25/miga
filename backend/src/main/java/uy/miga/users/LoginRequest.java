@@ -1,4 +1,4 @@
-package uy.nutriplan.users;
+package uy.miga.users;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

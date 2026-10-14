@@ -1,12 +1,12 @@
-# NutriPlan
+# Miga
 
-> Nombre provisorio.
+App web para **cumplir el plan de tu nutricionista en el día a día**. Cargás el plan que te dieron
+(por porciones), y Miga te ayuda a saber qué comer hoy, armar la semana, adaptar las comidas a lo
+que tenés en casa y saber qué y cuánto comprar, con precios de supermercados de Uruguay.
 
-Plataforma web que conecta **nutricionistas y pacientes**: el nutricionista arma el plan
-de cada paciente por porciones e intercambios, y el paciente lo sigue en el día a día armando
-su menú semanal, viendo recetas y generando la lista de compras con precios de supermercados
-de Uruguay. Los nutricionistas pueden traer a sus propios pacientes o, más adelante,
-conseguir nuevos a través del marketplace.
+Funciona aunque tu nutricionista no use la app. Las herramientas para nutricionistas quedan para más adelante.
+
+Sitio: [miga.uy](https://miga.uy)
 
 ## Stack
 
@@ -60,8 +60,8 @@ cd frontend && npm test
 
 | Variable | Por defecto | Uso |
 | --- | --- | --- |
-| `DB_URL` | `jdbc:postgresql://localhost:5432/nutriplan` | Conexión JDBC |
-| `DB_USER` / `DB_PASSWORD` | `nutriplan` | Credenciales de la base |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/miga` | Conexión JDBC |
+| `DB_USER` / `DB_PASSWORD` | `miga` | Credenciales de la base |
 | `DB_POOL_SIZE` | `10` | Tamaño del pool de conexiones |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Orígenes permitidos para el frontend |
 | `PORT` | `8080` | Puerto HTTP |
@@ -71,9 +71,9 @@ En el frontend, `VITE_API_URL` apunta al backend desplegado (en local queda vac�
 ## Roadmap
 
 - [x] **v0 — Fundaciones:** esqueleto, Docker Compose, CI, endpoint de estado de punta a punta
-- [ ] v0 — Registro y login con rol (nutricionista / paciente), primer deploy
-- [ ] v1 — Plan del nutricionista: vínculo con pacientes, alimentos uruguayos, intercambios y editor de planes
-- [ ] v2 — Menú semanal, recetas y lista de compras
+- [ ] v0 — Registro y login, base visual (claro/oscuro), primer deploy
+- [ ] v1 — Mi plan: carga guiada del plan por porciones, alimentos uruguayos y equivalencias, vista del día
+- [ ] v2 — Mi semana y compras: menú semanal, adaptar con lo que tengo, recetas, lista de compras con cantidades
 - [ ] v3 — Precios de supermercados de Uruguay (datos abiertos SIPC)
-- [ ] v4 — Seguimiento: registro diario, evolución, alertas de adherencia, chat y agenda
-- [ ] v5 — Marketplace de nutricionistas
+- [ ] v4 — Constancia y progreso: recordatorios, resumen semanal, evolución
+- [ ] Más adelante — Herramientas para nutricionistas y directorio

@@ -1,4 +1,4 @@
-package uy.nutriplan.users;
+package uy.miga.users;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

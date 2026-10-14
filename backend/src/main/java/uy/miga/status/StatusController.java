@@ -1,4 +1,4 @@
-package uy.nutriplan.status;
+package uy.miga.status;
 
 import java.time.OffsetDateTime;
 

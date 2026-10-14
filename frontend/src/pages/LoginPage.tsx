@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { login } from '../api/users'
 import { useAuth } from '../auth/AuthContext'
+import Brand from '../components/Brand'
 import './RegisterPage.css'
 
 export default function LoginPage() {
@@ -30,6 +31,7 @@ export default function LoginPage() {
   return (
     <main className="register-page">
       <div className="register-card">
+        <div className="register-brand"><Brand size={30}/></div>
         <h1 className="register-title">Iniciar sesión</h1>
         <form onSubmit={handleSubmit} noValidate>
           <div className="register-field">
