@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { register } from '../api/users'
+import Brand from '../components/Brand'
 import './RegisterPage.css'
 
 export default function RegisterPage() {
@@ -27,6 +28,7 @@ export default function RegisterPage() {
   return (
     <main className="register-page">
       <div className="register-card">
+        <div className="register-brand"><Brand size={30}/></div>
         <h1 className="register-title">Crear cuenta</h1>
         <form onSubmit={handleSubmit} noValidate>
           <div className="register-field">

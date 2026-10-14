@@ -10,14 +10,17 @@
   background: var(--surface);
   border-radius: var(--radius-card);
   padding: 32px 24px;
+  box-shadow: var(--shadow-featured);
   width: 100%;
   max-width: 400px;
 }
 
+.register-brand {
+  margin-bottom: 20px;
+}
+
 .register-title {
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 30px;
   margin-bottom: 24px;
 }
 
@@ -30,7 +33,7 @@
 
 .register-field label {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .register-field input {
@@ -73,7 +76,7 @@
   border: none;
   border-radius: var(--radius-control);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
 }
@@ -93,5 +96,5 @@
 .register-footer a {
   color: var(--primary);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 700;
 }
