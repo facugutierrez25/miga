@@ -1,4 +1,4 @@
-package uy.morso;
+package uy.miga;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
@@ -6,6 +6,6 @@ class ModularityTest {
 
     @Test
     void modulesShouldRespectTheirBoundaries() {
-        ApplicationModules.of(MorsoApplication.class).verify();
+        ApplicationModules.of(MigaApplication.class).verify();
     }
 }

@@ -5,7 +5,7 @@
 
 ## Contexto
 
-Morso lo desarrolla una sola persona, de punta a punta. Los datos del dominio
+Miga lo desarrolla una sola persona, de punta a punta. Los datos del dominio
 (plan, alimentos, recetas, menú, lista de compras) están muy relacionados y se
 consultan juntos. La app tiene que soportar usuarios concurrentes.
 
@@ -13,7 +13,7 @@ consultan juntos. La app tiene que soportar usuarios concurrentes.
 
 Un **monolito modular** con Spring Boot:
 
-- Cada subpaquete directo de `uy.morso` es un módulo con su interfaz pública.
+- Cada subpaquete directo de `uy.miga` es un módulo con su interfaz pública.
 - Spring Modulith verifica en los tests que ningún módulo use clases internas de otro.
 - La comunicación entre módulos se hace por llamadas a su API pública o por eventos internos.
 - La API es sin estado, para poder correr varias instancias detrás de un balanceador.

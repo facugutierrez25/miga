@@ -1,12 +1,12 @@
-# Morso
+# Miga
 
 App web para **cumplir el plan de tu nutricionista en el día a día**. Cargás el plan que te dieron
-(por porciones), y Morso te ayuda a saber qué comer hoy, armar la semana, adaptar las comidas a lo
+(por porciones), y Miga te ayuda a saber qué comer hoy, armar la semana, adaptar las comidas a lo
 que tenés en casa y saber qué y cuánto comprar, con precios de supermercados de Uruguay.
 
 Funciona aunque tu nutricionista no use la app. Las herramientas para nutricionistas quedan para más adelante.
 
-Sitio: [morso.uy](https://morso.uy)
+Sitio: [miga.uy](https://miga.uy)
 
 ## Stack
 
@@ -60,8 +60,8 @@ cd frontend && npm test
 
 | Variable | Por defecto | Uso |
 | --- | --- | --- |
-| `DB_URL` | `jdbc:postgresql://localhost:5432/morso` | Conexión JDBC |
-| `DB_USER` / `DB_PASSWORD` | `morso` | Credenciales de la base |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/miga` | Conexión JDBC |
+| `DB_USER` / `DB_PASSWORD` | `miga` | Credenciales de la base |
 | `DB_POOL_SIZE` | `10` | Tamaño del pool de conexiones |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Orígenes permitidos para el frontend |
 | `PORT` | `8080` | Puerto HTTP |

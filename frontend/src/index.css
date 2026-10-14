@@ -1,46 +1,50 @@
+/* Tokens de la guía de estilo (docs/diseno/guia-de-estilo.md) */
 :root {
   color-scheme: light;
-  --bg: #F1F4F9; --surface: #FFFFFF; --surface-2: #FBFCFE;
-  --ink: #111C2E; --muted: #566275;
-  --primary: #1D3A6B; --on-primary: #FFFFFF; --selected: #E8EDF5; --accent: #1F7A70;
-  --line: #E2E6EE; --line-soft: #EEF1F5; --border: #D3D9E2; --control: #8A93A3;
+  --bg: #F2F7F6; --surface: #FFFFFF; --surface-2: #F8FBFA;
+  --ink: #102624; --muted: #5A706E; --muted-2: #6E8482; --done: #7C918F;
+  --primary: #0E6E6B; --on-primary: #FFFFFF; --on-primary-muted: #CFE6E4; --primary-soft: #EAF4F3;
+  --accent: #F6C344; --accent-soft: #FDF1D2; --on-accent-soft: #7A5A0B;
+  --line: #DCE9E7; --line-soft: #E8F1EF; --rail: #CFE0DE; --border: #C6DCDA; --control: #7A9290;
   --g-prot: #C0704A; --g-cer: #B8913A; --g-frut: #B5627A;
   --g-lac: #4F86B8; --g-gras: #8070B0; --g-verd: #4E8F6A;
   --t-prot: #F4E7E0; --t-cer: #F4EEDD; --t-frut: #F4E4EA;
   --t-lac: #E3ECF5; --t-gras: #ECE9F4; --t-verd: #E2EEE6;
-  --error: #b91c1c; --error-bg: #fef2f2;
-  --radius-card: 8px; --radius-control: 6px; --radius-sm: 4px;
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  --error: #B42318; --error-bg: #FEF3F2;
+  --shadow-featured: 0 6px 20px rgba(16, 38, 36, 0.08);
+  --radius-header: 24px; --radius-card: 16px; --radius-control: 12px; --radius-sm: 8px;
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
 }
 
 /* Oscuro: por preferencia del sistema (salvo que el usuario elija claro) o por elección explícita */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0E1420; --surface: #172133; --surface-2: #131C2C;
-    --ink: #E6EBF3; --muted: #9AA6B8;
-    --primary: #8DB0E6; --on-primary: #0B1424; --selected: #22324D; --accent: #4DB6A8;
-    --line: #263247; --line-soft: #1F2A3D; --border: #33415A; --control: #76839A;
+    --bg: #0B1716; --surface: #132322; --surface-2: #0F1D1C;
+    --ink: #E6F0EF; --muted: #93A9A7; --muted-2: #7F9795; --done: #6E8684;
+    --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
+    --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
+    --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
     --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
     --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
-    --error: #f87171; --error-bg: #3a1c1a;
+    --error: #F97066; --error-bg: #3A1C1A;
+    --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.35);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0E1420; --surface: #172133; --surface-2: #131C2C;
-  --ink: #E6EBF3; --muted: #9AA6B8;
-  --primary: #8DB0E6; --on-primary: #0B1424; --selected: #22324D; --accent: #4DB6A8;
-  --line: #263247; --line-soft: #1F2A3D; --border: #33415A; --control: #76839A;
+  --bg: #0B1716; --surface: #132322; --surface-2: #0F1D1C;
+  --ink: #E6F0EF; --muted: #93A9A7; --muted-2: #7F9795; --done: #6E8684;
+  --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
+  --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
+  --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
   --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
   --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
-  --error: #f87171; --error-bg: #3a1c1a;
+  --error: #F97066; --error-bg: #3A1C1A;
+  --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
-
-body { margin: 0; background: var(--bg); color: var(--ink); }
-:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 * {
   box-sizing: border-box;
@@ -49,17 +53,49 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 }
 
 body {
-  margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Logo: "miga" con el punto de la i en amarillo */
+.brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--primary);
+}
+
+.brand-i {
+  position: relative;
+  display: inline-block;
+}
+
+.brand-i::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0.04em;
+  width: 0.22em;
+  height: 0.22em;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 @media (prefers-reduced-motion: reduce) {

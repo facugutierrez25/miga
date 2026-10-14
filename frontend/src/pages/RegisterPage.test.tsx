@@ -30,12 +30,12 @@ describe('RegisterPage', () => {
     vi.spyOn(usersApi, 'register').mockResolvedValue()
     renderPage()
 
-    await user.type(screen.getByLabelText('Email'), 'facu@morso.uy')
+    await user.type(screen.getByLabelText('Email'), 'facu@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
     await waitFor(() => {
-      expect(usersApi.register).toHaveBeenCalledWith('facu@morso.uy', 'Segura1234!')
+      expect(usersApi.register).toHaveBeenCalledWith('facu@miga.uy', 'Segura1234!')
     })
   })
 
@@ -44,7 +44,7 @@ describe('RegisterPage', () => {
     vi.spyOn(usersApi, 'register').mockRejectedValue(new Error('Este email ya está registrado.'))
     renderPage()
 
-    await user.type(screen.getByLabelText('Email'), 'duplicado@morso.uy')
+    await user.type(screen.getByLabelText('Email'), 'duplicado@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
@@ -58,7 +58,7 @@ describe('RegisterPage', () => {
     vi.spyOn(usersApi, 'register').mockRejectedValue(new Error('Error al registrarse. Revisá los datos.'))
     renderPage()
 
-    await user.type(screen.getByLabelText('Email'), 'facu@morso.uy')
+    await user.type(screen.getByLabelText('Email'), 'facu@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
@@ -72,7 +72,7 @@ describe('RegisterPage', () => {
     vi.spyOn(usersApi, 'register').mockImplementation(() => new Promise(() => {}))
     renderPage()
 
-    await user.type(screen.getByLabelText('Email'), 'facu@morso.uy')
+    await user.type(screen.getByLabelText('Email'), 'facu@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 

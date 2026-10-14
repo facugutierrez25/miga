@@ -1,4 +1,4 @@
-package uy.morso.users;
+package uy.miga.users;
 
 public class InvalidCredentialsException extends RuntimeException {
     public InvalidCredentialsException() {
