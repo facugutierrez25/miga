@@ -4,7 +4,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
-class UserService {
+public class UserService {
 
     private final UsersRepository repository;
     private final PasswordEncoder passwordEncoder;
@@ -23,6 +23,12 @@ class UserService {
             throw new InvalidCredentialsException();
         }
         return jwtService.generateToken(user);
+    }
+
+    public Long findUserIdByEmail(String email) {
+        return repository.findByEmail(email)
+            .map(User::getId)
+            .orElseThrow();
     }
 
     User register(String email, String password) {

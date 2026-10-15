@@ -31,6 +31,7 @@ class User {
     void prePersist() {
         if (createdAt == null) createdAt = OffsetDateTime.now();
     }
+    Long getId() { return id; }
     String getEmail() { return email; }
     String getPasswordHash() { return passwordHash; }
     Role getRole() { return role; }

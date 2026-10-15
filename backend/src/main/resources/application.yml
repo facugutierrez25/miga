@@ -4,9 +4,9 @@ spring:
   application:
     name: miga-backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/miga}
-    username: ${DB_USER:miga}
-    password: ${DB_PASSWORD:miga}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nutriplan}
+    username: ${DB_USER:nutriplan}
+    password: ${DB_PASSWORD:nutriplan}
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:10}
   jpa:

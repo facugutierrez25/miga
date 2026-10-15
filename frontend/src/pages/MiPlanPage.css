@@ -1,0 +1,329 @@
+.mi-plan-page {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.mi-plan-header {
+  background: var(--primary);
+  border-radius: 0 0 var(--radius-header) var(--radius-header);
+  padding: 24px 20px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mi-plan-header .brand {
+  color: var(--on-primary);
+}
+
+.mi-plan-header__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  color: var(--on-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.mi-plan-body {
+  padding: 24px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.mi-plan-loading {
+  text-align: center;
+  color: var(--muted);
+  padding: 48px 0;
+  font-size: 15px;
+}
+
+/* Tarjeta base */
+
+.comida-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-featured);
+}
+
+/* Tarjeta minimizada */
+
+.comida-card--min {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 16px;
+  min-height: 60px;
+}
+
+.comida-min__nombre {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.comida-min__chips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.porcion-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 99px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.porcion-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.btn-editar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-eliminar-min {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-eliminar-min:hover {
+  color: var(--error);
+  background: var(--error-bg);
+}
+
+/* Tarjeta expandida */
+
+.comida-card--exp {
+  padding: 20px 16px 16px;
+}
+
+.comida-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.comida-card__nombre {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--line);
+  padding: 4px 0;
+  outline: none;
+  letter-spacing: -0.02em;
+  min-height: 44px;
+}
+
+.comida-card__nombre:focus {
+  border-bottom-color: var(--primary);
+}
+
+.comida-card__nombre::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.btn-eliminar-exp {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--error-bg);
+  color: var(--error);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Filas de porción */
+
+.porcion-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.porcion-row__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.porcion-row__label {
+  flex: 1;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.porcion-row__stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stepper-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.stepper-btn:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  min-width: 38px;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.btn-guardar-comida {
+  margin-top: 14px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-control);
+  border: 1.5px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-guardar-comida:disabled {
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Botones de acción globales */
+
+.btn-agregar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-agregar:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.btn-confirmar {
+  min-height: 52px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-confirmar:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-confirmar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmado-msg {
+  text-align: center;
+  color: var(--primary);
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.plan-error {
+  text-align: center;
+  color: var(--error);
+  font-size: 14px;
+  background: var(--error-bg);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
