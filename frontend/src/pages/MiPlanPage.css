@@ -1,5 +1,5 @@
 .mi-plan-page {
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--bg);
 }
 
@@ -46,7 +46,6 @@
 .comida-card {
   background: var(--surface);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-featured);
 }
 
 /* Tarjeta minimizada */
@@ -251,8 +250,8 @@
   width: 100%;
   min-height: 44px;
   border-radius: var(--radius-control);
-  border: 1.5px solid var(--primary);
-  background: transparent;
+  border: none;
+  background: var(--primary-soft);
   color: var(--primary);
   font-family: var(--font-body);
   font-size: 15px;
@@ -326,4 +325,13 @@
   background: var(--error-bg);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
+}
+
+@media (min-width: 640px) {
+  .mi-plan-header {
+    padding: 16px 20px 24px;
+  }
+  .mi-plan-header__title {
+    font-size: 24px;
+  }
 }
