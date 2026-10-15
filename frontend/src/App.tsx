@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthContext'
 import PrivateRoute from './auth/PrivateRoute'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
+import MiPlanPage from './pages/MiPlanPage'
 
 export default function App() {
   return (
@@ -11,8 +12,9 @@ export default function App() {
         <Routes>
           <Route path="/register" element={<RegisterPage/>}/>
           <Route path="/login" element={<LoginPage/>}/>
-          {/* Rutas privadas van acá adentro de PrivateRoute */}
-          <Route path="*" element={<PrivateRoute><Navigate to="/login" replace/></PrivateRoute>}/>
+          <Route path="/mi-plan" element={<PrivateRoute><MiPlanPage/></PrivateRoute>}/>
+          <Route path="/" element={<PrivateRoute><Navigate to="/mi-plan" replace/></PrivateRoute>}/>
+          <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>
       </BrowserRouter>
     </AuthProvider>
