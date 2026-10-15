@@ -12,7 +12,7 @@ const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockSaveMyPlan = vi.mocked(plansApi.saveMyPlan)
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ token: 'tok', login: vi.fn(), logout: vi.fn() })
+  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', login: vi.fn(), logout: vi.fn() })
 })
 
 afterEach(() => {

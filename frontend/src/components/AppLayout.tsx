@@ -1,3 +1,4 @@
+import React from 'react'
 import { Link, Outlet, useMatch } from 'react-router-dom'
 import './AppLayout.css'
 
@@ -44,7 +45,7 @@ const NAV_ITEMS = [
   { to: '/perfil',   label: 'Perfil',   Icon: IcPerfil  },
 ]
 
-function NavItem({ to, label, Icon }: { to: string; label: string; Icon: () => JSX.Element }) {
+function NavItem({ to, label, Icon }: { to: string; label: string; Icon: () => React.ReactElement }) {
   const match = useMatch({ path: to, end: false })
   const active = !!match
   return (
