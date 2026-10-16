@@ -318,6 +318,156 @@
   font-size: 15px;
 }
 
+/* Historial de planes */
+
+.plan-historial {
+  margin-top: 8px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 16px;
+}
+
+.plan-historial__titulo {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.plan-historial__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--line-soft);
+  background: transparent;
+  padding: 6px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.plan-historial__item:hover .plan-historial__fecha {
+  color: var(--primary);
+}
+
+.plan-historial__fecha {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.plan-historial__detalle {
+  font-size: 13px;
+  color: var(--muted-2);
+}
+
+/* Modal de detalle de plan */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 300;
+  padding: 0;
+}
+
+.modal-card {
+  background: var(--surface);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 80dvh;
+  overflow-y: auto;
+  padding: 24px 20px 40px;
+}
+
+.modal-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-card__eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.modal-card__rango {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.modal-card__rango-sep {
+  color: var(--muted);
+}
+
+.modal-card__close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-card__meals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-meal {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+}
+
+.modal-meal__nombre {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.modal-meal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+@media (min-width: 640px) {
+  .modal-overlay {
+    align-items: center;
+  }
+
+  .modal-card {
+    border-radius: var(--radius-card);
+    max-height: 70dvh;
+  }
+}
+
 .plan-error {
   text-align: center;
   color: var(--error);

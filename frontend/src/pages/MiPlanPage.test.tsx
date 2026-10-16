@@ -11,9 +11,11 @@ vi.mock('../auth/AuthContext')
 const mockUseAuth = vi.mocked(AuthContext.useAuth)
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockSaveMyPlan = vi.mocked(plansApi.saveMyPlan)
+const mockGetPlanHistory = vi.mocked(plansApi.getPlanHistory)
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', login: vi.fn(), logout: vi.fn() })
+  mockGetPlanHistory.mockResolvedValue([])
 })
 
 afterEach(() => {

@@ -5,6 +5,8 @@ import org.springframework.transaction.annotation.Transactional;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.List;
 
 @Service
 class PlanService {
@@ -20,8 +22,8 @@ class PlanService {
     @Transactional(readOnly = true)
     PlanDto getMyPlan(String email) {
         Long userId = userService.findUserIdByEmail(email);
-        Plan plan = plansRepository.findByUserId(userId)
-            .orElseThrow(() -> new PlanNotFoundException());
+        Plan plan = plansRepository.findByUserIdAndCurrentTrue(userId)
+            .orElseThrow(PlanNotFoundException::new);
         return toDto(plan);
     }
 
@@ -30,13 +32,16 @@ class PlanService {
         validatePortions(dto);
         Long userId = userService.findUserIdByEmail(email);
 
-        Plan plan = plansRepository.findByUserId(userId).orElseGet(() -> {
-            Plan p = new Plan();
-            p.setUserId(userId);
-            return p;
+        // Archivar plan vigente si existe
+        plansRepository.findByUserIdAndCurrentTrue(userId).ifPresent(old -> {
+            old.setCurrent(false);
+            old.setSupersededAt(OffsetDateTime.now());
+            plansRepository.save(old);
         });
 
-        plan.getMeals().clear();
+        // Crear nuevo plan vigente
+        Plan plan = new Plan();
+        plan.setUserId(userId);
 
         for (MealDto mealDto : dto.meals()) {
             Meal meal = new Meal();
@@ -56,6 +61,26 @@ class PlanService {
         }
 
         return toDto(plansRepository.save(plan));
+    }
+
+    @Transactional(readOnly = true)
+    List<PlanSummaryDto> getPlanHistory(String email) {
+        Long userId = userService.findUserIdByEmail(email);
+        return plansRepository.findAllByUserIdAndCurrentFalseOrderBySupersededAtDesc(userId)
+            .stream()
+            .map(p -> new PlanSummaryDto(
+                p.getCreatedAt().toLocalDate(),
+                p.getSupersededAt().toLocalDate(),
+                p.getMeals().size(),
+                p.getMeals().stream().map(meal -> new MealSummaryDto(
+                    meal.getName(),
+                    meal.getPortions().stream()
+                        .filter(por -> por.getPortions().compareTo(java.math.BigDecimal.ZERO) > 0)
+                        .map(por -> new MealPortionDto(por.getFoodGroup(), por.getPortions()))
+                        .toList()
+                )).toList()
+            ))
+            .toList();
     }
 
     private void validatePortions(PlanDto dto) {
