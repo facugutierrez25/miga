@@ -1,5 +1,5 @@
 .perfil-page {
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--bg);
 }
 
@@ -33,7 +33,23 @@
   background: var(--surface);
   border-radius: var(--radius-card);
   padding: 16px;
-  box-shadow: var(--shadow-featured);
+}
+
+.perfil-card--link {
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+.perfil-card--link:hover {
+  box-shadow: 0 6px 24px rgba(16, 38, 36, 0.12);
+}
+
+.perfil-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--primary);
 }
 
 .perfil-card__label {
@@ -98,9 +114,9 @@
 .btn-cerrar-sesion {
   min-height: 52px;
   border-radius: var(--radius-control);
-  border: 1.5px solid var(--line);
-  background: transparent;
-  color: var(--ink);
+  border: none;
+  background: var(--primary-soft);
+  color: var(--primary);
   font-family: var(--font-body);
   font-size: 15px;
   font-weight: 500;
@@ -110,6 +126,15 @@
 }
 
 .btn-cerrar-sesion:hover {
-  border-color: var(--error);
+  background: var(--error-bg);
   color: var(--error);
+}
+
+@media (min-width: 640px) {
+  .perfil-header {
+    padding: 16px 20px;
+  }
+  .perfil-title {
+    font-size: 22px;
+  }
 }

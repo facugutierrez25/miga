@@ -1,15 +1,28 @@
+/* ── Mobile: layout vertical, nav fija abajo ── */
+
 .app-layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
   min-height: 100dvh;
+}
+
+/* Barra superior oculta en mobile (cada página tiene su propio header) */
+.app-header {
+  display: none;
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-layout__main {
   flex: 1;
-  padding-bottom: 82px;
+  padding-bottom: 82px; /* espacio para la nav fija */
 }
 
+/* Nav fija abajo en mobile */
 .app-nav {
   position: fixed;
   bottom: 0;
@@ -51,37 +64,134 @@
   line-height: 1;
 }
 
+/* ── Desktop: barra superior + sidebar izquierda ── */
+
 @media (min-width: 640px) {
-  .app-layout {
+
+  /* Barra superior full-width en primary */
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--primary);
+    padding: 0 20px;
+    height: 52px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+  }
+
+  .app-header .brand {
+    color: var(--on-primary);
+  }
+
+  .app-header__toggle {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--on-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+  }
+
+  .app-header__toggle:hover {
+    background: var(--on-primary-muted);
+  }
+
+  .app-header__title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--on-primary);
+    letter-spacing: -0.03em;
+  }
+
+  /* Cuerpo: sidebar + contenido en fila */
+  .app-body {
     flex-direction: row;
+    flex: 1;
+    min-height: 0;
   }
 
   .app-layout__main {
     flex: 1;
     padding-bottom: 0;
+    min-width: 0;
+    overflow-y: auto;
   }
 
+  /* Ocultar los headers de cada página en desktop
+     (la barra superior del layout los reemplaza) */
+  .app-layout__main .hoy-header,
+  .app-layout__main .mi-plan-header,
+  .app-layout__main .perfil-header {
+    display: none;
+  }
+
+  /* Sidebar */
   .app-nav {
     position: sticky;
     top: 0;
-    bottom: auto;
-    left: auto;
-    right: auto;
-    width: 80px;
-    height: 100vh;
-    height: 100dvh;
+    align-self: flex-start;
+    height: calc(100vh - 52px);
+    height: calc(100dvh - 52px);
+    width: 140px;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
     border-top: none;
     border-right: 1px solid var(--line);
-    padding-top: 20px;
-    padding-bottom: 0;
-    gap: 4px;
+    padding: 8px 0;
+    gap: 2px;
+    overflow: hidden;
+    transition: width 0.2s ease;
+    flex-shrink: 0;
+    background: var(--surface);
+    /* quita el fixed de mobile */
+    right: auto;
+    left: auto;
+    bottom: auto;
   }
 
+  .app-layout--collapsed .app-nav {
+    width: 52px;
+  }
+
+  /* Items de nav en desktop: fila icono + etiqueta */
   .nav-item {
-    padding: 10px 0;
+    flex-direction: row;
+    gap: 10px;
+    padding: 10px 16px;
     border-radius: 0;
+    min-height: 44px;
+    justify-content: flex-start;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .nav-item--active {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .app-layout--collapsed .nav-item {
+    padding: 10px 0;
+    justify-content: center;
+  }
+
+  .nav-item__label {
+    font-size: 14px;
+    font-weight: 500;
+    transition: opacity 0.15s;
+  }
+
+  .app-layout--collapsed .nav-item__label {
+    display: none;
   }
 }
