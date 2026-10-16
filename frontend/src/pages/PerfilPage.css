@@ -1,0 +1,140 @@
+.perfil-page {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.perfil-header {
+  padding: 24px 20px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.perfil-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.perfil-body {
+  padding: 20px 16px 40px;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.perfil-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+.perfil-card--link {
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+.perfil-card--link:hover {
+  box-shadow: 0 6px 24px rgba(16, 38, 36, 0.12);
+}
+
+.perfil-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--primary);
+}
+
+.perfil-card__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.perfil-card__value {
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Selector de tema segmentado */
+
+.tema-selector {
+  display: flex;
+  background: var(--primary-soft);
+  border-radius: var(--radius-control);
+  padding: 3px;
+  gap: 2px;
+}
+
+.tema-opcion {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border-radius: calc(var(--radius-control) - 3px);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tema-opcion--activa {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(16, 38, 36, 0.1);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Botón cerrar sesión */
+
+.btn-cerrar-sesion {
+  min-height: 52px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.btn-cerrar-sesion:hover {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+@media (min-width: 640px) {
+  .perfil-header {
+    padding: 16px 20px;
+  }
+  .perfil-title {
+    font-size: 22px;
+  }
+}

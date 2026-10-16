@@ -1,0 +1,487 @@
+.mi-plan-page {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.mi-plan-header {
+  background: var(--primary);
+  border-radius: 0 0 var(--radius-header) var(--radius-header);
+  padding: 24px 20px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mi-plan-header .brand {
+  color: var(--on-primary);
+}
+
+.mi-plan-header__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  color: var(--on-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.mi-plan-body {
+  padding: 24px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.mi-plan-loading {
+  text-align: center;
+  color: var(--muted);
+  padding: 48px 0;
+  font-size: 15px;
+}
+
+/* Tarjeta base */
+
+.comida-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+
+/* Tarjeta minimizada */
+
+.comida-card--min {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 16px;
+  min-height: 60px;
+}
+
+.comida-min__nombre {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.comida-min__chips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.porcion-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 99px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.porcion-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.btn-editar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-eliminar-min {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-eliminar-min:hover {
+  color: var(--error);
+  background: var(--error-bg);
+}
+
+/* Tarjeta expandida */
+
+.comida-card--exp {
+  padding: 20px 16px 16px;
+}
+
+.comida-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.comida-card__nombre {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--line);
+  padding: 4px 0;
+  outline: none;
+  letter-spacing: -0.02em;
+  min-height: 44px;
+}
+
+.comida-card__nombre:focus {
+  border-bottom-color: var(--primary);
+}
+
+.comida-card__nombre::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.btn-eliminar-exp {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--error-bg);
+  color: var(--error);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Filas de porción */
+
+.porcion-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.porcion-row__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.porcion-row__label {
+  flex: 1;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.porcion-row__stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stepper-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.stepper-btn:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  min-width: 38px;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.btn-guardar-comida {
+  margin-top: 14px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-guardar-comida:disabled {
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Botones de acción globales */
+
+.btn-agregar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-agregar:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.btn-confirmar {
+  min-height: 52px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-confirmar:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-confirmar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmado-msg {
+  text-align: center;
+  color: var(--primary);
+  font-weight: 500;
+  font-size: 15px;
+}
+
+/* Historial de planes */
+
+.plan-historial {
+  margin-top: 8px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 16px;
+}
+
+.plan-historial__titulo {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.plan-historial__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--line-soft);
+  background: transparent;
+  padding: 6px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.plan-historial__item:hover .plan-historial__fecha {
+  color: var(--primary);
+}
+
+.plan-historial__fecha {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.plan-historial__detalle {
+  font-size: 13px;
+  color: var(--muted-2);
+}
+
+/* Modal de detalle de plan */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 300;
+  padding: 0;
+}
+
+.modal-card {
+  background: var(--surface);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 80dvh;
+  overflow-y: auto;
+  padding: 24px 20px 40px;
+}
+
+.modal-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-card__eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.modal-card__rango {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.modal-card__rango-sep {
+  color: var(--muted);
+}
+
+.modal-card__close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-card__meals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-meal {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+}
+
+.modal-meal__nombre {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.modal-meal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+@media (min-width: 640px) {
+  .modal-overlay {
+    align-items: center;
+  }
+
+  .modal-card {
+    border-radius: var(--radius-card);
+    max-height: 70dvh;
+  }
+}
+
+.plan-error {
+  text-align: center;
+  color: var(--error);
+  font-size: 14px;
+  background: var(--error-bg);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+@media (min-width: 640px) {
+  .mi-plan-header {
+    padding: 16px 20px 24px;
+  }
+  .mi-plan-header__title {
+    font-size: 24px;
+  }
+}

@@ -1,0 +1,176 @@
+.hoy-page {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.hoy-header {
+  background: var(--primary);
+  border-radius: 0 0 var(--radius-header) var(--radius-header);
+  padding: 20px 20px 32px;
+}
+
+.hoy-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.hoy-header .brand {
+  color: var(--on-primary);
+}
+
+.hoy-header__fecha {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--on-primary-muted);
+  text-transform: capitalize;
+  text-align: right;
+}
+
+.hoy-header__titulo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  color: var(--on-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.hoy-body {
+  padding: 20px 16px 40px;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hoy-loading {
+  text-align: center;
+  color: var(--muted);
+  padding: 48px 0;
+  font-size: 15px;
+}
+
+/* Estado sin plan */
+
+.hoy-sin-plan {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 24px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.hoy-sin-plan__texto {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.btn-cargar-plan {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 24px;
+  border-radius: var(--radius-control);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.btn-cargar-plan-manual {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Tarjeta de comida */
+
+.comida-hoy {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+.comida-hoy__encabezado {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.comida-hoy__nombre {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.comida-hoy__hora {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--muted);
+  letter-spacing: -0.02em;
+}
+
+/* Chips de grupos */
+
+.comida-hoy__grupos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.grupo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.grupo-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.grupo-chip__label {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.grupo-chip__valor {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 640px) {
+  .hoy-header {
+    padding: 16px 20px 24px;
+  }
+  .hoy-header__titulo {
+    font-size: 24px;
+  }
+}

@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       const token = await login(email, password)
       auth.login(token)
-      navigate('/')
+      navigate('/hoy')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido.')
     } finally {
