@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MiPlanPage from './MiPlanPage'
 import * as plansApi from '../api/plans'
@@ -21,7 +22,7 @@ afterEach(() => {
 
 test('muestra cargando mientras carga el plan', () => {
   mockGetMyPlan.mockReturnValue(new Promise(() => {}))
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   expect(screen.getByText('Cargando tu plan…')).toBeInTheDocument()
 })
 
@@ -40,7 +41,7 @@ test('muestra las comidas minimizadas al cargar el plan', async () => {
       ],
     }],
   })
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
   expect(screen.queryByPlaceholderText('Nombre de la comida')).not.toBeInTheDocument()
 })
@@ -49,7 +50,7 @@ test('expande una comida al hacer clic en editar', async () => {
   mockGetMyPlan.mockResolvedValue({
     meals: [{ name: 'Almuerzo', displayOrder: 1, portions: [] }],
   })
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByLabelText('Editar comida'))
   fireEvent.click(screen.getByLabelText('Editar comida'))
   expect(screen.getByDisplayValue('Almuerzo')).toBeInTheDocument()
@@ -57,7 +58,7 @@ test('expande una comida al hacer clic en editar', async () => {
 
 test('minimiza una comida al guardarla', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByText('Agregar comida'))
   fireEvent.change(screen.getByPlaceholderText('Nombre de la comida'), { target: { value: 'Merienda' } })
@@ -68,7 +69,7 @@ test('minimiza una comida al guardarla', async () => {
 
 test('deshabilita guardar comida si el nombre está vacío', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByText('Agregar comida'))
   expect(screen.getByText('Guardar comida')).toBeDisabled()
@@ -76,7 +77,7 @@ test('deshabilita guardar comida si el nombre está vacío', async () => {
 
 test('agrega una comida expandida al hacer clic en agregar', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByText('Agregar comida'))
   expect(screen.getByPlaceholderText('Nombre de la comida')).toBeInTheDocument()
@@ -84,7 +85,7 @@ test('agrega una comida expandida al hacer clic en agregar', async () => {
 
 test('elimina una comida expandida', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByLabelText('Eliminar comida'))
@@ -94,7 +95,7 @@ test('elimina una comida expandida', async () => {
 test('confirma el plan y muestra mensaje de éxito', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   mockSaveMyPlan.mockResolvedValue({ meals: [] })
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Confirmar plan'))
   fireEvent.click(screen.getByText('Confirmar plan'))
   await waitFor(() => expect(screen.getByText('¡Plan guardado!')).toBeInTheDocument())
@@ -103,7 +104,7 @@ test('confirma el plan y muestra mensaje de éxito', async () => {
 test('muestra error si falla el confirmar', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   mockSaveMyPlan.mockRejectedValue(new Error('error de red'))
-  render(<MiPlanPage />)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Confirmar plan'))
   fireEvent.click(screen.getByText('Confirmar plan'))
   await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())

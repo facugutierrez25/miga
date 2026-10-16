@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { getMyPlan, saveMyPlan, type FoodGroup, type PlanDto } from '../api/plans'
@@ -48,6 +49,8 @@ function localAPlan(comidas: ComidaLocal[]): PlanDto {
 
 export default function MiPlanPage() {
   const { token } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [comidas, setComidas] = useState<ComidaLocal[]>([])
   const [cargando, setCargando] = useState(true)
   const [confirmando, setConfirmando] = useState(false)
@@ -58,7 +61,16 @@ export default function MiPlanPage() {
     if (!token) return
     getMyPlan(token)
       .then(dto => setComidas(planALocal(dto)))
-      .catch(err => { if (err.message !== 'sin-plan') console.error(err) })
+      .catch(err => {
+        if (err.message === 'sin-plan') {
+          const draft = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
+          if (draft) {
+            setComidas(draft.map(m => ({ nombre: m.name, porciones: porcionesVacias(), minimizada: false })))
+          }
+        } else {
+          console.error(err)
+        }
+      })
       .finally(() => setCargando(false))
   }, [token])
 
@@ -99,7 +111,7 @@ export default function MiPlanPage() {
       const dto = await saveMyPlan(token, localAPlan(comidas))
       setComidas(planALocal(dto))
       setConfirmado(true)
-      setTimeout(() => setConfirmado(false), 2500)
+      setTimeout(() => navigate('/hoy', { replace: true }), 1800)
     } catch (err) {
       console.error('confirmarPlan falló:', err)
       setError('No se pudo guardar el plan. Intentá de nuevo.')
