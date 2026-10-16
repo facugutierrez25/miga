@@ -111,3 +111,38 @@ test('muestra error si falla el confirmar', async () => {
   fireEvent.click(screen.getByText('Confirmar plan'))
   await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
 })
+
+test('abre el modal al hacer click en un plan del historial', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  mockGetPlanHistory.mockResolvedValue([{
+    createdAt: '2026-09-01',
+    supersededAt: '2026-10-01',
+    mealCount: 2,
+    meals: [
+      { name: 'Desayuno', portions: [{ foodGroup: 'PROTEINS', portions: 1 }] },
+      { name: 'Almuerzo', portions: [{ foodGroup: 'GRAINS', portions: 2 }] },
+    ],
+  }])
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('2 comidas'))
+  fireEvent.click(screen.getByText('2 comidas'))
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  expect(screen.getByText('Desayuno')).toBeInTheDocument()
+  expect(screen.getByText('Almuerzo')).toBeInTheDocument()
+})
+
+test('cierra el modal al hacer click en el overlay', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  mockGetPlanHistory.mockResolvedValue([{
+    createdAt: '2026-09-01',
+    supersededAt: '2026-10-01',
+    mealCount: 1,
+    meals: [{ name: 'Cena', portions: [] }],
+  }])
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('1 comidas'))
+  fireEvent.click(screen.getByText('1 comidas'))
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('dialog'))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})

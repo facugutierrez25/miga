@@ -32,8 +32,14 @@ class PlanService {
         validatePortions(dto);
         Long userId = userService.findUserIdByEmail(email);
 
+        // Si el plan vigente no cambió, devolver sin tocar la base
+        var existing = plansRepository.findByUserIdAndCurrentTrue(userId);
+        if (existing.isPresent() && !planChanged(existing.get(), dto)) {
+            return toDto(existing.get());
+        }
+
         // Archivar plan vigente si existe
-        plansRepository.findByUserIdAndCurrentTrue(userId).ifPresent(old -> {
+        existing.ifPresent(old -> {
             old.setCurrent(false);
             old.setSupersededAt(OffsetDateTime.now());
             plansRepository.save(old);
@@ -43,23 +49,7 @@ class PlanService {
         Plan plan = new Plan();
         plan.setUserId(userId);
 
-        for (MealDto mealDto : dto.meals()) {
-            Meal meal = new Meal();
-            meal.setPlan(plan);
-            meal.setName(mealDto.name());
-            meal.setSuggestedTime(mealDto.suggestedTime());
-            meal.setDisplayOrder(mealDto.displayOrder());
-
-            for (MealPortionDto portionDto : mealDto.portions()) {
-                MealPortion portion = new MealPortion();
-                portion.setMeal(meal);
-                portion.setFoodGroup(portionDto.foodGroup());
-                portion.setPortions(portionDto.portions());
-                meal.getPortions().add(portion);
-            }
-            plan.getMeals().add(meal);
-        }
-
+        buildMeals(plan, dto);
         return toDto(plansRepository.save(plan));
     }
 
@@ -81,6 +71,56 @@ class PlanService {
                 )).toList()
             ))
             .toList();
+    }
+
+    private void buildMeals(Plan plan, PlanDto dto) {
+        for (MealDto mealDto : dto.meals()) {
+            Meal meal = new Meal();
+            meal.setPlan(plan);
+            meal.setName(mealDto.name());
+            meal.setSuggestedTime(mealDto.suggestedTime());
+            meal.setDisplayOrder(mealDto.displayOrder());
+            for (MealPortionDto portionDto : mealDto.portions()) {
+                MealPortion portion = new MealPortion();
+                portion.setMeal(meal);
+                portion.setFoodGroup(portionDto.foodGroup());
+                portion.setPortions(portionDto.portions());
+                meal.getPortions().add(portion);
+            }
+            plan.getMeals().add(meal);
+        }
+    }
+
+    private boolean planChanged(Plan current, PlanDto dto) {
+        List<Meal> currentMeals = current.getMeals().stream()
+                .sorted(java.util.Comparator.comparingInt(Meal::getDisplayOrder))
+                .toList();
+        List<MealDto> newMeals = dto.meals().stream()
+                .sorted(java.util.Comparator.comparingInt(MealDto::displayOrder))
+                .toList();
+
+        if (currentMeals.size() != newMeals.size()) return true;
+
+        for (int i = 0; i < currentMeals.size(); i++) {
+            Meal cm = currentMeals.get(i);
+            MealDto nm = newMeals.get(i);
+            if (!cm.getName().equals(nm.name())) return true;
+            if (!java.util.Objects.equals(cm.getSuggestedTime(), nm.suggestedTime())) return true;
+
+            var currentPortions = cm.getPortions().stream()
+                    .sorted(java.util.Comparator.comparing(p -> p.getFoodGroup().name()))
+                    .toList();
+            var newPortions = nm.portions().stream()
+                    .sorted(java.util.Comparator.comparing(p -> p.foodGroup().name()))
+                    .toList();
+
+            if (currentPortions.size() != newPortions.size()) return true;
+            for (int j = 0; j < currentPortions.size(); j++) {
+                if (currentPortions.get(j).getFoodGroup() != newPortions.get(j).foodGroup()) return true;
+                if (currentPortions.get(j).getPortions().compareTo(newPortions.get(j).portions()) != 0) return true;
+            }
+        }
+        return false;
     }
 
     private void validatePortions(PlanDto dto) {

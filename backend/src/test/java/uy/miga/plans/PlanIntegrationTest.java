@@ -245,6 +245,45 @@ class PlanIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void saveMyPlan_withSameContent_doesNotCreateHistoryEntry() throws Exception {
+        String token = registerAndLogin("sincambios@miga.uy");
+
+        String plan = """
+                {
+                  "meals": [{
+                    "name": "Desayuno",
+                    "displayOrder": 1,
+                    "portions": [
+                      { "foodGroup": "PROTEINS",   "portions": 1.0 },
+                      { "foodGroup": "GRAINS",     "portions": 2.0 },
+                      { "foodGroup": "FRUITS",     "portions": 1.0 },
+                      { "foodGroup": "DAIRY",      "portions": 1.0 },
+                      { "foodGroup": "FATS",       "portions": 0.5 },
+                      { "foodGroup": "VEGETABLES", "portions": 0.0 }
+                    ]
+                  }]
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(plan))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(plan))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/my-plan/historial")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
     private String registerAndLogin(String email) throws Exception {
         try {
             mockMvc.perform(post("/api/v1/users")
