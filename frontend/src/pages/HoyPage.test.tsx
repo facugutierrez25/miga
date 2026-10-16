@@ -37,7 +37,7 @@ test('muestra link a mi plan cuando no hay plan cargado', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   renderHoy()
   await waitFor(() => expect(screen.getByText('Cargar mi plan')).toBeInTheDocument())
-  expect(screen.getByRole('link', { name: 'Cargar mi plan' })).toHaveAttribute('href', '/mi-plan')
+  expect(screen.getByRole('link', { name: 'Cargar mi plan' })).toHaveAttribute('href', '/onboarding')
 })
 
 test('muestra las comidas del plan ordenadas', async () => {

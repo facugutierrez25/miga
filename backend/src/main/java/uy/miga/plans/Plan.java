@@ -13,8 +13,14 @@ class Plan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Column(name = "is_current", nullable = false)
+    private boolean current = true;
+
+    @Column(name = "superseded_at")
+    private OffsetDateTime supersededAt;
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")
@@ -41,8 +47,12 @@ class Plan {
 
     Long getId() { return id; }
     Long getUserId() { return userId; }
+    boolean isCurrent() { return current; }
+    OffsetDateTime getSupersededAt() { return supersededAt; }
+    OffsetDateTime getCreatedAt() { return createdAt; }
     List<Meal> getMeals() { return meals; }
 
     void setUserId(Long userId) { this.userId = userId; }
-    void setMeals(List<Meal> meals) { this.meals = meals; }
+    void setCurrent(boolean current) { this.current = current; }
+    void setSupersededAt(OffsetDateTime supersededAt) { this.supersededAt = supersededAt; }
 }

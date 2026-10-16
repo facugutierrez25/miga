@@ -27,6 +27,26 @@ export async function getMyPlan(token: string): Promise<PlanDto> {
   return res.json()
 }
 
+export interface MealSummaryDto {
+  name: string
+  portions: MealPortionDto[]
+}
+
+export interface PlanSummaryDto {
+  createdAt: string     // YYYY-MM-DD
+  supersededAt: string  // YYYY-MM-DD
+  mealCount: number
+  meals: MealSummaryDto[]
+}
+
+export async function getPlanHistory(token: string): Promise<PlanSummaryDto[]> {
+  const res = await fetch(`${API_URL}/api/v1/my-plan/historial`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error('Error al cargar el historial.')
+  return res.json()
+}
+
 export async function saveMyPlan(token: string, plan: PlanDto): Promise<PlanDto> {
   const res = await fetch(`${API_URL}/api/v1/my-plan`, {
     method: 'PUT',

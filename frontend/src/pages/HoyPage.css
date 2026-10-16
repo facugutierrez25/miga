@@ -86,6 +86,17 @@
   text-decoration: none;
 }
 
+.btn-cargar-plan-manual {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Tarjeta de comida */
 
 .comida-hoy {

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
-import { getMyPlan, saveMyPlan, type FoodGroup, type PlanDto } from '../api/plans'
+import { getMyPlan, getPlanHistory, saveMyPlan, type FoodGroup, type PlanDto, type PlanSummaryDto } from '../api/plans'
 import './MiPlanPage.css'
 
 const GRUPOS: { key: FoodGroup; label: string; dot: string }[] = [
@@ -46,10 +47,63 @@ function localAPlan(comidas: ComidaLocal[]): PlanDto {
   }
 }
 
+function formatFecha(iso: string) {
+  return new Date(iso).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: () => void }) {
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalle del plan" onClick={onClose}>
+      <div className="modal-card" onClick={e => e.stopPropagation()}>
+        <div className="modal-card__header">
+          <div>
+            <p className="modal-card__eyebrow">Plan anterior</p>
+            <p className="modal-card__rango">
+              <span>Desde {formatFecha(plan.createdAt)}</span>
+              <span className="modal-card__rango-sep">→</span>
+              <span>Hasta {formatFecha(plan.supersededAt)}</span>
+            </p>
+          </div>
+          <button className="modal-card__close" onClick={onClose} aria-label="Cerrar">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="modal-card__meals">
+          {plan.meals.map((meal, i) => (
+            <div key={i} className="modal-meal">
+              <p className="modal-meal__nombre">{meal.name}</p>
+              <div className="modal-meal__chips">
+                {meal.portions.map(p => {
+                  const g = GRUPOS.find(gr => gr.key === p.foodGroup)
+                  if (!g) return null
+                  return (
+                    <span key={p.foodGroup} className="porcion-chip">
+                      <span className="porcion-chip__dot" style={{ background: g.dot }} />
+                      {g.label} {p.portions}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MiPlanPage() {
   const { token } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const desdeWizard = !!(location.state as { meals?: unknown } | null)?.meals
   const [comidas, setComidas] = useState<ComidaLocal[]>([])
   const [cargando, setCargando] = useState(true)
+  const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
+  const [planDetalle, setPlanDetalle] = useState<PlanSummaryDto | null>(null)
   const [confirmando, setConfirmando] = useState(false)
   const [confirmado, setConfirmado] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,8 +112,19 @@ export default function MiPlanPage() {
     if (!token) return
     getMyPlan(token)
       .then(dto => setComidas(planALocal(dto)))
-      .catch(err => { if (err.message !== 'sin-plan') console.error(err) })
+      .catch(err => {
+        if (err.message === 'sin-plan') {
+          const draft = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
+          if (draft) {
+            setComidas(draft.map(m => ({ nombre: m.name, porciones: porcionesVacias(), minimizada: false })))
+          }
+        } else {
+          console.error(err)
+        }
+      })
       .finally(() => setCargando(false))
+
+    getPlanHistory(token).then(setHistorial).catch(() => {})
   }, [token])
 
   function actualizarNombre(i: number, nombre: string) {
@@ -98,8 +163,9 @@ export default function MiPlanPage() {
     try {
       const dto = await saveMyPlan(token, localAPlan(comidas))
       setComidas(planALocal(dto))
+      if (token) getPlanHistory(token).then(setHistorial).catch(() => {})
       setConfirmado(true)
-      setTimeout(() => setConfirmado(false), 2500)
+      if (desdeWizard) setTimeout(() => navigate('/hoy', { replace: true }), 1800)
     } catch (err) {
       console.error('confirmarPlan falló:', err)
       setError('No se pudo guardar el plan. Intentá de nuevo.')
@@ -217,6 +283,27 @@ export default function MiPlanPage() {
             </button>
 
             {confirmado && <p className="confirmado-msg">¡Plan guardado!</p>}
+
+            {historial.length > 0 && (
+              <div className="plan-historial">
+                <p className="plan-historial__titulo">Planes anteriores</p>
+                {historial.map((h, i) => (
+                  <button key={i} className="plan-historial__item" onClick={() => setPlanDetalle(h)}>
+                    <span className="plan-historial__fecha">
+                      {new Date(h.supersededAt).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                    <span className="plan-historial__detalle">{h.mealCount} comidas</span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {planDetalle && (
+              <PlanDetalleModal plan={planDetalle} onClose={() => setPlanDetalle(null)} />
+            )}
           </>
         )}
       </div>

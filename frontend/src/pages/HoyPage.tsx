@@ -61,7 +61,8 @@ export default function HoyPage() {
         ) : sinPlan ? (
           <div className="hoy-sin-plan">
             <p className="hoy-sin-plan__texto">Todavía no cargaste tu plan.</p>
-            <Link to="/mi-plan" className="btn-cargar-plan">Cargar mi plan</Link>
+            <Link to="/onboarding" className="btn-cargar-plan">Cargar mi plan</Link>
+            <Link to="/mi-plan" className="btn-cargar-plan-manual">Cargar yo solo</Link>
           </div>
         ) : (
           plan?.meals
