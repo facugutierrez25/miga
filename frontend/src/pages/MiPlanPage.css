@@ -4,32 +4,30 @@
 }
 
 .mi-plan-header {
-  background: var(--primary);
-  border-radius: 0 0 var(--radius-header) var(--radius-header);
-  padding: 24px 20px 32px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  padding: 20px 16px 0;
 }
 
-.mi-plan-header .brand {
-  color: var(--on-primary);
+.mi-plan-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .mi-plan-header__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 34px;
-  color: var(--on-primary);
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-size: clamp(24px, 7vw, 36px);
+  color: var(--ink);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 
 .mi-plan-body {
-  padding: 24px 16px 40px;
+  padding: 14px 14px 32px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   max-width: 480px;
   margin: 0 auto;
 }
@@ -45,60 +43,100 @@
 
 .comida-card {
   background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: comida-enter 0.25s ease forwards;
+}
+
+.comida-card:nth-child(1) { animation-delay: 30ms;  }
+.comida-card:nth-child(2) { animation-delay: 80ms;  }
+.comida-card:nth-child(3) { animation-delay: 130ms; }
+.comida-card:nth-child(4) { animation-delay: 180ms; }
+.comida-card:nth-child(5) { animation-delay: 230ms; }
+.comida-card:nth-child(6) { animation-delay: 280ms; }
+.comida-card:nth-child(7) { animation-delay: 330ms; }
+
+@keyframes comida-enter {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comida-card { animation: none; opacity: 1; transform: none; }
 }
 
 /* Tarjeta minimizada */
 
 .comida-card--min {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas:
+    "nombre edit del"
+    "chips  chips chips";
+  column-gap: 8px;
+  row-gap: 8px;
+  padding: 11px 12px 12px 14px;
   align-items: center;
-  gap: 10px;
-  padding: 12px 12px 12px 16px;
-  min-height: 60px;
 }
 
 .comida-min__nombre {
+  grid-area: nombre;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--ink);
   letter-spacing: -0.02em;
   white-space: nowrap;
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .comida-min__chips {
-  flex: 1;
+  grid-area: chips;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  overflow: hidden;
 }
 
 .porcion-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--muted);
-  background: var(--surface-2);
-  border-radius: 99px;
-  padding: 2px 8px;
   white-space: nowrap;
 }
 
-.porcion-chip__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.porcion-chip__num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
+/* color-mix: adapts to light and dark without extra tokens */
+.porcion-chip--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, var(--surface)); color: var(--muted); }
+.porcion-chip--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, var(--surface)); color: var(--muted); }
+.porcion-chip--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, var(--surface)); color: var(--muted); }
+.porcion-chip--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, var(--surface)); color: var(--muted); }
+.porcion-chip--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, var(--surface)); color: var(--muted); }
+.porcion-chip--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, var(--surface)); color: var(--muted); }
+
+.porcion-chip--PROTEINS   .porcion-chip__num { color: var(--g-prot); }
+.porcion-chip--GRAINS     .porcion-chip__num { color: var(--g-cer);  }
+.porcion-chip--FRUITS     .porcion-chip__num { color: var(--g-frut); }
+.porcion-chip--DAIRY      .porcion-chip__num { color: var(--g-lac);  }
+.porcion-chip--FATS       .porcion-chip__num { color: var(--g-gras); }
+.porcion-chip--VEGETABLES .porcion-chip__num { color: var(--g-verd); }
+
 .btn-editar {
-  width: 44px;
-  height: 44px;
+  grid-area: edit;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -111,8 +149,9 @@
 }
 
 .btn-eliminar-min {
-  width: 44px;
-  height: 44px;
+  grid-area: del;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   border: none;
   background: transparent;
@@ -479,9 +518,6 @@
 
 @media (min-width: 640px) {
   .mi-plan-header {
-    padding: 16px 20px 24px;
-  }
-  .mi-plan-header__title {
-    font-size: 24px;
+    padding: 28px 24px 0;
   }
 }

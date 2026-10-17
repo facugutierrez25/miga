@@ -44,31 +44,40 @@ export default function HoyPage() {
   }, [token])
 
   const nombre = email?.split('@')[0] ?? ''
+  const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
 
   return (
     <div className="hoy-page">
+      {/* Header visible solo en mobile — AppLayout lo oculta en desktop */}
       <header className="hoy-header">
-        <div className="hoy-header__top">
-          <Brand size={24} />
+        <div className="hoy-header__meta">
+          <Brand size={20} />
           <p className="hoy-header__fecha">{fechaHoy()}</p>
         </div>
         <h1 className="hoy-header__titulo">{saludo()}, {nombre}.</h1>
       </header>
 
       <div className="hoy-body">
+        {/* Greeting visible solo en desktop — complementa el app-header */}
+        <div className="hoy-desktop-saludo">
+          <p className="hoy-desktop-saludo__fecha">{fechaHoy()}</p>
+          <h1 className="hoy-desktop-saludo__titulo">{saludo()}, {nombre}.</h1>
+        </div>
+
         {cargando ? (
           <p className="hoy-loading">Cargando tu día…</p>
         ) : sinPlan ? (
           <div className="hoy-sin-plan">
-            <p className="hoy-sin-plan__texto">Todavía no cargaste tu plan.</p>
+            <p className="hoy-sin-plan__titulo">Todavía no tenés un plan</p>
+            <p className="hoy-sin-plan__texto">
+              Cargá el plan que te dio tu nutricionista y organizá tu día.
+            </p>
             <Link to="/onboarding" className="btn-cargar-plan">Cargar mi plan</Link>
             <Link to="/mi-plan" className="btn-cargar-plan-manual">Cargar yo solo</Link>
           </div>
         ) : (
-          plan?.meals
-            .slice()
-            .sort((a, b) => a.displayOrder - b.displayOrder)
-            .map((meal, i) => {
+          <div className="hoy-cards">
+            {meals.map((meal, i) => {
               const noVacias = meal.portions.filter(p => p.portions > 0)
               return (
                 <div key={i} className="comida-hoy">
@@ -82,21 +91,18 @@ export default function HoyPage() {
                   </div>
                   {noVacias.length > 0 && (
                     <div className="comida-hoy__grupos">
-                      {noVacias.map(p => {
-                        const g = GRUPOS[p.foodGroup]
-                        return (
-                          <span key={p.foodGroup} className="grupo-chip">
-                            <span className="grupo-chip__dot" style={{ background: g.dot }} />
-                            <span className="grupo-chip__label">{g.label}</span>
-                            <span className="grupo-chip__valor">{p.portions}</span>
-                          </span>
-                        )
-                      })}
+                      {noVacias.map(p => (
+                        <span key={p.foodGroup} className={`grupo-badge grupo-badge--${p.foodGroup}`}>
+                          <span className="grupo-badge__numero">{p.portions}</span>
+                          <span className="grupo-badge__label">{GRUPOS[p.foodGroup].label}</span>
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
               )
-            })
+            })}
+          </div>
         )}
       </div>
     </div>
