@@ -105,9 +105,8 @@ function fmt(n: number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
-const HOY = toISO(new Date())
-
 export default function HoyPage() {
+  const HOY = toISO(new Date())
   const { token, email } = useAuth()
   const [fecha, setFecha] = useState(HOY)
   const [plan, setPlan] = useState<PlanDto | null>(null)
