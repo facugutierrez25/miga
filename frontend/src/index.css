@@ -95,7 +95,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(420px 420px at 0% 0%, var(--ambient-1), transparent 70%),
+    radial-gradient(480px 480px at 5% 0%,   var(--ambient-1), transparent 70%),
+    radial-gradient(400px 320px at 95% 0%,  var(--ambient-2), transparent 70%),
     radial-gradient(380px 380px at 100% 45%, var(--ambient-2), transparent 70%),
     radial-gradient(460px 400px at 10% 100%, var(--ambient-3), transparent 70%);
 }
