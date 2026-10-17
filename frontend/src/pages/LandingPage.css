@@ -591,9 +591,27 @@
   justify-content: space-between;
 }
 
+.land-footer__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
 .land-footer__copy {
   font-size: 13px;
   color: var(--muted);
+}
+
+.land-footer__priv {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.land-footer__priv:hover {
+  color: var(--ink);
 }
 
 /* ── Desktop ── */
