@@ -325,6 +325,7 @@ export default function HoyPage() {
                       <button
                         className={`btn-ya-lo-comi${hecha ? ' btn-ya-lo-comi--hecha' : ''}`}
                         aria-pressed={hecha}
+                        aria-label={hecha ? `Desmarcar ${meal.name}` : `Marcar ${meal.name} como comida`}
                         onClick={() => toggle(meal.id!)}
                       >
                         {hecha ? '✓ Hecho' : 'Ya lo comí'}
