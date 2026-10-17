@@ -205,26 +205,20 @@
 }
 
 .grupo-badge__label {
+  font-family: var(--font-display);
   font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
+  font-weight: 800;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 /* color-mix sobre --surface: se adapta a light y dark sin tokens extra */
-.grupo-badge--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, var(--surface)); }
-.grupo-badge--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, var(--surface)); }
-.grupo-badge--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, var(--surface)); }
-.grupo-badge--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, var(--surface)); }
-.grupo-badge--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, var(--surface)); }
-.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, var(--surface)); }
-
-.grupo-badge--PROTEINS   .grupo-badge__numero { color: var(--g-prot); }
-.grupo-badge--GRAINS     .grupo-badge__numero { color: var(--g-cer);  }
-.grupo-badge--FRUITS     .grupo-badge__numero { color: var(--g-frut); }
-.grupo-badge--DAIRY      .grupo-badge__numero { color: var(--g-lac);  }
-.grupo-badge--FATS       .grupo-badge__numero { color: var(--g-gras); }
-.grupo-badge--VEGETABLES .grupo-badge__numero { color: var(--g-verd); }
+.grupo-badge--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, var(--surface)); color: var(--g-prot); }
+.grupo-badge--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, var(--surface)); color: var(--g-cer);  }
+.grupo-badge--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, var(--surface)); color: var(--g-frut); }
+.grupo-badge--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, var(--surface)); color: var(--g-lac);  }
+.grupo-badge--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, var(--surface)); color: var(--g-gras); }
+.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, var(--surface)); color: var(--g-verd); }
 
 /* ── Desktop ── */
 
