@@ -20,6 +20,7 @@
 
 /* Cápsula de vidrio con la fecha */
 .hoy-fecha-nav {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0;
@@ -35,8 +36,8 @@
 }
 
 .hoy-fecha-nav__btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -132,7 +133,7 @@
   color: var(--muted);
   font-size: 15px;
   line-height: 1.5;
-  max-width: 260px;
+  max-width: min(260px, 100%);
 }
 
 .btn-cargar-plan {
@@ -163,7 +164,7 @@
   font-weight: 500;
   color: var(--muted);
   text-decoration: none;
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
 }
@@ -422,7 +423,7 @@
 
 .hoy-resumen__grupos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
   gap: 6px;
 }
 
@@ -471,6 +472,8 @@
 /* ── Tarjeta "Ahora" ── */
 
 .comida-hoy--ahora {
+  opacity: 1;
+  transform: translateY(0);
   background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 18%, transparent), var(--glass-bg));
   box-shadow: var(--glass-shadow-ahora);
   animation: card-enter 0.3s ease forwards, ahora-glow 3s ease-in-out 0.5s infinite;
@@ -483,6 +486,7 @@
 
 /* ── Tarjeta pasada (hora ya pasó, sin comer) ── */
 
+/* solo se aplica cuando !hecha — ver HoyPage.tsx */
 .comida-hoy--pasada {
   opacity: 0.5;
 }
@@ -507,8 +511,6 @@
 }
 
 .btn-toggle-comida {
-  width: 32px;
-  height: 32px;
   min-width: 44px;
   min-height: 44px;
   display: flex;
