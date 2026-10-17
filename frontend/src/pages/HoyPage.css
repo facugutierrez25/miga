@@ -151,11 +151,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .comida-hoy {
+  .comida-hoy,
+  .comida-hoy--ahora {
     animation: none;
     opacity: 1;
     transform: none;
   }
+  .comida-hoy--pasada { opacity: 0.5; }
+  .comida-hoy--hecha  { opacity: 0.7; }
+  .comida-hoy__live-dot { animation: none; }
 }
 
 .comida-hoy__encabezado {
@@ -173,11 +177,40 @@
   letter-spacing: -0.02em;
 }
 
+.comida-hoy__hora-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .comida-hoy__hora {
   font-size: 12px;
   font-weight: 500;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.comida-hoy__hora-wrap--ahora .comida-hoy__hora {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+}
+
+/* Punto vivo pulsante */
+.comida-hoy__live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.65); }
 }
 
 /* ── Badges de grupos ── */
@@ -265,6 +298,10 @@
 
   .comida-hoy__hora {
     font-size: 13px;
+  }
+
+  .comida-hoy__hora-wrap--ahora .comida-hoy__hora {
+    font-size: 17px;
   }
 
   .comida-hoy__grupos {
@@ -388,12 +425,25 @@
 .comida-hoy--ahora {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  animation: card-enter 0.3s ease forwards, ahora-glow 3s ease-in-out 0.5s infinite;
+}
+
+@keyframes ahora-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent); }
+  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent); }
+}
+
+/* ── Tarjeta pasada (hora ya pasó, sin comer) ── */
+
+.comida-hoy--pasada {
+  opacity: 0.5;
 }
 
 /* ── Tarjeta hecha ── */
 
 .comida-hoy--hecha {
   opacity: 0.7;
+  transition: opacity 0.3s ease;
 }
 
 .comida-hoy--hecha .comida-hoy__nombre {

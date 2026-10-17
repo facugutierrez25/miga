@@ -30,6 +30,13 @@ function fechaHoy(): string {
   })
 }
 
+function esPasada(suggestedTime?: string): boolean {
+  if (!suggestedTime) return false
+  const [h, m] = suggestedTime.split(':').map(Number)
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  return h * 60 + m < nowMin - 90
+}
+
 function findIndexAhora(meals: MealDto[], comidas: Set<number>): number {
   if (meals.length === 0) return -1
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
@@ -189,6 +196,7 @@ export default function HoyPage() {
                 const noVacias = meal.portions.filter(p => p.portions > 0)
                 const esAhora = i === ahoraIdx
                 const hecha = meal.id !== undefined && comidas.has(meal.id)
+                const pasada = !hecha && esPasada(meal.suggestedTime)
 
                 return (
                   <div
@@ -197,15 +205,19 @@ export default function HoyPage() {
                       'comida-hoy',
                       esAhora && !hecha ? 'comida-hoy--ahora' : '',
                       hecha ? 'comida-hoy--hecha' : '',
+                      pasada ? 'comida-hoy--pasada' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <div className="comida-hoy__encabezado">
                       <span className="comida-hoy__nombre">{meal.name}</span>
                       <div className="comida-hoy__enc-right">
                         {meal.suggestedTime && (
-                          <span className="comida-hoy__hora">
-                            {meal.suggestedTime.slice(0, 5)}
-                          </span>
+                          <div className={`comida-hoy__hora-wrap${esAhora && !hecha ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
+                            {esAhora && !hecha && <span className="comida-hoy__live-dot" aria-hidden="true" />}
+                            <span className="comida-hoy__hora">
+                              {meal.suggestedTime.slice(0, 5)}
+                            </span>
+                          </div>
                         )}
                         {meal.id !== undefined && !esAhora && (
                           <button
