@@ -1,6 +1,6 @@
 .hoy-page {
   min-height: 100%;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* ── Header mobile ── */
@@ -18,16 +18,25 @@
 
 /* ── Navegación por fecha ── */
 
+/* Cápsula de vidrio con la fecha */
 .hoy-fecha-nav {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0;
-  margin-bottom: 4px;
+  height: 44px;
+  padding: 0 4px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .hoy-fecha-nav__btn {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,7 +47,7 @@
   padding: 0;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-chip);
 }
 
 .hoy-fecha-nav__btn:disabled {
@@ -48,7 +57,7 @@
 }
 
 .hoy-fecha-nav__btn:not(:disabled):hover {
-  background: var(--surface-2);
+  background: var(--glass-bg-strong);
 }
 
 .hoy-fecha-nav__label {
@@ -97,8 +106,6 @@
 /* ── Estado sin plan ── */
 
 .hoy-sin-plan {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
   padding: 36px 24px;
   text-align: center;
@@ -106,6 +113,11 @@
   flex-direction: column;
   gap: 14px;
   align-items: center;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .hoy-sin-plan__titulo {
@@ -129,18 +141,20 @@
   justify-content: center;
   min-height: 48px;
   padding: 0 28px;
-  border-radius: var(--radius-control);
-  background: var(--primary);
   color: var(--on-primary);
   font-family: var(--font-body);
   font-size: 15px;
   font-weight: 700;
   text-decoration: none;
   transition: background 0.15s;
+  background: var(--btn-primary-bg);
+  border: 1px solid var(--btn-primary-border);
+  box-shadow: var(--btn-primary-shadow);
+  border-radius: var(--radius-pill);
 }
 
 .btn-cargar-plan:hover {
-  background: color-mix(in srgb, var(--primary) 88%, var(--ink));
+  filter: brightness(1.06);
 }
 
 .btn-cargar-plan-manual {
@@ -165,13 +179,16 @@
 /* ── Tarjeta de comida ── */
 
 .comida-hoy {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
   padding: 14px 14px 12px;
   opacity: 0;
   transform: translateY(10px);
   animation: card-enter 0.3s ease forwards;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .comida-hoy:nth-child(1) { animation-delay: 40ms;  }
@@ -248,7 +265,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-chip);
   padding: 5px 9px;
 }
 
@@ -269,12 +286,12 @@
 }
 
 /* color-mix sobre --surface: se adapta a light y dark sin tokens extra */
-.grupo-badge--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, var(--surface)); color: var(--g-prot); }
-.grupo-badge--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, var(--surface)); color: var(--g-cer);  }
-.grupo-badge--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, var(--surface)); color: var(--g-frut); }
-.grupo-badge--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, var(--surface)); color: var(--g-lac);  }
-.grupo-badge--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, var(--surface)); color: var(--g-gras); }
-.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, var(--surface)); color: var(--g-verd); }
+.grupo-badge--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, transparent); color: var(--g-prot); }
+.grupo-badge--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, transparent); color: var(--g-cer);  }
+.grupo-badge--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, transparent); color: var(--g-frut); }
+.grupo-badge--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, transparent); color: var(--g-lac);  }
+.grupo-badge--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, transparent); color: var(--g-gras); }
+.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); color: var(--g-verd); }
 
 /* ── Desktop ── */
 
@@ -285,7 +302,7 @@
   }
 
   .hoy-desktop-saludo .hoy-fecha-nav {
-    margin-left: -10px;
+    margin-left: 0;
     margin-bottom: 6px;
   }
 
@@ -360,13 +377,16 @@
 /* ── Resumen de porciones ── */
 
 .hoy-resumen {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .hoy-resumen__porciones {
@@ -401,60 +421,64 @@
 }
 
 .hoy-resumen__grupos {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
   gap: 6px;
 }
 
-.hoy-grupo-prog {
+/* Celular: anillos por grupo. Escritorio: barras (como antes). */
+.hoy-grupo-prog { display: none; }
+
+.hoy-anillo {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
-.hoy-grupo-prog__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.hoy-anillo__svg {
+  width: 40px;
+  height: 40px;
+  transform: rotate(-90deg);
 }
 
-.hoy-grupo-prog__bar {
-  flex: 1;
-  height: 4px;
-  background: var(--line);
-  border-radius: 99px;
-  overflow: hidden;
+.hoy-anillo__pista {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 9%, transparent);
+  stroke-width: 5;
 }
 
-.hoy-grupo-prog__fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  opacity: 0.75;
+.hoy-anillo__valor {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.hoy-grupo-prog__frac {
+.hoy-anillo__frac {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 11px;
   color: var(--muted);
   letter-spacing: -0.02em;
-  min-width: 32px;
-  text-align: right;
 }
+
+
+
+
+
 
 /* ── Tarjeta "Ahora" ── */
 
 .comida-hoy--ahora {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 18%, transparent), var(--glass-bg));
+  box-shadow: var(--glass-shadow-ahora);
   animation: card-enter 0.3s ease forwards, ahora-glow 3s ease-in-out 0.5s infinite;
 }
 
 @keyframes ahora-glow {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent); }
-  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent); }
+  0%, 100% { box-shadow: var(--glass-shadow-ahora), 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent); }
+  50%       { box-shadow: var(--glass-shadow-ahora), 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent); }
 }
 
 /* ── Tarjeta pasada (hora ya pasó, sin comer) ── */
@@ -525,27 +549,100 @@
   width: 100%;
   min-height: 48px;
   margin-top: 14px;
-  border-radius: var(--radius-control);
-  border: none;
-  background: var(--primary);
   color: var(--on-primary);
   font-family: var(--font-body);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
+  background: var(--btn-primary-bg);
+  border: 1px solid var(--btn-primary-border);
+  box-shadow: var(--btn-primary-shadow);
+  border-radius: var(--radius-pill);
 }
 
 .btn-ya-lo-comi:hover {
-  background: color-mix(in srgb, var(--primary) 88%, var(--ink));
+  filter: brightness(1.06);
 }
 
 .btn-ya-lo-comi--hecha {
-  background: var(--primary-soft);
   color: var(--primary);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-pill);
 }
 
 .btn-ya-lo-comi--hecha:hover {
   background: var(--primary-soft);
   opacity: 0.85;
+}
+
+/* ── Escritorio: se mantiene el estilo anterior ── */
+@media (min-width: 640px) {
+  .hoy-desktop-saludo .hoy-fecha-nav {
+    height: auto;
+    padding: 0;
+    margin-left: -10px;
+    background: none;
+    border: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .hoy-fecha-nav__btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .comida-hoy--ahora {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  }
+
+  .hoy-resumen__grupos {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .hoy-anillo { display: none; }
+
+  .hoy-grupo-prog {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hoy-grupo-prog__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .hoy-grupo-prog__bar {
+    flex: 1;
+    height: 4px;
+    background: var(--line);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .hoy-grupo-prog__fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 0.75;
+  }
+  .hoy-grupo-prog__frac {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: -0.02em;
+    min-width: 32px;
+    text-align: right;
+  }
+
 }

@@ -1,6 +1,6 @@
 .priv-page {
   min-height: 100dvh;
-  background: var(--bg);
+  background: transparent;
   color: var(--ink);
   font-family: var(--font-body);
   display: flex;

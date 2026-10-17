@@ -1,6 +1,6 @@
 .perfil-page {
   min-height: 100%;
-  background: var(--bg);
+  background: transparent;
 }
 
 .perfil-header {
@@ -30,10 +30,13 @@
 }
 
 .perfil-card {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
   padding: 16px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .perfil-card--link {
@@ -94,9 +97,9 @@
 }
 
 .tema-opcion--activa {
-  background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 4px rgba(16, 38, 36, 0.1);
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow);
 }
 
 .sr-only {
@@ -115,9 +118,6 @@
 
 .btn-cerrar-sesion {
   min-height: 52px;
-  border-radius: var(--radius-control);
-  border: none;
-  background: var(--primary-soft);
   color: var(--primary);
   font-family: var(--font-body);
   font-size: 15px;
@@ -125,6 +125,12 @@
   cursor: pointer;
   width: 100%;
   margin-top: 8px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-pill);
 }
 
 .btn-cerrar-sesion:hover {
