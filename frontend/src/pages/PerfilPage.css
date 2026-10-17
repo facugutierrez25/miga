@@ -31,6 +31,7 @@
 
 .perfil-card {
   background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
   padding: 16px;
 }
@@ -39,10 +40,11 @@
   text-decoration: none;
   display: block;
   color: inherit;
+  transition: border-color 0.15s;
 }
 
 .perfil-card--link:hover {
-  box-shadow: 0 6px 24px rgba(16, 38, 36, 0.12);
+  border-color: var(--primary);
 }
 
 .perfil-card__row {

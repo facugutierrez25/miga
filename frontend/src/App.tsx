@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/AuthContext'
 import AppLayout from './components/AppLayout'
+import LandingPage from './pages/LandingPage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import HoyPage from './pages/HoyPage'
@@ -13,7 +14,7 @@ import OnboardingPage from './pages/OnboardingPage'
 
 function AuthLayout() {
   const { token } = useAuth()
-  if (!token) return <Navigate to="/login" replace />
+  if (!token) return <Navigate to="/" replace />
   return <AppLayout />
 }
 
@@ -22,6 +23,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route element={<AuthLayout />}>
@@ -32,7 +34,7 @@ export default function App() {
             <Route path="/mi-plan" element={<MiPlanPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
           </Route>
-          <Route path="*" element={<Navigate to="/hoy" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
