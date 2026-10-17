@@ -101,7 +101,7 @@ No usar IBM Plex, Inter, Roboto, Arial ni tipografías con serifa. Inputs siempr
 
 **Logo.** La palabra "miga" en minúscula, Bricolage Grotesque 800, `letter-spacing: -0.04em`. El punto de la "i" es un círculo `--accent`: se escribe con "ı" (sin punto) y el círculo encima. Sobre `--primary` va en blanco; sobre fondo claro, en `--primary`.
 
-**Ícono de la app.** Cuadrado `--primary` con radio 24 px, una "m" blanca en Bricolage 800 y un punto `--accent` arriba a la derecha.
+**Ícono de la app.** Cuadrado `--primary` con radio 24 px, una "m" blanca en Bricolage 800 y un punto `--accent` arriba a la derecha. La "m" y el punto se centran juntos como un solo bloque. Archivos en `frontend/public/`: `apple-touch-icon.png` (180 px, iPhone; va cuadrado porque iOS redondea solo), `icon-192.png` e `icon-512.png` (Android, manifest) y `favicon.svg`.
 
 **Encabezado de color.** Bloque `--primary` con radio inferior de 24 px. Arriba: logo a la izquierda y fecha a la derecha (`--on-primary-muted`, 14 px). Abajo: título humano en dos líneas ("Buen día. / Te quedan 3 comidas."). Padding inferior de 56 px para que se le superponga la tarjeta destacada.
 
