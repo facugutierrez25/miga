@@ -18,6 +18,7 @@ type Porciones = Record<FoodGroup, number>
 
 interface ComidaLocal {
   nombre: string
+  hora: string
   porciones: Porciones
   minimizada: boolean
 }
@@ -33,7 +34,8 @@ function planALocal(dto: PlanDto): ComidaLocal[] {
     .map(meal => {
       const porciones = porcionesVacias()
       meal.portions.forEach(p => { porciones[p.foodGroup] = p.portions })
-      return { nombre: meal.name, porciones, minimizada: true }
+      const hora = meal.suggestedTime ? meal.suggestedTime.slice(0, 5) : ''
+      return { nombre: meal.name, hora, porciones, minimizada: true }
     })
 }
 
@@ -41,6 +43,7 @@ function localAPlan(comidas: ComidaLocal[]): PlanDto {
   return {
     meals: comidas.map((c, i) => ({
       name: c.nombre,
+      suggestedTime: c.hora ? c.hora + ':00' : undefined,
       displayOrder: i + 1,
       portions: GRUPOS.map(g => ({ foodGroup: g.key, portions: c.porciones[g.key] })),
     })),
@@ -116,7 +119,7 @@ export default function MiPlanPage() {
         if (err.message === 'sin-plan') {
           const draft = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
           if (draft) {
-            setComidas(draft.map(m => ({ nombre: m.name, porciones: porcionesVacias(), minimizada: false })))
+            setComidas(draft.map(m => ({ nombre: m.name, hora: m.suggestedTime ? m.suggestedTime.slice(0, 5) : '', porciones: porcionesVacias(), minimizada: false })))
           }
         } else {
           console.error(err)
@@ -129,6 +132,10 @@ export default function MiPlanPage() {
 
   function actualizarNombre(i: number, nombre: string) {
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, nombre } : c))
+  }
+
+  function actualizarHora(i: number, hora: string) {
+    setComidas(prev => prev.map((c, j) => j === i ? { ...c, hora } : c))
   }
 
   function actualizarPorcion(i: number, grupo: FoodGroup, delta: number) {
@@ -149,7 +156,7 @@ export default function MiPlanPage() {
   }
 
   function agregarComida() {
-    setComidas(prev => [...prev, { nombre: '', porciones: porcionesVacias(), minimizada: false }])
+    setComidas(prev => [...prev, { nombre: '', hora: '', porciones: porcionesVacias(), minimizada: false }])
   }
 
   function eliminarComida(i: number) {
@@ -192,6 +199,7 @@ export default function MiPlanPage() {
               comida.minimizada ? (
                 <div key={i} className="comida-card comida-card--min">
                   <span className="comida-min__nombre">{comida.nombre || 'Sin nombre'}</span>
+                  {comida.hora && <span className="comida-min__hora">{comida.hora}</span>}
                   <div className="comida-min__chips">
                     {GRUPOS.filter(g => comida.porciones[g.key] > 0).map(g => (
                       <span key={g.key} className={`porcion-chip porcion-chip--${g.key}`}>
@@ -238,6 +246,20 @@ export default function MiPlanPage() {
                         <path d="M7 4h6M3 6h14M8 9v5M12 9v5M5 6l1 11h8l1-11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </button>
+                  </div>
+                  <div className="comida-card__hora-row">
+                    <svg className="comida-card__hora-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M7 4.5V7l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <label htmlFor={`hora-${i}`} className="comida-card__hora-label">Hora sugerida</label>
+                    <input
+                      id={`hora-${i}`}
+                      type="time"
+                      className="comida-card__hora-input"
+                      value={comida.hora}
+                      onChange={e => actualizarHora(i, e.target.value)}
+                    />
                   </div>
                   {GRUPOS.map(g => (
                     <div key={g.key} className="porcion-row">

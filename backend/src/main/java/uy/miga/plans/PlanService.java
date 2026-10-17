@@ -139,7 +139,7 @@ class PlanService {
             var portions = meal.getPortions().stream()
                 .map(p -> new MealPortionDto(p.getFoodGroup(), p.getPortions()))
                 .toList();
-            return new MealDto(meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
+            return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
         }).toList();
         return new PlanDto(meals);
     }
