@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
@@ -227,12 +227,12 @@ export default function HoyPage() {
                     .map(g => {
                       const { total: t, done: d } = porGrupo[g]!
                       const pct = Math.round((d / t) * 100)
+                      const circ = 2 * Math.PI * 15
                       return (
-                        <div key={g} className="hoy-grupo-prog" title={GRUPOS[g].label}>
-                          <div
-                            className="hoy-grupo-prog__dot"
-                            style={{ background: GRUPOS[g].token }}
-                          />
+                        <Fragment key={g}>
+                        {/* Escritorio: barra por grupo */}
+                        <div className="hoy-grupo-prog" title={GRUPOS[g].label}>
+                          <div className="hoy-grupo-prog__dot" style={{ background: GRUPOS[g].token }} />
                           <div className="hoy-grupo-prog__bar">
                             <div
                               className="hoy-grupo-prog__fill"
@@ -241,6 +241,24 @@ export default function HoyPage() {
                           </div>
                           <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
                         </div>
+                        {/* Celular: anillo por grupo */}
+                        <div
+                          className="hoy-anillo"
+                          role="img"
+                          aria-label={`${GRUPOS[g].label}: ${fmt(d)} de ${fmt(t)}`}
+                        >
+                          <svg className="hoy-anillo__svg" viewBox="0 0 40 40" aria-hidden="true">
+                            <circle className="hoy-anillo__pista" cx="20" cy="20" r="15" />
+                            <circle
+                              className="hoy-anillo__valor"
+                              cx="20" cy="20" r="15"
+                              style={{ stroke: GRUPOS[g].token, opacity: pct > 0 ? 1 : 0 }}
+                              strokeDasharray={`${(pct / 100) * circ} ${circ}`}
+                            />
+                          </svg>
+                          <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
+                        </div>
+                        </Fragment>
                       )
                     })}
                 </div>
