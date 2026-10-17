@@ -1,6 +1,6 @@
 .mi-plan-page {
   min-height: 100%;
-  background: var(--bg);
+  background: transparent;
 }
 
 .mi-plan-header {
@@ -42,12 +42,15 @@
 /* Tarjeta base */
 
 .comida-card {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
   opacity: 0;
   transform: translateY(8px);
   animation: comida-enter 0.25s ease forwards;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .comida-card:nth-child(1) { animation-delay: 30ms;  }
@@ -130,12 +133,12 @@
 }
 
 /* color-mix: adapts to light and dark without extra tokens */
-.porcion-chip--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, var(--surface)); color: var(--muted); }
-.porcion-chip--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, var(--surface)); color: var(--muted); }
-.porcion-chip--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, var(--surface)); color: var(--muted); }
-.porcion-chip--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, var(--surface)); color: var(--muted); }
-.porcion-chip--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, var(--surface)); color: var(--muted); }
-.porcion-chip--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, var(--surface)); color: var(--muted); }
+.porcion-chip--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, transparent); color: var(--muted); }
+.porcion-chip--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, transparent); color: var(--muted); }
+.porcion-chip--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, transparent); color: var(--muted); }
+.porcion-chip--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, transparent); color: var(--muted); }
+.porcion-chip--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, transparent); color: var(--muted); }
+.porcion-chip--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); color: var(--muted); }
 
 .porcion-chip--PROTEINS   .porcion-chip__num { color: var(--g-prot); }
 .porcion-chip--GRAINS     .porcion-chip__num { color: var(--g-cer);  }
@@ -341,14 +344,17 @@
   margin-top: 14px;
   width: 100%;
   min-height: 44px;
-  border-radius: var(--radius-control);
-  border: none;
-  background: var(--primary-soft);
   color: var(--primary);
   font-family: var(--font-body);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-pill);
 }
 
 .btn-guardar-comida:disabled {
@@ -383,15 +389,16 @@
 
 .btn-confirmar {
   min-height: 52px;
-  border-radius: var(--radius-control);
-  border: none;
-  background: var(--primary);
   color: var(--on-primary);
   font-family: var(--font-body);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   width: 100%;
+  background: var(--btn-primary-bg);
+  border: 1px solid var(--btn-primary-border);
+  box-shadow: var(--btn-primary-shadow);
+  border-radius: var(--radius-pill);
 }
 
 .btn-confirmar:hover:not(:disabled) {
@@ -470,13 +477,17 @@
 }
 
 .modal-card {
-  background: var(--surface);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   width: 100%;
   max-width: 520px;
   max-height: 80dvh;
   overflow-y: auto;
   padding: 24px 20px 40px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 .modal-card__header {

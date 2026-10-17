@@ -8,7 +8,7 @@ Funciona en modo claro y oscuro.
 
 1. **Poco texto.** Frases cortas y humanas ("Te quedan 3 comidas"), contadores en formato `1/4`.
 2. **El color nunca va solo.** Todo dato con color (grupo de alimentos, estado) lleva también número o texto.
-3. **Cálido, no infantil.** Sin bordes gruesos ni negros, sin degradados, sin emojis, sin tarjetas con borde de color a un costado.
+3. **Cálido, no infantil.** Sin bordes gruesos ni negros, sin emojis, sin tarjetas con borde de color a un costado. Los únicos degradados son los del vidrio en celular (fondo ambiental y botón primario).
 4. **Una sola acción principal por pantalla**, en color primario. El resto, botones secundarios.
 5. **Pensado para el celular:** zonas táctiles de 44 px como mínimo y navegación inferior.
 6. **Tono:** voseo uruguayo, directo, como un amigo ordenado. Nada de jerga técnica ni frases motivacionales largas.
@@ -61,6 +61,29 @@ Se muestran como **punto de 8 px + texto** ("Proteína 1") o como **barra segmen
 - Por defecto se sigue la preferencia del sistema (`prefers-color-scheme`).
 - En **Perfil** hay un selector: Automático / Claro / Oscuro. Se guarda en el navegador.
 
+## Vidrio (Liquid Glass) — solo en celular
+
+En pantallas de menos de 640 px la app usa superficies de vidrio translúcido sobre un fondo ambiental, al estilo de iOS. En escritorio todo sigue sólido, con los colores y radios de siempre: los mismos tokens cambian de valor en `@media (min-width: 640px)`.
+
+| Token | Uso | Claro | Oscuro |
+| --- | --- | --- | --- |
+| `--glass-bg` | Tarjetas, botones secundarios, cápsula de fecha | `rgba(255,255,255,.55)` | `rgba(30,56,54,.42)` |
+| `--glass-bg-strong` | Barra inferior, pestaña activa, hojas modales | `rgba(255,255,255,.72)` | `rgba(24,46,44,.72)` |
+| `--glass-border` | Borde fino de luz | `rgba(255,255,255,.80)` | `rgba(255,255,255,.12)` |
+| `--glass-blur` | Difuminado de lo que hay detrás | `blur(24px) saturate(180%)` | igual |
+| `--glass-shadow` | Brillo interior arriba + sombra suave | — | — |
+| `--btn-primary-bg` | Botón primario con leve degradé vertical | `#158581 → #0E6E6B` | `#57C6C1 → #3FB3AE` |
+| `--ambient-1/2/3` | Manchas de color del fondo (verde azulado, amarillo, verde) | — | — |
+
+- **Fondo ambiental:** tres degradés radiales fijos en `body::before`. Las páginas tienen fondo transparente para que se vea.
+- **Tarjetas:** `--glass-bg` + `backdrop-filter: var(--glass-blur)` + borde `--glass-border` + `--glass-shadow`, radio 22 px.
+- **Tarjeta "Ahora":** vidrio teñido con el color principal (`--glass-shadow-ahora`).
+- **Botones:** en píldora (`--radius-pill`). Primario con `--btn-primary-bg`; secundarios de vidrio.
+- **Chips de grupos:** tinte del grupo mezclado con transparente, en píldora (`--radius-chip`).
+- **Barra inferior:** cápsula flotante de vidrio separada 16 px de los bordes; la pestaña activa es una "lente" más clara.
+- **Resumen de Hoy:** un anillo de progreso por grupo (en escritorio siguen las barras).
+- **Accesibilidad:** con `prefers-reduced-transparency` o sin soporte de `backdrop-filter`, el vidrio pasa a ser sólido.
+
 ## Tipografía
 
 Dos familias de Google Fonts:
@@ -101,7 +124,7 @@ No usar IBM Plex, Inter, Roboto, Arial ni tipografías con serifa. Inputs siempr
 
 **Logo.** La palabra "miga" en minúscula, Bricolage Grotesque 800, `letter-spacing: -0.04em`. El punto de la "i" es un círculo `--accent`: se escribe con "ı" (sin punto) y el círculo encima. Sobre `--primary` va en blanco; sobre fondo claro, en `--primary`.
 
-**Ícono de la app.** Cuadrado `--primary` con radio 24 px, una "m" blanca en Bricolage 800 y un punto `--accent` arriba a la derecha.
+**Ícono de la app.** Cuadrado `--primary` con radio 24 px, una "m" blanca en Bricolage 800 y un punto `--accent` arriba a la derecha. La "m" ocupa el 62 % del ancho y el conjunto se centra por peso visual (centro de masa de la "m" y el punto), no por su caja: así la "m" queda centrada y el punto acompaña arriba a la derecha. Archivos en `frontend/public/`: `apple-touch-icon.png` (180 px, iPhone; va cuadrado porque iOS redondea solo), `icon-192.png` e `icon-512.png` (Android, manifest) y `favicon.svg`.
 
 **Encabezado de color.** Bloque `--primary` con radio inferior de 24 px. Arriba: logo a la izquierda y fecha a la derecha (`--on-primary-muted`, 14 px). Abajo: título humano en dos líneas ("Buen día. / Te quedan 3 comidas."). Padding inferior de 56 px para que se le superponga la tarjeta destacada.
 

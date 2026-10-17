@@ -1,0 +1,15 @@
+{
+  "name": "Miga",
+  "short_name": "Miga",
+  "description": "Tu plan de nutri, fácil de cumplir.",
+  "lang": "es-UY",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F2F7F6",
+  "theme_color": "#0E6E6B",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
