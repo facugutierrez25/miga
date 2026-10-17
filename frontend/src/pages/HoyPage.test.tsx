@@ -11,7 +11,7 @@ vi.mock('../api/registro')
 vi.mock('../auth/AuthContext')
 
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
-const mockGetTodayLog = vi.mocked(registroApi.getTodayLog)
+const mockGetLog = vi.mocked(registroApi.getLog)
 const mockMarkMealEaten = vi.mocked(registroApi.markMealEaten)
 const mockUnmarkMealEaten = vi.mocked(registroApi.unmarkMealEaten)
 
@@ -32,7 +32,7 @@ beforeEach(() => {
     login: vi.fn(),
     logout: vi.fn(),
   })
-  mockGetTodayLog.mockResolvedValue([])
+  mockGetLog.mockResolvedValue([])
   mockMarkMealEaten.mockResolvedValue()
   mockUnmarkMealEaten.mockResolvedValue()
 })
@@ -112,13 +112,19 @@ test('el botón "Ya lo comí" marca la comida como hecha', async () => {
   renderHoy()
   await waitFor(() => expect(screen.getByText('Ya lo comí')).toBeInTheDocument())
   fireEvent.click(screen.getByText('Ya lo comí'))
-  expect(mockMarkMealEaten).toHaveBeenCalledWith('tok', 1)
+  expect(mockMarkMealEaten).toHaveBeenCalledWith('tok', 1, expect.any(String))
   await waitFor(() => expect(screen.getByText('✓ Hecho')).toBeInTheDocument())
 })
 
-test('marca como comida las que ya están en el log de hoy', async () => {
+test('marca como comida las que ya están en el log', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
-  mockGetTodayLog.mockResolvedValue([1])
+  mockGetLog.mockResolvedValue([1])
   renderHoy()
   await waitFor(() => expect(screen.getByText('✓ Hecho')).toBeInTheDocument())
+})
+
+test('muestra "Hoy" en la barra de navegación por defecto', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  renderHoy()
+  await waitFor(() => expect(screen.getAllByText('Hoy').length).toBeGreaterThan(0))
 })

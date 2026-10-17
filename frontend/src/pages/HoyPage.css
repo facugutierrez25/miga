@@ -16,11 +16,49 @@
   margin-bottom: 8px;
 }
 
-.hoy-header__fecha {
-  font-size: 12px;
-  font-weight: 500;
+/* ── Navegación por fecha ── */
+
+.hoy-fecha-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 4px;
+}
+
+.hoy-fecha-nav__btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 0;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: var(--radius-sm);
+}
+
+.hoy-fecha-nav__btn:disabled {
   color: var(--muted);
-  text-transform: capitalize;
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hoy-fecha-nav__btn:not(:disabled):hover {
+  background: var(--surface-2);
+}
+
+.hoy-fecha-nav__label {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  min-width: 52px;
+  text-align: center;
 }
 
 .hoy-header__titulo {
@@ -159,7 +197,6 @@
   }
   .comida-hoy--pasada { opacity: 0.5; }
   .comida-hoy--hecha  { opacity: 0.7; }
-  .comida-hoy__live-dot { animation: none; }
 }
 
 .comida-hoy__encabezado {
@@ -198,20 +235,6 @@
   color: var(--primary);
 }
 
-/* Punto vivo pulsante */
-.comida-hoy__live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--primary);
-  flex-shrink: 0;
-  animation: live-pulse 2s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.35; transform: scale(0.65); }
-}
 
 /* ── Badges de grupos ── */
 
@@ -261,12 +284,13 @@
     display: block;
   }
 
-  .hoy-desktop-saludo__fecha {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-    text-transform: capitalize;
+  .hoy-desktop-saludo .hoy-fecha-nav {
+    margin-left: -10px;
     margin-bottom: 6px;
+  }
+
+  .hoy-desktop-saludo .hoy-fecha-nav__label {
+    font-size: 14px;
   }
 
   .hoy-desktop-saludo__titulo {

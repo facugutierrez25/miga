@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { getMyPlan, type FoodGroup, type MealDto, type PlanDto } from '../api/plans'
-import { getTodayLog, markMealEaten, unmarkMealEaten } from '../api/registro'
+import { getLog, markMealEaten, unmarkMealEaten } from '../api/registro'
 import './HoyPage.css'
 
 const GRUPOS: Record<FoodGroup, { label: string; token: string }> = {
@@ -15,19 +15,40 @@ const GRUPOS: Record<FoodGroup, { label: string; token: string }> = {
   VEGETABLES: { label: 'Verduras',  token: 'var(--g-verd)' },
 }
 
+function toISO(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function sumarDias(iso: string, delta: number): string {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() + delta)
+  return toISO(d)
+}
+
+function formatFechaLarga(iso: string): string {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('es-UY', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
+}
+
+function labelFecha(iso: string, hoy: string): string {
+  if (iso === hoy) return 'Hoy'
+  if (iso === sumarDias(hoy, -1)) return 'Ayer'
+  const d = new Date(iso + 'T12:00:00')
+  const wd = d.toLocaleDateString('es-UY', { weekday: 'short' }).replace(/\./g, '')
+  const day = d.getDate()
+  const mo = d.toLocaleDateString('es-UY', { month: 'short' }).replace(/\./g, '')
+  return `${wd} ${day} ${mo}`
+}
+
 function saludo(): string {
   const h = new Date().getHours()
   if (h < 12) return 'Buenos días'
   if (h < 20) return 'Buenas tardes'
   return 'Buenas noches'
-}
-
-function fechaHoy(): string {
-  return new Date().toLocaleDateString('es-UY', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
 }
 
 function esPasada(suggestedTime?: string): boolean {
@@ -41,7 +62,6 @@ function findIndexAhora(meals: MealDto[], comidas: Set<number>): number {
   if (meals.length === 0) return -1
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
 
-  // Buscar por ventana de tiempo (independiente del estado)
   const byTime = meals
     .map((m, i) => ({ m, i }))
     .find(({ m }) => {
@@ -53,7 +73,6 @@ function findIndexAhora(meals: MealDto[], comidas: Set<number>): number {
 
   if (byTime) return byTime.i
 
-  // Si no hay por tiempo, primera no hecha; si todas hechas, la última
   const firstUneaten = meals
     .map((m, i) => ({ m, i }))
     .find(({ m }) => m.id === undefined || !comidas.has(m.id))
@@ -87,7 +106,9 @@ function fmt(n: number): string {
 }
 
 export default function HoyPage() {
+  const HOY = toISO(new Date())
   const { token, email } = useAuth()
+  const [fecha, setFecha] = useState(HOY)
   const [plan, setPlan] = useState<PlanDto | null>(null)
   const [sinPlan, setSinPlan] = useState(false)
   const [cargando, setCargando] = useState(true)
@@ -95,14 +116,18 @@ export default function HoyPage() {
 
   useEffect(() => {
     if (!token) return
-    Promise.all([
-      getMyPlan(token).catch(err => { if (err.message === 'sin-plan') setSinPlan(true); return null }),
-      getTodayLog(token).catch(() => [] as number[]),
-    ]).then(([planData, log]) => {
-      if (planData) setPlan(planData)
-      setComidas(new Set(log))
-    }).finally(() => setCargando(false))
+    getMyPlan(token)
+      .then(data => setPlan(data))
+      .catch(err => { if (err.message === 'sin-plan') setSinPlan(true) })
+      .finally(() => setCargando(false))
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    getLog(token, fecha)
+      .then(log => setComidas(new Set(log)))
+      .catch(() => setComidas(new Set()))
+  }, [token, fecha])
 
   const toggle = useCallback(async (mealId: number) => {
     if (!token) return
@@ -113,7 +138,8 @@ export default function HoyPage() {
       return next
     })
     try {
-      if (eaten) await unmarkMealEaten(token, mealId); else await markMealEaten(token, mealId)
+      if (eaten) await unmarkMealEaten(token, mealId, fecha)
+      else await markMealEaten(token, mealId, fecha)
     } catch {
       setComidas(prev => {
         const next = new Set(prev)
@@ -121,27 +147,57 @@ export default function HoyPage() {
         return next
       })
     }
-  }, [token, comidas])
+  }, [token, comidas, fecha])
 
+  const esHoy = fecha === HOY
   const nombre = email?.split('@')[0] ?? ''
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
-  const ahoraIdx = plan ? findIndexAhora(meals, comidas) : -1
+  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, comidas) : -1
   const { total, done, porGrupo } = calcResumen(meals, comidas)
+
+  const navFecha = (
+    <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
+      <button
+        className="hoy-fecha-nav__btn"
+        onClick={() => setFecha(f => sumarDias(f, -1))}
+        aria-label="Día anterior"
+      >
+        <svg width="10" height="16" viewBox="0 0 10 16" fill="none" aria-hidden="true">
+          <path d="M8 2L2 8l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <span className="hoy-fecha-nav__label">{labelFecha(fecha, HOY)}</span>
+      <button
+        className="hoy-fecha-nav__btn"
+        onClick={() => setFecha(f => sumarDias(f, 1))}
+        disabled={esHoy}
+        aria-label="Día siguiente"
+      >
+        <svg width="10" height="16" viewBox="0 0 10 16" fill="none" aria-hidden="true">
+          <path d="M2 2l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+    </nav>
+  )
 
   return (
     <div className="hoy-page">
       <header className="hoy-header">
         <div className="hoy-header__meta">
           <Brand size={20} />
-          <p className="hoy-header__fecha">{fechaHoy()}</p>
         </div>
-        <h1 className="hoy-header__titulo">{saludo()}, {nombre}.</h1>
+        {navFecha}
+        <h1 className="hoy-header__titulo">
+          {esHoy ? `${saludo()}, ${nombre}.` : formatFechaLarga(fecha)}
+        </h1>
       </header>
 
       <div className="hoy-body">
         <div className="hoy-desktop-saludo">
-          <p className="hoy-desktop-saludo__fecha">{fechaHoy()}</p>
-          <h1 className="hoy-desktop-saludo__titulo">{saludo()}, {nombre}.</h1>
+          {navFecha}
+          <h1 className="hoy-desktop-saludo__titulo">
+            {esHoy ? `${saludo()}, ${nombre}.` : formatFechaLarga(fecha)}
+          </h1>
         </div>
 
         {cargando ? (
@@ -196,7 +252,7 @@ export default function HoyPage() {
                 const noVacias = meal.portions.filter(p => p.portions > 0)
                 const esAhora = i === ahoraIdx
                 const hecha = meal.id !== undefined && comidas.has(meal.id)
-                const pasada = !hecha && esPasada(meal.suggestedTime)
+                const pasada = esHoy && !hecha && esPasada(meal.suggestedTime)
 
                 return (
                   <div
@@ -213,7 +269,6 @@ export default function HoyPage() {
                       <div className="comida-hoy__enc-right">
                         {meal.suggestedTime && (
                           <div className={`comida-hoy__hora-wrap${esAhora && !hecha ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
-                            {esAhora && !hecha && <span className="comida-hoy__live-dot" aria-hidden="true" />}
                             <span className="comida-hoy__hora">
                               {meal.suggestedTime.slice(0, 5)}
                             </span>

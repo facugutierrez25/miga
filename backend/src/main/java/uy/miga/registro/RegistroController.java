@@ -1,9 +1,11 @@
 package uy.miga.registro;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -16,20 +18,25 @@ public class RegistroController {
         this.registroService = registroService;
     }
 
-    @GetMapping("/hoy")
-    List<Long> getHoy(Authentication auth) {
-        return registroService.getTodayLog(auth.getName());
+    @GetMapping("/{date}")
+    List<Long> getLog(Authentication auth,
+                      @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return registroService.getLog(auth.getName(), date);
     }
 
-    @PostMapping("/hoy/{mealId}")
+    @PostMapping("/{date}/{mealId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    void markEaten(Authentication auth, @PathVariable Long mealId) {
-        registroService.markEaten(auth.getName(), mealId);
+    void markEaten(Authentication auth,
+                   @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                   @PathVariable Long mealId) {
+        registroService.markEaten(auth.getName(), mealId, date);
     }
 
-    @DeleteMapping("/hoy/{mealId}")
+    @DeleteMapping("/{date}/{mealId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    void unmarkEaten(Authentication auth, @PathVariable Long mealId) {
-        registroService.unmarkEaten(auth.getName(), mealId);
+    void unmarkEaten(Authentication auth,
+                     @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                     @PathVariable Long mealId) {
+        registroService.unmarkEaten(auth.getName(), mealId, date);
     }
 }
