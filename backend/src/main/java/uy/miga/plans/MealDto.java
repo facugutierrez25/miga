@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 record MealDto(
+    Long id,
     @NotBlank @Size(max = 100) String name,
     LocalTime suggestedTime,
     int displayOrder,

@@ -290,4 +290,188 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
+
+  .comida-hoy--ahora {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Resumen de porciones ── */
+
+.hoy-resumen {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hoy-resumen__porciones {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.hoy-resumen__num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--primary);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.hoy-resumen__sep,
+.hoy-resumen__total {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--muted);
+  letter-spacing: -0.03em;
+}
+
+.hoy-resumen__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+.hoy-resumen__grupos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hoy-grupo-prog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hoy-grupo-prog__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hoy-grupo-prog__bar {
+  flex: 1;
+  height: 4px;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.hoy-grupo-prog__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.75;
+}
+
+.hoy-grupo-prog__frac {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: -0.02em;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ── Tarjeta "Ahora" ── */
+
+.comida-hoy--ahora {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+}
+
+/* ── Tarjeta hecha ── */
+
+.comida-hoy--hecha {
+  opacity: 0.7;
+}
+
+.comida-hoy--hecha .comida-hoy__nombre {
+  color: var(--done);
+}
+
+/* ── Botón toggle (cards regulares) ── */
+
+.comida-hoy__enc-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-toggle-comida {
+  width: 32px;
+  height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 50%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-toggle-comida__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: transparent;
+  transition: border-color 0.15s, background 0.15s;
+  display: block;
+}
+
+.btn-toggle-comida:hover .btn-toggle-comida__dot,
+.btn-toggle-comida:focus-visible .btn-toggle-comida__dot {
+  border-color: var(--primary);
+}
+
+.btn-toggle-comida--hecha .btn-toggle-comida__dot {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+/* ── Botón "Ya lo comí" (tarjeta ahora) ── */
+
+.btn-ya-lo-comi {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-ya-lo-comi:hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--ink));
+}
+
+.btn-ya-lo-comi--hecha {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.btn-ya-lo-comi--hecha:hover {
+  background: var(--primary-soft);
+  opacity: 0.85;
 }
