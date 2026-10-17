@@ -16,6 +16,8 @@
   flex: 1;
   /* espacio para la barra flotante + zona de gestos */
   padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  /* fusión entre el color sólido del top y el fondo ambiental glass */
+  background: linear-gradient(to bottom, var(--bg) 0%, transparent 72px);
 }
 
 /* Celular: barra flotante tipo cápsula de vidrio */
