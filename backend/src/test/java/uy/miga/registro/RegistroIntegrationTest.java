@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.LocalDate;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -31,6 +33,7 @@ class RegistroIntegrationTest {
     private MockMvc mockMvc;
     private String token;
     private long mealId;
+    private final String hoy = LocalDate.now().toString();
 
     @BeforeEach
     void setup() throws Exception {
@@ -56,7 +59,6 @@ class RegistroIntegrationTest {
         token = objectMapper.readTree(loginResult.getResponse().getContentAsString())
                 .get("token").asText();
 
-        // Crear un plan y obtener el ID de la primera comida
         MvcResult planResult = mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -77,26 +79,26 @@ class RegistroIntegrationTest {
     }
 
     @Test
-    void getHoy_sinRegistros_devuelveListaVacia() throws Exception {
-        mockMvc.perform(get("/api/v1/registro/hoy")
+    void getLog_sinRegistros_devuelveListaVacia() throws Exception {
+        mockMvc.perform(get("/api/v1/registro/" + hoy)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
     }
 
     @Test
-    void getHoy_sinToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/v1/registro/hoy"))
+    void getLog_sinToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/registro/" + hoy))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void markEaten_marcaComidaYApareceEnHoy() throws Exception {
-        mockMvc.perform(post("/api/v1/registro/hoy/" + mealId)
+    void markEaten_marcaComidaYApareceEnLog() throws Exception {
+        mockMvc.perform(post("/api/v1/registro/" + hoy + "/" + mealId)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/v1/registro/hoy")
+        mockMvc.perform(get("/api/v1/registro/" + hoy)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value(mealId));
@@ -104,15 +106,15 @@ class RegistroIntegrationTest {
 
     @Test
     void markEaten_idempotente_noCreaDuplicado() throws Exception {
-        mockMvc.perform(post("/api/v1/registro/hoy/" + mealId)
+        mockMvc.perform(post("/api/v1/registro/" + hoy + "/" + mealId)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/v1/registro/hoy/" + mealId)
+        mockMvc.perform(post("/api/v1/registro/" + hoy + "/" + mealId)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        MvcResult result = mockMvc.perform(get("/api/v1/registro/hoy")
+        MvcResult result = mockMvc.perform(get("/api/v1/registro/" + hoy)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -123,15 +125,35 @@ class RegistroIntegrationTest {
 
     @Test
     void unmarkEaten_desmarcaComida() throws Exception {
-        mockMvc.perform(post("/api/v1/registro/hoy/" + mealId)
+        mockMvc.perform(post("/api/v1/registro/" + hoy + "/" + mealId)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(delete("/api/v1/registro/hoy/" + mealId)
+        mockMvc.perform(delete("/api/v1/registro/" + hoy + "/" + mealId)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/v1/registro/hoy")
+        mockMvc.perform(get("/api/v1/registro/" + hoy)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void markEaten_fechaAnterior_seRegistraCorrectamente() throws Exception {
+        String ayer = LocalDate.now().minusDays(1).toString();
+
+        mockMvc.perform(post("/api/v1/registro/" + ayer + "/" + mealId)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/registro/" + ayer)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(mealId));
+
+        // No aparece en hoy
+        mockMvc.perform(get("/api/v1/registro/" + hoy)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));

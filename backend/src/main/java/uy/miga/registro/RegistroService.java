@@ -19,27 +19,27 @@ class RegistroService {
     }
 
     @Transactional(readOnly = true)
-    List<Long> getTodayLog(String email) {
+    List<Long> getLog(String email, LocalDate date) {
         Long userId = userService.findUserIdByEmail(email);
-        return registroRepository.findByUserIdAndLoggedDate(userId, LocalDate.now())
+        return registroRepository.findByUserIdAndLoggedDate(userId, date)
                 .stream().map(MealLog::getMealId).toList();
     }
 
     @Transactional
-    void markEaten(String email, Long mealId) {
+    void markEaten(String email, Long mealId, LocalDate date) {
         Long userId = userService.findUserIdByEmail(email);
-        if (!registroRepository.existsByUserIdAndMealIdAndLoggedDate(userId, mealId, LocalDate.now())) {
+        if (!registroRepository.existsByUserIdAndMealIdAndLoggedDate(userId, mealId, date)) {
             MealLog log = new MealLog();
             log.setUserId(userId);
             log.setMealId(mealId);
-            log.setLoggedDate(LocalDate.now());
+            log.setLoggedDate(date);
             registroRepository.save(log);
         }
     }
 
     @Transactional
-    void unmarkEaten(String email, Long mealId) {
+    void unmarkEaten(String email, Long mealId, LocalDate date) {
         Long userId = userService.findUserIdByEmail(email);
-        registroRepository.deleteByUserIdAndMealIdAndLoggedDate(userId, mealId, LocalDate.now());
+        registroRepository.deleteByUserIdAndMealIdAndLoggedDate(userId, mealId, date);
     }
 }
