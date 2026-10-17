@@ -209,7 +209,10 @@ export default function LandingPage() {
       {/* ── Footer ── */}
       <footer className="land-footer">
         <Brand size={18} />
-        <p className="land-footer__copy">Hecho con cuidado en Uruguay.</p>
+        <div className="land-footer__right">
+          <Link to="/privacidad" className="land-footer__priv">Privacidad y términos</Link>
+          <p className="land-footer__copy">Hecho con cuidado en Uruguay.</p>
+        </div>
       </footer>
 
     </div>

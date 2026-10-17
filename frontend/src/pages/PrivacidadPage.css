@@ -1,0 +1,160 @@
+.priv-page {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Main ── */
+
+.priv-main {
+  flex: 1;
+  padding: 48px 20px 64px;
+}
+
+.priv-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ── Hero ── */
+
+.priv-hero {
+  margin-bottom: 48px;
+}
+
+.priv-hero__updated {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.priv-hero__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(32px, 7vw, 52px);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.priv-hero__sub {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 580px;
+}
+
+/* ── Secciones ── */
+
+.priv-section {
+  padding: 32px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.priv-section--last {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.priv-section__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.priv-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.priv-section__body p {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.priv-section__body strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ── Lista ── */
+
+.priv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.priv-list li {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding-left: 20px;
+  position: relative;
+}
+
+.priv-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.5;
+}
+
+.priv-list li strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ── Link ── */
+
+.priv-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  transition: border-color 0.15s;
+}
+
+.priv-link:hover {
+  border-color: var(--primary);
+}
+
+
+/* ── Desktop ── */
+
+@media (min-width: 640px) {
+  .priv-main {
+    padding: 64px 40px 80px;
+  }
+
+  .priv-section {
+    padding: 40px 0;
+  }
+
+  .priv-section__title {
+    font-size: 22px;
+  }
+
+  .priv-section__body p,
+  .priv-list li {
+    font-size: 16px;
+  }
+}

@@ -11,6 +11,8 @@ import ComprasPage from './pages/ComprasPage'
 import PerfilPage from './pages/PerfilPage'
 import MiPlanPage from './pages/MiPlanPage'
 import OnboardingPage from './pages/OnboardingPage'
+import PrivacidadPage from './pages/PrivacidadPage'
+import ScrollToTop from './components/ScrollToTop'
 
 function AuthLayout() {
   const { token } = useAuth()
@@ -22,10 +24,12 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/privacidad" element={<PrivacidadPage />} />
           <Route element={<AuthLayout />}>
             <Route path="/hoy" element={<HoyPage />} />
             <Route path="/semana" element={<SemanaPage />} />

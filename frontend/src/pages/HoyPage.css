@@ -16,11 +16,49 @@
   margin-bottom: 8px;
 }
 
-.hoy-header__fecha {
-  font-size: 12px;
-  font-weight: 500;
+/* ── Navegación por fecha ── */
+
+.hoy-fecha-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 4px;
+}
+
+.hoy-fecha-nav__btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 0;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: var(--radius-sm);
+}
+
+.hoy-fecha-nav__btn:disabled {
   color: var(--muted);
-  text-transform: capitalize;
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hoy-fecha-nav__btn:not(:disabled):hover {
+  background: var(--surface-2);
+}
+
+.hoy-fecha-nav__label {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  min-width: 52px;
+  text-align: center;
 }
 
 .hoy-header__titulo {
@@ -151,11 +189,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .comida-hoy {
+  .comida-hoy,
+  .comida-hoy--ahora {
     animation: none;
     opacity: 1;
     transform: none;
   }
+  .comida-hoy--pasada { opacity: 0.5; }
+  .comida-hoy--hecha  { opacity: 0.7; }
 }
 
 .comida-hoy__encabezado {
@@ -173,12 +214,27 @@
   letter-spacing: -0.02em;
 }
 
+.comida-hoy__hora-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .comida-hoy__hora {
   font-size: 12px;
   font-weight: 500;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+.comida-hoy__hora-wrap--ahora .comida-hoy__hora {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+}
+
 
 /* ── Badges de grupos ── */
 
@@ -228,12 +284,13 @@
     display: block;
   }
 
-  .hoy-desktop-saludo__fecha {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-    text-transform: capitalize;
+  .hoy-desktop-saludo .hoy-fecha-nav {
+    margin-left: -10px;
     margin-bottom: 6px;
+  }
+
+  .hoy-desktop-saludo .hoy-fecha-nav__label {
+    font-size: 14px;
   }
 
   .hoy-desktop-saludo__titulo {
@@ -267,6 +324,10 @@
     font-size: 13px;
   }
 
+  .comida-hoy__hora-wrap--ahora .comida-hoy__hora {
+    font-size: 17px;
+  }
+
   .comida-hoy__grupos {
     gap: 7px;
   }
@@ -290,4 +351,201 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
+
+  .comida-hoy--ahora {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Resumen de porciones ── */
+
+.hoy-resumen {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hoy-resumen__porciones {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.hoy-resumen__num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--primary);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.hoy-resumen__sep,
+.hoy-resumen__total {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--muted);
+  letter-spacing: -0.03em;
+}
+
+.hoy-resumen__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+.hoy-resumen__grupos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hoy-grupo-prog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hoy-grupo-prog__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hoy-grupo-prog__bar {
+  flex: 1;
+  height: 4px;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.hoy-grupo-prog__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.75;
+}
+
+.hoy-grupo-prog__frac {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: -0.02em;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ── Tarjeta "Ahora" ── */
+
+.comida-hoy--ahora {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  animation: card-enter 0.3s ease forwards, ahora-glow 3s ease-in-out 0.5s infinite;
+}
+
+@keyframes ahora-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent); }
+  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent); }
+}
+
+/* ── Tarjeta pasada (hora ya pasó, sin comer) ── */
+
+.comida-hoy--pasada {
+  opacity: 0.5;
+}
+
+/* ── Tarjeta hecha ── */
+
+.comida-hoy--hecha {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.comida-hoy--hecha .comida-hoy__nombre {
+  color: var(--done);
+}
+
+/* ── Botón toggle (cards regulares) ── */
+
+.comida-hoy__enc-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-toggle-comida {
+  width: 32px;
+  height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 50%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-toggle-comida__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: transparent;
+  transition: border-color 0.15s, background 0.15s;
+  display: block;
+}
+
+.btn-toggle-comida:hover .btn-toggle-comida__dot,
+.btn-toggle-comida:focus-visible .btn-toggle-comida__dot {
+  border-color: var(--primary);
+}
+
+.btn-toggle-comida--hecha .btn-toggle-comida__dot {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+/* ── Botón "Ya lo comí" (tarjeta ahora) ── */
+
+.btn-ya-lo-comi {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-ya-lo-comi:hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--ink));
+}
+
+.btn-ya-lo-comi--hecha {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.btn-ya-lo-comi--hecha:hover {
+  background: var(--primary-soft);
+  opacity: 0.85;
 }
