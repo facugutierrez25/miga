@@ -76,13 +76,13 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
             <div key={i} className="modal-meal">
               <p className="modal-meal__nombre">{meal.name}</p>
               <div className="modal-meal__chips">
-                {meal.portions.map(p => {
+                {meal.portions.filter(p => p.portions > 0).map(p => {
                   const g = GRUPOS.find(gr => gr.key === p.foodGroup)
                   if (!g) return null
                   return (
-                    <span key={p.foodGroup} className="porcion-chip">
-                      <span className="porcion-chip__dot" style={{ background: g.dot }} />
-                      {g.label} {p.portions}
+                    <span key={p.foodGroup} className={`porcion-chip porcion-chip--${p.foodGroup}`}>
+                      <span className="porcion-chip__num">{p.portions}</span>
+                      {g.label}
                     </span>
                   )
                 })}
@@ -177,7 +177,9 @@ export default function MiPlanPage() {
   return (
     <div className="mi-plan-page">
       <header className="mi-plan-header">
-        <Brand size={28} />
+        <div className="mi-plan-header__meta">
+          <Brand size={20} />
+        </div>
         <h1 className="mi-plan-header__title">Tu plan</h1>
       </header>
 
@@ -192,9 +194,9 @@ export default function MiPlanPage() {
                   <span className="comida-min__nombre">{comida.nombre || 'Sin nombre'}</span>
                   <div className="comida-min__chips">
                     {GRUPOS.filter(g => comida.porciones[g.key] > 0).map(g => (
-                      <span key={g.key} className="porcion-chip">
-                        <span className="porcion-chip__dot" style={{ background: g.dot }} />
-                        {comida.porciones[g.key]}
+                      <span key={g.key} className={`porcion-chip porcion-chip--${g.key}`}>
+                        <span className="porcion-chip__num">{comida.porciones[g.key]}</span>
+                        {g.label}
                       </span>
                     ))}
                   </div>

@@ -29,7 +29,6 @@ function Step1({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
   return (
     <div className="ob-step">
       <div className="ob-step__content">
-        <p className="ob-step__eyebrow">Bienvenido a miga</p>
         <h1 className="ob-step__title">Vamos a cargar tu plan juntos</h1>
         <p className="ob-step__example">
           Te vamos a hacer 3 preguntas cortas para ayudarte a pasar el plan de tu nutricionista a la app. Tené el papel o la foto a mano.

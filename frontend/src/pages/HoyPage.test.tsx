@@ -94,5 +94,5 @@ test('muestra solo los grupos con porciones mayores a cero', async () => {
 test('muestra el nombre del usuario en el saludo', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   renderHoy()
-  await waitFor(() => expect(screen.getByText(/facu/)).toBeInTheDocument())
+  await waitFor(() => expect(screen.getAllByText(/facu/).length).toBeGreaterThan(0))
 })

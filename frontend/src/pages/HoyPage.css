@@ -3,47 +3,50 @@
   background: var(--bg);
 }
 
+/* ── Header mobile ── */
+
 .hoy-header {
-  background: var(--primary);
-  border-radius: 0 0 var(--radius-header) var(--radius-header);
-  padding: 20px 20px 32px;
+  padding: 20px 16px 0;
 }
 
-.hoy-header__top {
+.hoy-header__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.hoy-header .brand {
-  color: var(--on-primary);
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .hoy-header__fecha {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--on-primary-muted);
+  color: var(--muted);
   text-transform: capitalize;
-  text-align: right;
 }
 
 .hoy-header__titulo {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 34px;
-  color: var(--on-primary);
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-size: clamp(24px, 7vw, 38px);
+  color: var(--ink);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 
+/* ── Greeting desktop (oculto en mobile) ── */
+
+.hoy-desktop-saludo {
+  display: none;
+}
+
+/* ── Body ── */
+
 .hoy-body {
-  padding: 20px 16px 40px;
-  max-width: 480px;
+  padding: 14px 14px 32px;
+  max-width: 600px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .hoy-loading {
@@ -53,30 +56,41 @@
   font-size: 15px;
 }
 
-/* Estado sin plan */
+/* ── Estado sin plan ── */
 
 .hoy-sin-plan {
   background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
-  padding: 24px 20px;
+  padding: 36px 24px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
+}
+
+.hoy-sin-plan__titulo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .hoy-sin-plan__texto {
   color: var(--muted);
   font-size: 15px;
+  line-height: 1.5;
+  max-width: 260px;
 }
 
 .btn-cargar-plan {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 24px;
+  min-height: 48px;
+  padding: 0 28px;
   border-radius: var(--radius-control);
   background: var(--primary);
   color: var(--on-primary);
@@ -84,6 +98,11 @@
   font-size: 15px;
   font-weight: 700;
   text-decoration: none;
+  transition: background 0.15s;
+}
+
+.btn-cargar-plan:hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--ink));
 }
 
 .btn-cargar-plan-manual {
@@ -92,17 +111,51 @@
   font-weight: 500;
   color: var(--muted);
   text-decoration: none;
-  min-height: 44px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
 }
 
-/* Tarjeta de comida */
+/* ── Grid de cards ── */
+
+.hoy-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Tarjeta de comida ── */
 
 .comida-hoy {
   background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
-  padding: 16px;
+  padding: 14px 14px 12px;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: card-enter 0.3s ease forwards;
+}
+
+.comida-hoy:nth-child(1) { animation-delay: 40ms;  }
+.comida-hoy:nth-child(2) { animation-delay: 100ms; }
+.comida-hoy:nth-child(3) { animation-delay: 160ms; }
+.comida-hoy:nth-child(4) { animation-delay: 220ms; }
+.comida-hoy:nth-child(5) { animation-delay: 280ms; }
+.comida-hoy:nth-child(6) { animation-delay: 340ms; }
+
+@keyframes card-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comida-hoy {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .comida-hoy__encabezado {
@@ -115,62 +168,126 @@
 .comida-hoy__nombre {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--ink);
   letter-spacing: -0.02em;
 }
 
 .comida-hoy__hora {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 15px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--muted);
-  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Chips de grupos */
+/* ── Badges de grupos ── */
 
 .comida-hoy__grupos {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
-.grupo-chip {
+.grupo-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: var(--surface-2);
-  border-radius: 99px;
-  padding: 4px 10px;
-  font-size: 13px;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
 }
 
-.grupo-chip__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.grupo-chip__label {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.grupo-chip__valor {
+.grupo-badge__numero {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 13px;
-  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.grupo-badge__label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
+/* color-mix sobre --surface: se adapta a light y dark sin tokens extra */
+.grupo-badge--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, var(--surface)); color: var(--g-prot); }
+.grupo-badge--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, var(--surface)); color: var(--g-cer);  }
+.grupo-badge--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, var(--surface)); color: var(--g-frut); }
+.grupo-badge--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, var(--surface)); color: var(--g-lac);  }
+.grupo-badge--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, var(--surface)); color: var(--g-gras); }
+.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, var(--surface)); color: var(--g-verd); }
+
+/* ── Desktop ── */
+
 @media (min-width: 640px) {
-  .hoy-header {
-    padding: 16px 20px 24px;
+  /* Header mobile oculto por AppLayout — mostramos el greeting dentro del body */
+  .hoy-desktop-saludo {
+    display: block;
   }
-  .hoy-header__titulo {
-    font-size: 24px;
+
+  .hoy-desktop-saludo__fecha {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: capitalize;
+    margin-bottom: 6px;
+  }
+
+  .hoy-desktop-saludo__titulo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(28px, 3vw, 40px);
+    color: var(--ink);
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+  }
+
+  .hoy-body {
+    max-width: 960px;
+    padding: 28px 24px 48px;
+    gap: 20px;
+  }
+
+  .comida-hoy {
+    padding: 18px 16px 16px;
+  }
+
+  .comida-hoy__encabezado {
+    margin-bottom: 14px;
+  }
+
+  .comida-hoy__nombre {
+    font-size: 19px;
+  }
+
+  .comida-hoy__hora {
+    font-size: 13px;
+  }
+
+  .comida-hoy__grupos {
+    gap: 7px;
+  }
+
+  .grupo-badge {
+    padding: 7px 11px;
+    gap: 8px;
+  }
+
+  .grupo-badge__numero {
+    font-size: 22px;
+  }
+
+  .grupo-badge__label {
+    font-size: 12px;
+  }
+
+  /* Grid de 2 columnas */
+  .hoy-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
 }
