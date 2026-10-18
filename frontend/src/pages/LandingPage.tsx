@@ -159,7 +159,7 @@ export default function LandingPage() {
           <h2 className="land-section-title" data-reveal>Tres pasos para empezar</h2>
           <div className="land-steps__list">
             <div className="land-step" data-reveal data-delay="0">
-              <span className="land-step__num">1</span>
+              <span className="land-step__num" aria-hidden="true">1</span>
               <div className="land-step__body">
                 <h3 className="land-step__title">Cargá tu plan</h3>
                 <p className="land-step__desc">
@@ -168,7 +168,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="land-step" data-reveal data-delay="1">
-              <span className="land-step__num">2</span>
+              <span className="land-step__num" aria-hidden="true">2</span>
               <div className="land-step__body">
                 <h3 className="land-step__title">Revisá tu día</h3>
                 <p className="land-step__desc">
@@ -177,7 +177,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="land-step" data-reveal data-delay="2">
-              <span className="land-step__num">3</span>
+              <span className="land-step__num" aria-hidden="true">3</span>
               <div className="land-step__body">
                 <h3 className="land-step__title">Seguí tu semana</h3>
                 <p className="land-step__desc">

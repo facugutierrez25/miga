@@ -35,11 +35,21 @@
   justify-content: space-between;
   padding: 0 20px;
   height: 56px;
-  border-bottom: 1px solid var(--line-soft);
   background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid var(--glass-border);
+}
+
+.land-nav::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .land-nav__links {
@@ -169,7 +179,7 @@
   justify-content: center;
   min-height: 48px;
   padding: 0 20px;
-  color: var(--muted);
+  color: var(--ink);
   font-family: var(--font-body);
   font-size: 15px;
   font-weight: 500;
@@ -287,6 +297,7 @@
 }
 
 .phone__pill {
+  position: relative;
   height: 40px;
   background: var(--surface);
   display: flex;
@@ -390,6 +401,7 @@
 .pbadge--gras { background: color-mix(in srgb, var(--g-gras) 16%, transparent); color: var(--g-gras); }
 
 .phone__home {
+  position: relative;
   height: 28px;
   background: var(--surface);
   display: flex;
@@ -488,7 +500,6 @@
 
 .land-steps {
   padding: 72px 0;
-  border-top: 1px solid var(--line-soft);
   background: transparent;
   border-top: 1px solid var(--glass-border);
 }

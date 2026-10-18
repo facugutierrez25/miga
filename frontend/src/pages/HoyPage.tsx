@@ -129,6 +129,11 @@ export default function HoyPage() {
       .catch(() => setComidas(new Set()))
   }, [token, fecha])
 
+  function irDia(delta: number) {
+    setComidas(new Set())
+    setFecha(f => sumarDias(f, delta))
+  }
+
   const toggle = useCallback(async (mealId: number) => {
     if (!token) return
     const eaten = comidas.has(mealId)
@@ -159,7 +164,7 @@ export default function HoyPage() {
     <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
       <button
         className="hoy-fecha-nav__btn"
-        onClick={() => setFecha(f => sumarDias(f, -1))}
+        onClick={() => irDia(-1)}
         aria-label="Día anterior"
       >
         <svg width="10" height="16" viewBox="0 0 10 16" fill="none" aria-hidden="true">
@@ -169,7 +174,7 @@ export default function HoyPage() {
       <span className="hoy-fecha-nav__label">{labelFecha(fecha, HOY)}</span>
       <button
         className="hoy-fecha-nav__btn"
-        onClick={() => setFecha(f => sumarDias(f, 1))}
+        onClick={() => irDia(1)}
         disabled={esHoy}
         aria-label="Día siguiente"
       >
@@ -320,6 +325,7 @@ export default function HoyPage() {
                       <button
                         className={`btn-ya-lo-comi${hecha ? ' btn-ya-lo-comi--hecha' : ''}`}
                         aria-pressed={hecha}
+                        aria-label={hecha ? `Desmarcar ${meal.name}` : `Marcar ${meal.name} como comida`}
                         onClick={() => toggle(meal.id!)}
                       >
                         {hecha ? '✓ Hecho' : 'Ya lo comí'}
