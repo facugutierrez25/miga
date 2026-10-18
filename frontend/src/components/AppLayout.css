@@ -18,6 +18,8 @@
   padding-top: env(safe-area-inset-top, 0px);
   /* espacio para la barra flotante + zona de gestos */
   padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  /* fusión entre el color sólido del top y el fondo ambiental glass */
+  background: linear-gradient(to bottom, var(--bg) 0%, transparent 72px);
 }
 
 /* Celular: barra flotante tipo cápsula de vidrio */
@@ -174,8 +176,8 @@
   }
 
   .app-nav__toggle {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border: none;
     background: transparent;
     color: var(--muted-2);
@@ -199,7 +201,7 @@
     flex-direction: column;
     gap: 2px;
     padding: 0 8px;
-    contents: unset; /* cancelar display:contents del mobile */
+    /* cancelar display:contents del mobile */
   }
 
   .nav-item {
@@ -209,7 +211,7 @@
     gap: 10px;
     padding: 9px 12px;
     border-radius: var(--radius-sm);
-    min-height: 40px;
+    min-height: 44px;
     justify-content: flex-start;
     white-space: nowrap;
     overflow: hidden;

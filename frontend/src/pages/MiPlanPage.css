@@ -133,12 +133,12 @@
 }
 
 /* color-mix: adapts to light and dark without extra tokens */
-.porcion-chip--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, transparent); color: var(--muted); }
-.porcion-chip--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, transparent); color: var(--muted); }
-.porcion-chip--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, transparent); color: var(--muted); }
-.porcion-chip--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, transparent); color: var(--muted); }
-.porcion-chip--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, transparent); color: var(--muted); }
-.porcion-chip--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); color: var(--muted); }
+.porcion-chip--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, transparent); color: var(--ink); }
+.porcion-chip--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, transparent); color: var(--ink); }
+.porcion-chip--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, transparent); color: var(--ink); }
+.porcion-chip--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, transparent); color: var(--ink); }
+.porcion-chip--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, transparent); color: var(--ink); }
+.porcion-chip--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); color: var(--ink); }
 
 .porcion-chip--PROTEINS   .porcion-chip__num { color: var(--g-prot); }
 .porcion-chip--GRAINS     .porcion-chip__num { color: var(--g-cer);  }
@@ -149,8 +149,8 @@
 
 .btn-editar {
   grid-area: edit;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -164,8 +164,8 @@
 
 .btn-eliminar-min {
   grid-area: del;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   border: none;
   background: transparent;
@@ -210,7 +210,7 @@
   min-height: 44px;
 }
 
-.comida-card__nombre:focus {
+.comida-card__nombre:focus-visible {
   border-bottom-color: var(--primary);
 }
 
@@ -271,7 +271,7 @@
   min-width: 0;
 }
 
-.comida-card__hora-input:focus {
+.comida-card__hora-input:focus-visible {
   border-bottom-color: var(--primary);
 }
 
@@ -468,7 +468,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay, rgba(0, 0, 0, 0.45));
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -521,8 +521,8 @@
 }
 
 .modal-card__close {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: var(--surface-2);
   color: var(--ink);
