@@ -14,6 +14,8 @@
 
 .app-layout__main {
   flex: 1;
+  /* empuja el contenido por debajo de la status bar (notch / Dynamic Island) */
+  padding-top: env(safe-area-inset-top, 0px);
   /* espacio para la barra flotante + zona de gestos */
   padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
 }
