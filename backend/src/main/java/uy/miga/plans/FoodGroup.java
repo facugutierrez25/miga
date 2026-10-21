@@ -1,5 +1,5 @@
 package uy.miga.plans;
 
-enum FoodGroup {
+public enum FoodGroup {
     PROTEINS, GRAINS, FRUITS, DAIRY, FATS, VEGETABLES
 }
