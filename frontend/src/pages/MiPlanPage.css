@@ -39,6 +39,239 @@
   font-size: 15px;
 }
 
+/* Tab switcher */
+
+.plan-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  margin-bottom: 8px;
+}
+
+.plan-tab {
+  flex: 1;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plan-tab--active {
+  background: var(--glass-bg-strong);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--glass-shadow);
+}
+
+/* Equivalencias */
+
+/* Acordeón de equivalencias */
+
+.equiv-group {
+  border-radius: var(--radius-card);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+
+.equiv-group__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 14px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  min-height: 52px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.equiv-group__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.equiv-group__label {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.equiv-group__count {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.equiv-group__chevron {
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.equiv-group__chevron--open {
+  transform: rotate(180deg);
+}
+
+.equiv-group__body {
+  border-top: 1px solid var(--line-soft);
+  padding: 8px 14px 12px;
+}
+
+.equiv-empty {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 6px 0 10px;
+}
+
+.equiv-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.equiv-item__food {
+  flex: 1;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.equiv-item__amount {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.equiv-item__delete {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.equiv-item__delete:hover {
+  color: var(--error);
+  background: var(--error-bg);
+}
+
+.equiv-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.equiv-add__input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 2px;
+  outline: none;
+  min-width: 0;
+}
+
+.equiv-add__input::placeholder {
+  color: var(--muted-2);
+}
+
+.equiv-add__input:focus {
+  border-bottom-color: var(--primary);
+}
+
+.equiv-add__input--qty {
+  flex: 0 0 64px;
+}
+
+.equiv-add__unit-wrap {
+  position: relative;
+  flex: 0 0 76px;
+  display: flex;
+  align-items: center;
+}
+
+.equiv-add__unit-wrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 18px 4px 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.equiv-add__unit-wrap select:focus {
+  border-bottom-color: var(--primary);
+}
+
+.equiv-add__unit-chevron {
+  position: absolute;
+  right: 2px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.equiv-add__btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--primary-soft);
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.equiv-add__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Tarjeta base */
 
 .comida-card {
