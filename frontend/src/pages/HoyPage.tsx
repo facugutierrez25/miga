@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { getMyPlan, type FoodGroup, type MealDto, type PlanDto } from '../api/plans'
-import { getLog, markMealEaten, unmarkMealEaten } from '../api/registro'
+import { getIntake, addFoodEntry, deleteFoodEntry, markMealConsumed, unmarkMealConsumed, type FoodEntryDto } from '../api/intake'
+import { getEquivalences, type EquivalenceDto } from '../api/equivalences'
 import './HoyPage.css'
 
 const GRUPOS: Record<FoodGroup, { label: string; token: string }> = {
@@ -58,7 +59,7 @@ function esPasada(suggestedTime?: string): boolean {
   return h * 60 + m < nowMin - 90
 }
 
-function findIndexAhora(meals: MealDto[], comidas: Set<number>): number {
+function findIndexAhora(meals: MealDto[], consumedSet: Set<number>): number {
   if (meals.length === 0) return -1
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
 
@@ -75,27 +76,40 @@ function findIndexAhora(meals: MealDto[], comidas: Set<number>): number {
 
   const firstUneaten = meals
     .map((m, i) => ({ m, i }))
-    .find(({ m }) => m.id === undefined || !comidas.has(m.id))
+    .find(({ m }) => m.id === undefined || !consumedSet.has(m.id))
 
   return firstUneaten ? firstUneaten.i : meals.length - 1
 }
 
-function calcResumen(meals: MealDto[], comidas: Set<number>) {
-  let total = 0
-  let done = 0
-  const porGrupo: Partial<Record<FoodGroup, { total: number; done: number }>> = {}
+function calcPortions(entry: FoodEntryDto, equivalences: EquivalenceDto[]): number {
+  const equiv = equivalences.find(e => e.food === entry.food && e.foodGroup === entry.foodGroup)
+  if (!equiv || equiv.quantity === 0) return 0
+  return entry.quantity / equiv.quantity
+}
+
+function calcResumen(meals: MealDto[], entries: FoodEntryDto[], equivalences: EquivalenceDto[]) {
+  const totalByGroup: Partial<Record<FoodGroup, number>> = {}
+  const doneByGroup: Partial<Record<FoodGroup, number>> = {}
 
   for (const meal of meals) {
-    const eaten = meal.id !== undefined && comidas.has(meal.id)
     for (const p of meal.portions) {
       if (p.portions <= 0) continue
       const n = Number(p.portions)
-      total += n
-      if (eaten) done += n
-      if (!porGrupo[p.foodGroup]) porGrupo[p.foodGroup] = { total: 0, done: 0 }
-      porGrupo[p.foodGroup]!.total += n
-      if (eaten) porGrupo[p.foodGroup]!.done += n
+      totalByGroup[p.foodGroup] = (totalByGroup[p.foodGroup] ?? 0) + n
     }
+  }
+
+  for (const entry of entries.filter(e => e.consumed)) {
+    const portions = calcPortions(entry, equivalences)
+    doneByGroup[entry.foodGroup] = (doneByGroup[entry.foodGroup] ?? 0) + portions
+  }
+
+  const total = Object.values(totalByGroup).reduce((s, v) => s + v, 0)
+  const done = Object.values(doneByGroup).reduce((s, v) => s + v, 0)
+
+  const porGrupo: Partial<Record<FoodGroup, { total: number; done: number }>> = {}
+  for (const [g, t] of Object.entries(totalByGroup) as [FoodGroup, number][]) {
+    porGrupo[g] = { total: t, done: doneByGroup[g] ?? 0 }
   }
 
   return { total, done, porGrupo }
@@ -105,6 +119,174 @@ function fmt(n: number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
+// ── IntakeMealSection ──────────────────────────────────────────────────────
+
+interface IntakeMealSectionProps {
+  mealId: number
+  entries: FoodEntryDto[]
+  equivalences: EquivalenceDto[]
+  mealFoodGroups: FoodGroup[]
+  onAdd: (mealId: number, food: string, qty: number, unit: string, foodGroup: FoodGroup) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+  onToggleConsumed: (mealId: number) => Promise<void>
+  isConsumed: boolean
+  isAhora: boolean
+}
+
+function IntakeMealSection({
+  mealId, entries, equivalences, mealFoodGroups,
+  onAdd, onDelete, onToggleConsumed, isConsumed, isAhora,
+}: IntakeMealSectionProps) {
+  const [isOpen, setIsOpen] = useState(isAhora)
+  const [selectedEquivId, setSelectedEquivId] = useState<string>('')
+  const [qty, setQty] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  const relevantEquivs = equivalences.filter(e => mealFoodGroups.includes(e.foodGroup))
+  const selectedEquiv = equivalences.find(e => String(e.id) === selectedEquivId)
+  const hasEntries = entries.length > 0
+  const unitLabel = selectedEquiv?.unit.toLowerCase() ?? ''
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedEquiv) return
+    const q = parseFloat(qty)
+    if (!q || q <= 0) return
+    setAdding(true)
+    try {
+      await onAdd(mealId, selectedEquiv.food, q, selectedEquiv.unit, selectedEquiv.foodGroup)
+      setQty('')
+      setSelectedEquivId('')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const summaryLabel = !hasEntries
+    ? 'Registrar'
+    : isConsumed
+      ? `✓ ${entries.length} alimento${entries.length !== 1 ? 's' : ''}`
+      : `${entries.length} alimento${entries.length !== 1 ? 's' : ''}`
+
+  return (
+    <div className="comida-hoy__intake">
+      <button
+        className="intake-toggle"
+        onClick={() => setIsOpen(o => !o)}
+        aria-expanded={isOpen}
+      >
+        <span className={`intake-toggle__label${isConsumed ? ' intake-toggle__label--consumed' : ''}`}>
+          {summaryLabel}
+        </span>
+        <svg
+          className={`intake-toggle__chevron${isOpen ? ' intake-toggle__chevron--open' : ''}`}
+          viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6"
+        >
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="intake-body">
+          {hasEntries && (
+            <ul className="intake-entries" aria-label="Lo que comiste">
+              {entries.map(e => (
+                <li key={e.id} className="intake-entry">
+                  <span className="intake-entry__food">{e.food}</span>
+                  <span className="intake-entry__qty">{e.quantity} {e.unit.toLowerCase()}</span>
+                  <button
+                    className="intake-entry__del"
+                    onClick={() => onDelete(e.id)}
+                    aria-label={`Eliminar ${e.food}`}
+                    type="button"
+                  >×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form className="intake-form" onSubmit={handleSubmit}>
+            {relevantEquivs.length === 0 ? (
+              <span className="intake-form__hint">
+                Agregá equivalencias en{' '}
+                <Link to="/mi-plan" className="intake-form__hint-link">Mi plan</Link>
+                {' '}para registrar lo que comés
+              </span>
+            ) : (
+              <>
+                <div className="intake-form__equiv-wrap">
+                  <select
+                    className="intake-form__equiv"
+                    value={selectedEquivId}
+                    onChange={e => { setSelectedEquivId(e.target.value); setQty('') }}
+                    aria-label="Alimento"
+                  >
+                    <option value="">Alimento…</option>
+                    {(Object.keys(GRUPOS) as FoodGroup[])
+                      .filter(g => relevantEquivs.some(e => e.foodGroup === g))
+                      .map(g => (
+                        <optgroup key={g} label={GRUPOS[g].label}>
+                          {relevantEquivs
+                            .filter(e => e.foodGroup === g)
+                            .map(e => (
+                              <option key={e.id} value={String(e.id)}>
+                                {e.food}
+                              </option>
+                            ))}
+                        </optgroup>
+                      ))}
+                  </select>
+                  <svg className="intake-form__chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6">
+                    <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <input
+                  className="intake-form__qty"
+                  type="number"
+                  placeholder="Cant."
+                  value={qty}
+                  onChange={e => setQty(e.target.value)}
+                  min={0.01}
+                  step="any"
+                  aria-label="Cantidad"
+                  disabled={!selectedEquiv}
+                />
+                {unitLabel && <span className="intake-form__unit-label">{unitLabel}</span>}
+                <button
+                  className="intake-form__add"
+                  type="submit"
+                  disabled={adding || !selectedEquiv || !qty}
+                  aria-label="Agregar alimento"
+                >+</button>
+              </>
+            )}
+          </form>
+
+          {hasEntries && (isAhora ? (
+            <button
+              className={`btn-ya-lo-comi${isConsumed ? ' btn-ya-lo-comi--hecha' : ''}`}
+              aria-pressed={isConsumed}
+              onClick={() => onToggleConsumed(mealId)}
+            >
+              {isConsumed ? '✓ Hecho' : 'Ya lo comí'}
+            </button>
+          ) : (
+            <button
+              className={`btn-toggle-consumed${isConsumed ? ' btn-toggle-consumed--hecha' : ''}`}
+              aria-pressed={isConsumed}
+              onClick={() => onToggleConsumed(mealId)}
+            >
+              {isConsumed ? '✓ Comido' : 'Marcar como comido'}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── HoyPage ────────────────────────────────────────────────────────────────
+
 export default function HoyPage() {
   const HOY = toISO(new Date())
   const { token, email } = useAuth()
@@ -112,7 +294,8 @@ export default function HoyPage() {
   const [plan, setPlan] = useState<PlanDto | null>(null)
   const [sinPlan, setSinPlan] = useState(false)
   const [cargando, setCargando] = useState(true)
-  const [comidas, setComidas] = useState<Set<number>>(new Set())
+  const [entries, setEntries] = useState<FoodEntryDto[]>([])
+  const [equivalences, setEquivalences] = useState<EquivalenceDto[]>([])
 
   useEffect(() => {
     if (!token) return
@@ -124,41 +307,72 @@ export default function HoyPage() {
 
   useEffect(() => {
     if (!token) return
-    getLog(token, fecha)
-      .then(log => setComidas(new Set(log)))
-      .catch(() => setComidas(new Set()))
+    getEquivalences(token).then(setEquivalences).catch(() => {})
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    getIntake(token, fecha)
+      .then(setEntries)
+      .catch(() => setEntries([]))
   }, [token, fecha])
 
   function irDia(delta: number) {
-    setComidas(new Set())
+    setEntries([])
     setFecha(f => sumarDias(f, delta))
   }
 
-  const toggle = useCallback(async (mealId: number) => {
+  const addEntry = useCallback(async (mealId: number, food: string, qty: number, unit: string, foodGroup: FoodGroup) => {
     if (!token) return
-    const eaten = comidas.has(mealId)
-    setComidas(prev => {
-      const next = new Set(prev)
-      if (eaten) next.delete(mealId); else next.add(mealId)
-      return next
-    })
+    const entry = await addFoodEntry(token, fecha, mealId, food, qty, unit, foodGroup)
+    setEntries(prev => [...prev, entry])
+  }, [token, fecha])
+
+  const deleteEntry = useCallback(async (id: number) => {
+    if (!token) return
+    setEntries(prev => prev.filter(e => e.id !== id))
     try {
-      if (eaten) await unmarkMealEaten(token, mealId, fecha)
-      else await markMealEaten(token, mealId, fecha)
+      await deleteFoodEntry(token, id)
     } catch {
-      setComidas(prev => {
-        const next = new Set(prev)
-        if (eaten) next.add(mealId); else next.delete(mealId)
-        return next
-      })
+      getIntake(token, fecha).then(setEntries).catch(() => {})
     }
-  }, [token, comidas, fecha])
+  }, [token, fecha])
+
+  const toggleConsumed = useCallback(async (mealId: number) => {
+    if (!token) return
+    const mealEntries = entries.filter(e => e.mealId === mealId)
+    if (mealEntries.length === 0) return
+    const wasConsumed = mealEntries.every(e => e.consumed)
+
+    setEntries(prev => prev.map(e =>
+      e.mealId === mealId ? { ...e, consumed: !wasConsumed } : e
+    ))
+    try {
+      if (wasConsumed) await unmarkMealConsumed(token, fecha, mealId)
+      else await markMealConsumed(token, fecha, mealId)
+    } catch {
+      setEntries(prev => prev.map(e =>
+        e.mealId === mealId ? { ...e, consumed: wasConsumed } : e
+      ))
+    }
+  }, [token, fecha, entries])
 
   const esHoy = fecha === HOY
   const nombre = email?.split('@')[0] ?? ''
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
-  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, comidas) : -1
-  const { total, done, porGrupo } = calcResumen(meals, comidas)
+
+  const consumedMealIds = new Set(
+    meals
+      .filter(m => m.id !== undefined)
+      .filter(m => {
+        const mealEntries = entries.filter(e => e.mealId === m.id)
+        return mealEntries.length > 0 && mealEntries.every(e => e.consumed)
+      })
+      .map(m => m.id!)
+  )
+
+  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, consumedMealIds) : -1
+  const { total, done, porGrupo } = calcResumen(meals, entries, equivalences)
 
   const navFecha = (
     <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
@@ -231,11 +445,10 @@ export default function HoyPage() {
                     .filter(g => porGrupo[g] && porGrupo[g]!.total > 0)
                     .map(g => {
                       const { total: t, done: d } = porGrupo[g]!
-                      const pct = Math.round((d / t) * 100)
+                      const pct = Math.min(100, Math.round((d / t) * 100))
                       const circ = 2 * Math.PI * 15
                       return (
                         <Fragment key={g}>
-                        {/* Escritorio: barra por grupo */}
                         <div className="hoy-grupo-prog" title={GRUPOS[g].label}>
                           <div className="hoy-grupo-prog__dot" style={{ background: GRUPOS[g].token }} />
                           <div className="hoy-grupo-prog__bar">
@@ -246,7 +459,6 @@ export default function HoyPage() {
                           </div>
                           <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
                         </div>
-                        {/* Celular: anillo por grupo */}
                         <div
                           className="hoy-anillo"
                           role="img"
@@ -274,40 +486,29 @@ export default function HoyPage() {
               {meals.map((meal, i) => {
                 const noVacias = meal.portions.filter(p => p.portions > 0)
                 const esAhora = i === ahoraIdx
-                const hecha = meal.id !== undefined && comidas.has(meal.id)
-                const pasada = esHoy && !hecha && esPasada(meal.suggestedTime)
+                const isConsumed = meal.id !== undefined && consumedMealIds.has(meal.id)
+                const pasada = esHoy && !isConsumed && !esAhora && esPasada(meal.suggestedTime)
+                const mealFoodGroups = noVacias.map(p => p.foodGroup)
 
                 return (
                   <div
                     key={i}
                     className={[
                       'comida-hoy',
-                      esAhora && !hecha ? 'comida-hoy--ahora' : '',
-                      hecha ? 'comida-hoy--hecha' : '',
+                      esAhora && !isConsumed ? 'comida-hoy--ahora' : '',
+                      isConsumed ? 'comida-hoy--hecha' : '',
                       pasada ? 'comida-hoy--pasada' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <div className="comida-hoy__encabezado">
                       <span className="comida-hoy__nombre">{meal.name}</span>
-                      <div className="comida-hoy__enc-right">
-                        {meal.suggestedTime && (
-                          <div className={`comida-hoy__hora-wrap${esAhora && !hecha ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
-                            <span className="comida-hoy__hora">
-                              {meal.suggestedTime.slice(0, 5)}
-                            </span>
-                          </div>
-                        )}
-                        {meal.id !== undefined && !esAhora && (
-                          <button
-                            className={`btn-toggle-comida${hecha ? ' btn-toggle-comida--hecha' : ''}`}
-                            aria-pressed={hecha}
-                            aria-label={hecha ? `Desmarcar ${meal.name}` : `Marcar ${meal.name} como comida`}
-                            onClick={() => toggle(meal.id!)}
-                          >
-                            <span className="btn-toggle-comida__dot" />
-                          </button>
-                        )}
-                      </div>
+                      {meal.suggestedTime && (
+                        <div className={`comida-hoy__hora-wrap${esAhora && !isConsumed ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
+                          <span className="comida-hoy__hora">
+                            {meal.suggestedTime.slice(0, 5)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {noVacias.length > 0 && (
@@ -321,15 +522,18 @@ export default function HoyPage() {
                       </div>
                     )}
 
-                    {meal.id !== undefined && esAhora && (
-                      <button
-                        className={`btn-ya-lo-comi${hecha ? ' btn-ya-lo-comi--hecha' : ''}`}
-                        aria-pressed={hecha}
-                        aria-label={hecha ? `Desmarcar ${meal.name}` : `Marcar ${meal.name} como comida`}
-                        onClick={() => toggle(meal.id!)}
-                      >
-                        {hecha ? '✓ Hecho' : 'Ya lo comí'}
-                      </button>
+                    {meal.id !== undefined && (
+                      <IntakeMealSection
+                        mealId={meal.id}
+                        entries={entries.filter(e => e.mealId === meal.id)}
+                        equivalences={equivalences}
+                        mealFoodGroups={mealFoodGroups}
+                        onAdd={addEntry}
+                        onDelete={deleteEntry}
+                        onToggleConsumed={toggleConsumed}
+                        isConsumed={isConsumed}
+                        isAhora={esAhora}
+                      />
                     )}
                   </div>
                 )
