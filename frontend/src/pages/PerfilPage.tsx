@@ -1,4 +1,4 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTheme, type Theme } from '../hooks/useTheme'
 import Brand from '../components/Brand'
@@ -32,16 +32,6 @@ export default function PerfilPage() {
           <p className="perfil-card__label">Email</p>
           <p className="perfil-card__value">{email}</p>
         </div>
-
-        <Link to="/mi-plan" className="perfil-card perfil-card--link">
-          <p className="perfil-card__label">Plan</p>
-          <div className="perfil-card__row">
-            <p className="perfil-card__value">Editar mi plan de porciones</p>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M7 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-        </Link>
 
         <div className="perfil-card">
           <p className="perfil-card__label">Tema</p>
