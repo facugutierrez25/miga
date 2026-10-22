@@ -195,7 +195,7 @@ export default function MiPlanPage() {
     setEquivAdding(true)
     setEquivError(null)
     try {
-      const created = await addEquivalence(token, group, newFood.trim(), qty, newUnit.trim())
+      const created = await addEquivalence(token, group, newFood.trim(), qty, newUnit)
       setEquivalences(prev => [...(prev ?? []), created])
       setNewFood('')
       setNewQuantity('')

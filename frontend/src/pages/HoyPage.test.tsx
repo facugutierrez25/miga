@@ -3,17 +3,19 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import HoyPage from './HoyPage'
 import * as plansApi from '../api/plans'
-import * as registroApi from '../api/registro'
+import * as intakeApi from '../api/intake'
+import * as equivalencesApi from '../api/equivalences'
 import * as AuthContext from '../auth/AuthContext'
 
 vi.mock('../api/plans')
-vi.mock('../api/registro')
+vi.mock('../api/intake')
+vi.mock('../api/equivalences')
 vi.mock('../auth/AuthContext')
 
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
-const mockGetLog = vi.mocked(registroApi.getLog)
-const mockMarkMealEaten = vi.mocked(registroApi.markMealEaten)
-const mockUnmarkMealEaten = vi.mocked(registroApi.unmarkMealEaten)
+const mockGetIntake = vi.mocked(intakeApi.getIntake)
+const mockMarkMealConsumed = vi.mocked(intakeApi.markMealConsumed)
+const mockGetEquivalences = vi.mocked(equivalencesApi.getEquivalences)
 
 const planConComida = {
   meals: [{
@@ -25,6 +27,11 @@ const planConComida = {
   }],
 }
 
+const entradaConsumo = {
+  id: 10, mealId: 1, food: 'Pechuga de pollo',
+  quantity: 200, unit: 'G', foodGroup: 'PROTEINS' as const, consumed: false,
+}
+
 beforeEach(() => {
   vi.mocked(AuthContext.useAuth).mockReturnValue({
     token: 'tok',
@@ -32,9 +39,9 @@ beforeEach(() => {
     login: vi.fn(),
     logout: vi.fn(),
   })
-  mockGetLog.mockResolvedValue([])
-  mockMarkMealEaten.mockResolvedValue()
-  mockUnmarkMealEaten.mockResolvedValue()
+  mockGetIntake.mockResolvedValue([])
+  mockGetEquivalences.mockResolvedValue([])
+  mockMarkMealConsumed.mockResolvedValue()
 })
 
 afterEach(() => {
@@ -109,16 +116,16 @@ test('muestra el resumen de porciones cuando hay un plan', async () => {
 
 test('el botón "Ya lo comí" marca la comida como hecha', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetIntake.mockResolvedValue([entradaConsumo])
   renderHoy()
   await waitFor(() => expect(screen.getByText('Ya lo comí')).toBeInTheDocument())
   fireEvent.click(screen.getByText('Ya lo comí'))
-  expect(mockMarkMealEaten).toHaveBeenCalledWith('tok', 1, expect.any(String))
-  await waitFor(() => expect(screen.getByText('✓ Hecho')).toBeInTheDocument())
+  await waitFor(() => expect(mockMarkMealConsumed).toHaveBeenCalledWith('tok', expect.any(String), 1))
 })
 
 test('marca como comida las que ya están en el log', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
-  mockGetLog.mockResolvedValue([1])
+  mockGetIntake.mockResolvedValue([{ ...entradaConsumo, consumed: true }])
   renderHoy()
   await waitFor(() => expect(screen.getByText('✓ Hecho')).toBeInTheDocument())
 })
