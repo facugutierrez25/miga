@@ -10,7 +10,8 @@ export interface EquivalenceDto {
   unit: Unit
 }
 
-const BASE = '/api/v1/equivalences'
+const API_URL = import.meta.env.VITE_API_URL ?? ''
+const BASE = `${API_URL}/api/v1/equivalences`
 
 export async function getEquivalences(token: string): Promise<EquivalenceDto[]> {
   const res = await fetch(BASE, {
