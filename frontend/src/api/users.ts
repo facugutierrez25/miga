@@ -17,7 +17,21 @@ export async function login(email: string, password: string): Promise<string> {
     body: JSON.stringify({ email, password }),
   })
   if (response.status === 401) throw new Error('Email o contraseña incorrectos.')
+  if (response.status === 403) throw new Error('EMAIL_NOT_VERIFIED')
   if (!response.ok) throw new Error('Error al iniciar sesión. Intentá de nuevo.')
   const data = await response.json()
   return data.token
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/v1/auth/verify?token=${encodeURIComponent(token)}`)
+  if (!response.ok) throw new Error('INVALID_TOKEN')
+}
+
+export async function resendVerification(email: string): Promise<void> {
+  await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
 }

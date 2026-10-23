@@ -9,11 +9,14 @@ public class UserService {
     private final UsersRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final VerificationService verificationService;
 
-    UserService(UsersRepository repository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    UserService(UsersRepository repository, PasswordEncoder passwordEncoder,
+                JwtService jwtService, VerificationService verificationService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.verificationService = verificationService;
     }
 
     String login(String email, String password) {
@@ -21,6 +24,9 @@ public class UserService {
             .orElseThrow(InvalidCredentialsException::new);
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
+        }
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException();
         }
         return jwtService.generateToken(user);
     }
@@ -39,6 +45,13 @@ public class UserService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setRole(Role.PATIENT);
-        return repository.save(user);
+        user.setEmailVerified(false);
+        User saved = repository.save(user);
+        try {
+            verificationService.sendVerificationFor(saved);
+        } catch (Exception e) {
+            // El registro no falla si el email no se puede enviar; el usuario puede reenviar
+        }
+        return saved;
     }
 }

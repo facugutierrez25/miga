@@ -54,7 +54,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await register(email, password)
-      navigate('/login')
+      navigate('/verificar-email', { state: { email } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido.')
     } finally {
