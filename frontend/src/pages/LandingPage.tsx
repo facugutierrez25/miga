@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 import './LandingPage.css'
 
 function useScrollReveal() {
@@ -73,6 +74,7 @@ function PhoneMockup() {
 }
 
 export default function LandingPage() {
+  useTitle('Miga - Cumplí el plan de tu nutricionista')
   const { token } = useAuth()
   useScrollReveal()
 
@@ -89,6 +91,9 @@ export default function LandingPage() {
           <Link to="/register" className="land-nav__cta">Crear cuenta</Link>
         </nav>
       </header>
+
+      {/* ── Main content ── */}
+      <main>
 
       {/* ── Hero ── */}
       <div className="land-hero-wrap">
@@ -128,21 +133,38 @@ export default function LandingPage() {
           <h2 className="land-section-title" data-reveal>Diseñado para el día a día del paciente</h2>
           <div className="land-features__grid">
             <div className="land-feature" data-reveal data-delay="0">
-              <div className="land-feature__dot land-feature__dot--hoy" />
+              <div className="land-feature__icon land-feature__icon--hoy">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M7 2v4M13 2v4M3 8h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M7 12h2M11 12h2M7 15h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
               <h3 className="land-feature__title">Tu plan, cada día</h3>
               <p className="land-feature__desc">
                 Cada mañana sabés exactamente qué comer en cada comida: cuántas porciones de cada grupo alimenticio.
               </p>
             </div>
             <div className="land-feature" data-reveal data-delay="1">
-              <div className="land-feature__dot land-feature__dot--plan" />
+              <div className="land-feature__icon land-feature__icon--plan">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M10 3v14M4 6l6-3 6 3M4 14l6 3 6-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M4 6v8M16 6v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
               <h3 className="land-feature__title">Porciones e intercambios</h3>
               <p className="land-feature__desc">
                 Trabajamos con el sistema de porciones que usán los nutricionistas en Uruguay. Tu plan, tal cual te lo dieron.
               </p>
             </div>
             <div className="land-feature" data-reveal data-delay="2">
-              <div className="land-feature__dot land-feature__dot--semana" />
+              <div className="land-feature__icon land-feature__icon--semana">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M15 4l1.5 1.5L19 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
               <h3 className="land-feature__title">Sin apps del profesional</h3>
               <p className="land-feature__desc">
                 Tu nutricionista no necesita usar ninguna app. Vos cargás el plan y listo. Funciona desde el día uno.
@@ -205,6 +227,8 @@ export default function LandingPage() {
           <Link to="/register" className="land-btn-primary land-btn-primary--lg">Crear cuenta gratis</Link>
         </div>
       </section>
+
+      </main>
 
       {/* ── Footer ── */}
       <footer className="land-footer">

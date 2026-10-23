@@ -32,6 +32,7 @@ describe('RegisterPage', () => {
 
     await user.type(screen.getByLabelText('Email'), 'facu@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
+    await user.type(screen.getByLabelText('Repetir contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
     await waitFor(() => {
@@ -46,6 +47,7 @@ describe('RegisterPage', () => {
 
     await user.type(screen.getByLabelText('Email'), 'duplicado@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
+    await user.type(screen.getByLabelText('Repetir contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
     await waitFor(() => {
@@ -60,6 +62,7 @@ describe('RegisterPage', () => {
 
     await user.type(screen.getByLabelText('Email'), 'facu@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
+    await user.type(screen.getByLabelText('Repetir contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
     await waitFor(() => {
@@ -74,6 +77,7 @@ describe('RegisterPage', () => {
 
     await user.type(screen.getByLabelText('Email'), 'facu@miga.uy')
     await user.type(screen.getByLabelText('Contraseña'), 'Segura1234!')
+    await user.type(screen.getByLabelText('Repetir contraseña'), 'Segura1234!')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
 
     expect(screen.getByRole('button', { name: 'Registrando…' })).toBeDisabled()

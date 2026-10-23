@@ -55,7 +55,7 @@
 
 .plan-tab {
   flex: 1;
-  height: 36px;
+  min-height: 44px;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
@@ -170,8 +170,8 @@
 }
 
 .equiv-item__delete {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
   color: var(--muted);
@@ -181,6 +181,7 @@
   justify-content: center;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .equiv-item__delete:hover {
@@ -203,7 +204,8 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--line);
-  padding: 4px 2px;
+  padding: 0 2px;
+  min-height: 44px;
   outline: none;
   min-width: 0;
 }
@@ -237,7 +239,8 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--line);
-  padding: 4px 18px 4px 2px;
+  padding: 0 18px 0 2px;
+  min-height: 44px;
   outline: none;
   cursor: pointer;
 }
@@ -254,8 +257,8 @@
 }
 
 .equiv-add__btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   border: none;
   background: var(--primary-soft);
@@ -265,6 +268,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .equiv-add__btn:disabled {
@@ -816,5 +820,221 @@
 @media (min-width: 640px) {
   .mi-plan-header {
     padding: 28px 24px 0;
+  }
+}
+
+/* ── Dark mode: cards planas, sin glass ── */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .comida-card,
+  :root:not([data-theme="light"]) .equiv-group,
+  :root:not([data-theme="light"]) .plan-tabs,
+  :root:not([data-theme="light"]) .btn-guardar-comida,
+  :root:not([data-theme="light"]) .modal-card {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+  }
+
+  :root:not([data-theme="light"]) .plan-tab--active {
+    background: var(--surface-2);
+    box-shadow: none;
+  }
+
+  :root:not([data-theme="light"]) .modal-card {
+    background: var(--surface);
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+  }
+}
+
+[data-theme="dark"] .comida-card,
+[data-theme="dark"] .equiv-group,
+[data-theme="dark"] .plan-tabs,
+[data-theme="dark"] .btn-guardar-comida,
+[data-theme="dark"] .modal-card {
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .plan-tab--active {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .modal-card {
+  background: var(--surface);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+/* ── Equivalencias intro ── */
+
+.equiv-intro {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 4px 2px 8px;
+}
+
+.equiv-success {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  padding: 8px 12px;
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+/* ── Snackbar undo ── */
+
+.snackbar {
+  position: fixed;
+  bottom: calc(64px + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 400;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  animation: snackbar-in 0.2s ease;
+}
+
+@keyframes snackbar-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.snackbar__undo {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-body);
+}
+
+/* ── Confirm delete inline (tarjeta minimizada) ── */
+
+.confirm-delete {
+  grid-area: del;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.confirm-delete__yes {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.confirm-delete__no {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── Confirm modal (tarjeta expandida) ── */
+
+.confirm-modal {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 24px 20px 20px;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  border: 1px solid var(--glass-border);
+}
+
+.confirm-modal__msg {
+  font-size: 16px;
+  color: var(--ink);
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.confirm-modal__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-modal__cancel {
+  flex: 1;
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.confirm-modal__confirm {
+  flex: 1;
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+/* ── Equiv add — mobile column layout ── */
+
+@media (max-width: 479px) {
+  .equiv-add {
+    flex-wrap: wrap;
+  }
+
+  .equiv-add__input {
+    flex: 1 1 100%;
+  }
+
+  .equiv-add__input--qty {
+    flex: 1 1 calc(50% - 60px);
+  }
+
+  .equiv-add__unit-wrap {
+    flex: 0 0 80px;
+  }
+
+  .equiv-add__btn {
+    margin-left: auto;
   }
 }
