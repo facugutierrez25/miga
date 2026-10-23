@@ -25,6 +25,10 @@ services:
       DB_USER: ${DB_USER:-miga}
       DB_PASSWORD: ${DB_PASSWORD:-miga}
       CORS_ALLOWED_ORIGINS: http://localhost:5173
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      MAIL_FROM: ${MAIL_FROM:-onboarding@resend.dev}
     ports:
       - "8080:8080"
     depends_on:

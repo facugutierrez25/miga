@@ -3,6 +3,10 @@
 spring:
   application:
     name: miga-backend
+  config:
+    # Carga .env de la raíz del proyecto cuando se corre con Maven local.
+    # En Docker no existe esa ruta y Spring lo ignora (optional:).
+    import: optional:file:../.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/nutriplan}
     username: ${DB_USER:nutriplan}
@@ -24,9 +28,15 @@ app:
   version: '@project.version@'
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175}
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  mail:
+    from: ${MAIL_FROM:noreply@miga.uy}
 
 jwt:
   secret: ${JWT_SECRET:dev-secret-local-must-be-at-least-32-chars}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
 
 management:
   endpoints:

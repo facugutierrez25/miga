@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 import { getMyPlan, type FoodGroup, type MealDto, type PlanDto } from '../api/plans'
 import { getIntake, addFoodEntry, deleteFoodEntry, markMealConsumed, unmarkMealConsumed, type FoodEntryDto } from '../api/intake'
 import { getEquivalences, type EquivalenceDto } from '../api/equivalences'
@@ -50,6 +51,15 @@ function saludo(): string {
   if (h < 12) return 'Buenos días'
   if (h < 20) return 'Buenas tardes'
   return 'Buenas noches'
+}
+
+function formatNombre(email: string | undefined): string {
+  if (!email) return ''
+  const local = email.split('@')[0]
+  return local
+    .replace(/[._+]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim()
 }
 
 function esPasada(suggestedTime?: string): boolean {
@@ -174,6 +184,7 @@ function IntakeMealSection({
         className="intake-toggle"
         onClick={() => setIsOpen(o => !o)}
         aria-expanded={isOpen}
+        aria-controls={`intake-body-${mealId}`}
       >
         <span className={`intake-toggle__label${isConsumed ? ' intake-toggle__label--consumed' : ''}`}>
           {summaryLabel}
@@ -187,7 +198,7 @@ function IntakeMealSection({
       </button>
 
       {isOpen && (
-        <div className="intake-body">
+        <div className="intake-body" id={`intake-body-${mealId}`}>
           {hasEntries && (
             <ul className="intake-entries" aria-label="Lo que comiste">
               {entries.map(e => (
@@ -262,23 +273,19 @@ function IntakeMealSection({
             )}
           </form>
 
-          {hasEntries && (isAhora ? (
+          {hasEntries && (
             <button
-              className={`btn-ya-lo-comi${isConsumed ? ' btn-ya-lo-comi--hecha' : ''}`}
+              className={[
+                'btn-ya-lo-comi',
+                isConsumed ? 'btn-ya-lo-comi--hecha' : '',
+                !isAhora ? 'btn-ya-lo-comi--secondary' : '',
+              ].filter(Boolean).join(' ')}
               aria-pressed={isConsumed}
               onClick={() => onToggleConsumed(mealId)}
             >
-              {isConsumed ? '✓ Hecho' : 'Ya lo comí'}
+              {isConsumed ? '✓ Hecho' : isAhora ? 'Ya lo comí' : 'Marcar como comido'}
             </button>
-          ) : (
-            <button
-              className={`btn-toggle-consumed${isConsumed ? ' btn-toggle-consumed--hecha' : ''}`}
-              aria-pressed={isConsumed}
-              onClick={() => onToggleConsumed(mealId)}
-            >
-              {isConsumed ? '✓ Comido' : 'Marcar como comido'}
-            </button>
-          ))}
+          )}
         </div>
       )}
     </div>
@@ -288,8 +295,9 @@ function IntakeMealSection({
 // ── HoyPage ────────────────────────────────────────────────────────────────
 
 export default function HoyPage() {
+  useTitle('Hoy | Miga')
   const HOY = toISO(new Date())
-  const { token, email } = useAuth()
+  const { token, email, firstName } = useAuth()
   const [fecha, setFecha] = useState(HOY)
   const [plan, setPlan] = useState<PlanDto | null>(null)
   const [sinPlan, setSinPlan] = useState(false)
@@ -358,7 +366,7 @@ export default function HoyPage() {
   }, [token, fecha, entries])
 
   const esHoy = fecha === HOY
-  const nombre = email?.split('@')[0] ?? ''
+  const nombre = firstName ?? formatNombre(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
 
   const consumedMealIds = new Set(
@@ -450,7 +458,7 @@ export default function HoyPage() {
                       return (
                         <Fragment key={g}>
                         <div className="hoy-grupo-prog" title={GRUPOS[g].label}>
-                          <div className="hoy-grupo-prog__dot" style={{ background: GRUPOS[g].token }} />
+                          <span className="hoy-grupo-prog__nombre">{GRUPOS[g].label}</span>
                           <div className="hoy-grupo-prog__bar">
                             <div
                               className="hoy-grupo-prog__fill"
@@ -474,6 +482,7 @@ export default function HoyPage() {
                             />
                           </svg>
                           <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
+                          <span className="hoy-anillo__nombre" aria-hidden="true">{GRUPOS[g].label}</span>
                         </div>
                         </Fragment>
                       )
@@ -501,7 +510,15 @@ export default function HoyPage() {
                     ].filter(Boolean).join(' ')}
                   >
                     <div className="comida-hoy__encabezado">
-                      <span className="comida-hoy__nombre">{meal.name}</span>
+                      <div className="comida-hoy__nombre-wrap">
+                        <span className="comida-hoy__nombre">{meal.name}</span>
+                        {isConsumed && (
+                          <svg className="comida-hoy__done-icon" viewBox="0 0 16 16" fill="none" aria-label="Consumida" width="14" height="14">
+                            <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.15"/>
+                            <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
                       {meal.suggestedTime && (
                         <div className={`comida-hoy__hora-wrap${esAhora && !isConsumed ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
                           <span className="comida-hoy__hora">

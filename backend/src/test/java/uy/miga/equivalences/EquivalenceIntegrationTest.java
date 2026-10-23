@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import uy.miga.users.MockEmailService;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -23,6 +25,7 @@ class EquivalenceIntegrationTest {
 
     @Autowired private WebApplicationContext context;
     @Autowired private FilterChainProxy springSecurityFilterChain;
+    @Autowired private MockEmailService mockEmailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
@@ -30,6 +33,7 @@ class EquivalenceIntegrationTest {
 
     @BeforeEach
     void setup() throws Exception {
+        mockEmailService.reset();
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .addFilters(springSecurityFilterChain)
             .build();
@@ -41,6 +45,11 @@ class EquivalenceIntegrationTest {
                     { "email": "equiv@miga.uy", "password": "Segura1234!" }
                     """));
         } catch (Exception ignored) {}
+
+        String verifyToken = mockEmailService.getLastToken();
+        if (verifyToken != null) {
+            mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
+        }
 
         MvcResult result = mockMvc.perform(post("/api/v1/users/login")
             .contentType(MediaType.APPLICATION_JSON)

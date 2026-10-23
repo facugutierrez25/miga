@@ -2,6 +2,7 @@ package uy.miga.users;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,4 +26,15 @@ class UserController {
         String token = userService.login(request.email(), request.password());
         return new LoginResponse(token);
     }
+
+    @GetMapping("/me")
+    UserProfileResponse me(Authentication auth) {
+        return userService.getProfile(auth.getName());
+    }
+
+    @PatchMapping("/me")
+    UserProfileResponse updateMe(Authentication auth, @Valid @RequestBody UpdateProfileRequest req) {
+        return userService.updateProfile(auth.getName(), req);
+    }
+
 }
