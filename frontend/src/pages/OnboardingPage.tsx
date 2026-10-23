@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 import './OnboardingPage.css'
 
 const TOTAL_STEPS = 4
@@ -154,6 +155,7 @@ function Step4({ meals, onNext, onBack }: { meals: MealDraft[]; onNext: () => vo
 }
 
 export default function OnboardingPage() {
+  useTitle('Cargar mi plan | Miga')
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [mealCount, setMealCount] = useState(4)

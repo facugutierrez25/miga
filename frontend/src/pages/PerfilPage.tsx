@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTheme, type Theme } from '../hooks/useTheme'
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 import './PerfilPage.css'
 
 const TEMAS: { value: Theme; label: string }[] = [
@@ -11,6 +12,7 @@ const TEMAS: { value: Theme; label: string }[] = [
 ]
 
 export default function PerfilPage() {
+  useTitle('Perfil | Miga')
   const { email, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()

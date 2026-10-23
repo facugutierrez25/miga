@@ -98,14 +98,14 @@ test('muestra solo los grupos con porciones mayores a cero', async () => {
     }],
   })
   renderHoy()
-  await waitFor(() => expect(screen.getByText('Proteínas')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getAllByText('Proteínas').length).toBeGreaterThan(0))
   expect(screen.queryByText('Cereales')).not.toBeInTheDocument()
 })
 
 test('muestra el nombre del usuario en el saludo', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   renderHoy()
-  await waitFor(() => expect(screen.getAllByText(/facu/).length).toBeGreaterThan(0))
+  await waitFor(() => expect(screen.getAllByText(/facu/i).length).toBeGreaterThan(0))
 })
 
 test('muestra el resumen de porciones cuando hay un plan', async () => {
