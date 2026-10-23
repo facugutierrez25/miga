@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
+import { useAhora } from '../hooks/useAhora'
 import { getMyPlan, type FoodGroup, type MealDto, type PlanDto } from '../api/plans'
 import { getIntake, addFoodEntry, deleteFoodEntry, markMealConsumed, unmarkMealConsumed, type FoodEntryDto } from '../api/intake'
 import { getEquivalences, type EquivalenceDto } from '../api/equivalences'
@@ -46,8 +47,8 @@ function labelFecha(iso: string, hoy: string): string {
   return `${wd} ${day} ${mo}`
 }
 
-function saludo(): string {
-  const h = new Date().getHours()
+function saludo(ahora: Date): string {
+  const h = ahora.getHours()
   if (h < 12) return 'Buenos días'
   if (h < 20) return 'Buenas tardes'
   return 'Buenas noches'
@@ -62,16 +63,16 @@ function formatNombre(email: string | undefined): string {
     .trim()
 }
 
-function esPasada(suggestedTime?: string): boolean {
+function esPasada(suggestedTime: string | undefined, ahora: Date): boolean {
   if (!suggestedTime) return false
   const [h, m] = suggestedTime.split(':').map(Number)
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const nowMin = ahora.getHours() * 60 + ahora.getMinutes()
   return h * 60 + m < nowMin - 90
 }
 
-function findIndexAhora(meals: MealDto[], consumedSet: Set<number>): number {
+function findIndexAhora(meals: MealDto[], consumedSet: Set<number>, ahora: Date): number {
   if (meals.length === 0) return -1
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const nowMin = ahora.getHours() * 60 + ahora.getMinutes()
 
   const byTime = meals
     .map((m, i) => ({ m, i }))
@@ -296,7 +297,9 @@ function IntakeMealSection({
 
 export default function HoyPage() {
   useTitle('Hoy | Miga')
-  const HOY = toISO(new Date())
+  // Hora del dispositivo, al día aunque la app vuelva de segundo plano
+  const ahora = useAhora()
+  const HOY = toISO(ahora)
   const { token, email, firstName } = useAuth()
   const [fecha, setFecha] = useState(HOY)
   const [plan, setPlan] = useState<PlanDto | null>(null)
@@ -304,6 +307,16 @@ export default function HoyPage() {
   const [cargando, setCargando] = useState(true)
   const [entries, setEntries] = useState<FoodEntryDto[]>([])
   const [equivalences, setEquivalences] = useState<EquivalenceDto[]>([])
+
+  // Si pasó la medianoche con la app abierta (o en segundo plano) y estaba viendo
+  // "hoy", se pasa solo al día nuevo. Si estaba mirando otro día, no se toca.
+  const hoyAnterior = useRef(HOY)
+  useEffect(() => {
+    if (hoyAnterior.current === HOY) return
+    const anterior = hoyAnterior.current
+    hoyAnterior.current = HOY
+    setFecha(f => (f === anterior ? HOY : f))
+  }, [HOY])
 
   useEffect(() => {
     if (!token) return
@@ -379,7 +392,7 @@ export default function HoyPage() {
       .map(m => m.id!)
   )
 
-  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, consumedMealIds) : -1
+  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, consumedMealIds, ahora) : -1
   const { total, done, porGrupo } = calcResumen(meals, entries, equivalences)
 
   const navFecha = (
@@ -415,7 +428,7 @@ export default function HoyPage() {
         </div>
         {navFecha}
         <h1 className="hoy-header__titulo">
-          {esHoy ? `${saludo()}, ${nombre}.` : formatFechaLarga(fecha)}
+          {esHoy ? `${saludo(ahora)}, ${nombre}.` : formatFechaLarga(fecha)}
         </h1>
       </header>
 
@@ -423,7 +436,7 @@ export default function HoyPage() {
         <div className="hoy-desktop-saludo">
           {navFecha}
           <h1 className="hoy-desktop-saludo__titulo">
-            {esHoy ? `${saludo()}, ${nombre}.` : formatFechaLarga(fecha)}
+            {esHoy ? `${saludo(ahora)}, ${nombre}.` : formatFechaLarga(fecha)}
           </h1>
         </div>
 
@@ -496,7 +509,7 @@ export default function HoyPage() {
                 const noVacias = meal.portions.filter(p => p.portions > 0)
                 const esAhora = i === ahoraIdx
                 const isConsumed = meal.id !== undefined && consumedMealIds.has(meal.id)
-                const pasada = esHoy && !isConsumed && !esAhora && esPasada(meal.suggestedTime)
+                const pasada = esHoy && !isConsumed && !esAhora && esPasada(meal.suggestedTime, ahora)
                 const mealFoodGroups = noVacias.map(p => p.foodGroup)
 
                 return (
