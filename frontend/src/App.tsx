@@ -12,6 +12,7 @@ import PerfilPage from './pages/PerfilPage'
 import MiPlanPage from './pages/MiPlanPage'
 import OnboardingPage from './pages/OnboardingPage'
 import PrivacidadPage from './pages/PrivacidadPage'
+import VerificarEmailPage from './pages/VerificarEmailPage'
 import ScrollToTop from './components/ScrollToTop'
 
 function AuthLayout() {
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/privacidad" element={<PrivacidadPage />} />
+          <Route path="/verificar-email" element={<VerificarEmailPage />} />
           <Route element={<AuthLayout />}>
             <Route path="/hoy" element={<HoyPage />} />
             <Route path="/semana" element={<SemanaPage />} />

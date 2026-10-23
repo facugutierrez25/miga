@@ -80,7 +80,10 @@
   color: var(--on-primary);
   background: var(--primary);
   text-decoration: none;
-  padding: 7px 16px;
+  padding: 0 16px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   border-radius: var(--radius-control);
   transition: background 0.15s;
 }
@@ -120,7 +123,8 @@
 
 .land-hero__sub {
   font-size: clamp(15px, 2.5vw, 18px);
-  color: var(--muted);
+  color: var(--ink);
+  opacity: 0.65;
   line-height: 1.6;
   max-width: 480px;
   margin: 0 auto;
@@ -471,16 +475,19 @@
   box-shadow: var(--glass-shadow);
 }
 
-.land-feature__dot {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+.land-feature__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.land-feature__dot--hoy  { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
-.land-feature__dot--plan { background: color-mix(in srgb, var(--g-prot)  18%, var(--surface)); }
-.land-feature__dot--semana { background: color-mix(in srgb, var(--g-cer) 18%, var(--surface)); }
+.land-feature__icon--hoy   { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+.land-feature__icon--plan  { background: color-mix(in srgb, var(--g-prot)  14%, transparent); color: var(--g-prot);  }
+.land-feature__icon--semana { background: color-mix(in srgb, var(--g-cer)  14%, transparent); color: var(--g-cer);   }
 
 .land-feature__title {
   font-family: var(--font-display);
@@ -492,7 +499,8 @@
 
 .land-feature__desc {
   font-size: 15px;
-  color: var(--muted);
+  color: var(--ink);
+  opacity: 0.65;
   line-height: 1.6;
 }
 
@@ -543,7 +551,8 @@
 
 .land-step__desc {
   font-size: 15px;
-  color: var(--muted);
+  color: var(--ink);
+  opacity: 0.65;
   line-height: 1.6;
 }
 

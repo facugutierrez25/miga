@@ -26,3 +26,6 @@ dist-ssr
 *.png
 # Los íconos de la app sí se versionan
 !public/*.png
+# Snapshots de playwright-cli
+*-snap.yml
+*-snap.yaml

@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 import './PrivacidadPage.css'
 
 export default function PrivacidadPage() {
+  useTitle('Privacidad | Miga')
   return (
     <div className="priv-page">
 

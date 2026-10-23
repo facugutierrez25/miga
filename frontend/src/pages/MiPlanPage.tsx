@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 import { getMyPlan, getPlanHistory, saveMyPlan, type FoodGroup, type PlanDto, type PlanSummaryDto } from '../api/plans'
 import { getEquivalences, addEquivalence, deleteEquivalence, type EquivalenceDto, type Unit } from '../api/equivalences'
 import './MiPlanPage.css'
@@ -102,6 +103,7 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
 type Tab = 'comidas' | 'equivalencias'
 
 export default function MiPlanPage() {
+  useTitle('Mi plan | Miga')
   const { token } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -121,6 +123,10 @@ export default function MiPlanPage() {
   const [newQuantity, setNewQuantity] = useState('')
   const [newUnit, setNewUnit] = useState<Unit>('G')
   const [equivAdding, setEquivAdding] = useState(false)
+  const [equivAdded, setEquivAdded] = useState(false)
+  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null)
+  const [snackbar, setSnackbar] = useState<{ eq: EquivalenceDto } | null>(null)
+  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -179,6 +185,7 @@ export default function MiPlanPage() {
 
   function eliminarComida(i: number) {
     setComidas(prev => prev.filter((_, j) => j !== i))
+    setConfirmDeleteIdx(null)
   }
 
   function toggleGroup(group: FoodGroup) {
@@ -200,6 +207,8 @@ export default function MiPlanPage() {
       setNewFood('')
       setNewQuantity('')
       setNewUnit('G')
+      setEquivAdded(true)
+      setTimeout(() => setEquivAdded(false), 2000)
     } catch {
       setEquivError('No se pudo agregar. Intentá de nuevo.')
     } finally {
@@ -207,14 +216,32 @@ export default function MiPlanPage() {
     }
   }
 
-  async function handleDeleteEquivalence(id: number) {
+  function handleDeleteEquivalence(id: number) {
     if (!token) return
-    try {
-      await deleteEquivalence(token, id)
-      setEquivalences(prev => prev?.filter(e => e.id !== id) ?? null)
-    } catch {
-      setEquivError('No se pudo eliminar. Intentá de nuevo.')
-    }
+    const eq = equivalences?.find(e => e.id === id)
+    if (!eq) return
+
+    setEquivalences(prev => prev?.filter(e => e.id !== id) ?? null)
+
+    if (snackbarTimer.current) clearTimeout(snackbarTimer.current)
+    setSnackbar({ eq })
+
+    snackbarTimer.current = setTimeout(async () => {
+      setSnackbar(null)
+      try {
+        await deleteEquivalence(token, id)
+      } catch {
+        setEquivalences(prev => prev ? [...prev, eq] : [eq])
+        setEquivError('No se pudo eliminar. Intentá de nuevo.')
+      }
+    }, 5000)
+  }
+
+  function handleUndoDelete() {
+    if (!snackbar) return
+    if (snackbarTimer.current) clearTimeout(snackbarTimer.current)
+    setEquivalences(prev => prev ? [...prev, snackbar.eq] : [snackbar.eq])
+    setSnackbar(null)
   }
 
   async function confirmarPlan() {
@@ -237,6 +264,13 @@ export default function MiPlanPage() {
 
   return (
     <div className="mi-plan-page">
+      {snackbar && (
+        <div className="snackbar" role="status">
+          <span>"{snackbar.eq.food}" eliminada</span>
+          <button className="snackbar__undo" onClick={handleUndoDelete}>Deshacer</button>
+        </div>
+      )}
+
       <header className="mi-plan-header">
         <div className="mi-plan-header__meta">
           <Brand size={20} />
@@ -269,6 +303,13 @@ export default function MiPlanPage() {
             <p className="mi-plan-loading">Cargando equivalencias…</p>
           ) : (
             <>
+              <p className="equiv-intro">
+                Las equivalencias son los alimentos que podés elegir para cada porción de tu plan.
+                Por ejemplo, si tu plan indica "1 porción de proteínas", podés elegir entre los alimentos de esa lista.
+              </p>
+              {equivAdded && (
+                <p className="equiv-success" role="status">¡Equivalencia agregada!</p>
+              )}
               {GRUPOS.map(g => {
                 const items = equivalences.filter(e => e.foodGroup === g.key)
                 const open = expandedGroup === g.key
@@ -391,7 +432,7 @@ export default function MiPlanPage() {
                   </button>
                   <button
                     className="btn-eliminar-min"
-                    onClick={() => eliminarComida(i)}
+                    onClick={() => setConfirmDeleteIdx(i)}
                     aria-label="Eliminar comida"
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -411,7 +452,7 @@ export default function MiPlanPage() {
                     />
                     <button
                       className="btn-eliminar-exp"
-                      onClick={() => eliminarComida(i)}
+                      onClick={() => setConfirmDeleteIdx(i)}
                       aria-label="Eliminar comida"
                     >
                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -499,6 +540,20 @@ export default function MiPlanPage() {
 
             {planDetalle && (
               <PlanDetalleModal plan={planDetalle} onClose={() => setPlanDetalle(null)} />
+            )}
+
+            {confirmDeleteIdx !== null && comidas[confirmDeleteIdx] && (
+              <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar eliminación" onClick={() => setConfirmDeleteIdx(null)}>
+                <div className="confirm-modal" onClick={e => e.stopPropagation()}>
+                  <p className="confirm-modal__msg">
+                    ¿Eliminar <strong>{comidas[confirmDeleteIdx].nombre || 'esta comida'}</strong>?
+                  </p>
+                  <div className="confirm-modal__actions">
+                    <button className="confirm-modal__cancel" onClick={() => setConfirmDeleteIdx(null)}>Cancelar</button>
+                    <button className="confirm-modal__confirm" onClick={() => eliminarComida(confirmDeleteIdx)}>Eliminar</button>
+                  </div>
+                </div>
+              </div>
             )}
           </>
         )}

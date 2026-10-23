@@ -34,51 +34,53 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #081413; --surface: #132322; --surface-2: #0F1D1C;
-    --ink: #E6F0EF; --muted: #93A9A7; --muted-2: #7F9795; --done: #6E8684;
+    --bg: #0A0A0A; --surface: #141414; --surface-2: #1C1C1C;
+    --ink: #F0F0F0; --muted: #888888; --muted-2: #707070; --done: #595959;
     --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
     --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
-    --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
+    --line: #242424; --line-soft: #1E1E1E; --rail: #2A2A2A; --border: #303030; --control: #606060;
     --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
     --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
     --error: #F97066; --error-bg: #3A1C1A;
-    --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.35);
-    --glass-bg: rgba(30, 56, 54, 0.42);
-    --glass-bg-strong: rgba(24, 46, 44, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 32px rgba(0, 0, 0, 0.45);
-    --glass-shadow-ahora: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 16px 40px rgba(0, 0, 0, 0.50);
+    --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-bg-strong: rgba(255, 255, 255, 0.07);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: blur(12px);
+    --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --glass-shadow-ahora: 0 0 0 2px var(--primary);
     --btn-primary-bg: linear-gradient(180deg, #57C6C1, #3FB3AE);
     --btn-primary-border: rgba(255, 255, 255, 0.25);
     --btn-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 8px 20px rgba(63, 179, 174, 0.25);
-    --ambient-1: rgba(63, 179, 174, 0.34);
-    --ambient-2: rgba(246, 195, 68, 0.16);
-    --ambient-3: rgba(78, 143, 106, 0.28);
+    --ambient-1: transparent;
+    --ambient-2: transparent;
+    --ambient-3: transparent;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #081413; --surface: #132322; --surface-2: #0F1D1C;
-  --ink: #E6F0EF; --muted: #93A9A7; --muted-2: #7F9795; --done: #6E8684;
+  --bg: #0A0A0A; --surface: #141414; --surface-2: #1C1C1C;
+  --ink: #F0F0F0; --muted: #888888; --muted-2: #707070; --done: #595959;
   --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
   --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
-  --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
+  --line: #242424; --line-soft: #1E1E1E; --rail: #2A2A2A; --border: #303030; --control: #606060;
   --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
   --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
   --error: #F97066; --error-bg: #3A1C1A;
-  --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.35);
-  --glass-bg: rgba(30, 56, 54, 0.42);
-  --glass-bg-strong: rgba(24, 46, 44, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 32px rgba(0, 0, 0, 0.45);
-  --glass-shadow-ahora: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 16px 40px rgba(0, 0, 0, 0.50);
+  --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-strong: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(12px);
+  --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --glass-shadow-ahora: 0 0 0 2px var(--primary);
   --btn-primary-bg: linear-gradient(180deg, #57C6C1, #3FB3AE);
   --btn-primary-border: rgba(255, 255, 255, 0.25);
   --btn-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 8px 20px rgba(63, 179, 174, 0.25);
-  --ambient-1: rgba(63, 179, 174, 0.34);
-  --ambient-2: rgba(246, 195, 68, 0.16);
-  --ambient-3: rgba(78, 143, 106, 0.28);
+  --ambient-1: transparent;
+  --ambient-2: transparent;
+  --ambient-3: transparent;
 }
 
 * {

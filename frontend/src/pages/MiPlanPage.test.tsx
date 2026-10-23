@@ -14,7 +14,7 @@ const mockSaveMyPlan = vi.mocked(plansApi.saveMyPlan)
 const mockGetPlanHistory = vi.mocked(plansApi.getPlanHistory)
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', login: vi.fn(), logout: vi.fn() })
+  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
 })
 
@@ -91,6 +91,8 @@ test('elimina una comida expandida', async () => {
   await waitFor(() => screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByLabelText('Eliminar comida'))
+  await waitFor(() => expect(screen.getByText('Eliminar')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Eliminar'))
   expect(screen.queryByPlaceholderText('Nombre de la comida')).not.toBeInTheDocument()
 })
 

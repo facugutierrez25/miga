@@ -15,3 +15,9 @@ frontend/dist/
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Playwright CLI
+.playwright-cli/
+*-snap.yml
+*-snap.yaml
+*.png

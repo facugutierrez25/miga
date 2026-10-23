@@ -1,6 +1,8 @@
 import Brand from '../components/Brand'
+import { useTitle } from '../hooks/useTitle'
 
 export default function SemanaPage() {
+  useTitle('Semana | Miga')
   return (
     <div style={{ padding: '24px 16px', maxWidth: 480, margin: '0 auto' }}>
       <div style={{ marginBottom: 24 }}>

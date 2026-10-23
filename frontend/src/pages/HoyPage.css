@@ -462,6 +462,18 @@
   letter-spacing: -0.02em;
 }
 
+.hoy-anillo__nombre {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+  max-width: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 
 
@@ -480,10 +492,22 @@
 /* ── Tarjeta hecha ── */
 
 .comida-hoy--hecha {
+  background: color-mix(in srgb, var(--primary) 4%, var(--glass-bg));
 }
 
 .comida-hoy--hecha .comida-hoy__nombre {
   color: var(--done);
+}
+
+.comida-hoy__nombre-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comida-hoy__done-icon {
+  color: var(--primary);
+  flex-shrink: 0;
 }
 
 /* ── Botón toggle (cards regulares) ── */
@@ -601,10 +625,11 @@
     align-items: center;
     gap: 8px;
   }
-  .hoy-grupo-prog__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+  .hoy-grupo-prog__nombre {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    min-width: 64px;
     flex-shrink: 0;
   }
   .hoy-grupo-prog__bar {
@@ -828,32 +853,28 @@
   opacity: 0.75;
 }
 
-.btn-toggle-consumed {
-  margin-top: 8px;
-  align-self: flex-start;
-  background: transparent;
-  border: none;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
+.btn-ya-lo-comi--secondary {
   color: var(--muted);
-  cursor: pointer;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
-  transition: color 0.15s;
+  background: transparent;
+  border: 1px solid var(--line);
+  box-shadow: none;
 }
 
-.btn-toggle-consumed:hover {
-  color: var(--ink);
-}
-
-.btn-toggle-consumed--hecha {
+.btn-ya-lo-comi--secondary:hover {
+  filter: none;
+  border-color: var(--primary);
   color: var(--primary);
 }
 
-.btn-toggle-consumed--hecha:hover {
+.btn-ya-lo-comi--secondary.btn-ya-lo-comi--hecha {
   color: var(--primary);
-  opacity: 0.75;
+  background: var(--primary-soft);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ya-lo-comi--secondary.btn-ya-lo-comi--hecha:hover {
+  opacity: 0.85;
 }
 
 /* ── Intake collapsible toggle ── */
@@ -865,7 +886,8 @@
   width: 100%;
   background: transparent;
   border: none;
-  padding: 2px 0;
+  min-height: 44px;
+  padding: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   gap: 6px;
@@ -873,7 +895,7 @@
 
 .intake-toggle__label {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--muted);
   transition: color 0.15s;
@@ -906,4 +928,56 @@
   flex-direction: column;
   gap: 4px;
   padding-top: 6px;
+}
+
+/* ── Dark mode: cards planas, sin glass ── */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .comida-hoy--hecha {
+    background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  }
+
+  :root:not([data-theme="light"]) .comida-hoy,
+  :root:not([data-theme="light"]) .hoy-resumen,
+  :root:not([data-theme="light"]) .hoy-sin-plan,
+  :root:not([data-theme="light"]) .hoy-fecha-nav,
+  :root:not([data-theme="light"]) .btn-ya-lo-comi--hecha {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+  }
+
+  :root:not([data-theme="light"]) .comida-hoy--ahora {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 2px solid var(--primary);
+    box-shadow: 0 0 0 1px rgba(63, 179, 174, 0.15);
+  }
+}
+
+[data-theme="dark"] .comida-hoy--hecha {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+[data-theme="dark"] .comida-hoy,
+[data-theme="dark"] .hoy-resumen,
+[data-theme="dark"] .hoy-sin-plan,
+[data-theme="dark"] .hoy-fecha-nav,
+[data-theme="dark"] .btn-ya-lo-comi--hecha {
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .comida-hoy--ahora {
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 1px rgba(63, 179, 174, 0.15);
 }
