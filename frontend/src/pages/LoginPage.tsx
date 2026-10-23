@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { login } from '../api/users'
+import { login, resendVerification, getMe } from '../api/users'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
@@ -19,6 +19,8 @@ export default function LoginPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [notVerified, setNotVerified] = useState(false)
+  const [resendDone, setResendDone] = useState(false)
 
   function validateEmail(v: string) {
     if (!v) return 'El email es obligatorio.'
@@ -40,16 +42,28 @@ export default function LoginPage() {
     if (eErr || pErr) return
 
     setError(null)
+    setNotVerified(false)
+    setResendDone(false)
     setLoading(true)
     try {
       const token = await login(email, password)
-      auth.login(token)
-      navigate('/hoy')
+      const profile = await getMe(token)
+      auth.login(token, profile.firstName)
+      navigate(profile.firstName ? '/hoy' : '/onboarding')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido.')
+      if (err instanceof Error && err.message === 'EMAIL_NOT_VERIFIED') {
+        setNotVerified(true)
+      } else {
+        setError(err instanceof Error ? err.message : 'Error desconocido.')
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleResend() {
+    await resendVerification(email)
+    setResendDone(true)
   }
 
   return (
@@ -117,6 +131,21 @@ export default function LoginPage() {
             {loading ? 'Ingresando…' : 'Iniciar sesión'}
           </button>
         </form>
+
+        {notVerified && (
+          <div role="alert" className="login-unverified">
+            <p className="login-unverified__msg">
+              Verificá tu email antes de ingresar.
+            </p>
+            {resendDone
+              ? <p className="login-unverified__ok">Link reenviado, revisá tu bandeja.</p>
+              : <button type="button" className="login-unverified__resend" onClick={handleResend}>
+                  Reenviar link de verificación
+                </button>
+            }
+          </div>
+        )}
+
         <p className="register-footer">
           <Link to="/recuperar-contrasena" className="register-footer__forgot">¿Olvidaste tu contraseña?</Link>
         </p>

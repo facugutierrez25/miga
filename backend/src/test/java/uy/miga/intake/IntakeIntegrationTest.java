@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import uy.miga.users.MockEmailService;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -23,6 +25,7 @@ class IntakeIntegrationTest {
 
     @Autowired private WebApplicationContext context;
     @Autowired private FilterChainProxy springSecurityFilterChain;
+    @Autowired private MockEmailService mockEmailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
@@ -39,6 +42,7 @@ class IntakeIntegrationTest {
             .addFilters(springSecurityFilterChain)
             .build();
 
+        mockEmailService.reset();
         String email = "intake" + System.nanoTime() + "@miga.uy";
 
         mockMvc.perform(post("/api/v1/users")
@@ -46,6 +50,11 @@ class IntakeIntegrationTest {
             .content("""
                 { "email": "%s", "password": "Segura1234!" }
                 """.formatted(email)));
+
+        String verifyToken = mockEmailService.getLastToken();
+        if (verifyToken != null) {
+            mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
+        }
 
         MvcResult login = mockMvc.perform(post("/api/v1/users/login")
             .contentType(MediaType.APPLICATION_JSON)

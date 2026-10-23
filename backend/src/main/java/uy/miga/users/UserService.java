@@ -2,6 +2,7 @@ package uy.miga.users;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
@@ -9,11 +10,14 @@ public class UserService {
     private final UsersRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final VerificationService verificationService;
 
-    UserService(UsersRepository repository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    UserService(UsersRepository repository, PasswordEncoder passwordEncoder,
+                JwtService jwtService, VerificationService verificationService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.verificationService = verificationService;
     }
 
     String login(String email, String password) {
@@ -21,6 +25,9 @@ public class UserService {
             .orElseThrow(InvalidCredentialsException::new);
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
+        }
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException();
         }
         return jwtService.generateToken(user);
     }
@@ -31,6 +38,21 @@ public class UserService {
             .orElseThrow();
     }
 
+    UserProfileResponse getProfile(String email) {
+        User user = repository.findByEmail(email).orElseThrow();
+        return new UserProfileResponse(user.getEmail(), user.getFirstName(), user.getLastName(), user.getBirthDate());
+    }
+
+    @Transactional
+    UserProfileResponse updateProfile(String email, UpdateProfileRequest req) {
+        User user = repository.findByEmail(email).orElseThrow();
+        user.setFirstName(req.firstName().strip());
+        user.setLastName(req.lastName() != null ? req.lastName().strip() : null);
+        user.setBirthDate(req.birthDate());
+        repository.save(user);
+        return new UserProfileResponse(user.getEmail(), user.getFirstName(), user.getLastName(), user.getBirthDate());
+    }
+
     User register(String email, String password) {
         if (repository.existsByEmail(email)) {
             throw new EmailAlreadyExistsException(email);
@@ -39,6 +61,13 @@ public class UserService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setRole(Role.PATIENT);
-        return repository.save(user);
+        user.setEmailVerified(false);
+        User saved = repository.save(user);
+        try {
+            verificationService.sendVerificationFor(saved);
+        } catch (Exception e) {
+            // El registro no falla si el email no se puede enviar; el usuario puede reenviar
+        }
+        return saved;
     }
 }
