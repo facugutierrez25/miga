@@ -5,7 +5,7 @@ import AppLayout from './AppLayout'
 import * as AuthContext from '../auth/AuthContext'
 
 vi.mock('../auth/AuthContext')
-vi.mocked(AuthContext.useAuth).mockReturnValue({ token: 'tok', email: 'u@test.com', login: vi.fn(), logout: vi.fn() })
+vi.mocked(AuthContext.useAuth).mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
 
 afterEach(() => {
   vi.clearAllMocks()

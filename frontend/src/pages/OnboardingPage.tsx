@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
+import { useAuth } from '../auth/AuthContext'
+import { updateMe } from '../api/users'
 import './OnboardingPage.css'
+import './RegisterPage.css'
 
 const TOTAL_STEPS = 4
 
@@ -23,6 +26,65 @@ function ProgressBar({ step }: { step: number }) {
       </div>
       <span className="ob-progress__label">{step} de {TOTAL_STEPS}</span>
     </div>
+  )
+}
+
+function Step0({
+  onNext, firstName, setFirstName, lastName, setLastName, birthDate, setBirthDate, loading, error,
+}: {
+  onNext: (e: React.FormEvent) => void
+  firstName: string; setFirstName: (v: string) => void
+  lastName: string; setLastName: (v: string) => void
+  birthDate: string; setBirthDate: (v: string) => void
+  loading: boolean; error: string | null
+}) {
+  return (
+    <form className="ob-step" onSubmit={onNext} noValidate>
+      <div className="ob-step__content">
+        <h1 className="ob-step__title">¿Cómo te llamás?</h1>
+        <p className="ob-step__example">
+          Usamos tu nombre para personalizar la app. No lo compartimos con nadie.
+        </p>
+        <div className="register-field">
+          <label htmlFor="ob-first-name">Nombre <span aria-hidden="true">*</span></label>
+          <input
+            id="ob-first-name"
+            type="text"
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            autoComplete="given-name"
+            required
+            autoFocus
+          />
+        </div>
+        <div className="register-field">
+          <label htmlFor="ob-last-name">Apellido</label>
+          <input
+            id="ob-last-name"
+            type="text"
+            value={lastName}
+            onChange={e => setLastName(e.target.value)}
+            autoComplete="family-name"
+          />
+        </div>
+        <div className="register-field">
+          <label htmlFor="ob-birth-date">Fecha de nacimiento</label>
+          <input
+            id="ob-birth-date"
+            type="date"
+            value={birthDate}
+            onChange={e => setBirthDate(e.target.value)}
+            autoComplete="bday"
+          />
+        </div>
+        {error && <p className="register-error" role="alert">{error}</p>}
+      </div>
+      <div className="ob-step__actions">
+        <button type="submit" className="btn-primary ob-btn" disabled={!firstName.trim() || loading}>
+          {loading ? 'Guardando…' : 'Continuar'}
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -157,11 +219,17 @@ function Step4({ meals, onNext, onBack }: { meals: MealDraft[]; onNext: () => vo
 export default function OnboardingPage() {
   useTitle('Cargar mi plan | Miga')
   const navigate = useNavigate()
-  const [step, setStep] = useState(1)
+  const auth = useAuth()
+  const [step, setStep] = useState(auth.firstName ? 1 : 0)
   const [mealCount, setMealCount] = useState(4)
   const [meals, setMeals] = useState<MealDraft[]>(() =>
     Array.from({ length: 4 }, (_, i) => ({ name: NOMBRES_SUGERIDOS[i] ?? '', time: '' }))
   )
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
 
   function handleCountChange(n: number) {
     setMealCount(n)
@@ -176,6 +244,26 @@ export default function OnboardingPage() {
 
   function handleMealChange(i: number, field: keyof MealDraft, value: string) {
     setMeals(prev => prev.map((m, idx) => idx === i ? { ...m, [field]: value } : m))
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault()
+    if (!firstName.trim() || !auth.token) return
+    setSavingProfile(true)
+    setProfileError(null)
+    try {
+      await updateMe(auth.token, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim() || undefined,
+        birthDate: birthDate || undefined,
+      })
+      auth.setFirstName(firstName.trim())
+      setStep(1)
+    } catch {
+      setProfileError('No se pudo guardar. Intentá de nuevo.')
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
   function goToMiPlan() {
@@ -195,6 +283,15 @@ export default function OnboardingPage() {
         <Brand size={22} />
       </div>
       <div className="ob-body">
+        {step === 0 && (
+          <Step0
+            onNext={handleSaveProfile}
+            firstName={firstName} setFirstName={setFirstName}
+            lastName={lastName} setLastName={setLastName}
+            birthDate={birthDate} setBirthDate={setBirthDate}
+            loading={savingProfile} error={profileError}
+          />
+        )}
         {step === 1 && (
           <Step1
             onNext={() => setStep(2)}

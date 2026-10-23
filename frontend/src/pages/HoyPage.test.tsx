@@ -36,7 +36,9 @@ beforeEach(() => {
   vi.mocked(AuthContext.useAuth).mockReturnValue({
     token: 'tok',
     email: 'facu@miga.uy',
+    firstName: 'Facu',
     login: vi.fn(),
+    setFirstName: vi.fn(),
     logout: vi.fn(),
   })
   mockGetIntake.mockResolvedValue([])

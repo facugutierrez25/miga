@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,22 +22,26 @@ class UserLoginIntegrationTest {
     @Autowired
     private WebApplicationContext context;
 
+    @Autowired
+    private MockEmailService mockEmailService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
-    void setup() {
-        mockMvc = MockMvcBuilders
-                .webAppContextSetup(context)
-                .build();
+    void setup() throws Exception {
+        mockEmailService.reset();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
 
-        // Registrar usuario base para los tests de login
-        try {
-            mockMvc.perform(post("/api/v1/users")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                            { "email": "login@miga.uy", "password": "Segura1234!" }
-                            """));
-        } catch (Exception ignored) {}
+        mockMvc.perform(post("/api/v1/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        { "email": "login@miga.uy", "password": "Segura1234!" }
+                        """));
+
+        String token = mockEmailService.getLastToken();
+        if (token != null) {
+            mockMvc.perform(get("/api/v1/auth/verify?token=" + token));
+        }
     }
 
     @Test
@@ -81,5 +86,22 @@ class UserLoginIntegrationTest {
                         """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors").isArray());
+    }
+
+    @Test
+    void loginWithoutVerification_returns403() throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        { "email": "sinverificar@miga.uy", "password": "Segura1234!" }
+                        """));
+
+        mockMvc.perform(post("/api/v1/users/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        { "email": "sinverificar@miga.uy", "password": "Segura1234!" }
+                        """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
     }
 }

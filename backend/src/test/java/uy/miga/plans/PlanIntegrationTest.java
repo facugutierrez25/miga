@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.security.web.FilterChainProxy;
+import uy.miga.users.MockEmailService;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -29,6 +30,9 @@ class PlanIntegrationTest {
     @Autowired
     private FilterChainProxy springSecurityFilterChain;
 
+    @Autowired
+    private MockEmailService mockEmailService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
     private String token;
@@ -39,44 +43,13 @@ class PlanIntegrationTest {
                 .addFilters(springSecurityFilterChain)
                 .build();
 
-        // Registrar y hacer login para obtener el token
-        try {
-            mockMvc.perform(post("/api/v1/users")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                            { "email": "plan@miga.uy", "password": "Segura1234!" }
-                            """));
-        } catch (Exception ignored) {}
-
-        MvcResult result = mockMvc.perform(post("/api/v1/users/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        { "email": "plan@miga.uy", "password": "Segura1234!" }
-                        """))
-                .andReturn();
-
-        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        token = json.get("token").asText();
+        mockEmailService.reset();
+        token = registerAndLogin("plan@miga.uy");
     }
 
     @Test
     void getMyPlan_whenNoPlan_returns404() throws Exception {
-        mockMvc.perform(post("/api/v1/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        { "email": "sinplan@miga.uy", "password": "Segura1234!" }
-                        """));
-
-        MvcResult loginResult = mockMvc.perform(post("/api/v1/users/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        { "email": "sinplan@miga.uy", "password": "Segura1234!" }
-                        """))
-                .andReturn();
-
-        String sinPlanToken = objectMapper
-                .readTree(loginResult.getResponse().getContentAsString())
-                .get("token").asText();
+        String sinPlanToken = registerAndLogin("sinplan@miga.uy");
 
         mockMvc.perform(get("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + sinPlanToken))
@@ -292,6 +265,11 @@ class PlanIntegrationTest {
                             { "email": "%s", "password": "Segura1234!" }
                             """.formatted(email)));
         } catch (Exception ignored) {}
+
+        String verifyToken = mockEmailService.getLastToken();
+        if (verifyToken != null) {
+            mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
+        }
 
         MvcResult result = mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)

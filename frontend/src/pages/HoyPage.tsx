@@ -297,7 +297,7 @@ function IntakeMealSection({
 export default function HoyPage() {
   useTitle('Hoy | Miga')
   const HOY = toISO(new Date())
-  const { token, email } = useAuth()
+  const { token, email, firstName } = useAuth()
   const [fecha, setFecha] = useState(HOY)
   const [plan, setPlan] = useState<PlanDto | null>(null)
   const [sinPlan, setSinPlan] = useState(false)
@@ -366,7 +366,7 @@ export default function HoyPage() {
   }, [token, fecha, entries])
 
   const esHoy = fecha === HOY
-  const nombre = formatNombre(email ?? undefined)
+  const nombre = firstName ?? formatNombre(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
 
   const consumedMealIds = new Set(
