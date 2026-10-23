@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @Profile("test")
-class MockEmailService implements EmailService {
+public class MockEmailService implements EmailService {
 
     private String lastToken;
 
@@ -14,11 +14,11 @@ class MockEmailService implements EmailService {
         this.lastToken = token;
     }
 
-    String getLastToken() {
+    public String getLastToken() {
         return lastToken;
     }
 
-    void reset() {
+    public void reset() {
         this.lastToken = null;
     }
 }

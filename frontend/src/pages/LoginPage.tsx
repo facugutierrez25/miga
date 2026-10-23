@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { login, resendVerification } from '../api/users'
+import { login, resendVerification, getMe } from '../api/users'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
@@ -47,8 +47,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const token = await login(email, password)
-      auth.login(token)
-      navigate('/hoy')
+      const profile = await getMe(token)
+      auth.login(token, profile.firstName)
+      navigate(profile.firstName ? '/hoy' : '/onboarding')
     } catch (err) {
       if (err instanceof Error && err.message === 'EMAIL_NOT_VERIFIED') {
         setNotVerified(true)

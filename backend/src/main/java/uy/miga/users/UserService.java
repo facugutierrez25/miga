@@ -2,6 +2,7 @@ package uy.miga.users;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
@@ -35,6 +36,21 @@ public class UserService {
         return repository.findByEmail(email)
             .map(User::getId)
             .orElseThrow();
+    }
+
+    UserProfileResponse getProfile(String email) {
+        User user = repository.findByEmail(email).orElseThrow();
+        return new UserProfileResponse(user.getEmail(), user.getFirstName(), user.getLastName(), user.getBirthDate());
+    }
+
+    @Transactional
+    UserProfileResponse updateProfile(String email, UpdateProfileRequest req) {
+        User user = repository.findByEmail(email).orElseThrow();
+        user.setFirstName(req.firstName().strip());
+        user.setLastName(req.lastName() != null ? req.lastName().strip() : null);
+        user.setBirthDate(req.birthDate());
+        repository.save(user);
+        return new UserProfileResponse(user.getEmail(), user.getFirstName(), user.getLastName(), user.getBirthDate());
     }
 
     User register(String email, String password) {

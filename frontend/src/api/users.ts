@@ -35,3 +35,31 @@ export async function resendVerification(email: string): Promise<void> {
     body: JSON.stringify({ email }),
   })
 }
+
+export interface UserProfile {
+  email: string
+  firstName: string | null
+  lastName: string | null
+  birthDate: string | null
+}
+
+export async function getMe(token: string): Promise<UserProfile> {
+  const response = await fetch(`${API_URL}/api/v1/users/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) throw new Error('Error al obtener perfil.')
+  return response.json()
+}
+
+export async function updateMe(
+  token: string,
+  data: { firstName: string; lastName?: string; birthDate?: string }
+): Promise<UserProfile> {
+  const response = await fetch(`${API_URL}/api/v1/users/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('Error al guardar perfil.')
+  return response.json()
+}
