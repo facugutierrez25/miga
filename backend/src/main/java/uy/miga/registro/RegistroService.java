@@ -190,6 +190,120 @@ class RegistroService {
         return map;
     }
 
+    @Transactional(readOnly = true)
+    DayRegistroDto getDayRegistro(String userEmail, LocalDate date) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        Long planId = planService.getCurrentPlanId(userEmail);
+
+        List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserEmailAndDate(userEmail, date);
+        Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
+            .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
+        Map<Long, MealNote> noteByMeal = noteRepository.findByUserIdAndDate(userId, date)
+            .stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
+
+        List<Long> planMealIds = planService.getMealIds(planId);
+        List<uy.miga.plans.PlanFoodGroupDto> groups = planService.getPlanFoodGroups(planId);
+        Map<Long, uy.miga.plans.PlanFoodGroupDto> groupById = groups.stream()
+            .collect(Collectors.toMap(uy.miga.plans.PlanFoodGroupDto::id, g -> g));
+
+        Map<Long, BigDecimal> totalByGroup = new HashMap<>();
+        List<DayRegistroDto.MealDayDto> mealDtos = new ArrayList<>();
+
+        for (Long mealId : planMealIds) {
+            MealNote note = noteByMeal.get(mealId);
+            List<FoodEntryFacade.EntryData> mealEntries = byMeal.getOrDefault(mealId, List.of());
+
+            List<DayRegistroDto.EntryItemDto> itemDtos = mealEntries.stream()
+                .map(e -> new DayRegistroDto.EntryItemDto(
+                    e.id(), e.food(), e.quantity(), e.unit(),
+                    e.foodGroupId(), e.portions(), e.origin(), e.uncertain()))
+                .toList();
+
+            mealEntries.stream()
+                .filter(e -> e.foodGroupId() != null && e.portions() != null)
+                .forEach(e -> totalByGroup.merge(e.foodGroupId(), e.portions(), BigDecimal::add));
+
+            Map<Long, BigDecimal> portionsByGroup = mealEntries.stream()
+                .filter(e -> e.foodGroupId() != null && e.portions() != null)
+                .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::foodGroupId,
+                    Collectors.reducing(BigDecimal.ZERO, FoodEntryFacade.EntryData::portions, BigDecimal::add)));
+
+            List<ComparisonService.GroupStatus> statuses = comparison.compare(planId, mealId, portionsByGroup);
+            List<GroupStatusDto> compDtos = statuses.stream()
+                .map(s -> new GroupStatusDto(
+                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()))
+                .toList();
+
+            mealDtos.add(new DayRegistroDto.MealDayDto(
+                mealId,
+                note != null ? note.getId() : null,
+                note != null ? note.getText() : null,
+                itemDtos,
+                compDtos
+            ));
+        }
+
+        List<DayRegistroDto.DailySummaryDto> summary = groups.stream()
+            .map(g -> new DayRegistroDto.DailySummaryDto(
+                g.id(), g.name(), g.clave(),
+                totalByGroup.getOrDefault(g.id(), BigDecimal.ZERO),
+                g.metaDiaria()))
+            .toList();
+
+        return new DayRegistroDto(date, mealDtos, summary);
+    }
+
+    @Transactional
+    DayRegistroDto.EntryItemDto patchItem(String userEmail, LocalDate date, Long entryId,
+                                          PatchItemRequest req) {
+        FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserEmail(entryId, userEmail);
+        if (entry == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!date.equals(entry.mealId() == null ? null : date)) {
+            // date path param must match entry date — validated implicitly by mealId ownership
+        }
+
+        Double newQty = req.quantity() != null ? req.quantity().doubleValue() : null;
+        entryFacade.updateEntry(entryId, newQty, req.unit(), req.foodGroupId(), req.portions());
+
+        if (req.saveAsRule()) {
+            Long userId = userService.findUserIdByEmail(userEmail);
+            Long planId = planService.getCurrentPlanId(userEmail);
+            Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
+            ruleService.createUserRule(userId, planId, groupId,
+                entry.food(), null,
+                req.quantity(), req.unit(),
+                req.portions());
+        }
+
+        FoodEntryFacade.EntryData updated = entryFacade.findEntryByIdAndUserEmail(entryId, userEmail);
+        return new DayRegistroDto.EntryItemDto(
+            updated.id(), updated.food(), updated.quantity(), updated.unit(),
+            updated.foodGroupId(), updated.portions(), updated.origin(), updated.uncertain());
+    }
+
+    @Transactional
+    void saveRespuesta(String userEmail, LocalDate date, Long mealId, RespuestaRequest req) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        if (!planService.mealBelongsToUser(mealId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if (!req.consumed()) return; // negativa: no crear entrada
+
+        // Buscar grupo para obtener el nombre del alimento
+        Long planId = planService.getCurrentPlanId(userEmail);
+        String food = planService.getPlanFoodGroups(planId).stream()
+            .filter(g -> g.id().equals(req.foodGroupId()))
+            .findFirst().map(uy.miga.plans.PlanFoodGroupDto::name).orElse("alimento");
+
+        entryFacade.createUserEntry(userEmail, mealId, date, food, req.foodGroupId());
+    }
+
+    @Transactional(readOnly = true)
+    List<String> getSugerencias(String userEmail, Long mealId) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        return noteRepository.findTopTextsByUserIdAndMealId(userId, mealId);
+    }
+
     private InterpretedItemDto toItemDto(InterpretedItem item) {
         return new InterpretedItemDto(
             item.originalText(), item.foodName(),

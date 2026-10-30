@@ -47,6 +47,36 @@ public class FoodEntryFacade {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public EntryData findEntryByIdAndUserEmail(Long id, String userEmail) {
+        return repository.findByIdAndUserEmail(id, userEmail)
+            .map(e -> new EntryData(
+                e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
+                e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
+                e.getOrigen(), e.getSupuesto(), e.getPorciones()))
+            .orElse(null);
+    }
+
+    @Transactional
+    public void updateEntry(Long id, Double quantity, String unit, Long foodGroupId, BigDecimal portions) {
+        repository.findById(id).ifPresent(e -> {
+            if (quantity != null) e.setQuantity(quantity);
+            if (unit != null) e.setUnit(unit.strip());
+            if (foodGroupId != null) e.setFoodGroupId(foodGroupId);
+            if (portions != null) e.setPorciones(portions);
+            repository.save(e);
+        });
+    }
+
+    @Transactional
+    public Long createUserEntry(String userEmail, Long mealId, LocalDate date,
+                                String food, Long foodGroupId) {
+        FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
+        entry.setOrigen("USUARIO");
+        entry.setPorciones(BigDecimal.ONE);
+        return repository.save(entry).getId();
+    }
+
     public record EntryData(
         Long id, Long mealId, String food, Double quantity, String unit,
         Long foodGroupId, boolean consumed, Long mealNoteId,
