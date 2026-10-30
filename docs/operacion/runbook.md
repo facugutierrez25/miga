@@ -155,7 +155,7 @@ curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/hikaricp.conne
 curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/jvm.memory.used
 
 # Versión desplegada
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/info
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/info
 ```
 
 ### 4.4 Buscar logs por correlación
