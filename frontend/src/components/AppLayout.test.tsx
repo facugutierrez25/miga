@@ -2,9 +2,9 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi, test, expect, afterEach } from 'vitest'
 import AppLayout from './AppLayout'
-import * as AuthContext from '../auth/AuthContext'
+import * as AuthContext from '../auth/authTypes'
 
-vi.mock('../auth/AuthContext')
+vi.mock('../auth/authTypes')
 vi.mocked(AuthContext.useAuth).mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
 
 afterEach(() => {

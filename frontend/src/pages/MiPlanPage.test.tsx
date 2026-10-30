@@ -3,10 +3,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MiPlanPage from './MiPlanPage'
 import * as plansApi from '../api/plans'
-import * as AuthContext from '../auth/AuthContext'
+import * as AuthContext from '../auth/authTypes'
 
 vi.mock('../api/plans')
-vi.mock('../auth/AuthContext')
+vi.mock('../auth/authTypes')
 
 const mockUseAuth = vi.mocked(AuthContext.useAuth)
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)

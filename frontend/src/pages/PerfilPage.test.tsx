@@ -2,9 +2,9 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import PerfilPage from './PerfilPage'
-import * as AuthContext from '../auth/AuthContext'
+import * as AuthContext from '../auth/authTypes'
 
-vi.mock('../auth/AuthContext')
+vi.mock('../auth/authTypes')
 
 const mockLogout = vi.fn()
 
