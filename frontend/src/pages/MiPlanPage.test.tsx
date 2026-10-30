@@ -13,6 +13,15 @@ const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockSaveMyPlan = vi.mocked(plansApi.saveMyPlan)
 const mockGetPlanHistory = vi.mocked(plansApi.getPlanHistory)
 
+const gruposDefault = [
+  { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
+  { id: 2, name: 'Cereales',  abbreviation: 'CER', displayOrder: 2, color: null },
+  { id: 3, name: 'Frutas',    abbreviation: 'FRU', displayOrder: 3, color: null },
+  { id: 4, name: 'Lácteos',   abbreviation: 'LAC', displayOrder: 4, color: null },
+  { id: 5, name: 'Grasas',    abbreviation: 'GRA', displayOrder: 5, color: null },
+  { id: 6, name: 'Verduras',  abbreviation: 'VER', displayOrder: 6, color: null },
+]
+
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
@@ -30,16 +39,17 @@ test('muestra cargando mientras carga el plan', () => {
 
 test('muestra las comidas minimizadas al cargar el plan', async () => {
   mockGetMyPlan.mockResolvedValue({
+    foodGroups: gruposDefault,
     meals: [{
       name: 'Desayuno',
       displayOrder: 1,
       portions: [
-        { foodGroup: 'PROTEINS',   portions: 1 },
-        { foodGroup: 'GRAINS',     portions: 2 },
-        { foodGroup: 'FRUITS',     portions: 0 },
-        { foodGroup: 'DAIRY',      portions: 0 },
-        { foodGroup: 'FATS',       portions: 0 },
-        { foodGroup: 'VEGETABLES', portions: 0 },
+        { foodGroupId: 1, portions: 1 },
+        { foodGroupId: 2, portions: 2 },
+        { foodGroupId: 3, portions: 0 },
+        { foodGroupId: 4, portions: 0 },
+        { foodGroupId: 5, portions: 0 },
+        { foodGroupId: 6, portions: 0 },
       ],
     }],
   })
@@ -50,6 +60,7 @@ test('muestra las comidas minimizadas al cargar el plan', async () => {
 
 test('expande una comida al hacer clic en editar', async () => {
   mockGetMyPlan.mockResolvedValue({
+    foodGroups: gruposDefault,
     meals: [{ name: 'Almuerzo', displayOrder: 1, portions: [] }],
   })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
@@ -98,7 +109,7 @@ test('elimina una comida expandida', async () => {
 
 test('confirma el plan y muestra mensaje de éxito', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  mockSaveMyPlan.mockResolvedValue({ meals: [] })
+  mockSaveMyPlan.mockResolvedValue({ foodGroups: [], meals: [] })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   await waitFor(() => screen.getByText('Confirmar plan'))
   fireEvent.click(screen.getByText('Confirmar plan'))
@@ -120,9 +131,10 @@ test('abre el modal al hacer click en un plan del historial', async () => {
     createdAt: '2026-09-01',
     supersededAt: '2026-10-01',
     mealCount: 2,
+    foodGroups: gruposDefault,
     meals: [
-      { name: 'Desayuno', portions: [{ foodGroup: 'PROTEINS', portions: 1 }] },
-      { name: 'Almuerzo', portions: [{ foodGroup: 'GRAINS', portions: 2 }] },
+      { name: 'Desayuno', portions: [{ foodGroupId: 1, portions: 1 }] },
+      { name: 'Almuerzo', portions: [{ foodGroupId: 2, portions: 2 }] },
     ],
   }])
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
@@ -139,6 +151,7 @@ test('cierra el modal al hacer click en el overlay', async () => {
     createdAt: '2026-09-01',
     supersededAt: '2026-10-01',
     mealCount: 1,
+    foodGroups: gruposDefault,
     meals: [{ name: 'Cena', portions: [] }],
   }])
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
