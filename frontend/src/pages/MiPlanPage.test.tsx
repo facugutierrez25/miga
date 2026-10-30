@@ -210,3 +210,14 @@ test('recarga las comidas cuando cambian las reglas del plan', async () => {
   fireEvent.click(screen.getByRole('tab', { name: 'Reglas de tu plan' }))
   await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
 })
+
+test('cargar Mi plan no mueve el foco y editar lo lleva al nombre de la comida', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getAllByRole('button', { name: /^Editar / }))
+  expect(document.activeElement).toBe(document.body)
+
+  fireEvent.click(screen.getAllByRole('button', { name: /^Editar / })[0])
+
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Nombre de la comida' })).toHaveFocus())
+})

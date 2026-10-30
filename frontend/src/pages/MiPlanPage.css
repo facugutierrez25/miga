@@ -437,7 +437,7 @@
   color: var(--ink);
   background: transparent;
   border: none;
-  border-bottom: 2px solid var(--line);
+  border-bottom: 2px solid var(--control-border);
   padding: 4px 0;
   outline: none;
   letter-spacing: -0.02em;
@@ -497,7 +497,7 @@
   color: var(--ink);
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--control-border);
   padding: 4px 2px;
   outline: none;
   font-variant-numeric: tabular-nums;

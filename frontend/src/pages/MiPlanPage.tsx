@@ -174,12 +174,22 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       nombre: meal.name, hora: meal.suggestedTime?.slice(0, 5) ?? '',
       porciones: porcionesVacias(DEFAULT_GRUPOS), minimizada: false,
     })))
-  // Al guardar una comida, el foco vuelve a su botón «Editar».
+  // El foco solo se mueve por una acción de la persona: al guardar una comida vuelve a
+  // su «Editar», al editar o agregar va al nombre y al eliminar va a «Agregar comida».
   const focoEditar = useRef<number | null>(null)
+  const focoNombre = useRef<number | null>(null)
+  const focoAgregar = useRef(false)
   useEffect(() => {
-    if (focoEditar.current === null) return
-    document.querySelector<HTMLElement>(`[data-edit-index="${focoEditar.current}"]`)?.focus()
+    if (focoEditar.current !== null) {
+      document.querySelector<HTMLElement>(`[data-edit-index="${focoEditar.current}"]`)?.focus()
+    } else if (focoNombre.current !== null) {
+      document.querySelector<HTMLElement>(`[data-name-index="${focoNombre.current}"]`)?.focus()
+    } else if (focoAgregar.current) {
+      document.querySelector<HTMLElement>('.btn-agregar')?.focus()
+    }
     focoEditar.current = null
+    focoNombre.current = null
+    focoAgregar.current = false
   }, [comidas])
   const [cargando, setCargando] = useState(false)
   const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
@@ -246,14 +256,17 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   }
 
   function editarComida(i: number) {
+    focoNombre.current = i
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, minimizada: false } : c))
   }
 
   function agregarComida() {
+    focoNombre.current = comidas.length
     setComidas(prev => [...prev, { nombre: '', hora: '', porciones: porcionesVacias(grupos), minimizada: false }])
   }
 
   function eliminarComida(i: number) {
+    focoAgregar.current = true
     setComidas(prev => prev.filter((_, j) => j !== i))
     setConfirmDeleteIdx(null)
   }
@@ -388,7 +401,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                       value={comida.nombre}
                       onChange={e => actualizarNombre(i, e.target.value)}
                       aria-label="Nombre de la comida"
-                      autoFocus
+                      data-name-index={i}
                     />
                     <button
                       className="btn-eliminar-exp"
