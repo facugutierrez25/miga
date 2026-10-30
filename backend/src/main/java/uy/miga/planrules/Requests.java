@@ -23,7 +23,9 @@ final class Requests {
         List<@NotBlank String> sinonimos, @NotBlank String tipo, UUID groupUid, @Positive BigDecimal cantidadPorPorcion,
         @Size(max=20) String unidad, @Positive BigDecimal porcionPorDefecto, List<@NotNull @Valid Component> componentes, UUID overridesRuleUid) {}
     record Habit(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=100) String name, @NotBlank String habitType,
-        @Size(max=40) String unit, @Positive BigDecimal goal, @NotBlank String period, @Positive BigDecimal step) {
-        HabitInput input() { return new HabitInput(name, habitType, unit, goal, period, step); }
+        @Size(max=40) String unit, @Positive BigDecimal goal, @NotBlank String period, @Positive BigDecimal step, Boolean countsFlexibleMeals) {
+        HabitInput input() {
+            return new HabitInput(name, habitType, unit, goal, period, step, Boolean.TRUE.equals(countsFlexibleMeals));
+        }
     }
 }

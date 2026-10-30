@@ -23,17 +23,19 @@ class WeekService {
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
     private final UserService userService;
+    private final uy.miga.registro.RegistroService registroService;
 
     WeekService(PlanHabitRepository habitRepository,
                 HabitLogRepository logRepository,
                 FoodEntryFacade entryFacade,
                 PlanService planService,
-                UserService userService) {
+                UserService userService, uy.miga.registro.RegistroService registroService) {
         this.habitRepository = habitRepository;
         this.logRepository = logRepository;
         this.entryFacade = entryFacade;
         this.planService = planService;
         this.userService = userService;
+        this.registroService = registroService;
     }
 
     @Transactional(readOnly = true)
@@ -42,22 +44,7 @@ class WeekService {
         LocalDate weekStart = refDate.with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
 
-        Long planId;
-        try {
-            planId = planService.getCurrentPlanId(email);
-        } catch (Exception e) {
-            planId = null;
-        }
-
-        List<HabitDto> habits = planId == null ? List.of() :
-            habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream().filter(h -> h.getArchivedAt() == null)
-                .map(this::toDto)
-                .toList();
-
-        BigDecimal totalGoal = planId == null ? BigDecimal.ZERO : computeTotalGoal(planId);
-
-        Map<java.util.UUID, Long> currentHabitIds = planId == null ? Map.of() : habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream()
-            .filter(h -> h.getArchivedAt() == null).collect(Collectors.toMap(PlanHabit::getUid, PlanHabit::getId));
+        Map<Long, HabitDto> weekHabits = new java.util.LinkedHashMap<>();
         List<HabitLog> weekLogs = logRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
         Map<LocalDate, List<HabitLog>> logsByDate = weekLogs.stream()
             .collect(Collectors.groupingBy(HabitLog::getLogDate));
@@ -73,15 +60,32 @@ class WeekService {
                 .map(FoodEntryFacade.EntryData::portions)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            List<HabitLogDto> habitLogs = logsByDate.getOrDefault(day, List.of()).stream()
-                .filter(l -> currentHabitIds.containsKey(l.getHabitUid()))
-                .map(l -> new HabitLogDto(currentHabitIds.get(l.getHabitUid()), l.getLogDate(), l.getValue()))
-                .toList();
-
-            days.add(new WeekDayDto(day, hasData, totalRecorded, totalGoal, habitLogs));
+            Long planId = null;
+            try {
+                planId = planService.getPlanIdForDate(userId, day);
+            } catch (uy.miga.plans.PlanNotFoundException ignored) { }
+            var dayHabits = planId == null ? List.<PlanHabit>of() : habitRepository
+                .findByPlanIdOrderByDisplayOrderAsc(planId).stream().filter(h -> h.getArchivedAt() == null).toList();
+            dayHabits.forEach(h -> weekHabits.putIfAbsent(h.getId(), toDto(h)));
+            var meals = planId == null ? List.<uy.miga.registro.WeekMealData>of() : registroService.getWeekMeals(email, day);
+            long flexibleCount = meals.stream().mapToLong(uy.miga.registro.WeekMealData::flexibleCount).sum();
+            List<HabitLogDto> habitLogs = new ArrayList<>();
+            for (PlanHabit habit : dayHabits) {
+                if (habit.isCountsFlexibleMeals()) {
+                    habitLogs.add(new HabitLogDto(habit.getId(), day, BigDecimal.valueOf(flexibleCount)));
+                } else {
+                    logsByDate.getOrDefault(day, List.of()).stream()
+                        .filter(l -> habit.getUid().equals(l.getHabitUid())).findFirst()
+                        .ifPresent(l -> habitLogs.add(new HabitLogDto(habit.getId(), day, l.getValue())));
+                }
+            }
+            BigDecimal totalGoal = planId == null || "LIBRE".equals(planService.getModoRegistro(planId))
+                ? BigDecimal.ZERO : computeTotalGoal(planId);
+            days.add(new WeekDayDto(day, hasData || meals.stream().anyMatch(m -> m.noteText() != null),
+                totalRecorded, totalGoal, habitLogs, meals, dayHabits.stream().map(PlanHabit::getId).toList()));
         }
 
-        return new WeekSummaryDto(weekStart, weekEnd, habits, days);
+        return new WeekSummaryDto(weekStart, weekEnd, List.copyOf(weekHabits.values()), days);
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +105,7 @@ class WeekService {
         Long planId = planService.getCurrentPlanId(email);
         PlanHabit habit = new PlanHabit();
         habit.setPlanId(planId);
+        habit.setCountsFlexibleMeals(Boolean.TRUE.equals(dto.countsFlexibleMeals()));
         habit.setName(dto.name());
         habit.setHabitType(HabitType.valueOf(dto.habitType()));
         habit.setUnit(dto.unit());
@@ -124,6 +129,10 @@ class WeekService {
         if (!habit.getPlanId().equals(planId) || habit.getArchivedAt() != null) {
             throw new IllegalArgumentException("Hábito no pertenece al plan activo.");
         }
+        if (habit.isCountsFlexibleMeals()) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+                "Este hábito se calcula desde las comidas flexibles.");
+        }
         HabitLog log = logRepository.findByUserIdAndHabitUidAndLogDate(userId, habit.getUid(), date)
             .orElseGet(() -> {
                 HabitLog l = new HabitLog();
@@ -141,7 +150,7 @@ class WeekService {
 
     private HabitDto toDto(PlanHabit h) {
         return new HabitDto(h.getId(), h.getName(), h.getHabitType().name(),
-            h.getUnit(), h.getDailyGoal(), h.getStep(), h.getPeriod(), h.getDisplayOrder());
+            h.getUnit(), h.getDailyGoal(), h.getStep(), h.getPeriod(), h.isCountsFlexibleMeals(), h.getDisplayOrder());
     }
 
     private BigDecimal computeTotalGoal(Long planId) {

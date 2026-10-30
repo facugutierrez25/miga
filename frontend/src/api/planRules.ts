@@ -12,7 +12,7 @@ export interface FoodInput {
   componentes: Component[]; overridesRuleUid: string | null
 }
 export interface FoodRule extends FoodInput { uid: string; alcance: string; textoRegla: string }
-export interface HabitInput { name: string; habitType: 'CONTADOR' | 'SI_NO' | 'CANTIDAD'; unit: string | null; goal: number | null; period: 'DIA' | 'SEMANA'; step: number }
+export interface HabitInput { countsFlexibleMeals?: boolean; name: string; habitType: 'CONTADOR' | 'SI_NO' | 'CANTIDAD'; unit: string | null; goal: number | null; period: 'DIA' | 'SEMANA'; step: number }
 export interface Habit extends HabitInput { uid: string; id: number; displayOrder: number }
 export interface PlanRules { planId: number; planVersion: number; modoRegistro: string; grupos: PlanGroup[]; alimentos: FoodRule[]; habitos: Habit[] }
 export interface GroupInput { name: string; abbreviation?: string; clave: string | null; color: string | null; metaDiaria: number | null; preguntarSiFalta: boolean; opcional: boolean }

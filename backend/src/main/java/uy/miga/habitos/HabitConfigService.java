@@ -46,10 +46,11 @@ public class HabitConfigService {
             in.period() == null || !List.of("DIA", "SEMANA").contains(in.period()) ||
             (in.goal() != null && in.goal().signum() <= 0) || (in.step() != null && in.step().signum() <= 0) ||
             (in.unit() != null && in.unit().length() > 40)) throw new IllegalArgumentException("Configuración de hábito inválida.");
+        h.setCountsFlexibleMeals(in.countsFlexibleMeals());
         h.setName(in.name().strip()); h.setHabitType(HabitType.valueOf(in.habitType())); h.setUnit(in.unit());
         h.setDailyGoal(in.goal()); h.setPeriod(in.period()); h.setStep(in.step() == null ? BigDecimal.ONE : in.step());
     }
     private HabitConfigDto dto(PlanHabit h) {
-        return new HabitConfigDto(h.getUid(), h.getId(), h.getName(), h.getHabitType().name(), h.getUnit(), h.getDailyGoal(), h.getPeriod(), h.getStep(), h.getDisplayOrder());
+        return new HabitConfigDto(h.getUid(), h.getId(), h.getName(), h.getHabitType().name(), h.getUnit(), h.getDailyGoal(), h.getPeriod(), h.getStep(), h.getDisplayOrder(), h.isCountsFlexibleMeals());
     }
 }

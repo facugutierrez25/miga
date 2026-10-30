@@ -259,3 +259,12 @@
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+.semana-views, .semana-exports { display: flex; gap: .5rem; }
+.semana-views { margin: 1rem 0; }
+.semana-views [aria-pressed="true"] { font-weight: bold; text-decoration: underline; }
+.semana-sheet { overflow-x: auto; }
+.semana-sheet table { border-collapse: collapse; width: 100%; }
+.semana-sheet th, .semana-sheet td { padding: .75rem; border: 1px solid var(--border, #ddd); text-align: left; }
+.semana-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.semana-meals { list-style: none; padding: 0; font-size: .85rem; }

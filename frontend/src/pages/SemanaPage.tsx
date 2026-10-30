@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
-import { exportWeekCsv, logHabit, type HabitDto, type HabitLogDto, type WeekDayDto } from '../api/semana'
+import { exportWeek, logHabit, type HabitDto, type HabitLogDto, type WeekDayDto } from '../api/semana'
 import './SemanaPage.css'
 import { useWeek } from '../hooks/useWeek'
 import { useAhora } from '../hooks/useAhora'
@@ -49,7 +49,7 @@ function pct(recorded: number, goal: number): number {
 }
 
 function fmtN(n: number): string {
-  return n === Math.floor(n) ? String(n) : n.toFixed(1).replace('.', ',')
+  return n.toLocaleString('es-UY', { useGrouping: false, maximumFractionDigits: 20 })
 }
 
 interface DayCardProps {
@@ -107,6 +107,12 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
         </div>
       )}
 
+      <ul className="semana-meals">
+        {(day.meals ?? []).map(meal => <li key={meal.mealId}>
+          <strong>{meal.name}</strong>: {mealStatus(meal.status)}
+          {meal.noteText && <p className="semana-note">{meal.noteText}</p>}
+        </li>)}
+      </ul>
       {habits.length > 0 && (
         <div className="semana-day__habitos">
           {habits.map(h => {
@@ -114,6 +120,7 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
             const done = Boolean(log && log.value > 0)
             return (
               <button
+                disabled={h.countsFlexibleMeals}
                 key={h.id}
                 className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
                 onClick={() => void toggleHabit(h)}
@@ -122,7 +129,7 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
               >
                 <span className="semana-habito__check">{done ? '✓' : ''}</span>
                 <span className="semana-habito__name">{h.name}</span>
-                {h.habitType !== 'SI_NO' && log && (
+                {(h.habitType !== 'SI_NO' || h.countsFlexibleMeals) && log && (
                   <span className="semana-habito__val">
                     {fmtN(log.value)}{h.unit ? ` ${h.unit}` : ''}
                   </span>
@@ -143,10 +150,19 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
 export default function SemanaPage() {
   useTitle('Semana | Miga')
   const { token, email } = useAuth()
+  const [view, setView] = useState<'day' | 'sheet'>('day')
+  const [exportError, setExportError] = useState('')
   const [refDate, setRefDate] = useState(() => mondayOf(toISO(new Date())))
   const { data: week, setData: setWeek, status, retry } = useWeek(token, email, refDate)
   const loading = status === 'loading'
   const error = status === 'error' ? 'No se pudo cargar la semana.' : null
+
+  async function download(format: 'csv' | 'xlsx') {
+    if (!token || !week) return
+    setExportError('')
+    try { await exportWeek(token, week.weekStart, format) }
+    catch { setExportError('No se pudo exportar la semana. Probá de nuevo.') }
+  }
 
   function handleLogUpdated(log: HabitLogDto) {
     setWeek(prev => {
@@ -194,15 +210,20 @@ export default function SemanaPage() {
           </button>
         </div>
         {week && token && (
-          <button
+          <div className="semana-exports"><button
             className="semana-export-btn"
-            onClick={() => void exportWeekCsv(token, week.weekStart)}
+            onClick={() => void download('csv')}
           >
             CSV
-          </button>
+          </button><button className="semana-export-btn" onClick={() => void download('xlsx')}>XLSX</button></div>
         )}
       </div>
 
+      <div className="semana-views" role="group" aria-label="Vista de la semana">
+        <button aria-pressed={view === 'day'} onClick={() => setView('day')}>Por día</button>
+        <button aria-pressed={view === 'sheet'} onClick={() => setView('sheet')}>Planilla</button>
+      </div>
+      {exportError && <p role="alert">{exportError}</p>}
       {loading && <p className="semana-estado">Cargando…</p>}
 
       {error && (
@@ -219,20 +240,38 @@ export default function SemanaPage() {
               Aún no hay datos para esta semana.
             </p>
           )}
-          <div className="semana-grid">
+          {view === 'sheet' ? <WeekSheet week={week} /> : <div className="semana-grid">
             {week.days.map(day => (
               <DayCard
                 key={day.date}
                 day={day}
-                habits={week.habits}
+                habits={week.habits.filter(h => !day.habitIds || day.habitIds.includes(h.id))}
                 token={token ?? ''}
                 todayISO={hoy}
                 onLogUpdated={handleLogUpdated}
               />
             ))}
-          </div>
+          </div>}
         </>
       )}
     </div>
   )
+}
+
+function mealStatus(status: string) {
+  return ({ SIN_ANOTAR: 'Sin anotar', REGISTRADA: 'Registrada', EN_PLAN: 'En plan', CASI: 'Casi', DE_MAS: 'De más', PREGUNTAR: 'Por confirmar' } as Record<string, string>)[status] ?? status
+}
+
+function WeekSheet({ week }: { week: import('../api/semana').WeekSummaryDto }) {
+  const meals = [...new Set(week.days.flatMap(day => (day.meals ?? []).map(meal => meal.name)))]
+  return <div className="semana-sheet"><table>
+    <caption>Comidas y hábitos de la semana</caption>
+    <thead><tr><th scope="col">Fecha</th>{meals.map(name => <th scope="col" key={name}>{name}</th>)}
+      {week.habits.map(h => <th scope="col" key={h.id}>{h.name}</th>)}</tr></thead>
+    <tbody>{week.days.map(day => <tr key={day.date}>
+      <th scope="row">{day.date}</th>
+      {meals.map(name => <td className="semana-note" key={name}>{(day.meals ?? []).filter(m => m.name === name).map(m => m.noteText).filter(Boolean).join('\n') || '—'}</td>)}
+      {week.habits.map(h => <td key={h.id}>{day.habitIds && !day.habitIds.includes(h.id) ? '—' : fmtN(Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}</td>)}
+    </tr>)}</tbody>
+  </table></div>
 }
