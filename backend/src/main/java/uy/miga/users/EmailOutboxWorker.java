@@ -2,6 +2,9 @@ package uy.miga.users;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,11 +31,15 @@ public class EmailOutboxWorker {
     private final EmailService emailService;
     private final TransactionTemplate transactions;
     private final Duration lease;
+    private final Counter sentCounter;
+    private final Counter retriedCounter;
+    private final Counter failedCounter;
 
     EmailOutboxWorker(EmailOutboxJobRepository outboxRepository,
                       VerificationTokenRepository tokenRepository,
                       EmailService emailService,
                       PlatformTransactionManager transactionManager,
+                      MeterRegistry meterRegistry,
                       @Value("${app.email-outbox.lease-ms:300000}") long leaseMs) {
         this.outboxRepository = outboxRepository;
         this.tokenRepository = tokenRepository;
@@ -43,6 +50,13 @@ public class EmailOutboxWorker {
         this.lease = Duration.ofMillis(leaseMs);
         this.transactions = new TransactionTemplate(transactionManager);
         this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // Métricas sin datos personales: solo cantidades por resultado y trabajos pendientes.
+        this.sentCounter = meterRegistry.counter("email.outbox.jobs", "result", "sent");
+        this.retriedCounter = meterRegistry.counter("email.outbox.jobs", "result", "retried");
+        this.failedCounter = meterRegistry.counter("email.outbox.jobs", "result", "failed");
+        Gauge.builder("email.outbox.pending", outboxRepository,
+                repository -> repository.countByStatusIn(List.of("PENDING", "PROCESSING")))
+            .register(meterRegistry);
     }
 
     @Scheduled(fixedDelayString = "${app.email-outbox.poll-interval-ms:30000}")
@@ -72,9 +86,12 @@ public class EmailOutboxWorker {
     }
 
     private void processJob(EmailOutboxJob job) {
+        // Solo se envía el token con el que se creó el trabajo: si hubo un reenvío, este
+        // trabajo quedó obsoleto y el token vigente lo envía su propio trabajo.
         String token = "VERIFY_EMAIL".equals(job.getJobType())
                 ? transactions.execute(status -> tokenRepository.findByUser_Id(job.getUserId())
                     .filter(value -> value.getExpiresAt().isAfter(OffsetDateTime.now()))
+                    .filter(value -> job.getTokenId() == null || job.getTokenId().equals(value.getId()))
                     .map(VerificationToken::getToken).orElse(null))
                 : null;
         if (token == null) {
@@ -109,6 +126,7 @@ public class EmailOutboxWorker {
             if (sent) {
                 job.setStatus("SENT");
                 job.setProcessedAt(OffsetDateTime.now());
+                sentCounter.increment();
             } else if (invalid) {
                 markFailed(job);
             } else {
@@ -119,6 +137,7 @@ public class EmailOutboxWorker {
                 } else {
                     job.setStatus("PENDING");
                     job.setNextAttemptAt(OffsetDateTime.now().plus(backoffFor(nextAttempt)));
+                    retriedCounter.increment();
                 }
             }
         });
@@ -127,6 +146,7 @@ public class EmailOutboxWorker {
     private void markFailed(EmailOutboxJob job) {
         job.setStatus("FAILED");
         job.setProcessedAt(OffsetDateTime.now());
+        failedCounter.increment();
     }
 
     private Duration backoffFor(int attempt) {

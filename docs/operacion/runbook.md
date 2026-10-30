@@ -171,7 +171,14 @@ Para correlacionar un error reportado por el usuario:
 
 ---
 
-El outbox de correo entrega al menos una vez: si el proceso cae durante el envío, el trabajo se reintenta al vencer el lease (`EMAIL_OUTBOX_LEASE_MS`, por defecto 5 minutos) y puede duplicarse un correo.
+El outbox de correo entrega al menos una vez: si el proceso cae durante el envío, el trabajo se reintenta al vencer el lease (`EMAIL_OUTBOX_LEASE_MS`, por defecto 5 minutos) y puede duplicarse un correo. Un trabajo queda asociado al token con el que se creó: si el usuario pidió un reenvío, el trabajo anterior se descarta sin enviar.
+
+Métricas del outbox (con `X-Ops-Key`): `email.outbox.pending` (pendientes y en proceso) y `email.outbox.jobs` con `result=sent|retried|failed`. No incluyen emails ni tokens.
+
+```bash
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/email.outbox.pending
+curl -H "X-Ops-Key: $OPS_API_KEY" "https://<host>/actuator/metrics/email.outbox.jobs?tag=result:failed"
+```
 
 ## 5. Simulacro de restauración (restore drill)
 

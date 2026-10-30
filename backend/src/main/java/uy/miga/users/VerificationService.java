@@ -28,8 +28,9 @@ class VerificationService {
         outboxRepository.deleteByUserIdAndJobTypeAndStatus(user.getId(), "VERIFY_EMAIL", "PENDING");
 
         String token = UUID.randomUUID().toString();
-        tokenRepository.save(new VerificationToken(user, token, OffsetDateTime.now().plusHours(24)));
-        outboxRepository.save(new EmailOutboxJob(user.getId(), user.getEmail(), "VERIFY_EMAIL"));
+        VerificationToken saved = tokenRepository.save(
+                new VerificationToken(user, token, OffsetDateTime.now().plusHours(24)));
+        outboxRepository.save(new EmailOutboxJob(user.getId(), user.getEmail(), "VERIFY_EMAIL", saved.getId()));
     }
 
     @Transactional

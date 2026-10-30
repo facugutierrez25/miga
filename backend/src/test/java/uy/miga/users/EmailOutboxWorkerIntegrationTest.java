@@ -27,6 +27,9 @@ class EmailOutboxWorkerIntegrationTest {
     @Autowired private MockEmailService email;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private io.micrometer.core.instrument.MeterRegistry meters;
+    @Autowired private VerificationService verification;
+    @Autowired private UsersRepository usersRepository;
 
     private final List<Long> users = new ArrayList<>();
 
@@ -132,6 +135,72 @@ class EmailOutboxWorkerIntegrationTest {
         assertThat(reload(job).getProcessedAt()).isNull();
     }
 
+
+    @Test
+    void jobForAReplacedTokenIsDiscardedWithoutSending() {
+        EmailOutboxJob current = createJob();
+        Long tokenId = jdbc.queryForObject(
+            "SELECT id FROM email_verification_tokens WHERE user_id = ?", Long.class, current.getUserId());
+        jdbc.update("UPDATE email_outbox SET token_id = ? WHERE id = ?", tokenId + 1000, current.getId());
+
+        worker.processJobs();
+
+        assertThat(reload(current).getStatus()).isEqualTo("FAILED");
+        assertThat(email.getRecipients()).isEmpty();
+    }
+
+    @Test
+    void registrationRollbackDoesNotSend() {
+        String recipient = UUID.randomUUID() + "@miga.uy";
+        Long userId = jdbc.queryForObject("""
+                INSERT INTO users (email, password_hash, role) VALUES (?, 'unused', 'PATIENT') RETURNING id
+                """, Long.class, recipient);
+        users.add(userId);
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> {
+            verification.sendVerificationFor(usersRepository.findById(userId).orElseThrow());
+            status.setRollbackOnly();
+        });
+
+        worker.processJobs();
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM email_outbox WHERE user_id = ?", Long.class, userId))
+            .isZero();
+        assertThat(email.getRecipients()).isEmpty();
+    }
+
+    @Test
+    void twoWorkersDoNotSendTheSameJob() throws Exception {
+        List<EmailOutboxJob> created = new ArrayList<>();
+        for (int i = 0; i < 4; i++) created.add(createJob());
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> { start.await(); worker.processJobs(); return null; });
+            var second = executor.submit(() -> { start.await(); worker.processJobs(); return null; });
+            start.countDown();
+            first.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            second.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        List<String> expected = created.stream().map(EmailOutboxJob::getRecipient).toList();
+        assertThat(email.getRecipients()).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(created).allSatisfy(job -> assertThat(reload(job).getStatus()).isEqualTo("SENT"));
+    }
+
+    @Test
+    void sentJobsAreCountedInMetrics() {
+        double before = meters.counter("email.outbox.jobs", "result", "sent").count();
+        createJob();
+
+        worker.processJobs();
+
+        assertThat(meters.counter("email.outbox.jobs", "result", "sent").count()).isEqualTo(before + 1);
+        assertThat(meters.find("email.outbox.pending").gauge()).isNotNull();
+    }
+
     private EmailOutboxJob createJob() {
         String recipient = UUID.randomUUID() + "@miga.uy";
         Long userId = jdbc.queryForObject("""
@@ -142,7 +211,7 @@ class EmailOutboxWorkerIntegrationTest {
                 INSERT INTO email_verification_tokens (user_id, token, expires_at)
                 VALUES (?, ?, now() + interval '1 day')
                 """, userId, UUID.randomUUID().toString());
-        return jobs.saveAndFlush(new EmailOutboxJob(userId, recipient, "VERIFY_EMAIL"));
+        return jobs.saveAndFlush(new EmailOutboxJob(userId, recipient, "VERIFY_EMAIL", null));
     }
 
     private EmailOutboxJob reload(EmailOutboxJob job) {

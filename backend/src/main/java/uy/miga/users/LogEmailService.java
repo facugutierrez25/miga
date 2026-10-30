@@ -16,17 +16,22 @@ class LogEmailService implements EmailService {
     private static final Logger log = LoggerFactory.getLogger(LogEmailService.class);
 
     private final String baseUrl;
+    private final boolean logLinks;
 
-    LogEmailService(@Value("${app.base-url}") String baseUrl) {
+    LogEmailService(@Value("${app.base-url}") String baseUrl,
+                    @Value("${app.mail.log-links:false}") boolean logLinks) {
         this.baseUrl = baseUrl;
+        this.logLinks = logLinks;
     }
 
+    // Sin proveedor de correo, el enlace (que contiene el token) solo se muestra si se
+    // activa app.mail.log-links en desarrollo; nunca se registra el email del usuario.
     @Override
     public void sendVerificationEmail(String to, String token) {
-        String link = baseUrl + "/verificar-email?token=" + token;
-        log.info("=== VERIFICACIÓN EMAIL ===");
-        log.info("Para: {}", to);
-        log.info("Link: {}", link);
-        log.info("=========================");
+        if (logLinks) {
+            log.info("Enlace de verificación (solo desarrollo): {}/verificar-email?token={}", baseUrl, token);
+        } else {
+            log.info("Email de verificación preparado; activá app.mail.log-links para ver el enlace en desarrollo");
+        }
     }
 }
