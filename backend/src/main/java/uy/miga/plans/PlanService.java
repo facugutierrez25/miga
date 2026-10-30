@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-class PlanService {
+public class PlanService {
 
     private static final List<Object[]> DEFAULT_GROUPS = List.of(
         new Object[]{"Proteínas", "PRO", 1},
@@ -32,6 +32,14 @@ class PlanService {
         this.plansRepository = plansRepository;
         this.groupRepository = groupRepository;
         this.userService = userService;
+    }
+
+    @Transactional(readOnly = true)
+    public Long getCurrentPlanId(String email) {
+        Long userId = userService.findUserIdByEmail(email);
+        return plansRepository.findByUserIdAndCurrentTrue(userId)
+            .map(Plan::getId)
+            .orElseThrow(PlanNotFoundException::new);
     }
 
     @Transactional(readOnly = true)

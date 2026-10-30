@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import uy.miga.plans.PlanService;
 
 import java.util.List;
 
@@ -11,9 +12,11 @@ import java.util.List;
 class EquivalenceService {
 
     private final EquivalenceRepository repository;
+    private final PlanService planService;
 
-    EquivalenceService(EquivalenceRepository repository) {
+    EquivalenceService(EquivalenceRepository repository, PlanService planService) {
         this.repository = repository;
+        this.planService = planService;
     }
 
     @Transactional(readOnly = true)
@@ -25,8 +28,9 @@ class EquivalenceService {
     }
 
     @Transactional
-    EquivalenceDto addEquivalence(String userEmail, Long planId, Long foodGroupId,
+    EquivalenceDto addEquivalence(String userEmail, Long foodGroupId,
                                   String food, Double quantity, Unit unit) {
+        Long planId = planService.getCurrentPlanId(userEmail);
         Equivalence eq = new Equivalence(userEmail, planId, foodGroupId, food.strip(), quantity, unit);
         return toDto(repository.save(eq));
     }

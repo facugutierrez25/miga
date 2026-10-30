@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 record AddEquivalenceRequest(
-    @NotNull  Long planId,
     @NotNull  Long foodGroupId,
     @NotBlank @Size(max = 120) String food,
     @NotNull  @Positive        Double quantity,
