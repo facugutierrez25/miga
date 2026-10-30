@@ -80,7 +80,7 @@ class RegistroService {
         for (InterpretedItem item : expanded) {
             if (!item.recognized() || item.foodGroupId() == null) continue;
             entryFacade.createNoteEntry(
-                userEmail, mealId, date,
+                userId, userEmail, mealId, date,
                 item.foodName(),
                 item.quantity().doubleValue(),
                 item.unit(),
@@ -109,7 +109,7 @@ class RegistroService {
         Long userId = userService.findUserIdByEmail(userEmail);
         Long planId = planService.getCurrentPlanId(userEmail);
 
-        List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserEmailAndDate(userEmail, date);
+        List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserIdAndDate(userId, date);
         Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
             .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
 
@@ -195,7 +195,7 @@ class RegistroService {
         Long userId = userService.findUserIdByEmail(userEmail);
         Long planId = planService.getCurrentPlanId(userEmail);
 
-        List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserEmailAndDate(userEmail, date);
+        List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserIdAndDate(userId, date);
         Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
             .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
         Map<Long, MealNote> noteByMeal = noteRepository.findByUserIdAndDate(userId, date)
@@ -256,17 +256,14 @@ class RegistroService {
     @Transactional
     DayRegistroDto.EntryItemDto patchItem(String userEmail, LocalDate date, Long entryId,
                                           PatchItemRequest req) {
-        FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserEmail(entryId, userEmail);
+        Long userId = userService.findUserIdByEmail(userEmail);
+        FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
         if (entry == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        if (!date.equals(entry.mealId() == null ? null : date)) {
-            // date path param must match entry date — validated implicitly by mealId ownership
-        }
 
         Double newQty = req.quantity() != null ? req.quantity().doubleValue() : null;
         entryFacade.updateEntry(entryId, newQty, req.unit(), req.foodGroupId(), req.portions());
 
         if (req.saveAsRule()) {
-            Long userId = userService.findUserIdByEmail(userEmail);
             Long planId = planService.getCurrentPlanId(userEmail);
             Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
             ruleService.createUserRule(userId, planId, groupId,
@@ -275,7 +272,7 @@ class RegistroService {
                 req.portions());
         }
 
-        FoodEntryFacade.EntryData updated = entryFacade.findEntryByIdAndUserEmail(entryId, userEmail);
+        FoodEntryFacade.EntryData updated = entryFacade.findEntryByIdAndUserId(entryId, userId);
         return new DayRegistroDto.EntryItemDto(
             updated.id(), updated.food(), updated.quantity(), updated.unit(),
             updated.foodGroupId(), updated.portions(), updated.origin(), updated.uncertain());
@@ -295,7 +292,7 @@ class RegistroService {
             .filter(g -> g.id().equals(req.foodGroupId()))
             .findFirst().map(uy.miga.plans.PlanFoodGroupDto::name).orElse("alimento");
 
-        entryFacade.createUserEntry(userEmail, mealId, date, food, req.foodGroupId());
+        entryFacade.createUserEntry(userId, userEmail, mealId, date, food, req.foodGroupId());
     }
 
     @Transactional(readOnly = true)
