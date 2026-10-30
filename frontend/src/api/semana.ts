@@ -8,6 +8,7 @@ export interface HabitDto {
   dailyGoal: number | null
   step: number
   period: string
+  countsFlexibleMeals?: boolean
   displayOrder: number
 }
 
@@ -23,6 +24,8 @@ export interface WeekDayDto {
   totalRecorded: number
   totalGoal: number
   habitLogs: HabitLogDto[]
+  habitIds?: number[]
+  meals?: { mealId: number; name: string; noteText: string | null; status: string }[]
 }
 
 export interface WeekSummaryDto {
@@ -52,13 +55,17 @@ export async function logHabit(
   return apiRequest(`/api/v1/habitos/${habitId}/log?date=${date}`, { errorMessage: 'Error al registrar el hábito.', token, method: 'PUT', body: { value } })
 }
 
-export async function exportWeekCsv(token: string, weekStart: string): Promise<void> {
-  const blob = await apiRequest<Blob>(`/api/v1/semana/export?date=${weekStart}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
+export async function exportWeek(token: string, weekStart: string, format: 'csv' | 'xlsx' = 'csv'): Promise<void> {
+  const blob = await apiRequest<Blob>(`/api/v1/semana/export?date=${weekStart}&format=${format}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
   if (!blob) return
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `semana-${weekStart}.csv`
+  a.download = `semana-${weekStart}.${format}`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export function exportWeekCsv(token: string, weekStart: string): Promise<void> {
+  return exportWeek(token, weekStart, 'csv')
 }

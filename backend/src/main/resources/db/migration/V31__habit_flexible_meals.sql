@@ -1,0 +1,1 @@
+ALTER TABLE plan_habits ADD COLUMN counts_flexible_meals BOOLEAN NOT NULL DEFAULT FALSE;

@@ -22,6 +22,33 @@ import java.util.stream.Collectors;
 @Service
 public class RegistroService {
     @Transactional(readOnly = true)
+    public List<WeekMealData> getWeekMeals(String email, LocalDate date) {
+        Long userId = userService.findUserIdByEmail(email);
+        Long planId = planService.getPlanIdForDate(userId, date);
+        var day = getDayRegistro(email, date);
+        var names = planService.getMeals(planId).stream()
+            .collect(Collectors.toMap(PlanService.MealRef::id, PlanService.MealRef::name));
+        var notes = noteRepository.findByUserIdAndDate(userId, date).stream()
+            .collect(Collectors.toMap(MealNote::getMealId, n -> n));
+        return day.meals().stream().map(meal -> {
+            var note = notes.get(meal.mealId());
+            long flexible = 0;
+            if (note != null) {
+                Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
+                flexible = interpreter.interpret(note.getText(), ruleService.findApplicable(notePlan, userId))
+                    .stream().filter(item -> "FLEXIBLE".equals(item.tipo())).count();
+            }
+            String status = "SIN_ANOTAR";
+            if (note != null || !meal.items().isEmpty()) {
+                status = meal.comparison().isEmpty() ? "REGISTRADA" :
+                    meal.comparison().stream().map(GroupStatusDto::status)
+                        .filter(s -> !"EN_PLAN".equals(s)).findFirst().orElse("EN_PLAN");
+            }
+            return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
     public boolean planHasNotes(Long planId) { return noteRepository.existsByPlanId(planId); }
 
     private final MealNoteRepository noteRepository;

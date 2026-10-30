@@ -128,6 +128,11 @@ function HabitForm({
         />
       </label>
       <label>
+        <input type="checkbox" checked={value.countsFlexibleMeals ?? false}
+          onChange={e => setValue({ ...value, countsFlexibleMeals: e.target.checked })} />
+        Cuenta comidas flexibles
+      </label>
+      <label>
         Tipo
         <select
           value={value.habitType}
