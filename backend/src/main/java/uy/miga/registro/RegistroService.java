@@ -16,7 +16,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-class RegistroService {
+public class RegistroService {
+    @Transactional(readOnly = true)
+    public boolean planHasNotes(Long planId) { return noteRepository.existsByPlanId(planId); }
 
     private final MealNoteRepository noteRepository;
     private final InterpreterService interpreter;

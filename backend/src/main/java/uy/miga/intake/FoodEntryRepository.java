@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
+    boolean existsByMealIdIn(List<Long> mealIds);
     List<FoodEntry> findByUserIdAndDateOrderByIdAsc(Long userId, LocalDate date);
     Optional<FoodEntry> findByIdAndUserId(Long id, Long userId);
 

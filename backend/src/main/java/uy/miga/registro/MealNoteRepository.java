@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 interface MealNoteRepository extends JpaRepository<MealNote, Long> {
+    boolean existsByPlanId(Long planId);
+
     Optional<MealNote> findByUserIdAndDateAndMealId(Long userId, LocalDate date, Long mealId);
     List<MealNote> findByUserIdAndDate(Long userId, LocalDate date);
     Optional<MealNote> findByIdAndUserId(Long id, Long userId);

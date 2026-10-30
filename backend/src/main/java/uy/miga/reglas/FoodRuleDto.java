@@ -16,5 +16,14 @@ public record FoodRuleDto(
     List<Componente> componentes,
     BigDecimal cantidadPorPorcion,
     String unidad,
-    BigDecimal porcionPorDefecto
-) {}
+    BigDecimal porcionPorDefecto,
+    java.util.UUID uid,
+    java.util.UUID overridesRuleUid
+) {
+    public FoodRuleDto(Long id, String alcance, Long planId, Long userId, String alimento, List<String> sinonimos,
+        String tipo, String standardGroupKey, Long foodGroupId, List<Componente> componentes,
+        BigDecimal cantidadPorPorcion, String unidad, BigDecimal porcionPorDefecto) {
+        this(id, alcance, planId, userId, alimento, sinonimos, tipo, standardGroupKey, foodGroupId, componentes,
+            cantidadPorPorcion, unidad, porcionPorDefecto, null, null);
+    }
+}

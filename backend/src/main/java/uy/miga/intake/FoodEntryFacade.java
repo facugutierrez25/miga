@@ -9,6 +9,8 @@ import java.util.List;
 
 @Component
 public class FoodEntryFacade {
+    @Transactional(readOnly = true)
+    public boolean hasEntriesForMeals(List<Long> mealIds) { return !mealIds.isEmpty() && repository.existsByMealIdIn(mealIds); }
 
     private final FoodEntryRepository repository;
 
