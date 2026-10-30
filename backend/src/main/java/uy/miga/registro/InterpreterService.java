@@ -16,7 +16,13 @@ class InterpreterService {
     private static final Pattern HARD_SEP = Pattern.compile(",|;|\\+|(?<=\\S)\\.(?=\\s|$)");
 
     private static final Pattern QUANTITY_PREFIX = Pattern.compile(
-        "^(\\d+(?:[.,]\\d+)?|medios?|un[ao]?)\\s+",
+        "^(\\d+(?:[.,]\\d+)?|medios?|medias?|un[ao]?)\\s+",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    // Handles "200g yogur" — number immediately followed by unit letters, then space
+    private static final Pattern QUANTITY_UNIT_NOSPACE = Pattern.compile(
+        "^(\\d+(?:[.,]\\d+)?)([a-z]+)\\s+",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -71,27 +77,39 @@ class InterpreterService {
     private InterpretedItem interpretSegment(String segment, List<FoodRuleDto> rules) {
         double rawQty = 1.0;
         String remaining = segment;
+        String detectedUnit = null;
 
         Matcher m = QUANTITY_PREFIX.matcher(segment);
         if (m.find()) {
             rawQty = parseQuantity(m.group(1));
             remaining = segment.substring(m.end()).strip();
+        } else {
+            Matcher m2 = QUANTITY_UNIT_NOSPACE.matcher(segment);
+            if (m2.find()) {
+                rawQty = Double.parseDouble(m2.group(1).replace(",", "."));
+                String unitToken = m2.group(2).toLowerCase();
+                if (UNIT_CANONICAL.containsKey(unitToken)) {
+                    detectedUnit = UNIT_CANONICAL.get(unitToken);
+                    remaining = segment.substring(m2.end()).strip();
+                }
+            }
         }
 
-        String detectedUnit = null;
         String foodName = remaining;
 
-        for (Map.Entry<String, String> entry : UNIT_CANONICAL.entrySet()) {
-            String key = entry.getKey();
-            if (remaining.startsWith(key + " ")) {
-                detectedUnit = entry.getValue();
-                foodName = remaining.substring(key.length()).strip();
-                break;
-            }
-            if (remaining.equals(key)) {
-                detectedUnit = entry.getValue();
-                foodName = "";
-                break;
+        if (detectedUnit == null) {
+            for (Map.Entry<String, String> entry : UNIT_CANONICAL.entrySet()) {
+                String key = entry.getKey();
+                if (remaining.startsWith(key + " ")) {
+                    detectedUnit = entry.getValue();
+                    foodName = remaining.substring(key.length()).strip();
+                    break;
+                }
+                if (remaining.equals(key)) {
+                    detectedUnit = entry.getValue();
+                    foodName = "";
+                    break;
+                }
             }
         }
 
@@ -112,15 +130,20 @@ class InterpreterService {
                 for (String s : r.sinonimos())
                     if (normalize(s).equals(name)) return r;
         }
+        if (name.length() < 4) return null;
         List<FoodRuleDto> candidates = new ArrayList<>();
         int bestDist = 3;
         for (FoodRuleDto r : rules) {
-            int d = levenshtein(name, normalize(r.alimento()));
+            String rName = normalize(r.alimento());
+            if (rName.length() < 4) continue;
+            int d = levenshtein(name, rName);
             if (d < bestDist) { bestDist = d; candidates.clear(); candidates.add(r); }
             else if (d == bestDist) candidates.add(r);
             if (r.sinonimos() != null) {
                 for (String s : r.sinonimos()) {
-                    d = levenshtein(name, normalize(s));
+                    String ns = normalize(s);
+                    if (ns.length() < 4) continue;
+                    d = levenshtein(name, ns);
                     if (d < bestDist) { bestDist = d; candidates.clear(); candidates.add(r); }
                     else if (d == bestDist && !candidates.contains(r)) candidates.add(r);
                 }
