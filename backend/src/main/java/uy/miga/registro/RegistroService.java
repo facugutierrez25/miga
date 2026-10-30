@@ -151,7 +151,7 @@ class RegistroService {
                         item.quantity(), item.unit(),
                         groupId, comp.standardGroupKey(),
                         BigDecimal.valueOf(comp.porciones()).multiply(item.quantity()).setScale(3, java.math.RoundingMode.HALF_UP),
-                        item.appliedRule(), item.uncertain(), item.ruleId(), null
+                        item.appliedRule(), item.uncertain(), item.ruleId(), null, null
                     ));
                 }
             } else if (item.recognized() && item.foodGroupId() == null && item.standardGroupKey() != null) {
@@ -161,7 +161,7 @@ class RegistroService {
                     item.originalText(), item.foodName(),
                     item.quantity(), item.unit(),
                     groupId, item.standardGroupKey(),
-                    item.portions(), item.appliedRule(), item.uncertain(), item.ruleId(), null
+                    item.portions(), item.appliedRule(), item.uncertain(), item.ruleId(), null, item.tipo()
                 ));
             } else {
                 result.add(item);
@@ -193,8 +193,8 @@ class RegistroService {
         return new InterpretedItemDto(
             item.originalText(), item.foodName(),
             item.quantity(), item.unit(),
-            item.foodGroupId(), item.portions(),
-            item.appliedRule(), item.uncertain(), item.recognized()
+            item.foodGroupId(), item.standardGroupKey(), item.portions(),
+            item.appliedRule(), item.uncertain(), item.recognized(), item.tipo()
         );
     }
 }

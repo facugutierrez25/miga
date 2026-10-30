@@ -16,11 +16,12 @@ record InterpretedItem(
     String appliedRule,
     boolean uncertain,
     Long ruleId,
-    List<Componente> components
+    List<Componente> components,
+    String tipo
 ) {
     static InterpretedItem unrecognized(String originalText) {
         return new InterpretedItem(originalText, originalText, BigDecimal.ONE, "u",
-            null, null, null, null, false, null, null);
+            null, null, null, null, false, null, null, null);
     }
 
     boolean recognized() { return portions != null; }

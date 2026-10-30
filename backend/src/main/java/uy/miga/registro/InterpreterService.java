@@ -164,8 +164,12 @@ class InterpreterService {
                 appliedRule = rule.alimento() + " = no cuenta";
             }
             case "LIBRE" -> {
-                portions = BigDecimal.ONE;
-                appliedRule = rule.alimento() + " = libre";
+                portions = BigDecimal.ZERO;
+                appliedRule = rule.alimento() + " = libre (sin porcion asignada)";
+            }
+            case "FLEXIBLE" -> {
+                portions = BigDecimal.ZERO;
+                appliedRule = rule.alimento() + " = flexible (sin porcion fija)";
             }
             case "COMPUESTO" -> {
                 portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
@@ -178,7 +182,7 @@ class InterpreterService {
                     if (converted != null) {
                         portions = converted.divide(rule.cantidadPorPorcion(), 3, RoundingMode.HALF_UP);
                         appliedRule = rule.cantidadPorPorcion() + " " + rule.unidad()
-                            + " " + rule.alimento() + " = 1 porcion";
+                            + " de " + rule.alimento() + " = 1 porcion";
                     } else {
                         portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
                             .setScale(3, RoundingMode.HALF_UP);
@@ -199,7 +203,8 @@ class InterpreterService {
             unit != null ? unit : (rule.unidad() != null ? rule.unidad() : "u"),
             rule.foodGroupId(), rule.standardGroupKey(),
             portions, appliedRule, uncertain, rule.id(),
-            "COMPUESTO".equals(rule.tipo()) ? rule.componentes() : null
+            "COMPUESTO".equals(rule.tipo()) ? rule.componentes() : null,
+            rule.tipo()
         );
     }
 
