@@ -150,13 +150,13 @@ class InterpreterServiceTest {
     // ── Levenshtein ──────────────────────────────────────────────────────────
 
     @Test
-    void findRule_levenshtein_paltaToPasta_noMatch_ambiguous() {
+    void findRule_levenshtein_noMatch_ambiguous() {
         var rules = List.of(
-            normal(1L, "palta", 5L, BigDecimal.ONE, "u"),
-            normal(2L, "pasta", 2L, new BigDecimal("80"), "g")
+            normal(1L, "posta", 5L, BigDecimal.ONE, "u"),
+            normal(2L, "pesta", 2L, new BigDecimal("80"), "g")
         );
-        // distance palta↔pasta = 2; two candidates → no match (ambiguous)
-        assertThat(interpreter.findRule("posta", rules)).isNull();
+        // "pasta" is d=1 from both "posta" and "pesta" → ambiguous → no match
+        assertThat(interpreter.findRule("pasta", rules)).isNull();
     }
 
     @Test
@@ -167,10 +167,10 @@ class InterpreterServiceTest {
     }
 
     @Test
-    void findRule_levenshtein_paltaNotMappedToNata() {
-        // "nata" is distance 3+ from "palta" → no match
+    void findRule_levenshtein_shortWordSkipped() {
+        // words shorter than 4 chars skip Levenshtein to avoid false positives
         var rules = List.of(normal(1L, "palta", 5L, BigDecimal.ONE, "u"));
-        assertThat(interpreter.findRule("nata", rules)).isNull();
+        assertThat(interpreter.findRule("pal", rules)).isNull();
     }
 
     // ── rule types ───────────────────────────────────────────────────────────
@@ -253,7 +253,8 @@ class InterpreterServiceTest {
 
     @Test
     void levenshtein_twoSubstitutions() {
-        assertThat(interpreter.levenshtein("palta", "pasta")).isEqualTo(2);
+        // "abcd" vs "axyd": b→x and c→y = 2 substitutions
+        assertThat(interpreter.levenshtein("abcd", "axyd")).isEqualTo(2);
     }
 
     // ── unrecognized ─────────────────────────────────────────────────────────
