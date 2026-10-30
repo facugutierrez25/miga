@@ -6,6 +6,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "food_rules")
@@ -14,6 +15,12 @@ class FoodRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, updatable = false)
+    private UUID uid = UUID.randomUUID();
+
+    @Column(name = "overrides_rule_uid")
+    private UUID overridesRuleUid;
 
     @Column(nullable = false, length = 10)
     private String alcance;
@@ -56,6 +63,8 @@ class FoodRule {
     FoodRule() {}
 
     Long getId()                    { return id; }
+    UUID getUid()                   { return uid; }
+    UUID getOverridesRuleUid()      { return overridesRuleUid; }
     String getAlcance()             { return alcance; }
     Long getPlanId()                { return planId; }
     Long getUserId()                { return userId; }
@@ -69,6 +78,8 @@ class FoodRule {
     String getUnidad()              { return unidad; }
     BigDecimal getPorcionPorDefecto() { return porcionPorDefecto; }
 
+    void setUid(UUID uid)                       { this.uid = uid; }
+    void setOverridesRuleUid(UUID u)            { this.overridesRuleUid = u; }
     void setAlcance(String alcance)             { this.alcance = alcance; }
     void setPlanId(Long planId)                 { this.planId = planId; }
     void setUserId(Long userId)                 { this.userId = userId; }

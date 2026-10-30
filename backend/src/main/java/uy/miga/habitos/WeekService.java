@@ -121,6 +121,7 @@ class WeekService {
                 HabitLog l = new HabitLog();
                 l.setUserId(userId);
                 l.setPlanHabitId(habitId);
+                l.setHabitUid(habit.getUid());
                 l.setLogDate(date);
                 return l;
             });

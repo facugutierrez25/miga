@@ -10,6 +10,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import java.sql.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Verifica invariantes de las migraciones Flyway:
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - Backfill V21: food_entries.user_id desde user_email.
  * - Backfill V22: meal_notes.plan_id.
  * - V23: índice único de plan vigente.
+ * - V26: uid estable entre versiones, habit_uid en registros y verificación de duplicados.
  * - Aislamiento de datos entre dos usuarios tras migración completa.
  */
 class MigrationInvariantsTest {
@@ -241,6 +243,83 @@ class MigrationInvariantsTest {
                 violated = true;
             }
             assertThat(violated).as("Unique index must prevent two current plans").isTrue();
+        }
+    }
+
+    /**
+     * V26 asigna el mismo uid a los grupos de igual abreviatura en distintas versiones
+     * del plan de un usuario y copia el uid del hábito a sus registros.
+     */
+    @Test
+    void v26Backfill_sharesGroupUidAcrossVersionsAndCopiesHabitUid() throws Exception {
+        buildFlyway("25").migrate();
+
+        long oldPlanId;
+        long newPlanId;
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "v26user@test.com");
+            oldPlanId = insertPlan(c, userId);
+            c.createStatement().execute(
+                "UPDATE plans SET is_current = false, superseded_at = now() WHERE id = " + oldPlanId);
+            newPlanId = insertPlan(c, userId);
+            for (long planId : new long[]{oldPlanId, newPlanId}) {
+                c.createStatement().execute("""
+                    INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order)
+                    VALUES (%d, 'Huevo', 'HUE', 1)
+                    """.formatted(planId));
+            }
+            c.createStatement().execute("""
+                INSERT INTO plan_habits (plan_id, name, habit_type, daily_goal)
+                VALUES (%d, 'Agua', 'CANTIDAD', 2)
+                """.formatted(oldPlanId));
+            long habitId = queryLong(c, "SELECT MAX(id) FROM plan_habits");
+            c.createStatement().execute("""
+                INSERT INTO habit_logs (user_id, plan_habit_id, log_date, value)
+                VALUES (%d, %d, CURRENT_DATE, 1.5)
+                """.formatted(userId, habitId));
+        }
+
+        buildFlyway(null).migrate();
+
+        try (Connection c = connect()) {
+            long distinctUids = queryLong(c, """
+                SELECT COUNT(DISTINCT uid) FROM plan_food_groups
+                WHERE abbreviation = 'HUE' AND plan_id IN (%d, %d)
+                """.formatted(oldPlanId, newPlanId));
+            assertThat(distinctUids).as("versiones del mismo grupo comparten uid").isEqualTo(1);
+
+            long mismatched = queryLong(c, """
+                SELECT COUNT(*) FROM habit_logs l
+                JOIN plan_habits h ON h.id = l.plan_habit_id
+                WHERE l.habit_uid IS DISTINCT FROM h.uid
+                """);
+            assertThat(mismatched).as("cada registro lleva el uid de su hábito").isZero();
+        }
+    }
+
+    /**
+     * V26 aborta si un plan tiene dos grupos con la misma abreviatura, sin borrar datos.
+     */
+    @Test
+    void v26_abortsOnDuplicateAbbreviationWithinPlan() throws Exception {
+        buildFlyway("25").migrate();
+
+        try (Connection c = connect()) {
+            long planId = insertPlan(c, insertUser(c, "v26dup@test.com"));
+            for (int i = 1; i <= 2; i++) {
+                c.createStatement().execute("""
+                    INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order)
+                    VALUES (%d, 'Grupo %d', 'DUP', %d)
+                    """.formatted(planId, i, i));
+            }
+        }
+
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V26 abortada");
+
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM plan_food_groups WHERE abbreviation = 'DUP'"))
+                .isEqualTo(2);
         }
     }
 

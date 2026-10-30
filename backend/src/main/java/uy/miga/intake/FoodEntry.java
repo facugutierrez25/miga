@@ -58,6 +58,12 @@ class FoodEntry {
     @Column(precision = 8, scale = 3)
     private BigDecimal porciones;
 
+    @Column(name = "applied_rule", columnDefinition = "text")
+    private String appliedRule;
+
+    @Column(name = "occurrence_id")
+    private java.util.UUID occurrenceId;
+
     FoodEntry() {}
 
     FoodEntry(Long userId, String userEmail, Long mealId, LocalDate date,
@@ -88,6 +94,8 @@ class FoodEntry {
     String getOrigen()       { return origen; }
     Boolean getSupuesto()    { return supuesto; }
     BigDecimal getPorciones(){ return porciones; }
+    String getAppliedRule()  { return appliedRule; }
+    java.util.UUID getOccurrenceId() { return occurrenceId; }
 
     void setQuantity(Double quantity)              { this.quantity = quantity; }
     void setUnit(String unit)                      { this.unit = unit; }
@@ -98,4 +106,6 @@ class FoodEntry {
     void setOrigen(String origen)             { this.origen = origen; }
     void setSupuesto(Boolean supuesto)        { this.supuesto = supuesto; }
     void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
+    void setAppliedRule(String appliedRule)   { this.appliedRule = appliedRule; }
+    void setOccurrenceId(java.util.UUID id)   { this.occurrenceId = id; }
 }
