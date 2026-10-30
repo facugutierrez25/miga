@@ -28,13 +28,12 @@ class InterpreterCoverageTest {
     @BeforeAll
     static void loadFixtures() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        try (InputStream rulesStream = InterpreterCoverageTest.class
-                .getResourceAsStream("/registro/rules-coverage.json")) {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        try (InputStream rulesStream = cl.getResourceAsStream("registro/rules-coverage.json")) {
             RuleJson[] ruleArray = mapper.readValue(rulesStream, RuleJson[].class);
             rules = Arrays.stream(ruleArray).map(InterpreterCoverageTest::toDto).toList();
         }
-        try (InputStream entriesStream = InterpreterCoverageTest.class
-                .getResourceAsStream("/registro/entries-coverage.json")) {
+        try (InputStream entriesStream = cl.getResourceAsStream("registro/entries-coverage.json")) {
             fixtures = Arrays.asList(mapper.readValue(entriesStream, EntryFixture[].class));
         }
     }
