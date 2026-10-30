@@ -2,11 +2,17 @@ const BASE = import.meta.env.VITE_API_URL ?? ''
 
 export class ApiError extends Error {
   readonly status: number
+  readonly code?: string
+  readonly error?: string
+  readonly details: Record<string, unknown>
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, details: Record<string, unknown> = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.details = details
+    this.code = typeof details.code === 'string' ? details.code : undefined
+    this.error = typeof details.error === 'string' ? details.error : undefined
   }
 }
 
@@ -15,6 +21,9 @@ interface RequestOptions {
   signal?: AbortSignal
   method?: string
   body?: unknown
+  errorMessage?: string
+  errorMessages?: Record<number, string>
+  responseType?: 'json' | 'blob' | 'text'
 }
 
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
@@ -30,9 +39,25 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
 
-  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status} ${path}`)
   if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  if (res.ok && opts.responseType === 'blob') {
+    const blob = await res.blob()
+    return (blob.size ? blob : undefined) as T
+  }
+  const text = await res.text()
+  let data: unknown
+  try { data = text.trim() ? JSON.parse(text) : undefined } catch { data = undefined }
+  if (!res.ok) {
+    const details = data && typeof data === 'object' && !Array.isArray(data)
+      ? data as Record<string, unknown> : {}
+    const message = opts.errorMessages?.[res.status] ?? opts.errorMessage
+      ?? (typeof details.error === 'string' ? details.error : `HTTP ${res.status} ${path}`)
+    throw new ApiError(res.status, message, details)
+  }
+  if (!text.trim()) return undefined as T
+  if (opts.responseType === 'text') return text as T
+  if (data === undefined) throw new ApiError(res.status, 'La respuesta del servidor no es JSON válido.')
+  return data as T
 }
 
 export function isAbortError(err: unknown): boolean {

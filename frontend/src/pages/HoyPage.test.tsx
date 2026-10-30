@@ -405,3 +405,20 @@ test('si recargar falla, la versión base no cambia', async () => {
   expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
   expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
 })
+
+
+test('muestra el inicio del plan aunque el registro del día siga pendiente', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  mockGetDayRegistro.mockReturnValue(new Promise(() => {}))
+  renderHoy()
+  await waitFor(() => expect(screen.getByRole('link', { name: 'Cargar mi plan' })).toBeInTheDocument())
+})
+
+test('permite reintentar un error del plan aunque el día siga pendiente', async () => {
+  mockGetMyPlan.mockRejectedValueOnce(new Error('Sin conexión')).mockResolvedValueOnce(planConComida)
+  mockGetDayRegistro.mockReturnValue(new Promise(() => {}))
+  renderHoy()
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar el plan.'))
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
+})
