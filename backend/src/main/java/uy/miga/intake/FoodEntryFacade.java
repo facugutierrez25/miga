@@ -17,12 +17,12 @@ public class FoodEntryFacade {
     }
 
     @Transactional
-    public Long createNoteEntry(String userEmail, Long mealId, LocalDate date,
+    public Long createNoteEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                 String food, Double quantity, String unit,
                                 Long foodGroupId, Long mealNoteId,
                                 String originalText, Boolean uncertain,
                                 BigDecimal portions) {
-        FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
+        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
         entry.setMealNoteId(mealNoteId);
         entry.setTextoOriginal(originalText);
         entry.setOrigen("REGLA");
@@ -37,24 +37,25 @@ public class FoodEntryFacade {
     }
 
     @Transactional(readOnly = true)
+    public List<EntryData> findByUserIdAndDate(Long userId, LocalDate date) {
+        return repository.findByUserIdAndDateOrderByIdAsc(userId, date)
+            .stream().map(this::toEntryData).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<EntryData> findByUserEmailAndDate(String userEmail, LocalDate date) {
         return repository.findByUserEmailAndDateOrderByIdAsc(userEmail, date)
-            .stream()
-            .map(e -> new EntryData(
-                e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
-                e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
-                e.getOrigen(), e.getSupuesto(), e.getPorciones()))
-            .toList();
+            .stream().map(this::toEntryData).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public EntryData findEntryByIdAndUserId(Long id, Long userId) {
+        return repository.findByIdAndUserId(id, userId).map(this::toEntryData).orElse(null);
     }
 
     @Transactional(readOnly = true)
     public EntryData findEntryByIdAndUserEmail(Long id, String userEmail) {
-        return repository.findByIdAndUserEmail(id, userEmail)
-            .map(e -> new EntryData(
-                e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
-                e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
-                e.getOrigen(), e.getSupuesto(), e.getPorciones()))
-            .orElse(null);
+        return repository.findByIdAndUserEmail(id, userEmail).map(this::toEntryData).orElse(null);
     }
 
     @Transactional
@@ -69,12 +70,19 @@ public class FoodEntryFacade {
     }
 
     @Transactional
-    public Long createUserEntry(String userEmail, Long mealId, LocalDate date,
+    public Long createUserEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                 String food, Long foodGroupId) {
-        FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
+        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
         entry.setOrigen("USUARIO");
         entry.setPorciones(BigDecimal.ONE);
         return repository.save(entry).getId();
+    }
+
+    private EntryData toEntryData(FoodEntry e) {
+        return new EntryData(
+            e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
+            e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
+            e.getOrigen(), e.getSupuesto(), e.getPorciones());
     }
 
     public record EntryData(

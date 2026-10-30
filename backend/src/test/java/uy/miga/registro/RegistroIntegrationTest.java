@@ -393,4 +393,34 @@ class RegistroIntegrationTest {
                 """))
             .andExpect(status().isNotFound());
     }
+
+    @Test
+    void twoUserIsolation_cannotSaveRespuestaOnOtherUserMeal() throws Exception {
+        createUniqueUserPlan();
+        long mealIdA = mealId;
+        String tokenB = registerAndLogin("registro-" + UUID.randomUUID() + "@miga.uy");
+
+        mockMvc.perform(post("/api/v1/registro/" + LocalDate.now() + "/comidas/" + mealIdA + "/respuestas")
+            .header("Authorization", "Bearer " + tokenB)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"foodGroupId": 1, "consumed": true}
+                """))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void twoUserIsolation_cannotPutNotaOnOtherUserMeal() throws Exception {
+        createUniqueUserPlan();
+        long mealIdA = mealId;
+        String tokenB = registerAndLogin("registro-" + UUID.randomUUID() + "@miga.uy");
+
+        mockMvc.perform(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + mealIdA + "/nota")
+            .header("Authorization", "Bearer " + tokenB)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"text": "intento"}
+                """))
+            .andExpect(status().isForbidden());
+    }
 }
