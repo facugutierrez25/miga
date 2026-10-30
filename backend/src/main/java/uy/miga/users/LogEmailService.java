@@ -4,10 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
-// Fallback: activo cuando no hay ResendEmailService (sin API key configurada).
+// Fallback para desarrollo local: activo solo en perfil "local" cuando no hay ResendEmailService.
 @Service
+@Profile("local")
 @ConditionalOnMissingBean(EmailService.class)
 class LogEmailService implements EmailService {
 
