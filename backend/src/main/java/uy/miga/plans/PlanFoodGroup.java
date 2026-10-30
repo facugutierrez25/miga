@@ -20,7 +20,7 @@ class PlanFoodGroup {
     @Column(nullable = false, length = 10)
     private String abbreviation;
 
-    @Column(name = "display_order", nullable = false)
+    @Column(name = "display_order", nullable = false, columnDefinition = "SMALLINT")
     private int displayOrder;
 
     @Column(length = 7)
