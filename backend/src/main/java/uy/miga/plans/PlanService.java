@@ -87,9 +87,15 @@ public class PlanService {
 
         var existing = plansRepository.lockCurrentByUserId(userId)
             .or(() -> plansRepository.lockCurrentByUserId(userId));
+        // Con un plan vigente, la versión es obligatoria: sin ella el cliente cree que está
+        // creando el primer plan y otro ya lo creó. Sin plan vigente, una versión indica un
+        // cliente desactualizado. La creación concurrente la frena el índice único de V23.
+        if (existing.isEmpty() && dto.clientVersion() != null) {
+            throw new PlanConflictException();
+        }
         if (existing.isPresent()) {
             Plan old = existing.get();
-            if (dto.clientVersion() != null && !dto.clientVersion().equals(old.getVersion())) {
+            if (!old.getVersion().equals(dto.clientVersion())) {
                 throw new PlanConflictException();
             }
             if (!planChanged(old, dto)) {

@@ -70,7 +70,7 @@ class RegistroIntegrationTest {
         MvcResult planResult = mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -268,7 +268,7 @@ class RegistroIntegrationTest {
         MvcResult result = mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk())
             .andReturn();
         mealId = objectMapper.readTree(result.getResponse().getContentAsString())
@@ -568,7 +568,7 @@ class RegistroIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_JSON.replace("\"Desayuno\"", "\"Primera comida\"")))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON.replace("\"Desayuno\"", "\"Primera comida\""))))
             .andExpect(status().isOk());
 
         JsonNode meal = getDay(date).path("meals").get(0);
@@ -699,7 +699,7 @@ class RegistroIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -728,7 +728,7 @@ class RegistroIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk());
 
         // GET día de ayer debe devolver datos sin error aunque el plan cambió
