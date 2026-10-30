@@ -1,9 +1,12 @@
 package uy.miga;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import uy.miga.plans.InvalidPortionsException;
+import uy.miga.plans.PlanConflictException;
 import uy.miga.plans.PlanNotFoundException;
 import uy.miga.users.EmailAlreadyExistsException;
 import uy.miga.users.EmailNotVerifiedException;
@@ -58,5 +61,23 @@ class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     Map<String, Object> handleInvalidPortions(InvalidPortionsException ex) {
         return Map.of("error", ex.getMessage());
+    }
+
+    @ExceptionHandler(PlanConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    Map<String, Object> handlePlanConflict(PlanConflictException ex) {
+        return Map.of("code", "PLAN_CONFLICT", "error", ex.getMessage());
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    Map<String, Object> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return Map.of("code", "PLAN_CONFLICT", "error", "El plan fue modificado por otra sesión. Recargá para ver la versión actual.");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    Map<String, Object> handleDataIntegrity(DataIntegrityViolationException ex) {
+        return Map.of("code", "PLAN_CONFLICT", "error", "Operación rechazada por restricción de integridad. Intentá de nuevo.");
     }
 }

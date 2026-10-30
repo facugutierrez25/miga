@@ -4,7 +4,7 @@ import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import {
-  getMyPlan, getPlanHistory, saveMyPlan,
+  getMyPlan, getPlanHistory, saveMyPlan, PlanConflictError,
   type PlanFoodGroupDto, type PlanDto, type PlanSummaryDto,
 } from '../api/plans'
 import { getEquivalences, addEquivalence, deleteEquivalence, type EquivalenceDto, type Unit } from '../api/equivalences'
@@ -129,9 +129,11 @@ export default function MiPlanPage() {
   const [cargando, setCargando] = useState(true)
   const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
   const [planDetalle, setPlanDetalle] = useState<PlanSummaryDto | null>(null)
+  const [planVersion, setPlanVersion] = useState<number | undefined>(undefined)
   const [confirmando, setConfirmando] = useState(false)
   const [confirmado, setConfirmado] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [conflicto, setConflicto] = useState(false)
   const [equivalences, setEquivalences] = useState<EquivalenceDto[] | null>(null)
   const [equivError, setEquivError] = useState<string | null>(null)
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
@@ -152,6 +154,7 @@ export default function MiPlanPage() {
       .then(dto => {
         setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
         setComidas(planALocal(dto))
+        setPlanVersion(dto.version)
       })
       .catch(err => {
         if (err.message === 'sin-plan') {
@@ -273,18 +276,40 @@ export default function MiPlanPage() {
     if (!token) return
     setConfirmando(true)
     setError(null)
+    setConflicto(false)
     try {
-      const dto = await saveMyPlan(token, localAPlan(comidas, grupos))
+      const dto = await saveMyPlan(token, { ...localAPlan(comidas, grupos), clientVersion: planVersion })
       setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
       setComidas(planALocal(dto))
+      setPlanVersion(dto.version)
       if (token) getPlanHistory(token).then(setHistorial).catch(() => {})
       setConfirmado(true)
       if (desdeWizard) setTimeout(() => navigate('/hoy', { replace: true }), 1800)
     } catch (err) {
-      console.error('confirmarPlan falló:', err)
-      setError('No se pudo guardar el plan. Intentá de nuevo.')
+      if (err instanceof PlanConflictError) {
+        setConflicto(true)
+      } else {
+        console.error('confirmarPlan falló:', err)
+        setError('No se pudo guardar el plan. Intentá de nuevo.')
+      }
     } finally {
       setConfirmando(false)
+    }
+  }
+
+  async function recargarPlan() {
+    if (!token) return
+    setConflicto(false)
+    setCargando(true)
+    try {
+      const dto = await getMyPlan(token)
+      setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
+      setComidas(planALocal(dto))
+      setPlanVersion(dto.version)
+    } catch {
+      setError('No se pudo recargar el plan.')
+    } finally {
+      setCargando(false)
     }
   }
 
@@ -548,7 +573,14 @@ export default function MiPlanPage() {
 
             {error && <p className="plan-error" role="alert">{error}</p>}
 
-            <button className="btn-confirmar" onClick={confirmarPlan} disabled={confirmando}>
+            {conflicto && (
+              <div className="plan-conflicto" role="alert">
+                <p>El plan fue modificado en otro dispositivo. Recargá para ver la versión actual.</p>
+                <button className="btn-recargar" onClick={recargarPlan}>Recargar plan</button>
+              </div>
+            )}
+
+            <button className="btn-confirmar" onClick={confirmarPlan} disabled={confirmando || conflicto}>
               {confirmando ? 'Confirmando…' : 'Confirmar plan'}
             </button>
 

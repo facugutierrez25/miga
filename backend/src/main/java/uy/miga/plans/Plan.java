@@ -64,6 +64,7 @@ class Plan {
     List<Meal> getMeals() { return meals; }
     String getModoRegistro() { return modoRegistro; }
     java.math.BigDecimal getMargenPorciones() { return margenPorciones; }
+    Long getVersion() { return version; }
 
     void setUserId(Long userId) { this.userId = userId; }
     void setCurrent(boolean current) { this.current = current; }
