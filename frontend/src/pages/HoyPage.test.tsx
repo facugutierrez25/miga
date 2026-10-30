@@ -32,7 +32,7 @@ const planConComida = {
 
 const entradaConsumo = {
   id: 10, mealId: 1, food: 'Pechuga de pollo',
-  quantity: 200, unit: 'G', foodGroupId: 1, consumed: false,
+  quantity: 200, unit: 'G', foodGroupId: 1, consumed: false, portions: 1,
 }
 
 beforeEach(() => {

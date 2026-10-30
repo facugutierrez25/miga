@@ -8,6 +8,7 @@ export interface FoodEntryDto {
   unit: string
   foodGroupId: number
   consumed: boolean
+  portions: number | null
 }
 
 export async function getIntake(token: string, date: string): Promise<FoodEntryDto[]> {

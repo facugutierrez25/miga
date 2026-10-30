@@ -109,16 +109,9 @@ function findIndexAhora(meals: MealDto[], consumedSet: Set<number>, ahora: Date)
   return firstUneaten ? firstUneaten.i : meals.length - 1
 }
 
-function calcPortions(entry: FoodEntryDto, equivalences: EquivalenceDto[]): number {
-  const equiv = equivalences.find(e => e.food === entry.food && e.foodGroupId === entry.foodGroupId)
-  if (!equiv || equiv.quantity === 0) return 0
-  return entry.quantity / equiv.quantity
-}
-
 function calcResumen(
   meals: MealDto[],
   entries: FoodEntryDto[],
-  equivalences: EquivalenceDto[],
   gruposMap: Record<number, GrupoInfo>,
 ) {
   const totalById: Record<number, number> = {}
@@ -131,9 +124,8 @@ function calcResumen(
     }
   }
 
-  for (const entry of entries.filter(e => e.consumed)) {
-    const portions = calcPortions(entry, equivalences)
-    doneById[entry.foodGroupId] = (doneById[entry.foodGroupId] ?? 0) + portions
+  for (const entry of entries.filter(e => e.consumed && e.portions != null)) {
+    doneById[entry.foodGroupId] = (doneById[entry.foodGroupId] ?? 0) + (entry.portions ?? 0)
   }
 
   const total = Object.values(totalById).reduce((s, v) => s + v, 0)
@@ -422,7 +414,7 @@ export default function HoyPage() {
   )
 
   const ahoraIdx = esHoy && plan ? findIndexAhora(meals, consumedMealIds, ahora) : -1
-  const { total, done, porGrupo } = calcResumen(meals, entries, equivalences, gruposMap)
+  const { total, done, porGrupo } = calcResumen(meals, entries, gruposMap)
 
   const navFecha = (
     <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
