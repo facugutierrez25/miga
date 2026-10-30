@@ -22,7 +22,7 @@ class PlanController {
     }
 
     @PutMapping
-    PlanDto saveMyPlan(Authentication auth, @Valid @RequestBody PlanDto dto) {
+    PlanDto saveMyPlan(Authentication auth, @Valid @RequestBody PlanSaveDto dto) {
         return planService.saveMyPlan(auth.getName(), dto);
     }
 

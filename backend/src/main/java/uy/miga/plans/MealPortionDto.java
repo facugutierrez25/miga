@@ -8,6 +8,6 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 record MealPortionDto(
-    @NotNull FoodGroup foodGroup,
+    @NotNull Long foodGroupId,
     @NotNull @DecimalMin("0.0") @DecimalMax("10.0") @Digits(integer = 2, fraction = 1) BigDecimal portions
 ) {}
