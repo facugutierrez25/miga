@@ -97,12 +97,15 @@ en producción se configura en el servidor estático o CDN).
 
 ## 3. RPO y RTO
 
-> Estado actual: sin backup automatizado configurado.
-
-| Métrica | Valor actual | Notas |
+| Métrica | Objetivo | Estado actual |
 |---|---|---|
-| **RPO** (Recovery Point Objective) | Último backup manual | No hay backup automático. El RPO real es la antigüedad del último `pg_dump` ejecutado manualmente. |
-| **RTO** (Recovery Time Objective) | ~30 minutos | Incluye: restaurar el dump (~5 min), reiniciar el backend (~2 min) y verificar con health check (~1 min). Estimación en condiciones normales; puede variar. |
+| **RPO** (pérdida máxima aceptable) | 24 horas | **Bloqueado:** no hay backup automático. Hasta configurarlo, el RPO real es la antigüedad del último `pg_dump` manual. |
+| **RTO** (tiempo máximo de recuperación) | 30 minutos | Medido en el ensayo con datos sintéticos (sección 5): restaurar tomó menos de 1 s y el backend arrancó en 9 s. El tiempo real lo dominan descargar el dump y desplegar. |
+| **Retención** | 7 diarios + 4 semanales | Pendiente de la automatización. |
+
+**Bloqueo externo (responsable: Facu):** elegir el proveedor de hosting de PostgreSQL y
+configurar ahí un `pg_dump` diario automático con la retención indicada y copia fuera del
+servidor. Hasta entonces, hacer un backup manual antes de cada despliegue (obligatorio, ver 3.1).
 
 ### Backup manual con pg_dump
 
@@ -114,8 +117,23 @@ pg_dump -h <host> -U nutriplan -Fc nutriplan > nutriplan_$(date +%Y%m%d_%H%M%S).
 ls -lh nutriplan_*.dump
 ```
 
-**Recomendación a futuro:** configurar un cron job o tarea programada que ejecute
-`pg_dump` al menos una vez al día y suba el dump a almacenamiento externo (S3 o similar).
+### 3.1 Despliegue con migraciones y migración fallida
+
+1. **Antes de desplegar:** backup manual con `pg_dump -Fc` y anotar su nombre.
+2. Desplegar el backend: Flyway aplica las migraciones pendientes al arrancar.
+3. Verificar `GET /actuator/health/readiness` = 200 y la versión en `flyway_schema_history`.
+
+Si una migración falla, el backend **no arranca** y readiness no responde:
+
+- PostgreSQL ejecuta cada migración en una transacción, así que una migración que falla
+  se revierte entera. Volver a desplegar la versión anterior del backend (la base sigue en
+  la versión previa) y corregir la migración con un archivo **nuevo**; nunca editar una
+  migración aplicada.
+- Si `flyway_schema_history` quedó con una fila `success = false`, no forzar `repair` en
+  producción sin entender la causa: restaurar el backup del paso 1 en una base nueva,
+  apuntar el backend anterior a ella y verificar con las consultas de integridad (sección 5).
+- Las migraciones con verificación previa (por ejemplo V23 o V26) abortan con un mensaje
+  que explica qué datos lo impiden: corregir esos datos y volver a desplegar.
 
 ---
 
@@ -123,13 +141,22 @@ ls -lh nutriplan_*.dump
 
 ### 4.1 Detectar problemas con el health endpoint
 
-Configurar una alerta externa (UptimeRobot, Betterstack u otro servicio) sobre:
+Alerta mínima: un monitor externo (UptimeRobot, Betterstack u otro) sobre readiness, que
+incluye la base de datos:
 
 ```
-GET https://<host>/actuator/health
-Esperar: HTTP 200 y body contiene "UP"
-Frecuencia: cada 1 minuto
+GET https://<host>/actuator/health/readiness
+Esperar: HTTP 200 y body {"status":"UP"}
+Frecuencia: cada 1 minuto; avisar tras 3 fallos seguidos
+Destinatario: email de Facu
 ```
+
+La respuesta no contiene datos personales (`show-details: never`).
+
+**Verificación de la alerta (al configurarla y una vez por trimestre):** en un entorno de
+prueba, detener PostgreSQL y comprobar que readiness pasa a 503 y que llega el aviso; luego
+levantar la base y comprobar que se normaliza. Que readiness depende de la base está cubierto
+por `OpsEndpointsIntegrationTest#readinessIncludesDatabase`.
 
 Si el health endpoint devuelve algo distinto de 200, investigar según la siguiente tabla.
 
@@ -228,9 +255,24 @@ rm drill_$(date +%Y%m%d).dump
 
 ### Criterio de éxito
 
-- El dump se restaura sin errores fatales.
-- Las tablas principales existen: `users`, `plans`, `meals`, `food_entries`, etc.
-- Al menos una consulta de negocio devuelve datos coherentes.
+- El dump se restaura sin errores con `--exit-on-error`.
+- Las consultas de [`consultas-integridad.sql`](consultas-integridad.sql) dan **el mismo
+  resultado** en origen y destino (versión de migración, planes vigentes únicos, reglas e ítems
+  sin referencias rotas, porciones totales, registros de hábitos con uid válido).
+- El backend arranca contra la base restaurada (Flyway sin migraciones pendientes,
+  Hibernate `validate` sin errores) y readiness responde 200.
+
+```bash
+psql -h <origen> -U nutriplan -d nutriplan -tA -F'|' -f docs/operacion/consultas-integridad.sql > origen.txt
+psql -h localhost -p 5433 -U drill -d nutriplan_drill -tA -F'|' -f docs/operacion/consultas-integridad.sql > destino.txt
+diff origen.txt destino.txt && echo "integridad OK"
+```
+
+### Último ensayo
+
+| Fecha | Datos | Dump | Restauración | Integridad | Arranque del backend |
+|---|---|---|---|---|---|
+| 2026-10-30 | Sintéticos ([`datos-sinteticos-ensayo.sql`](datos-sinteticos-ensayo.sql)): 50 usuarios, 150 grupos, 50 reglas, 700 notas, 700 ítems, 700 registros de hábitos; esquema V32 | 319 ms, 94 KB | 643 ms | 14/14 consultas idénticas | 8,4 s, readiness 200 |
 
 ### Registro del simulacro
 
