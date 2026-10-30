@@ -15,6 +15,10 @@ class InterpreterService {
 
     private static final Pattern HARD_SEP = Pattern.compile(",|;|\\+|(?<=\\S)\\.(?=\\s|$)");
 
+    // Separadores blandos: "y" / "con" como delimitadores de ítems cuando el
+    // segmento completo no coincide con ninguna regla.
+    private static final Pattern SOFT_SEP = Pattern.compile("\\s+(?:y|con)\\s+", Pattern.CASE_INSENSITIVE);
+
     private static final Pattern QUANTITY_PREFIX = Pattern.compile(
         "^(\\d+(?:[.,]\\d+)?|medios?|medias?|un[ao]?)\\s+",
         Pattern.CASE_INSENSITIVE
@@ -64,14 +68,35 @@ class InterpreterService {
         if (text == null || text.isBlank()) return List.of();
 
         String normalized = normalize(text);
-        String[] segments = HARD_SEP.split(normalized);
+        String[] hardSegments = HARD_SEP.split(normalized);
 
         List<InterpretedItem> result = new ArrayList<>();
-        for (String seg : segments) {
+        for (String seg : hardSegments) {
             String s = seg.strip();
-            if (!s.isBlank()) result.add(interpretSegment(s, rules));
+            if (!s.isBlank()) result.addAll(interpretWithSoftSplit(s, rules));
         }
         return result;
+    }
+
+    private List<InterpretedItem> interpretWithSoftSplit(String segment, List<FoodRuleDto> rules) {
+        InterpretedItem item = interpretSegment(segment, rules);
+        if (item.recognized()) return List.of(item);
+
+        // Segmento no reconocido: intentar separarlo por "y"/"con"
+        String[] parts = SOFT_SEP.split(segment);
+        if (parts.length <= 1) return List.of(item);
+
+        List<InterpretedItem> result = new ArrayList<>();
+        boolean anyRecognized = false;
+        for (String part : parts) {
+            String p = part.strip();
+            if (p.isBlank()) continue;
+            InterpretedItem partItem = interpretSegment(p, rules);
+            result.add(partItem);
+            if (partItem.recognized()) anyRecognized = true;
+        }
+        // Si ninguna parte se reconoció tampoco, devolver el ítem original sin split
+        return anyRecognized ? result : List.of(item);
     }
 
     private InterpretedItem interpretSegment(String segment, List<FoodRuleDto> rules) {
@@ -113,6 +138,11 @@ class InterpreterService {
             }
         }
 
+        // Strip preposition "de" after a unit: "un vaso de leche" → foodName = "leche"
+        if (foodName.startsWith("de ")) {
+            foodName = foodName.substring(3).strip();
+        }
+
         if (foodName.isBlank()) return InterpretedItem.unrecognized(segment);
 
         FoodRuleDto rule = findRule(foodName, rules);
@@ -122,13 +152,26 @@ class InterpreterService {
     }
 
     FoodRuleDto findRule(String name, List<FoodRuleDto> rules) {
+        // 1. Exact match on food name
         for (FoodRuleDto r : rules) {
             if (normalize(r.alimento()).equals(name)) return r;
         }
+        // 2. Exact match on synonyms
         for (FoodRuleDto r : rules) {
             if (r.sinonimos() != null)
                 for (String s : r.sinonimos())
                     if (normalize(s).equals(name)) return r;
+        }
+        // 3. Plural normalization: try stripping trailing -s / -es
+        for (String stem : depluralize(name)) {
+            for (FoodRuleDto r : rules) {
+                if (normalize(r.alimento()).equals(stem)) return r;
+            }
+            for (FoodRuleDto r : rules) {
+                if (r.sinonimos() != null)
+                    for (String s : r.sinonimos())
+                        if (normalize(s).equals(stem)) return r;
+            }
         }
         if (name.length() < 4) return null;
         List<FoodRuleDto> candidates = new ArrayList<>();
@@ -237,6 +280,15 @@ class InterpreterService {
             case "un", "una", "uno" -> 1.0;
             default -> Double.parseDouble(s.replace(",", "."));
         };
+    }
+
+    // Returns candidate stems after removing simple Spanish plural suffixes (-s, -es).
+    // Only used when exact match fails; never modifies canonical rule names.
+    static List<String> depluralize(String name) {
+        List<String> stems = new ArrayList<>();
+        if (name.endsWith("es") && name.length() > 3) stems.add(name.substring(0, name.length() - 2));
+        if (name.endsWith("s") && name.length() > 2)  stems.add(name.substring(0, name.length() - 1));
+        return stems;
     }
 
     int levenshtein(String a, String b) {
