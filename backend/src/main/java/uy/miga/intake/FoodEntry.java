@@ -2,6 +2,7 @@ package uy.miga.intake;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -39,6 +40,21 @@ class FoodEntry {
     @Column(name = "dish_id")
     private Long dishId;
 
+    // Campos añadidos en V17 (nullable para entradas antiguas del formulario)
+    @Column(name = "meal_note_id")
+    private Long mealNoteId;
+
+    @Column(name = "texto_original", length = 500)
+    private String textoOriginal;
+
+    @Column(length = 10)
+    private String origen;
+
+    private Boolean supuesto;
+
+    @Column(precision = 8, scale = 3)
+    private BigDecimal porciones;
+
     FoodEntry() {}
 
     FoodEntry(String userEmail, Long mealId, LocalDate date,
@@ -52,14 +68,26 @@ class FoodEntry {
         this.foodGroupId = foodGroupId;
     }
 
-    Long getId()          { return id; }
-    String getUserEmail() { return userEmail; }
-    Long getMealId()      { return mealId; }
-    LocalDate getDate()   { return date; }
-    String getFood()      { return food; }
-    Double getQuantity()  { return quantity; }
-    String getUnit()      { return unit; }
-    Long getFoodGroupId() { return foodGroupId; }
-    boolean isConsumed()  { return consumed; }
-    Long getDishId()      { return dishId; }
+    Long getId()             { return id; }
+    String getUserEmail()    { return userEmail; }
+    Long getMealId()         { return mealId; }
+    LocalDate getDate()      { return date; }
+    String getFood()         { return food; }
+    Double getQuantity()     { return quantity; }
+    String getUnit()         { return unit; }
+    Long getFoodGroupId()    { return foodGroupId; }
+    boolean isConsumed()     { return consumed; }
+    Long getDishId()         { return dishId; }
+    Long getMealNoteId()     { return mealNoteId; }
+    String getTextoOriginal(){ return textoOriginal; }
+    String getOrigen()       { return origen; }
+    Boolean getSupuesto()    { return supuesto; }
+    BigDecimal getPorciones(){ return porciones; }
+
+    void setConsumed(boolean consumed) { this.consumed = consumed; }
+    void setMealNoteId(Long mealNoteId)       { this.mealNoteId = mealNoteId; }
+    void setTextoOriginal(String textoOriginal){ this.textoOriginal = textoOriginal; }
+    void setOrigen(String origen)             { this.origen = origen; }
+    void setSupuesto(Boolean supuesto)        { this.supuesto = supuesto; }
+    void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
 }
