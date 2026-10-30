@@ -263,7 +263,8 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
             + Agregar grupo
           </button>
           <div className="nota-reparto__acciones">
-            <button type="button" disabled={saving || !repartoValido} onClick={() => guardarReparto(false)}>
+            <button type="button" className="nota-reparto__principal" disabled={saving || !repartoValido}
+              onClick={() => guardarReparto(false)}>
               Guardar
             </button>
             <button type="button" disabled={saving || !repartoValido} onClick={() => guardarReparto(true)}>

@@ -1129,14 +1129,56 @@
 
 .nota-item__regla {
   margin: 0 0 4px 14px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 
 .nota-item__repartir {
   align-self: flex-start;
   margin-left: 14px;
-  font-size: 12px;
+}
+
+.nota-item__repartir,
+.nota-reparto button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nota-reparto .nota-reparto__principal {
+  border: none;
+  background: var(--btn-primary-bg);
+  color: var(--on-primary);
+}
+
+.nota-item__repartir:focus-visible,
+.nota-reparto :focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.nota-reparto button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.nota-reparto select,
+.nota-reparto input {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 10px;
+  font: inherit;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .nota-entendido__titulo {
@@ -1162,9 +1204,9 @@
 .nota-reparto {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin: 4px 0 8px 14px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px;
 }
@@ -1173,7 +1215,7 @@
 .nota-reparto__acciones {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
