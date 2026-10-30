@@ -7,7 +7,11 @@ import './SemanaPage.css'
 import { useWeek } from '../hooks/useWeek'
 import { useAhora } from '../hooks/useAhora'
 
-const DIAS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+function fullDate(iso: string): string {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('es-UY', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
 const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
@@ -62,7 +66,8 @@ interface DayCardProps {
 
 function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
   const d = new Date(day.date + 'T12:00:00')
-  const weekdayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1
+  const [habitError, setHabitError] = useState('')
+  const [savingHabit, setSavingHabit] = useState<number | null>(null)
   const isToday = day.date === todayISO
   const recorded = Number(day.totalRecorded)
   const goal = Number(day.totalGoal)
@@ -70,6 +75,9 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
   const logMap = new Map(day.habitLogs.map(l => [l.habitId, l]))
 
   async function toggleHabit(habit: HabitDto) {
+    if (savingHabit !== null) return
+    setHabitError('')
+    setSavingHabit(habit.id)
     const current = logMap.get(habit.id)
     const newVal = habit.habitType === 'SI_NO'
       ? (current && current.value > 0 ? 0 : 1)
@@ -78,20 +86,22 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
       const updated = await logHabit(token, habit.id, day.date, newVal)
       onLogUpdated(updated)
     } catch {
-      // ignore
+      setHabitError('No se pudo registrar el hábito. Probá de nuevo.')
+    } finally {
+      setSavingHabit(null)
     }
   }
 
   return (
-    <div className={[
+    <article aria-current={isToday ? 'date' : undefined} className={[
       'semana-day',
       isToday ? 'semana-day--hoy' : '',
       day.hasData ? 'semana-day--datos' : '',
     ].filter(Boolean).join(' ')}>
-      <div className="semana-day__head">
-        <span className="semana-day__dow">{DIAS_ES[weekdayIdx]}</span>
-        <span className="semana-day__num">{d.getDate()}</span>
-      </div>
+      <h2 className="semana-day__head" aria-label={fullDate(day.date)}>
+        <time dateTime={day.date}>{d.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })}</time>
+        {isToday && <span className="semana-day__today">Hoy</span>}
+      </h2>
 
       {goal > 0 && (
         <div className="semana-day__porciones">
@@ -120,11 +130,11 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
             const done = Boolean(log && log.value > 0)
             return (
               <button
-                disabled={h.countsFlexibleMeals}
+                disabled={h.countsFlexibleMeals || savingHabit !== null}
                 key={h.id}
                 className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
                 onClick={() => void toggleHabit(h)}
-                aria-label={`${h.name}: ${done ? 'completado' : 'pendiente'}`}
+                aria-label={`${h.name}: ${done ? 'completado' : 'pendiente'}, ${fmtN(log?.value ?? 0)}${h.unit ? ` ${h.unit}` : ''}, ${fullDate(day.date)}`}
                 aria-pressed={done}
               >
                 <span className="semana-habito__check">{done ? '✓' : ''}</span>
@@ -140,10 +150,12 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
         </div>
       )}
 
+      {habitError && <p className="semana-habit-error" role="alert">{habitError}</p>}
+
       {!day.hasData && habits.length === 0 && (
         <span className="semana-day__vacio">—</span>
       )}
-    </div>
+    </article>
   )
 }
 
@@ -188,6 +200,7 @@ export default function SemanaPage() {
     <div className="semana-page">
       <div className="semana-header">
         <Brand size={22} />
+        <h1 className="semana-title" tabIndex={-1}>Semana</h1>
         <div className="semana-nav">
           <button
             className="semana-nav__btn"
@@ -240,7 +253,7 @@ export default function SemanaPage() {
               Aún no hay datos para esta semana.
             </p>
           )}
-          {view === 'sheet' ? <WeekSheet week={week} /> : <div className="semana-grid">
+          {view === 'sheet' ? <WeekSheet week={week} todayISO={hoy} /> : <div className="semana-grid">
             {week.days.map(day => (
               <DayCard
                 key={day.date}
@@ -262,14 +275,17 @@ function mealStatus(status: string) {
   return ({ SIN_ANOTAR: 'Sin anotar', REGISTRADA: 'Registrada', EN_PLAN: 'En plan', CASI: 'Casi', DE_MAS: 'De más', PREGUNTAR: 'Por confirmar' } as Record<string, string>)[status] ?? status
 }
 
-function WeekSheet({ week }: { week: import('../api/semana').WeekSummaryDto }) {
+function WeekSheet({ week, todayISO }: { week: import('../api/semana').WeekSummaryDto; todayISO: string }) {
   const meals = [...new Set(week.days.flatMap(day => (day.meals ?? []).map(meal => meal.name)))]
   return <div className="semana-sheet"><table>
     <caption>Comidas y hábitos de la semana</caption>
     <thead><tr><th scope="col">Fecha</th>{meals.map(name => <th scope="col" key={name}>{name}</th>)}
       {week.habits.map(h => <th scope="col" key={h.id}>{h.name}</th>)}</tr></thead>
     <tbody>{week.days.map(day => <tr key={day.date}>
-      <th scope="row">{day.date}</th>
+      <th scope="row" aria-current={day.date === todayISO ? 'date' : undefined}>
+        <time dateTime={day.date}>{fullDate(day.date)}</time>
+        {day.date === todayISO && <span> · Hoy</span>}
+      </th>
       {meals.map(name => <td className="semana-note" key={name}>{(day.meals ?? []).filter(m => m.name === name).map(m => m.noteText).filter(Boolean).join('\n') || '—'}</td>)}
       {week.habits.map(h => <td key={h.id}>{day.habitIds && !day.habitIds.includes(h.id) ? '—' : fmtN(Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}</td>)}
     </tr>)}</tbody>
