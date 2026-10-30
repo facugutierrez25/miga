@@ -443,11 +443,11 @@ class PlanRulesIntegrationTest {
         state = request(get(BASE + "reglas"), null, 200);
         JsonNode rule = state.path("alimentos").get(0);
         assertThat(rule.path("cantidadPorPorcion").asDouble()).isEqualTo(0.667);
-        assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1);
+        assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1.5);
         assertThat(rule.path("sinonimos").get(0).asText()).isEqualTo("yogurt");
-        for (String food : List.of("yogur prueba", "yogurt")) {
+        for (String text : List.of("2 yogur prueba u", "2 yogurt u", "2 yogur prueba")) {
             JsonNode reinterpreted = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + meal + "/nota"),
-                Map.of("text", "2 " + food + " u"), 201);
+                Map.of("text", text), 201);
             assertThat(reinterpreted.path("entries").get(0).path("portions").asDouble())
                 .isCloseTo(3, org.assertj.core.data.Offset.offset(0.01));
         }

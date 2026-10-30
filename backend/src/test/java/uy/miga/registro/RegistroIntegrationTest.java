@@ -491,6 +491,23 @@ class RegistroIntegrationTest {
     }
 
     @Test
+    void renamingMealKeepsTodaysRecordsVisible() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        putNote(date, "leche");
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_JSON.replace("\"Desayuno\"", "\"Primera comida\"")))
+            .andExpect(status().isOk());
+
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").asText()).isEqualTo("leche");
+        assertThat(meal.path("items").size()).isGreaterThan(0);
+    }
+
+    @Test
     void saveRespuesta_consumed_createsEntry() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();

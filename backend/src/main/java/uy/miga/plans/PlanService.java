@@ -356,11 +356,21 @@ public class PlanService {
             .collect(Collectors.toMap(PlanFoodGroup::getUid, PlanFoodGroup::getId));
         Map<Long, Long> groupIdMap = old.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getId, g -> groupsByUid.get(g.getUid())));
+        // Empareja comidas por nombre; si se renombró, por posición.
         Map<Long, Long> mealIdMap = new java.util.HashMap<>();
+        java.util.Set<Long> taken = new java.util.HashSet<>();
         for (Meal source : old.getMeals()) {
             copy.getMeals().stream()
-                .filter(m -> m.getDisplayOrder() == source.getDisplayOrder() && m.getName().equals(source.getName()))
-                .findFirst().ifPresent(m -> mealIdMap.put(source.getId(), m.getId()));
+                .filter(m -> m.getName().equals(source.getName()) && !taken.contains(m.getId()))
+                .findFirst()
+                .ifPresent(m -> { mealIdMap.put(source.getId(), m.getId()); taken.add(m.getId()); });
+        }
+        for (Meal source : old.getMeals()) {
+            if (mealIdMap.containsKey(source.getId())) continue;
+            copy.getMeals().stream()
+                .filter(m -> m.getDisplayOrder() == source.getDisplayOrder() && !taken.contains(m.getId()))
+                .findFirst()
+                .ifPresent(m -> { mealIdMap.put(source.getId(), m.getId()); taken.add(m.getId()); });
         }
         events.publishEvent(new PlanVersionCreated(old.getUserId(), old.getId(), copy.getId(),
             Map.copyOf(groupIdMap), Map.copyOf(mealIdMap), LocalDate.now()));

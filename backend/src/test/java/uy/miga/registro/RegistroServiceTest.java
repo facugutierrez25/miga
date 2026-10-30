@@ -110,14 +110,14 @@ class RegistroServiceTest {
     }
 
     @Test
-    void normalRuleStoresQuantityPerPortionAndDefaultOne() {
+    void normalRuleStoresQuantityAndPortionsPerUnit() {
         entryWithPortions(BigDecimal.ONE);
         service.patchItem("user", today, 3L,
             new PatchItemRequest(new BigDecimal("2"), null, null, new BigDecimal("3"), null, true));
         ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
         verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
         assertThat(input.getValue().cantidadPorPorcion()).isEqualByComparingTo("0.667");
-        assertThat(input.getValue().porcionPorDefecto()).isEqualByComparingTo("1");
+        assertThat(input.getValue().porcionPorDefecto()).isEqualByComparingTo("1.5");
     }
 
     @ParameterizedTest

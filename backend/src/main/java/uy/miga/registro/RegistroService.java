@@ -359,7 +359,8 @@ public class RegistroService {
                 Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
                     groupId, quantity.divide(portions, 3, RoundingMode.HALF_UP),
-                    req.unit() != null ? req.unit() : entry.unit(), BigDecimal.ONE, List.of(), null));
+                    req.unit() != null ? req.unit() : entry.unit(),
+                    portions.divide(quantity, 3, RoundingMode.HALF_UP), List.of(), null));
             }
         }
 
