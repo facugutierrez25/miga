@@ -29,7 +29,8 @@ const planConGrupos = {
 }
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
+  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(),
+    sessionExpired: false, logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
 
 })

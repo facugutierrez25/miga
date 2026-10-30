@@ -31,11 +31,18 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
   mail:
     from: ${MAIL_FROM:noreply@miga.uy}
+    connect-timeout-ms: ${MAIL_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${MAIL_READ_TIMEOUT_MS:10000}
+  email-outbox:
+    lease-ms: ${EMAIL_OUTBOX_LEASE_MS:300000}
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
     login-per-minute: ${RATE_LIMIT_LOGIN_PER_MIN:20}
     register-per-hour: ${RATE_LIMIT_REGISTER_PER_HOUR:20}
     resend-per-hour: ${RATE_LIMIT_RESEND_PER_HOUR:5}
+  ops:
+    # Clave para /actuator/metrics e /actuator/info (encabezado X-Ops-Key). Vacía = sin acceso.
+    api-key: ${OPS_API_KEY:}
 
 jwt:
   secret: ${JWT_SECRET:dev-secret-local-must-be-at-least-32-chars}
@@ -54,6 +61,9 @@ management:
       probes:
         enabled: true
       show-details: never
+      group:
+        readiness:
+          include: readinessState,db
     info:
       enabled: true
   health:

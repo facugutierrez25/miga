@@ -2,13 +2,19 @@ package uy.miga.users;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Component
@@ -20,54 +26,102 @@ public class EmailOutboxWorker {
     private final EmailOutboxJobRepository outboxRepository;
     private final VerificationTokenRepository tokenRepository;
     private final EmailService emailService;
+    private final TransactionTemplate transactions;
+    private final Duration lease;
 
     EmailOutboxWorker(EmailOutboxJobRepository outboxRepository,
                       VerificationTokenRepository tokenRepository,
-                      EmailService emailService) {
+                      EmailService emailService,
+                      PlatformTransactionManager transactionManager,
+                      @Value("${app.email-outbox.lease-ms:300000}") long leaseMs) {
         this.outboxRepository = outboxRepository;
         this.tokenRepository = tokenRepository;
         this.emailService = emailService;
+        if (leaseMs <= 0) {
+            throw new IllegalArgumentException("Outbox lease must be positive");
+        }
+        this.lease = Duration.ofMillis(leaseMs);
+        this.transactions = new TransactionTemplate(transactionManager);
+        this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Scheduled(fixedDelayString = "${app.email-outbox.poll-interval-ms:30000}")
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void processJobs() {
-        List<EmailOutboxJob> jobs = outboxRepository.findPendingForProcessing(
-                OffsetDateTime.now(), Pageable.ofSize(BATCH_SIZE));
+        List<EmailOutboxJob> jobs = transactions.execute(status -> {
+            var now = OffsetDateTime.now().truncatedTo(ChronoUnit.MICROS);
+            var claimed = outboxRepository.findPendingForProcessing(now, Pageable.ofSize(BATCH_SIZE));
+            for (var job : claimed) {
+                job.setStatus("PROCESSING");
+                job.setLockedUntil(now.plus(lease));
+            }
+            return claimed;
+        });
 
         for (EmailOutboxJob job : jobs) {
-            processJob(job);
+            try {
+                processJob(job);
+            } catch (Exception e) {
+                log.warn("Fallo al procesar trabajo de email {}: {}",
+                        job.getId(), e.getClass().getSimpleName());
+            }
         }
 
-        outboxRepository.deleteOldJobs(OffsetDateTime.now().minusDays(7));
+        transactions.executeWithoutResult(status ->
+                outboxRepository.deleteOldJobs(OffsetDateTime.now().minusDays(7)));
     }
 
     private void processJob(EmailOutboxJob job) {
-        if (!"VERIFY_EMAIL".equals(job.getJobType())) {
-            markFailed(job);
+        String token = "VERIFY_EMAIL".equals(job.getJobType())
+                ? transactions.execute(status -> tokenRepository.findByUser_Id(job.getUserId())
+                    .filter(value -> value.getExpiresAt().isAfter(OffsetDateTime.now()))
+                    .map(VerificationToken::getToken).orElse(null))
+                : null;
+        if (token == null) {
+            recordResult(job, false, true);
             return;
         }
-        var tokenOpt = tokenRepository.findByUser_Id(job.getUserId());
-        if (tokenOpt.isEmpty() || tokenOpt.get().getExpiresAt().isBefore(OffsetDateTime.now())) {
-            markFailed(job);
-            return;
-        }
+
+        boolean sent = false;
         try {
-            emailService.sendVerificationEmail(job.getRecipient(), tokenOpt.get().getToken());
-            job.setStatus("SENT");
-            job.setProcessedAt(OffsetDateTime.now());
+            emailService.sendVerificationEmail(job.getRecipient(), token);
+            sent = true;
         } catch (Exception e) {
-            int nextAttempt = job.getAttempts() + 1;
-            job.setAttempts(nextAttempt);
-            log.warn("Fallo al entregar trabajo de email {} (intento {}): {}",
-                    job.getId(), nextAttempt, e.getClass().getSimpleName());
-            if (nextAttempt >= job.getMaxAttempts()) {
+            log.warn("Fallo al entregar trabajo de email {}: {}",
+                    job.getId(), e.getClass().getSimpleName());
+        }
+        recordResult(job, sent, false);
+    }
+
+    private void recordResult(EmailOutboxJob claimed, boolean sent, boolean invalid) {
+        transactions.executeWithoutResult(status -> {
+            var current = outboxRepository.findByIdForUpdate(claimed.getId());
+            if (current.isEmpty()) {
+                return;
+            }
+            var job = current.get();
+            // Un worker atrasado no debe sobrescribir el resultado de un reclamo posterior.
+            if (!"PROCESSING".equals(job.getStatus()) || job.getLockedUntil() == null
+                    || !job.getLockedUntil().isEqual(claimed.getLockedUntil())) {
+                return;
+            }
+            job.setLockedUntil(null);
+            if (sent) {
+                job.setStatus("SENT");
+                job.setProcessedAt(OffsetDateTime.now());
+            } else if (invalid) {
                 markFailed(job);
             } else {
-                job.setNextAttemptAt(OffsetDateTime.now().plus(backoffFor(nextAttempt)));
+                int nextAttempt = job.getAttempts() + 1;
+                job.setAttempts(nextAttempt);
+                if (nextAttempt >= job.getMaxAttempts()) {
+                    markFailed(job);
+                } else {
+                    job.setStatus("PENDING");
+                    job.setNextAttemptAt(OffsetDateTime.now().plus(backoffFor(nextAttempt)));
+                }
             }
-        }
-        outboxRepository.save(job);
+        });
     }
 
     private void markFailed(EmailOutboxJob job) {

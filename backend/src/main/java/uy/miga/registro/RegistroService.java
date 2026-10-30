@@ -58,6 +58,16 @@ public class RegistroService {
 
     @Transactional
     NoteInterpretationDto saveNote(String userEmail, LocalDate date, Long mealId, String text) {
+        return saveNote(userEmail, date, mealId, text, null, false);
+    }
+
+    @Transactional
+    NoteInterpretationDto saveNote(String userEmail, LocalDate date, Long mealId, String text, Long version) {
+        return saveNote(userEmail, date, mealId, text, version, true);
+    }
+
+    private NoteInterpretationDto saveNote(String userEmail, LocalDate date, Long mealId, String text,
+                                            Long version, boolean checkVersion) {
         Long userId = userService.findUserIdByEmail(userEmail);
         lockCurrentPlanIfPresent(userId);
 
@@ -65,14 +75,19 @@ public class RegistroService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
-        MealNote note = noteRepository.findByUserIdAndDateAndMealId(userId, date, mealId)
-            .orElseGet(() -> {
-                MealNote n = new MealNote();
-                n.setUserId(userId);
-                n.setDate(date);
-                n.setMealId(mealId);
-                return n;
-            });
+        Optional<MealNote> existing = noteRepository.findByUserIdAndDateAndMealId(userId, date, mealId);
+        if (checkVersion && (existing.isPresent()
+            ? version == null || !version.equals(existing.get().getVersion())
+            : version != null)) {
+            throw new NoteConflictException();
+        }
+        MealNote note = existing.orElseGet(() -> {
+            MealNote n = new MealNote();
+            n.setUserId(userId);
+            n.setDate(date);
+            n.setMealId(mealId);
+            return n;
+        });
 
         Long planId = note.getPlanId() != null
             ? note.getPlanId()
@@ -86,23 +101,27 @@ public class RegistroService {
             note.setPlanId(planId);
         }
 
+        if (checkVersion && existing.isPresent() && text.strip().equals(note.getText())) {
+            DayRegistroDto.MealDayDto meal = getDayRegistro(userEmail, date).meals().stream()
+                .filter(m -> m.mealId().equals(mealId)).findFirst().orElseThrow();
+            return new NoteInterpretationDto(note.getId(), note.getVersion(), note.getText(), date, mealId,
+                List.of(), meal.items(), meal.comparison());
+        }
         List<FoodRuleDto> rules = ruleService.findApplicable(planId, userId);
 
         note.setText(text.strip());
-        MealNote saved = noteRepository.save(note);
+        MealNote saved = noteRepository.saveAndFlush(note);
 
         entryFacade.deleteNoteEntries(saved.getId());
 
         List<InterpretedItem> items = interpreter.interpret(text, rules);
         Map<Long, String> groupNames = planService.getPlanFoodGroups(planId).stream()
             .collect(Collectors.toMap(uy.miga.plans.PlanFoodGroupDto::id, uy.miga.plans.PlanFoodGroupDto::name));
-        List<InterpretedItem> expanded = new ArrayList<>();
 
         for (InterpretedItem mention : items) {
             UUID occurrenceId = UUID.randomUUID();
             String ruleText = describeRule(mention, rules, planId, groupNames);
             for (InterpretedItem item : expandCompound(List.of(mention), rules, planId)) {
-                expanded.add(item);
                 if (!item.recognized() || item.foodGroupId() == null) continue;
                 entryFacade.createNoteEntry(
                     userId, userEmail, mealId, date,
@@ -120,13 +139,18 @@ public class RegistroService {
             }
         }
 
-        Map<Long, BigDecimal> portionsByGroup = buildPortionMap(expanded);
+        List<FoodEntryFacade.EntryData> mealEntries = entryFacade.findByUserIdAndDate(userId, date).stream()
+            .filter(e -> mealId.equals(e.mealId())).toList();
+        Map<Long, BigDecimal> portionsByGroup = mealEntries.stream()
+            .filter(e -> e.foodGroupId() != null && e.portions() != null)
+            .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::foodGroupId,
+                Collectors.reducing(BigDecimal.ZERO, FoodEntryFacade.EntryData::portions, BigDecimal::add)));
         List<ComparisonService.GroupStatus> statuses = comparison.compare(planId, mealId, portionsByGroup);
 
         return new NoteInterpretationDto(
-            saved.getId(), text, date, mealId,
+            saved.getId(), saved.getVersion(), saved.getText(), date, mealId,
             items.stream().map(this::toItemDto).toList(),
-            entryFacade.findByMealNoteId(saved.getId()).stream().map(this::toEntryItemDto).toList(),
+            mealEntries.stream().map(this::toEntryItemDto).toList(),
             statuses.stream().map(s -> new GroupStatusDto(
                 s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()
             )).toList()
@@ -235,15 +259,6 @@ public class RegistroService {
         return planService.findGroupIdByClave(planId, standardGroupKey);
     }
 
-    private Map<Long, BigDecimal> buildPortionMap(List<InterpretedItem> items) {
-        Map<Long, BigDecimal> map = new HashMap<>();
-        for (InterpretedItem item : items) {
-            if (!item.recognized() || item.foodGroupId() == null || item.portions() == null) continue;
-            map.merge(item.foodGroupId(), item.portions(), BigDecimal::add);
-        }
-        return map;
-    }
-
     @Transactional(readOnly = true)
     DayRegistroDto getDayRegistro(String userEmail, LocalDate date) {
         Long userId = userService.findUserIdByEmail(userEmail);
@@ -290,6 +305,7 @@ public class RegistroService {
                 mealId,
                 note != null ? note.getId() : null,
                 note != null ? note.getText() : null,
+                note != null ? note.getVersion() : null,
                 itemDtos,
                 compDtos
             ));
@@ -402,13 +418,16 @@ public class RegistroService {
         if (planService.getPlanFoodGroups(planId).stream().noneMatch(g -> g.id().equals(req.foodGroupId()))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");
         }
-        if (!req.consumed()) return; // negativa: no crear entrada
+        if (!req.consumed()) {
+            entryFacade.deleteResponseEntries(userId, date, mealId, req.foodGroupId());
+            return;
+        }
 
         String food = planService.getPlanFoodGroups(planId).stream()
             .filter(g -> g.id().equals(req.foodGroupId()))
             .findFirst().map(uy.miga.plans.PlanFoodGroupDto::name).orElse("alimento");
 
-        entryFacade.createUserEntry(userId, userEmail, mealId, date, food, req.foodGroupId());
+        entryFacade.createResponseEntry(userId, userEmail, mealId, date, food, req.foodGroupId());
     }
 
     private Long lockCurrentPlanIfPresent(Long userId) {

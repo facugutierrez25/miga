@@ -38,6 +38,9 @@ class EmailOutboxJob {
     @Column(name = "processed_at")
     private OffsetDateTime processedAt;
 
+    @Column(name = "locked_until")
+    private OffsetDateTime lockedUntil;
+
     EmailOutboxJob() {}
 
     EmailOutboxJob(Long userId, String recipient, String jobType) {
@@ -54,9 +57,12 @@ class EmailOutboxJob {
     int getAttempts() { return attempts; }
     int getMaxAttempts() { return maxAttempts; }
     OffsetDateTime getNextAttemptAt() { return nextAttemptAt; }
+    OffsetDateTime getLockedUntil() { return lockedUntil; }
+    OffsetDateTime getProcessedAt() { return processedAt; }
 
     void setStatus(String status) { this.status = status; }
     void setAttempts(int attempts) { this.attempts = attempts; }
     void setNextAttemptAt(OffsetDateTime nextAttemptAt) { this.nextAttemptAt = nextAttemptAt; }
     void setProcessedAt(OffsetDateTime processedAt) { this.processedAt = processedAt; }
+    void setLockedUntil(OffsetDateTime lockedUntil) { this.lockedUntil = lockedUntil; }
 }

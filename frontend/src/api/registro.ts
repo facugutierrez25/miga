@@ -53,6 +53,7 @@ export interface GroupStatusDto {
 
 export interface NoteInterpretationDto {
   noteId: number
+  version: number
   text: string
   date: string
   mealId: number
@@ -86,6 +87,7 @@ export interface DailySummaryDto {
 export interface MealDayDto {
   mealId: number
   noteId: number | null
+  noteVersion: number | null
   noteText: string | null
   items: EntryItemDto[]
   comparison: GroupStatusDto[]
@@ -136,17 +138,24 @@ export async function getDayRegistro(
   return res.json()
 }
 
+export class NoteConflictError extends Error {}
+
 export async function saveNota(
   token: string,
   date: string,
   mealId: number,
   text: string,
+  version: number | null,
 ): Promise<NoteInterpretationDto> {
   const res = await fetch(`${API_URL}/api/v1/registro/${date}/comidas/${mealId}/nota`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, version }),
   })
+  if (res.status === 409) {
+    const body = await res.json()
+    if (body.code === 'NOTE_CONFLICT') throw new NoteConflictError(body.error)
+  }
   if (!res.ok) throw new Error('Error al guardar la nota.')
   return res.json()
 }

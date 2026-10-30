@@ -7,7 +7,11 @@ import * as registroApi from '../api/registro'
 import * as AuthContext from '../auth/authTypes'
 
 vi.mock('../api/plans')
-vi.mock('../api/registro')
+vi.mock('../api/registro', async importOriginal => {
+  const actual = await importOriginal<typeof import('../api/registro')>()
+  return { ...actual, getDayRegistro: vi.fn(), saveNota: vi.fn(), patchItem: vi.fn(),
+    saveRespuesta: vi.fn(), getSugerencias: vi.fn() }
+})
 vi.mock('../auth/authTypes')
 
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
@@ -41,6 +45,7 @@ beforeEach(() => {
     firstName: 'Facu',
     login: vi.fn(),
     setFirstName: vi.fn(),
+    sessionExpired: false,
     logout: vi.fn(),
   })
   mockGetDayRegistro.mockResolvedValue(dayVacio)
@@ -138,7 +143,7 @@ test('muestra nota guardada si el día tiene texto', async () => {
     date: '2025-01-01',
     meals: [{
       mealId: 1,
-      noteId: 5,
+      noteId: 5, noteVersion: 0,
       noteText: 'leche con pan',
       items: [],
       comparison: [],
@@ -152,7 +157,7 @@ test('muestra nota guardada si el día tiene texto', async () => {
 test('el botón guardar envía la nota al backend', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockSaveNota.mockResolvedValue({
-    noteId: 1,
+    noteId: 1, version: 0,
     text: 'leche',
     date: '2025-01-01',
     mealId: 1,
@@ -171,7 +176,7 @@ test('el botón guardar envía la nota al backend', async () => {
   await waitFor(() => expect(screen.getByPlaceholderText(/Qué comiste/)).toBeInTheDocument())
   fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche'))
+  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche', null))
 })
 
 test('muestra error si getDayRegistro falla', async () => {
@@ -213,7 +218,7 @@ async function abrirNota() {
 test('muestra un compuesto en una fila con su regla bajo el título Así lo entendí', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: gruposBarrita })
   mockSaveNota.mockResolvedValue({
-    noteId: 1, text: '1 barrita', date: '2025-01-01', mealId: 1, items: [], comparison: [],
+    noteId: 1, version: 0, text: '1 barrita', date: '2025-01-01', mealId: 1, items: [], comparison: [],
     entries: [entradaBarrita(11, 1), entradaBarrita(12, 2), entradaBarrita(13, 3)],
   })
   renderHoy()
@@ -234,7 +239,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   mockGetDayRegistro.mockResolvedValue({
     date: '2025-01-01', summary: [],
     meals: [{
-      mealId: 1, noteId: 1, noteText: 'leche', comparison: [],
+      mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', comparison: [],
       items: [{ id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
         origin: 'REGLA', uncertain: true, appliedRule: '1 leche = 1 Proteínas', occurrenceId: 'occ-2' }],
     }],
@@ -259,7 +264,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
 test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockSaveNota.mockResolvedValue({
-    noteId: 1, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [],
+    noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [],
     items: [{
       originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
@@ -279,7 +284,7 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
 test('no duplica las menciones que ya generaron ítems', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: gruposBarrita })
   mockSaveNota.mockResolvedValue({
-    noteId: 1, text: '1 barrita', date: '2025-01-01', mealId: 1, comparison: [],
+    noteId: 1, version: 0, text: '1 barrita', date: '2025-01-01', mealId: 1, comparison: [],
     items: [{
       originalText: '1 barrita', foodName: 'barrita', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 1, appliedRule: 'barrita (compuesto)',
@@ -295,4 +300,108 @@ test('no duplica las menciones que ya generaron ítems', async () => {
   await screen.findByRole('heading', { name: 'Así lo entendí' })
   expect(screen.queryByText('barrita (compuesto)')).not.toBeInTheDocument()
   expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
+})
+
+
+test('conserva el borrador ante conflicto, recarga la versión y usa la nueva al guardar', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const meal = { mealId: 1, noteId: 5, noteVersion: 2, noteText: 'leche', items: [], comparison: [] }
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [meal] })
+  renderHoy()
+  await waitFor(() => expect(screen.getByText('0 ítems')).toBeInTheDocument())
+  const toggle = screen.getByRole('button', { name: '0 ítems' })
+  if (toggle.getAttribute('aria-expanded') === 'false') fireEvent.click(toggle)
+  const textarea = screen.getByRole('textbox', { name: 'Nota de la comida' })
+  fireEvent.change(textarea, { target: { value: 'mi borrador' } })
+  const message = 'Esta nota cambió en otro dispositivo. Recargá para ver la versión actual.'
+  mockSaveNota.mockRejectedValueOnce(new registroApi.NoteConflictError(message))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(message))
+  expect(textarea).toHaveValue('mi borrador')
+  expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'mi borrador', 2)
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{ ...meal, noteVersion: 3, noteText: 'otro dispositivo' }] })
+  fireEvent.click(screen.getByRole('button', { name: 'Recargar' }))
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  expect(textarea).toHaveValue('mi borrador')
+  mockSaveNota.mockResolvedValue({ noteId: 5, version: 4, text: 'mi borrador', date: dayVacio.date,
+    mealId: 1, items: [], entries: [], comparison: [] })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'mi borrador', 3))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled())
+  fireEvent.change(textarea, { target: { value: 'segunda edición' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'segunda edición', 4))
+})
+
+test('un borrador empezado sobre una versión vieja sigue dando conflicto tras una recarga automática', async () => {
+  const mockSaveRespuesta = vi.mocked(registroApi.saveRespuesta)
+  mockSaveRespuesta.mockResolvedValue(undefined)
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const dia = (noteVersion: number) => ({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteText: 'leche', noteVersion, items: [],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTA', dailyGoal: null }],
+    }],
+  })
+  mockGetDayRegistro.mockResolvedValueOnce(dia(2)).mockResolvedValue(dia(3))
+  mockSaveNota.mockResolvedValue({
+    noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 3,
+    items: [], entries: [], comparison: [],
+  })
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Sí' }))
+  await waitFor(() => expect(mockGetDayRegistro).toHaveBeenCalledTimes(2))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche y pan', 2))
+})
+
+test('recargar desde el conflicto adopta la versión actual aunque no haya cambiado', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const dia = {
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 3, items: [], comparison: [] }],
+  }
+  mockGetDayRegistro.mockResolvedValue(dia)
+  mockSaveNota
+    .mockRejectedValueOnce(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
+    .mockResolvedValue({ noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 4, items: [], entries: [], comparison: [] })
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Recargar' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Recargar' })).not.toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+  await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 3))
+  expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
+})
+
+test('si recargar falla, la versión base no cambia', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro
+    .mockResolvedValueOnce({
+      date: '2025-01-01', summary: [],
+      meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 2, items: [], comparison: [] }],
+    })
+    .mockRejectedValue(new Error('sin red'))
+  mockSaveNota.mockRejectedValue(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Recargar' }))
+  expect(await screen.findByText('No se pudo recargar. Intentá de nuevo.')).toBeInTheDocument()
+
+  expect(mockSaveNota).toHaveBeenCalledTimes(1)
+  expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 2)
+  expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+  expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
 })

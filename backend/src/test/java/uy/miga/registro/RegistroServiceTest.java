@@ -102,6 +102,48 @@ class RegistroServiceTest {
         verify(entries).findEntryByIdAndUserId(3L, 1L);
     }
 
+    @Test
+    void versionedNoteRejectsMissingOrStaleVersionBeforeChangingEntries() {
+        MealNote note = new MealNote();
+        note.setText("original");
+        org.springframework.test.util.ReflectionTestUtils.setField(note, "version", 2L);
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(notes.findByUserIdAndDateAndMealId(1L, today, 10L)).thenReturn(Optional.of(note));
+        assertThatThrownBy(() -> service.saveNote("user", today, 10L, "changed", null))
+            .isInstanceOf(NoteConflictException.class);
+        assertThatThrownBy(() -> service.saveNote("user", today, 10L, "changed", 1L))
+            .isInstanceOf(NoteConflictException.class);
+        assertThat(note.getText()).isEqualTo("original");
+        verifyNoInteractions(entries);
+        verify(notes, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void versionedNoteRejectsVersionWhenNoteDoesNotExist() {
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        assertThatThrownBy(() -> service.saveNote("user", today, 10L, "food", 0L))
+            .isInstanceOf(NoteConflictException.class);
+        verifyNoInteractions(entries);
+    }
+
+    @Test
+    void identicalVersionedNoteDoesNotRecreateEntriesOrChangeVersion() {
+        MealNote note = new MealNote();
+        note.setText("leche");
+        note.setPlanId(20L);
+        note.setMealId(10L);
+        org.springframework.test.util.ReflectionTestUtils.setField(note, "version", 2L);
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(plans.getMealIds(20L)).thenReturn(List.of(10L));
+        when(notes.findByUserIdAndDateAndMealId(1L, today, 10L)).thenReturn(Optional.of(note));
+        when(notes.findByUserIdAndDate(1L, today)).thenReturn(List.of(note));
+        NoteInterpretationDto result = service.saveNote("user", today, 10L, "leche", 2L);
+        assertThat(result.version()).isEqualTo(2L);
+        verify(notes, never()).saveAndFlush(any());
+        verify(entries, never()).deleteNoteEntries(any());
+        verifyNoInteractions(rules);
+    }
+
     private void entryWithPortions(BigDecimal portions) {
         when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
             3L, 11L, "yogur", 2.0, "u", 7L, false, null, "USUARIO", false,

@@ -1082,6 +1082,7 @@
   margin: 0;
 }
 
+.nota-btn-recargar,
 .nota-btn-guardar {
   align-self: flex-start;
   background: var(--primary);
@@ -1095,11 +1096,13 @@
   transition: opacity 0.15s;
 }
 
+.nota-btn-recargar:disabled,
 .nota-btn-guardar:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
+.nota-btn-recargar:hover:not(:disabled),
 .nota-btn-guardar:hover:not(:disabled) {
   opacity: 0.88;
 }

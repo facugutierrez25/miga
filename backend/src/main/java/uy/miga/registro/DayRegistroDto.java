@@ -13,6 +13,7 @@ record DayRegistroDto(
         Long mealId,
         Long noteId,
         String noteText,
+        Long noteVersion,
         List<EntryItemDto> items,
         List<GroupStatusDto> comparison
     ) {}

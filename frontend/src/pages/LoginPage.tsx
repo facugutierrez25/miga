@@ -125,6 +125,9 @@ export default function LoginPage() {
             {passwordError && <span id="password-error" className="register-field-error" role="alert">{passwordError}</span>}
           </div>
 
+          {auth.sessionExpired && !error && (
+            <p role="status" className="register-error">Tu sesión venció. Volvé a ingresar.</p>
+          )}
           {error && <p role="alert" className="register-error">{error}</p>}
 
           <button type="submit" disabled={loading} className="register-submit">

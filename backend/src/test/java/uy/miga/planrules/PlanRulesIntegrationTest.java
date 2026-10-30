@@ -80,8 +80,24 @@ class PlanRulesIntegrationTest {
         JsonNode plan = request(get("/api/v1/my-plan"), null, 200);
         List<Long> result = new ArrayList<>(); plan.path("meals").forEach(m -> result.add(m.path("id").asLong())); return result;
     }
-    void note(long meal, LocalDate date, String text) throws Exception {
-        request(put("/api/v1/registro/"+date+"/comidas/"+meal+"/nota"), Map.of("text",text), 201);
+    // Versión de cada nota guardada (fecha/comida → versión), para editarla como un cliente al día.
+    private final Map<String, Long> noteVersions = new HashMap<>();
+
+    JsonNode note(long meal, LocalDate date, String text) throws Exception {
+        String key = date + "/" + meal;
+        Map<String, Object> body = new HashMap<>();
+        body.put("text", text);
+        body.put("version", noteVersions.containsKey(key) ? noteVersions.get(key) : currentNoteVersion(meal, date));
+        JsonNode saved = request(put("/api/v1/registro/"+date+"/comidas/"+meal+"/nota"), body, 201);
+        noteVersions.put(key, saved.path("version").asLong());
+        return saved;
+    }
+
+    private Long currentNoteVersion(long meal, LocalDate date) throws Exception {
+        for (JsonNode m : request(get("/api/v1/registro/" + date), null, 200).path("meals")) {
+            if (m.path("mealId").asLong() == meal && m.hasNonNull("noteVersion")) return m.path("noteVersion").asLong();
+        }
+        return null;
     }
     @ParameterizedTest @ValueSource(strings={"grupos", "alimentos", "habitos"})
     void mutationContracts(String resource) throws Exception {
@@ -198,7 +214,7 @@ class PlanRulesIntegrationTest {
         long meal=meals().getFirst(); note(meal,LocalDate.now(),"1 "+synonym);
         assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,meal)).isEqualTo(cereals);
         state=request(delete(BASE+"alimentos/"+adjustment).param("planVersion",state.path("planVersion").asText()),null,200);
-        long newMeal=meals().getFirst(); note(newMeal,LocalDate.now(),"1 "+synonym);
+        long newMeal=meals().getFirst(); note(newMeal,LocalDate.now(),"2 "+synonym);
         long newProtein=group("Proteínas").path("id").asLong();
         assertThat(newProtein).isNotEqualTo(protein);
         assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,newMeal)).isEqualTo(newProtein);
@@ -435,8 +451,7 @@ class PlanRulesIntegrationTest {
             "tipo", "NORMAL", "groupUid", group("Proteínas").path("uid").asText(),
             "cantidadPorPorcion", 1, "unidad", "u")), 201);
         long meal = meals().getFirst();
-        JsonNode saved = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + meal + "/nota"),
-            Map.of("text", "2 yogur prueba u"), 201);
+        JsonNode saved = note(meal, LocalDate.now(), "2 yogur prueba u");
         long entry = saved.path("entries").get(0).path("id").asLong();
         request(patch("/api/v1/registro/" + LocalDate.now() + "/items/" + entry),
             Map.of("quantity", 2, "portions", 3, "saveAsRule", true), 200);
@@ -446,8 +461,7 @@ class PlanRulesIntegrationTest {
         assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1.5);
         assertThat(rule.path("sinonimos").get(0).asText()).isEqualTo("yogurt");
         for (String text : List.of("2 yogur prueba u", "2 yogurt u", "2 yogur prueba")) {
-            JsonNode reinterpreted = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + meal + "/nota"),
-                Map.of("text", text), 201);
+            JsonNode reinterpreted = note(meal, LocalDate.now(), text);
             assertThat(reinterpreted.path("entries").get(0).path("portions").asDouble())
                 .isCloseTo(3, org.assertj.core.data.Offset.offset(0.01));
         }
