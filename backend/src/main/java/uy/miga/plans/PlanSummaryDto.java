@@ -7,5 +7,6 @@ record PlanSummaryDto(
     LocalDate createdAt,
     LocalDate supersededAt,
     int mealCount,
+    List<PlanFoodGroupDto> foodGroups,
     List<MealSummaryDto> meals
 ) {}

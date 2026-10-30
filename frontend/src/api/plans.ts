@@ -1,9 +1,20 @@
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
-export type FoodGroup = 'PROTEINS' | 'GRAINS' | 'FRUITS' | 'DAIRY' | 'FATS' | 'VEGETABLES'
+export interface PlanFoodGroupDto {
+  id: number
+  name: string
+  abbreviation: string
+  displayOrder: number
+  color: string | null
+}
 
 export interface MealPortionDto {
-  foodGroup: FoodGroup
+  foodGroupId: number
+  portions: number
+}
+
+export interface MealPortionInput {
+  foodGroupAbbr: string
   portions: number
 }
 
@@ -15,8 +26,20 @@ export interface MealDto {
   portions: MealPortionDto[]
 }
 
+export interface MealSaveDto {
+  name: string
+  suggestedTime?: string
+  displayOrder: number
+  portions: MealPortionInput[]
+}
+
 export interface PlanDto {
+  foodGroups: PlanFoodGroupDto[]
   meals: MealDto[]
+}
+
+export interface PlanSaveDto {
+  meals: MealSaveDto[]
 }
 
 export async function getMyPlan(token: string): Promise<PlanDto> {
@@ -37,6 +60,7 @@ export interface PlanSummaryDto {
   createdAt: string     // YYYY-MM-DD
   supersededAt: string  // YYYY-MM-DD
   mealCount: number
+  foodGroups: PlanFoodGroupDto[]
   meals: MealSummaryDto[]
 }
 
@@ -48,7 +72,7 @@ export async function getPlanHistory(token: string): Promise<PlanSummaryDto[]> {
   return res.json()
 }
 
-export async function saveMyPlan(token: string, plan: PlanDto): Promise<PlanDto> {
+export async function saveMyPlan(token: string, plan: PlanSaveDto): Promise<PlanDto> {
   const res = await fetch(`${API_URL}/api/v1/my-plan`, {
     method: 'PUT',
     headers: {

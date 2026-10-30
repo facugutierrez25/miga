@@ -1,8 +1,4 @@
-import type { FoodGroup } from './plans'
-
 const API_URL = import.meta.env.VITE_API_URL ?? ''
-
-export type { FoodGroup }
 
 export interface FoodEntryDto {
   id: number
@@ -10,7 +6,7 @@ export interface FoodEntryDto {
   food: string
   quantity: number
   unit: string
-  foodGroup: FoodGroup
+  foodGroupId: number
   consumed: boolean
 }
 
@@ -29,7 +25,7 @@ export async function addFoodEntry(
   food: string,
   quantity: number,
   unit: string,
-  foodGroup: FoodGroup,
+  foodGroupId: number,
 ): Promise<FoodEntryDto> {
   const res = await fetch(`${API_URL}/api/v1/intake/${date}/${mealId}`, {
     method: 'POST',
@@ -37,7 +33,7 @@ export async function addFoodEntry(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ food, quantity, unit, foodGroup }),
+    body: JSON.stringify({ food, quantity, unit, foodGroupId }),
   })
   if (!res.ok) throw new Error('Error al registrar.')
   return res.json()

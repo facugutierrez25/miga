@@ -24,7 +24,17 @@ class Plan {
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")
+    private List<PlanFoodGroup> foodGroups = new ArrayList<>();
+
+    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("displayOrder ASC")
     private List<Meal> meals = new ArrayList<>();
+
+    @Column(name = "modo_registro", nullable = false, length = 20)
+    private String modoRegistro = "PORCIONES";
+
+    @Column(name = "margen_porciones", nullable = false)
+    private java.math.BigDecimal margenPorciones = new java.math.BigDecimal("0.5");
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -50,7 +60,10 @@ class Plan {
     boolean isCurrent() { return current; }
     OffsetDateTime getSupersededAt() { return supersededAt; }
     OffsetDateTime getCreatedAt() { return createdAt; }
+    List<PlanFoodGroup> getFoodGroups() { return foodGroups; }
     List<Meal> getMeals() { return meals; }
+    String getModoRegistro() { return modoRegistro; }
+    java.math.BigDecimal getMargenPorciones() { return margenPorciones; }
 
     void setUserId(Long userId) { this.userId = userId; }
     void setCurrent(boolean current) { this.current = current; }

@@ -31,10 +31,10 @@ class IntakeIntegrationTest {
     private MockMvc mockMvc;
     private String token;
     private long mealId;
+    private long proGroupId;
+    private long cerGroupId;
+    private long fruGroupId;
     private static final String DATE = "2026-01-15";
-    private static final String ENTRY_JSON = """
-            { "food": "Pechuga de pollo", "quantity": 200, "unit": "G", "foodGroup": "PROTEINS" }
-            """;
 
     @BeforeEach
     void setup() throws Exception {
@@ -69,11 +69,22 @@ class IntakeIntegrationTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 { "meals": [{ "name": "Desayuno", "displayOrder": 1,
-                  "portions": [{ "foodGroup": "PROTEINS", "portions": 1 }] }] }
+                  "portions": [
+                    { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                    { "foodGroupAbbr": "CER", "portions": 1.0 },
+                    { "foodGroupAbbr": "FRU", "portions": 1.0 }
+                  ] }] }
                 """))
             .andReturn();
-        mealId = objectMapper.readTree(plan.getResponse().getContentAsString())
-            .get("meals").get(0).get("id").asLong();
+
+        JsonNode planJson = objectMapper.readTree(plan.getResponse().getContentAsString());
+        mealId = planJson.get("meals").get(0).get("id").asLong();
+        for (JsonNode g : planJson.get("foodGroups")) {
+            String abbr = g.get("abbreviation").asText();
+            if ("PRO".equals(abbr)) proGroupId = g.get("id").asLong();
+            if ("CER".equals(abbr)) cerGroupId = g.get("id").asLong();
+            if ("FRU".equals(abbr)) fruGroupId = g.get("id").asLong();
+        }
     }
 
     @Test
@@ -89,14 +100,16 @@ class IntakeIntegrationTest {
         mockMvc.perform(post("/api/v1/intake/" + DATE + "/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(ENTRY_JSON))
+            .content("""
+                { "food": "Pechuga de pollo", "quantity": 200, "unit": "G", "foodGroupId": %d }
+                """.formatted(proGroupId)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").isNumber())
             .andExpect(jsonPath("$.mealId").value(mealId))
             .andExpect(jsonPath("$.food").value("Pechuga de pollo"))
             .andExpect(jsonPath("$.quantity").value(200.0))
             .andExpect(jsonPath("$.unit").value("G"))
-            .andExpect(jsonPath("$.foodGroup").value("PROTEINS"))
+            .andExpect(jsonPath("$.foodGroupId").value(proGroupId))
             .andExpect(jsonPath("$.consumed").value(false));
     }
 
@@ -105,14 +118,16 @@ class IntakeIntegrationTest {
         mockMvc.perform(post("/api/v1/intake/" + DATE + "/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(ENTRY_JSON));
+            .content("""
+                { "food": "Pechuga de pollo", "quantity": 200, "unit": "G", "foodGroupId": %d }
+                """.formatted(proGroupId)));
 
         mockMvc.perform(post("/api/v1/intake/" + DATE + "/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "food": "Arroz cocido", "quantity": 1, "unit": "TAZA", "foodGroup": "GRAINS" }
-                """));
+                { "food": "Arroz cocido", "quantity": 1, "unit": "TAZA", "foodGroupId": %d }
+                """.formatted(cerGroupId)));
 
         mockMvc.perform(get("/api/v1/intake/" + DATE)
             .header("Authorization", "Bearer " + token))
@@ -127,7 +142,9 @@ class IntakeIntegrationTest {
         mockMvc.perform(post("/api/v1/intake/" + DATE + "/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(ENTRY_JSON));
+            .content("""
+                { "food": "Pechuga de pollo", "quantity": 200, "unit": "G", "foodGroupId": %d }
+                """.formatted(proGroupId)));
 
         mockMvc.perform(put("/api/v1/intake/" + DATE + "/" + mealId + "/consumed")
             .header("Authorization", "Bearer " + token))
@@ -143,7 +160,9 @@ class IntakeIntegrationTest {
         mockMvc.perform(post("/api/v1/intake/" + DATE + "/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(ENTRY_JSON));
+            .content("""
+                { "food": "Pechuga de pollo", "quantity": 200, "unit": "G", "foodGroupId": %d }
+                """.formatted(proGroupId)));
 
         mockMvc.perform(put("/api/v1/intake/" + DATE + "/" + mealId + "/consumed")
             .header("Authorization", "Bearer " + token));
@@ -162,7 +181,9 @@ class IntakeIntegrationTest {
         MvcResult created = mockMvc.perform(post("/api/v1/intake/" + DATE + "/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(ENTRY_JSON))
+            .content("""
+                { "food": "Pechuga de pollo", "quantity": 200, "unit": "G", "foodGroupId": %d }
+                """.formatted(proGroupId)))
             .andReturn();
 
         long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
@@ -195,15 +216,15 @@ class IntakeIntegrationTest {
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "food": "Manzana", "quantity": 1, "unit": "UNIDAD", "foodGroup": "FRUITS" }
-                """));
+                { "food": "Manzana", "quantity": 1, "unit": "UNIDAD", "foodGroupId": %d }
+                """.formatted(fruGroupId)));
 
         mockMvc.perform(post("/api/v1/intake/2026-01-16/" + mealId)
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "food": "Banana", "quantity": 1, "unit": "UNIDAD", "foodGroup": "FRUITS" }
-                """));
+                { "food": "Banana", "quantity": 1, "unit": "UNIDAD", "foodGroupId": %d }
+                """.formatted(fruGroupId)));
 
         mockMvc.perform(get("/api/v1/intake/" + DATE)
             .header("Authorization", "Bearer " + token))

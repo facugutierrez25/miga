@@ -15,17 +15,16 @@ class MealPortion {
     @JoinColumn(name = "meal_id", nullable = false)
     private Meal meal;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "food_group", nullable = false, length = 20)
-    private FoodGroup foodGroup;
+    @Column(name = "food_group_id", nullable = false)
+    private Long foodGroupId;
 
     @Column(nullable = false, precision = 3, scale = 1)
     private BigDecimal portions;
 
-    FoodGroup getFoodGroup() { return foodGroup; }
-    BigDecimal getPortions() { return portions; }
+    Long getFoodGroupId()          { return foodGroupId; }
+    BigDecimal getPortions()       { return portions; }
 
-    void setMeal(Meal meal) { this.meal = meal; }
-    void setFoodGroup(FoodGroup foodGroup) { this.foodGroup = foodGroup; }
-    void setPortions(BigDecimal portions) { this.portions = portions; }
+    void setMeal(Meal meal)        { this.meal = meal; }
+    void setFoodGroupId(Long id)   { this.foodGroupId = id; }
+    void setPortions(BigDecimal p) { this.portions = p; }
 }

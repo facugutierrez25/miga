@@ -3,20 +3,33 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
-import { getMyPlan, getPlanHistory, saveMyPlan, type FoodGroup, type PlanDto, type PlanSummaryDto } from '../api/plans'
+import {
+  getMyPlan, getPlanHistory, saveMyPlan,
+  type PlanFoodGroupDto, type PlanDto, type PlanSummaryDto,
+} from '../api/plans'
 import { getEquivalences, addEquivalence, deleteEquivalence, type EquivalenceDto, type Unit } from '../api/equivalences'
 import './MiPlanPage.css'
 
-const GRUPOS: { key: FoodGroup; label: string; dot: string }[] = [
-  { key: 'PROTEINS',   label: 'Proteínas', dot: 'var(--g-prot)' },
-  { key: 'GRAINS',     label: 'Cereales',  dot: 'var(--g-cer)'  },
-  { key: 'FRUITS',     label: 'Frutas',    dot: 'var(--g-frut)' },
-  { key: 'DAIRY',      label: 'Lácteos',   dot: 'var(--g-lac)'  },
-  { key: 'FATS',       label: 'Grasas',    dot: 'var(--g-gras)' },
-  { key: 'VEGETABLES', label: 'Verduras',  dot: 'var(--g-verd)' },
+const DEFAULT_GRUPOS: PlanFoodGroupDto[] = [
+  { id: -1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
+  { id: -2, name: 'Cereales',  abbreviation: 'CER', displayOrder: 2, color: null },
+  { id: -3, name: 'Frutas',    abbreviation: 'FRU', displayOrder: 3, color: null },
+  { id: -4, name: 'Lácteos',   abbreviation: 'LAC', displayOrder: 4, color: null },
+  { id: -5, name: 'Grasas',    abbreviation: 'GRA', displayOrder: 5, color: null },
+  { id: -6, name: 'Verduras',  abbreviation: 'VER', displayOrder: 6, color: null },
 ]
 
-type Porciones = Record<FoodGroup, number>
+const ABBR_DOT: Record<string, string> = {
+  PRO: 'var(--g-prot)', CER: 'var(--g-cer)', FRU: 'var(--g-frut)',
+  LAC: 'var(--g-lac)',  GRA: 'var(--g-gras)', VER: 'var(--g-verd)',
+}
+
+const ABBR_CSS: Record<string, string> = {
+  PRO: 'PROTEINS', CER: 'GRAINS', FRU: 'FRUITS',
+  LAC: 'DAIRY',    GRA: 'FATS',   VER: 'VEGETABLES',
+}
+
+type Porciones = Record<number, number>
 
 interface ComidaLocal {
   nombre: string
@@ -25,8 +38,8 @@ interface ComidaLocal {
   minimizada: boolean
 }
 
-function porcionesVacias(): Porciones {
-  return { PROTEINS: 0, GRAINS: 0, FRUITS: 0, DAIRY: 0, FATS: 0, VEGETABLES: 0 }
+function porcionesVacias(grupos: PlanFoodGroupDto[]): Porciones {
+  return Object.fromEntries(grupos.map(g => [g.id, 0]))
 }
 
 function planALocal(dto: PlanDto): ComidaLocal[] {
@@ -34,20 +47,20 @@ function planALocal(dto: PlanDto): ComidaLocal[] {
     .slice()
     .sort((a, b) => a.displayOrder - b.displayOrder)
     .map(meal => {
-      const porciones = porcionesVacias()
-      meal.portions.forEach(p => { porciones[p.foodGroup] = p.portions })
+      const porciones: Porciones = {}
+      meal.portions.forEach(p => { porciones[p.foodGroupId] = p.portions })
       const hora = meal.suggestedTime ? meal.suggestedTime.slice(0, 5) : ''
       return { nombre: meal.name, hora, porciones, minimizada: true }
     })
 }
 
-function localAPlan(comidas: ComidaLocal[]): PlanDto {
+function localAPlan(comidas: ComidaLocal[], grupos: PlanFoodGroupDto[]) {
   return {
     meals: comidas.map((c, i) => ({
       name: c.nombre,
       suggestedTime: c.hora ? c.hora + ':00' : undefined,
       displayOrder: i + 1,
-      portions: GRUPOS.map(g => ({ foodGroup: g.key, portions: c.porciones[g.key] })),
+      portions: grupos.map(g => ({ foodGroupAbbr: g.abbreviation, portions: c.porciones[g.id] ?? 0 })),
     })),
   }
 }
@@ -57,6 +70,7 @@ function formatFecha(iso: string) {
 }
 
 function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: () => void }) {
+  const gruposMap = Object.fromEntries((plan.foodGroups ?? []).map(g => [g.id, g]))
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalle del plan" onClick={onClose}>
       <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -82,12 +96,13 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
               <p className="modal-meal__nombre">{meal.name}</p>
               <div className="modal-meal__chips">
                 {meal.portions.filter(p => p.portions > 0).map(p => {
-                  const g = GRUPOS.find(gr => gr.key === p.foodGroup)
+                  const g = gruposMap[p.foodGroupId]
                   if (!g) return null
+                  const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
                   return (
-                    <span key={p.foodGroup} className={`porcion-chip porcion-chip--${p.foodGroup}`}>
+                    <span key={p.foodGroupId} className={`porcion-chip porcion-chip--${cssKey}`}>
                       <span className="porcion-chip__num">{p.portions}</span>
-                      {g.label}
+                      {g.name}
                     </span>
                   )
                 })}
@@ -109,6 +124,7 @@ export default function MiPlanPage() {
   const navigate = useNavigate()
   const desdeWizard = !!(location.state as { meals?: unknown } | null)?.meals
   const [tab, setTab] = useState<Tab>('comidas')
+  const [grupos, setGrupos] = useState<PlanFoodGroupDto[]>(DEFAULT_GRUPOS)
   const [comidas, setComidas] = useState<ComidaLocal[]>([])
   const [cargando, setCargando] = useState(true)
   const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
@@ -118,7 +134,7 @@ export default function MiPlanPage() {
   const [error, setError] = useState<string | null>(null)
   const [equivalences, setEquivalences] = useState<EquivalenceDto[] | null>(null)
   const [equivError, setEquivError] = useState<string | null>(null)
-  const [expandedGroup, setExpandedGroup] = useState<FoodGroup | null>(null)
+  const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
   const [newFood, setNewFood] = useState('')
   const [newQuantity, setNewQuantity] = useState('')
   const [newUnit, setNewUnit] = useState<Unit>('G')
@@ -131,12 +147,20 @@ export default function MiPlanPage() {
   useEffect(() => {
     if (!token) return
     getMyPlan(token)
-      .then(dto => setComidas(planALocal(dto)))
+      .then(dto => {
+        setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
+        setComidas(planALocal(dto))
+      })
       .catch(err => {
         if (err.message === 'sin-plan') {
           const draft = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
           if (draft) {
-            setComidas(draft.map(m => ({ nombre: m.name, hora: m.suggestedTime ? m.suggestedTime.slice(0, 5) : '', porciones: porcionesVacias(), minimizada: false })))
+            setComidas(draft.map(m => ({
+              nombre: m.name,
+              hora: m.suggestedTime ? m.suggestedTime.slice(0, 5) : '',
+              porciones: porcionesVacias(DEFAULT_GRUPOS),
+              minimizada: false,
+            })))
           }
         } else {
           console.error(err)
@@ -162,12 +186,12 @@ export default function MiPlanPage() {
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, hora } : c))
   }
 
-  function actualizarPorcion(i: number, grupo: FoodGroup, delta: number) {
+  function actualizarPorcion(i: number, grupoId: number, delta: number) {
     setComidas(prev => prev.map((c, j) => {
       if (j !== i) return c
-      const nuevo = Math.round((c.porciones[grupo] + delta) * 10) / 10
+      const nuevo = Math.round(((c.porciones[grupoId] ?? 0) + delta) * 10) / 10
       if (nuevo < 0 || nuevo > 10) return c
-      return { ...c, porciones: { ...c.porciones, [grupo]: nuevo } }
+      return { ...c, porciones: { ...c.porciones, [grupoId]: nuevo } }
     }))
   }
 
@@ -180,7 +204,7 @@ export default function MiPlanPage() {
   }
 
   function agregarComida() {
-    setComidas(prev => [...prev, { nombre: '', hora: '', porciones: porcionesVacias(), minimizada: false }])
+    setComidas(prev => [...prev, { nombre: '', hora: '', porciones: porcionesVacias(grupos), minimizada: false }])
   }
 
   function eliminarComida(i: number) {
@@ -188,21 +212,21 @@ export default function MiPlanPage() {
     setConfirmDeleteIdx(null)
   }
 
-  function toggleGroup(group: FoodGroup) {
-    setExpandedGroup(prev => prev === group ? null : group)
+  function toggleGroup(groupId: number) {
+    setExpandedGroup(prev => prev === groupId ? null : groupId)
     setNewFood('')
     setNewQuantity('')
     setNewUnit('G')
     setEquivError(null)
   }
 
-  async function handleAddEquivalence(group: FoodGroup) {
+  async function handleAddEquivalence(groupId: number) {
     const qty = parseFloat(newQuantity)
     if (!token || !newFood.trim() || !qty || qty <= 0) return
     setEquivAdding(true)
     setEquivError(null)
     try {
-      const created = await addEquivalence(token, group, newFood.trim(), qty, newUnit)
+      const created = await addEquivalence(token, groupId, newFood.trim(), qty, newUnit)
       setEquivalences(prev => [...(prev ?? []), created])
       setNewFood('')
       setNewQuantity('')
@@ -249,7 +273,8 @@ export default function MiPlanPage() {
     setConfirmando(true)
     setError(null)
     try {
-      const dto = await saveMyPlan(token, localAPlan(comidas))
+      const dto = await saveMyPlan(token, localAPlan(comidas, grupos))
+      setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
       setComidas(planALocal(dto))
       if (token) getPlanHistory(token).then(setHistorial).catch(() => {})
       setConfirmado(true)
@@ -310,18 +335,19 @@ export default function MiPlanPage() {
               {equivAdded && (
                 <p className="equiv-success" role="status">¡Equivalencia agregada!</p>
               )}
-              {GRUPOS.map(g => {
-                const items = equivalences.filter(e => e.foodGroup === g.key)
-                const open = expandedGroup === g.key
+              {grupos.map(g => {
+                const items = equivalences.filter(e => e.foodGroupId === g.id)
+                const open = expandedGroup === g.id
+                const dot = ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)'
                 return (
-                  <div key={g.key} className={`equiv-group${open ? ' equiv-group--open' : ''}`}>
+                  <div key={g.id} className={`equiv-group${open ? ' equiv-group--open' : ''}`}>
                     <button
                       className="equiv-group__header"
-                      onClick={() => toggleGroup(g.key)}
+                      onClick={() => toggleGroup(g.id)}
                       aria-expanded={open}
                     >
-                      <span className="equiv-group__dot" style={{ background: g.dot }} />
-                      <span className="equiv-group__label">{g.label}</span>
+                      <span className="equiv-group__dot" style={{ background: dot }} />
+                      <span className="equiv-group__label">{g.name}</span>
                       <span className="equiv-group__count">
                         {items.length > 0 ? `${items.length} equiv.` : ''}
                       </span>
@@ -386,7 +412,7 @@ export default function MiPlanPage() {
                           </div>
                           <button
                             className="equiv-add__btn"
-                            onClick={() => handleAddEquivalence(g.key)}
+                            onClick={() => handleAddEquivalence(g.id)}
                             disabled={equivAdding || !newFood.trim() || !newQuantity || parseFloat(newQuantity) <= 0}
                             aria-label="Agregar equivalencia"
                           >
@@ -414,12 +440,15 @@ export default function MiPlanPage() {
                   <span className="comida-min__nombre">{comida.nombre || 'Sin nombre'}</span>
                   {comida.hora && <span className="comida-min__hora">{comida.hora}</span>}
                   <div className="comida-min__chips">
-                    {GRUPOS.filter(g => comida.porciones[g.key] > 0).map(g => (
-                      <span key={g.key} className={`porcion-chip porcion-chip--${g.key}`}>
-                        <span className="porcion-chip__num">{comida.porciones[g.key]}</span>
-                        {g.label}
-                      </span>
-                    ))}
+                    {grupos.filter(g => (comida.porciones[g.id] ?? 0) > 0).map(g => {
+                      const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
+                      return (
+                        <span key={g.id} className={`porcion-chip porcion-chip--${cssKey}`}>
+                          <span className="porcion-chip__num">{comida.porciones[g.id]}</span>
+                          {g.name}
+                        </span>
+                      )
+                    })}
                   </div>
                   <button
                     className="btn-editar"
@@ -474,27 +503,30 @@ export default function MiPlanPage() {
                       onChange={e => actualizarHora(i, e.target.value)}
                     />
                   </div>
-                  {GRUPOS.map(g => (
-                    <div key={g.key} className="porcion-row">
-                      <span className="porcion-row__dot" style={{ background: g.dot }} />
-                      <span className="porcion-row__label">{g.label}</span>
-                      <div className="porcion-row__stepper">
-                        <button
-                          className="stepper-btn"
-                          onClick={() => actualizarPorcion(i, g.key, -0.5)}
-                          disabled={comida.porciones[g.key] <= 0}
-                          aria-label={`Reducir ${g.label}`}
-                        >−</button>
-                        <span className="stepper-value" aria-live="polite">{comida.porciones[g.key]}</span>
-                        <button
-                          className="stepper-btn"
-                          onClick={() => actualizarPorcion(i, g.key, 0.5)}
-                          disabled={comida.porciones[g.key] >= 10}
-                          aria-label={`Aumentar ${g.label}`}
-                        >+</button>
+                  {grupos.map(g => {
+                    const dot = ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)'
+                    return (
+                      <div key={g.id} className="porcion-row">
+                        <span className="porcion-row__dot" style={{ background: dot }} />
+                        <span className="porcion-row__label">{g.name}</span>
+                        <div className="porcion-row__stepper">
+                          <button
+                            className="stepper-btn"
+                            onClick={() => actualizarPorcion(i, g.id, -0.5)}
+                            disabled={(comida.porciones[g.id] ?? 0) <= 0}
+                            aria-label={`Reducir ${g.name}`}
+                          >−</button>
+                          <span className="stepper-value" aria-live="polite">{comida.porciones[g.id] ?? 0}</span>
+                          <button
+                            className="stepper-btn"
+                            onClick={() => actualizarPorcion(i, g.id, 0.5)}
+                            disabled={(comida.porciones[g.id] ?? 0) >= 10}
+                            aria-label={`Aumentar ${g.name}`}
+                          >+</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   <button
                     className="btn-guardar-comida"
                     onClick={() => guardarComida(i)}
