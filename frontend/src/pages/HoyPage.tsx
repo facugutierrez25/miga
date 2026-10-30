@@ -6,7 +6,7 @@ import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
 import { getMyPlan, type PlanFoodGroupDto, type MealDto, type PlanDto } from '../api/plans'
 import {
-  getDayRegistro, saveNota, patchItem, saveRespuesta, getSugerencias,
+  NoteConflictError, getDayRegistro, saveNota, patchItem, saveRespuesta, getSugerencias,
   type DayRegistroDto, type MealDayDto, type EntryItemDto,
   type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
@@ -334,15 +334,18 @@ interface NotaMealSectionProps {
   isAhora: boolean
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
+  onReload: () => Promise<void>
   onRespuestaGuardada: (mealId: number) => void
 }
 
 function NotaMealSection({
   meal, mealDay, date, token, gruposMap, isAhora,
-  onNotaSaved, onItemPatched, onRespuestaGuardada,
+  onNotaSaved, onItemPatched, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
   const [isOpen, setIsOpen] = useState(isAhora)
   const [texto, setTexto] = useState(mealDay?.noteText ?? '')
+  const dirty = useRef(false)
+  const [conflict, setConflict] = useState(false)
   const [sugerencias, setSugerencias] = useState<string[]>([])
   const [cargandoSug, setCargandoSug] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -355,7 +358,7 @@ function NotaMealSection({
   const preguntas = comparison.filter(s => s.status === 'PREGUNTA')
 
   useEffect(() => {
-    setTexto(mealDay?.noteText ?? '')
+    if (!dirty.current) setTexto(mealDay?.noteText ?? '')
   }, [mealDay?.noteText])
 
   useEffect(() => {
@@ -374,10 +377,13 @@ function NotaMealSection({
     setGuardando(true)
     setError(null)
     try {
-      const interp = await saveNota(token, date, meal.id, texto.trim())
+      const interp = await saveNota(token, date, meal.id, texto.trim(), mealDay?.noteVersion ?? null)
+      dirty.current = false
+      setConflict(false)
       onNotaSaved(interp, meal.id)
-    } catch {
-      setError('No se pudo guardar. Intentá de nuevo.')
+    } catch (err) {
+      setConflict(err instanceof NoteConflictError)
+      setError(err instanceof NoteConflictError ? err.message : 'No se pudo guardar. Intentá de nuevo.')
     } finally {
       setGuardando(false)
     }
@@ -423,7 +429,7 @@ function NotaMealSection({
                 <button
                   key={i}
                   className="nota-sugerencia"
-                  onClick={() => { setTexto(s); textareaRef.current?.focus() }}
+                  onClick={() => { dirty.current = true; setTexto(s); textareaRef.current?.focus() }}
                 >
                   {s}
                 </button>
@@ -436,17 +442,34 @@ function NotaMealSection({
             className="nota-textarea"
             placeholder="¿Qué comiste? Escribí en texto libre…"
             value={texto}
-            onChange={e => setTexto(e.target.value)}
+            onChange={e => { dirty.current = true; setTexto(e.target.value) }}
             rows={3}
             aria-label="Nota de la comida"
           />
 
           {error && <p className="nota-error" role="alert">{error}</p>}
+          {conflict && (
+            <button type="button" className="nota-btn-recargar" disabled={guardando}
+              onClick={async () => {
+                setGuardando(true)
+                try {
+                  await onReload()
+                  setConflict(false)
+                  setError(null)
+                } catch {
+                  setError('No se pudo recargar. Intentá de nuevo.')
+                } finally {
+                  setGuardando(false)
+                }
+              }}>
+              Recargar
+            </button>
+          )}
 
           <button
             className="nota-btn-guardar"
             onClick={handleGuardar}
-            disabled={guardando || !texto.trim()}
+            disabled={guardando || conflict || !texto.trim()}
           >
             {guardando ? 'Guardando…' : hasNote ? 'Guardar cambios' : 'Guardar'}
           </button>
@@ -625,6 +648,7 @@ export default function HoyPage() {
       const updatedMeal: MealDayDto = {
         mealId,
         noteId: interp.noteId,
+        noteVersion: interp.version,
         noteText: interp.text,
         items: [...interp.entries, ...sinItem],
         comparison: interp.comparison,
@@ -842,6 +866,11 @@ export default function HoyPage() {
 
                     {meal.id !== undefined && (
                       <NotaMealSection
+                        key={fecha}
+                        onReload={async () => {
+                          const data = await getDayRegistro(token!, fecha)
+                          setDayRegistro(data)
+                        }}
                         meal={meal}
                         mealDay={mealDay}
                         date={fecha}

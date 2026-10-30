@@ -173,6 +173,70 @@ class RegistroIntegrationTest {
             .andExpect(jsonPath("$.meals").isArray());
     }
 
+    @Test
+    void responsesAreIdempotentAndCanBeRemoved() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode before = getDay(date);
+        long groupId = before.path("summary").get(0).path("foodGroupId").asLong();
+        String url = "/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas";
+        String yes = "{\"foodGroupId\":" + groupId + ",\"consumed\":true}";
+        mockMvc.perform(post(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content(yes)).andExpect(status().isCreated());
+        JsonNode first = getDay(date);
+        mockMvc.perform(post(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content(yes)).andExpect(status().isCreated());
+        JsonNode repeated = getDay(date);
+        assertThat(repeated.path("summary")).isEqualTo(first.path("summary"));
+        assertThat(repeated.path("meals").get(0).path("items")).hasSize(1);
+        assertThat(repeated.path("meals").get(0).path("items").get(0).path("origin").asText())
+            .isEqualTo("RESPUESTA");
+        assertThat(repeated.path("summary").get(0).path("totalRecorded").decimalValue())
+            .isEqualByComparingTo("1");
+        mockMvc.perform(post(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":false}"))
+            .andExpect(status().isCreated());
+        JsonNode removed = getDay(date);
+        assertThat(removed.path("meals").get(0).path("items")).isEmpty();
+        assertThat(removed.path("summary")).isEqualTo(before.path("summary"));
+    }
+
+    @Test
+    void noteVersionsRejectStaleClientsAndKeepItemsOnIdenticalText() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode first = putNote(date, "leche");
+        JsonNode identical = putNote(date, "leche");
+        assertThat(identical.path("version")).isEqualTo(first.path("version"));
+        assertThat(identical.path("entries")).isEqualTo(first.path("entries"));
+        JsonNode updated = putNote(date, "pan");
+        assertThat(updated.path("version").asLong()).isGreaterThan(first.path("version").asLong());
+        String url = "/api/v1/registro/" + date + "/comidas/" + mealId + "/nota";
+        mockMvc.perform(put(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"manzana\",\"version\":" + first.path("version").asLong() + "}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("NOTE_CONFLICT"))
+            .andExpect(jsonPath("$.error").value(
+                "Esta nota cambió en otro dispositivo. Recargá para ver la versión actual."));
+        mockMvc.perform(put(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"manzana\"}"))
+            .andExpect(status().isConflict());
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").asText()).isEqualTo("pan");
+        assertThat(meal.path("noteVersion")).isEqualTo(updated.path("version"));
+    }
+
+    @Test
+    void missingNoteRejectsNonNullVersion() throws Exception {
+        createUniqueUserPlan();
+        mockMvc.perform(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + mealId + "/nota")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"leche\",\"version\":0}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTE_CONFLICT"));
+    }
+
     private String registerAndLogin(String email) throws Exception {
         try {
             mockMvc.perform(post("/api/v1/users")
@@ -212,10 +276,15 @@ class RegistroIntegrationTest {
     }
 
     private JsonNode putNote(String date, String text) throws Exception {
+        JsonNode meals = getDay(date).path("meals");
+        JsonNode currentVersion = meals.get(0).path("noteVersion");
+        java.util.Map<String, Object> request = new java.util.HashMap<>();
+        request.put("text", text);
+        request.put("version", currentVersion.isNumber() ? currentVersion.asLong() : null);
         MvcResult result = mockMvc.perform(put("/api/v1/registro/" + date + "/comidas/" + mealId + "/nota")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(java.util.Map.of("text", text))))
+            .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.noteId").isNumber())
             .andReturn();
@@ -527,7 +596,7 @@ class RegistroIntegrationTest {
         assertThat(after.size()).isEqualTo(before.size() + 1);
         assertThat(after).anySatisfy(item -> {
             assertThat(item.path("foodGroupId").asLong()).isEqualTo(foodGroupId);
-            assertThat(item.path("origin").asText()).isEqualTo("USUARIO");
+            assertThat(item.path("origin").asText()).isEqualTo("RESPUESTA");
         });
     }
 
@@ -639,7 +708,7 @@ class RegistroIntegrationTest {
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                {"text": "leche"}
+                {"text": "leche", "version": 0}
                 """))
             .andExpect(status().isCreated())
             .andReturn();

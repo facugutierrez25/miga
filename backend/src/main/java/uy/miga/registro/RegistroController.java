@@ -35,7 +35,7 @@ class RegistroController {
                                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                    @PathVariable Long mealId,
                                    @RequestBody @Valid NoteRequest req) {
-        return service.saveNote(auth.getName(), date, mealId, req.text());
+        return service.saveNote(auth.getName(), date, mealId, req.text(), req.version());
     }
 
     // GET  /api/v1/registro/{date}/{mealId}/note — mantenido por compatibilidad temporal
@@ -89,5 +89,5 @@ class RegistroController {
         return service.getSugerencias(auth.getName(), mealId);
     }
 
-    record NoteRequest(@NotBlank @Size(max = 10_000) String text) {}
+    record NoteRequest(@NotBlank @Size(max = 10_000) String text, Long version) {}
 }

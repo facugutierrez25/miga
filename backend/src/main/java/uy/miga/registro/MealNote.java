@@ -14,6 +14,9 @@ class MealNote {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
@@ -36,6 +39,7 @@ class MealNote {
     @PreUpdate
     void touch() { updatedAt = OffsetDateTime.now(); }
 
+    Long getVersion()             { return version; }
     Long getId()                  { return id; }
     Long getUserId()              { return userId; }
     LocalDate getDate()           { return date; }

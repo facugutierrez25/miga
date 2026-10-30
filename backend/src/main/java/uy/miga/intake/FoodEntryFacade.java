@@ -116,6 +116,23 @@ public class FoodEntryFacade {
     }
 
     @Transactional
+    public void createResponseEntry(Long userId, String userEmail, Long mealId, LocalDate date,
+                                    String food, Long foodGroupId) {
+        if (repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+            userId, date, mealId, foodGroupId, "RESPUESTA")) return;
+        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
+        entry.setOrigen("RESPUESTA");
+        entry.setPorciones(BigDecimal.ONE);
+        repository.save(entry);
+    }
+
+    @Transactional
+    public void deleteResponseEntries(Long userId, LocalDate date, Long mealId, Long foodGroupId) {
+        repository.deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+            userId, date, mealId, foodGroupId, "RESPUESTA");
+    }
+
+    @Transactional
     public void detachGroup(Long groupId) {
         repository.findByFoodGroupId(groupId).forEach(entry -> entry.setFoodGroupId(null));
         repository.flush();

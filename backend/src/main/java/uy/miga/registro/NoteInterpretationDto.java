@@ -5,6 +5,7 @@ import java.util.List;
 
 record NoteInterpretationDto(
     Long noteId,
+    Long version,
     String text,
     LocalDate date,
     Long mealId,
