@@ -1115,9 +1115,83 @@
 
 .nota-item {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 30px;
+}
+
+.nota-item__linea {
+  display: flex;
   align-items: center;
   gap: 6px;
   min-height: 30px;
+}
+
+.nota-item__regla {
+  margin: 0 0 4px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nota-item__repartir {
+  align-self: flex-start;
+  margin-left: 14px;
+  font-size: 12px;
+}
+
+.nota-entendido__titulo {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nota-compuesto {
+  list-style: none;
+}
+
+.nota-compuesto__titulo {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nota-compuesto .nota-items {
+  margin-left: 14px;
+}
+
+.nota-reparto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px 14px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.nota-reparto__fila,
+.nota-reparto__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.nota-reparto .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .nota-item__qty-input,
+  .nota-reparto select,
+  .nota-reparto input {
+    font-size: 16px;
+  }
 }
 
 .nota-item--dudoso {

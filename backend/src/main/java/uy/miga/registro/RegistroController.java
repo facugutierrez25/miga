@@ -65,10 +65,10 @@ class RegistroController {
 
     // PATCH /api/v1/registro/{date}/items/{id} — corregir cantidad/grupo; saveAsRule crea regla USUARIO
     @PatchMapping("/{date}/items/{id}")
-    DayRegistroDto.EntryItemDto patchItem(Authentication auth,
-                                          @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                                          @PathVariable Long id,
-                                          @RequestBody PatchItemRequest req) {
+    PatchItemResultDto patchItem(Authentication auth,
+                                 @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                 @PathVariable Long id,
+                                 @RequestBody @Valid PatchItemRequest req) {
         return service.patchItem(auth.getName(), date, id, req);
     }
 

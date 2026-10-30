@@ -8,7 +8,7 @@ import { getMyPlan, type PlanFoodGroupDto, type MealDto, type PlanDto } from '..
 import {
   getDayRegistro, saveNota, patchItem, saveRespuesta, getSugerencias,
   type DayRegistroDto, type MealDayDto, type EntryItemDto,
-  type GroupStatusDto, type NoteInterpretationDto,
+  type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
 import './HoyPage.css'
 
@@ -130,77 +130,174 @@ interface ItemRowProps {
   date: string
   token: string
   gruposMap: Record<number, GrupoInfo>
-  onPatched: (updated: EntryItemDto) => void
+  onPatched: (result: PatchItemResultDto) => void
 }
 
 function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
   const [editando, setEditando] = useState(false)
+  const [repartiendo, setRepartiendo] = useState(false)
   const [qty, setQty] = useState(String(item.quantity ?? ''))
+  const [reparto, setReparto] = useState<{ foodGroupId: string; porciones: string }[]>([])
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const info = item.foodGroupId !== null ? gruposMap[item.foodGroupId] : null
+  const editable = item.id > 0
 
-  async function handleSave() {
+  async function enviar(req: PatchItemRequest) {
     setSaving(true)
+    setError(null)
     try {
-      const updated = await patchItem(token, date, item.id, {
-        quantity: qty ? Number(qty) : null,
-        unit: item.unit,
-        foodGroupId: item.foodGroupId,
-        portions: null,
-        saveAsRule: false,
-      })
-      onPatched(updated)
+      onPatched(await patchItem(token, date, item.id, req))
       setEditando(false)
+      setRepartiendo(false)
     } catch {
-      // no-op
+      setError('No se pudo guardar la corrección.')
     } finally {
       setSaving(false)
     }
   }
 
-  const dot = info?.token ?? (item.foodGroupId === null ? 'var(--muted)' : 'var(--g-prot)')
+  function abrirReparto() {
+    const actual = item.foodGroupId !== null ? String(item.foodGroupId) : ''
+    setReparto([
+      { foodGroupId: actual, porciones: String(item.portions ?? 1) },
+      { foodGroupId: '', porciones: '1' },
+    ])
+    setRepartiendo(true)
+  }
+
+  function guardarReparto(saveAsRule: boolean) {
+    enviar({
+      quantity: item.quantity,
+      grupos: reparto.map(r => ({ foodGroupId: Number(r.foodGroupId), porciones: Number(r.porciones) })),
+      saveAsRule,
+    })
+  }
+
+  const repartoValido = reparto.length >= 2
+    && reparto.every(r => r.foodGroupId && Number(r.porciones) > 0)
+    && new Set(reparto.map(r => r.foodGroupId)).size === reparto.length
+
+  const dot = info?.token ?? 'var(--muted)'
   const label = info?.name ?? (item.foodGroupId === null ? 'Sin grupo en tu plan' : String(item.foodGroupId))
 
   return (
     <li className={`nota-item${item.uncertain ? ' nota-item--dudoso' : ''}`}>
-      <span className="nota-item__dot" style={{ background: dot }} />
-      <span className="nota-item__food">
-        {item.food}
-        {item.uncertain && <span className="nota-item__duda" title="Interpretación incierta">?</span>}
-      </span>
-      {editando ? (
-        <>
-          <input
-            className="nota-item__qty-input"
-            type="number"
-            value={qty}
-            onChange={e => setQty(e.target.value)}
-            min={0}
-            step="any"
-            aria-label="Cantidad"
-          />
-          <span className="nota-item__unit">{item.unit ?? ''}</span>
-          <button className="nota-item__save" onClick={handleSave} disabled={saving}>✓</button>
-          <button className="nota-item__cancel" onClick={() => { setEditando(false); setQty(String(item.quantity ?? '')) }}>✕</button>
-        </>
-      ) : (
-        <>
-          {item.quantity !== null && (
-            <span className="nota-item__qty">{item.quantity} {item.unit ?? ''}</span>
-          )}
-          <span className="nota-item__grupo">{label}</span>
-          {item.portions !== null && (
-            <span className="nota-item__porciones">{fmt(item.portions)} p.</span>
-          )}
-          <button className="nota-item__edit" onClick={() => setEditando(true)} aria-label="Corregir">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </>
+      <div className="nota-item__linea">
+        <span className="nota-item__dot" style={{ background: dot }} aria-hidden="true" />
+        <span className="nota-item__food">{item.food}</span>
+        {editando ? (
+          <>
+            <input
+              className="nota-item__qty-input"
+              type="number"
+              value={qty}
+              onChange={e => setQty(e.target.value)}
+              min={0}
+              step="any"
+              aria-label={`Cantidad de ${item.food}`}
+            />
+            <span className="nota-item__unit">{item.unit ?? ''}</span>
+            <button type="button" className="nota-item__save" aria-label="Guardar cantidad"
+              disabled={saving || !(Number(qty) > 0)}
+              onClick={() => enviar({ quantity: Number(qty), unit: item.unit })}>✓</button>
+            <button type="button" className="nota-item__cancel" aria-label="Cancelar"
+              onClick={() => { setEditando(false); setRepartiendo(false); setQty(String(item.quantity ?? '')) }}>✕</button>
+          </>
+        ) : (
+          <>
+            {item.quantity !== null && (
+              <span className="nota-item__qty">{item.quantity} {item.unit ?? ''}</span>
+            )}
+            <span className="nota-item__grupo">{label}</span>
+            {item.portions !== null && (
+              <span className="nota-item__porciones">{fmt(item.portions)} p.</span>
+            )}
+            {editable && (
+              <button type="button" className="nota-item__edit" onClick={() => setEditando(true)} aria-label={`Corregir ${item.food}`}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      {(item.appliedRule || item.uncertain) && (
+        <p className="nota-item__regla">
+          {item.appliedRule}
+          {item.appliedRule && item.uncertain && ' · '}
+          {item.uncertain && 'cantidad supuesta'}
+        </p>
       )}
+      {editando && !repartiendo && (
+        <button type="button" className="nota-item__repartir" onClick={abrirReparto}>
+          Repartir en varios grupos
+        </button>
+      )}
+      {repartiendo && (
+        <fieldset className="nota-reparto">
+          <legend>Repartir {item.food} en grupos</legend>
+          {reparto.map((r, i) => (
+            <div key={i} className="nota-reparto__fila">
+              <label>
+                <span className="sr-only">Grupo {i + 1}</span>
+                <select value={r.foodGroupId}
+                  onChange={e => setReparto(rs => rs.map((x, j) => j === i ? { ...x, foodGroupId: e.target.value } : x))}>
+                  <option value="">Elegí un grupo</option>
+                  {Object.entries(gruposMap).map(([id, g]) => <option key={id} value={id}>{g.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="sr-only">Porciones del grupo {i + 1}</span>
+                <input type="number" min={0.5} step={0.5} value={r.porciones}
+                  onChange={e => setReparto(rs => rs.map((x, j) => j === i ? { ...x, porciones: e.target.value } : x))} />
+              </label>
+              {reparto.length > 2 && (
+                <button type="button" aria-label={`Quitar grupo ${i + 1}`}
+                  onClick={() => setReparto(rs => rs.filter((_, j) => j !== i))}>✕</button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => setReparto(rs => [...rs, { foodGroupId: '', porciones: '1' }])}>
+            + Agregar grupo
+          </button>
+          <div className="nota-reparto__acciones">
+            <button type="button" disabled={saving || !repartoValido} onClick={() => guardarReparto(false)}>
+              Guardar
+            </button>
+            <button type="button" disabled={saving || !repartoValido} onClick={() => guardarReparto(true)}>
+              Guardar y usar siempre
+            </button>
+            <button type="button" onClick={() => setRepartiendo(false)}>Cancelar</button>
+          </div>
+        </fieldset>
+      )}
+      {error && <p className="nota-error" role="alert">{error}</p>}
     </li>
   )
+}
+
+// Agrupa los ítems de una misma mención (p. ej. los grupos de un alimento compuesto).
+function agruparPorMencion(items: EntryItemDto[]): EntryItemDto[][] {
+  const grupos: EntryItemDto[][] = []
+  const porMencion = new Map<string, EntryItemDto[]>()
+  for (const item of items) {
+    const key = item.occurrenceId
+    if (!key) {
+      grupos.push([item])
+      continue
+    }
+    const existente = porMencion.get(key)
+    if (existente) {
+      existente.push(item)
+      continue
+    }
+    const nuevo = [item]
+    porMencion.set(key, nuevo)
+    grupos.push(nuevo)
+  }
+  return grupos
 }
 
 // ── ComparisonRow ─────────────────────────────────────────────────────────
@@ -232,7 +329,7 @@ interface NotaMealSectionProps {
   gruposMap: Record<number, GrupoInfo>
   isAhora: boolean
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
-  onItemPatched: (mealId: number, item: EntryItemDto) => void
+  onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onRespuestaGuardada: (mealId: number) => void
 }
 
@@ -347,22 +444,41 @@ function NotaMealSection({
             onClick={handleGuardar}
             disabled={guardando || !texto.trim()}
           >
-            {guardando ? 'Guardando…' : hasNote ? 'Actualizar' : 'Así lo entendí'}
+            {guardando ? 'Guardando…' : hasNote ? 'Guardar cambios' : 'Guardar'}
           </button>
 
           {items.length > 0 && (
-            <ul className="nota-items" aria-label="Ítems interpretados">
-              {items.map(item => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  date={date}
-                  token={token}
-                  gruposMap={gruposMap}
-                  onPatched={updated => onItemPatched(meal.id!, updated)}
-                />
-              ))}
-            </ul>
+            <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
+              <h4 id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h4>
+              <ul className="nota-items">
+                {agruparPorMencion(items).map(mencion => {
+                  const fila = (item: EntryItemDto) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      date={date}
+                      token={token}
+                      gruposMap={gruposMap}
+                      onPatched={result => onItemPatched(meal.id!, result)}
+                    />
+                  )
+                  if (mencion.length === 1) return fila(mencion[0])
+                  const [primero] = mencion
+                  return (
+                    <li key={primero.occurrenceId} className="nota-compuesto">
+                      <p className="nota-compuesto__titulo">
+                        {primero.food}
+                        {primero.quantity !== null && <> · {primero.quantity} {primero.unit ?? ''}</>}
+                      </p>
+                      {primero.appliedRule && <p className="nota-item__regla">{primero.appliedRule}</p>}
+                      <ul className="nota-items" aria-label={`Grupos de ${primero.food}`}>
+                        {mencion.map(item => fila({ ...item, appliedRule: null }))}
+                      </ul>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
           )}
 
           {comparison.length > 0 && (
@@ -487,40 +603,26 @@ export default function HoyPage() {
   const handleNotaSaved = useCallback((interp: NoteInterpretationDto, mealId: number) => {
     setDayRegistro(prev => {
       if (!prev) return prev
-      const exists = prev.meals.find(m => m.mealId === mealId)
-      const updatedMeal: MealDayDto = exists
-        ? {
-            ...exists,
-            noteText: interp.text,
-            noteId: interp.noteId,
-            items: interp.items.map(it => ({
-              id: it.foodGroupId ?? 0,
-              food: it.foodName,
-              quantity: it.quantity,
-              unit: it.unit,
-              foodGroupId: it.foodGroupId,
-              portions: it.portions,
-              origin: 'NOTA',
-              uncertain: it.uncertain,
-            })),
-            comparison: interp.comparison,
-          }
-        : {
-            mealId,
-            noteId: interp.noteId,
-            noteText: interp.text,
-            items: interp.items.map(it => ({
-              id: it.foodGroupId ?? 0,
-              food: it.foodName,
-              quantity: it.quantity,
-              unit: it.unit,
-              foodGroupId: it.foodGroupId,
-              portions: it.portions,
-              origin: 'NOTA',
-              uncertain: it.uncertain,
-            })),
-            comparison: interp.comparison,
-          }
+      const unrecognized: EntryItemDto[] = interp.items
+        .filter(it => !it.recognized)
+        .map((it, i) => ({
+          id: -(i + 1),
+          food: it.foodName,
+          quantity: it.quantity,
+          unit: it.unit,
+          foodGroupId: null,
+          portions: null,
+          origin: 'NOTA',
+          uncertain: false,
+        }))
+      const updatedMeal: MealDayDto = {
+        mealId,
+        noteId: interp.noteId,
+        noteText: interp.text,
+        items: [...interp.entries, ...unrecognized],
+        comparison: interp.comparison,
+      }
+      const exists = prev.meals.some(m => m.mealId === mealId)
       const meals = exists
         ? prev.meals.map(m => m.mealId === mealId ? updatedMeal : m)
         : [...prev.meals, updatedMeal]
@@ -528,17 +630,23 @@ export default function HoyPage() {
     })
   }, [])
 
-  const handleItemPatched = useCallback((mealId: number, updated: EntryItemDto) => {
+  const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRegistro(prev => {
       if (!prev) return prev
-      const meals = prev.meals.map(m =>
-        m.mealId === mealId
-          ? { ...m, items: m.items.map(it => it.id === updated.id ? updated : it) }
-          : m
-      )
+      const meals = prev.meals.map(m => {
+        if (m.mealId !== mealId) return m
+        const at = m.items.findIndex(it => result.replacedItemIds.includes(it.id))
+        const kept = m.items.filter(it => !result.replacedItemIds.includes(it.id))
+        const items = at < 0 ? [...kept, ...result.items]
+          : [...kept.slice(0, at), ...result.items, ...kept.slice(at)]
+        return { ...m, items }
+      })
       return { ...prev, meals }
     })
-  }, [])
+    if (token) {
+      getDayRegistro(token, fecha).then(setDayRegistro).catch(() => {})
+    }
+  }, [token, fecha])
 
   const handleRespuestaGuardada = useCallback((_mealId: number) => {
     if (!token) return

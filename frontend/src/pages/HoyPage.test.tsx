@@ -157,6 +157,7 @@ test('el botón guardar envía la nota al backend', async () => {
     date: '2025-01-01',
     mealId: 1,
     items: [],
+    entries: [],
     comparison: [],
   })
   renderHoy()
@@ -169,7 +170,7 @@ test('el botón guardar envía la nota al backend', async () => {
 
   await waitFor(() => expect(screen.getByPlaceholderText(/Qué comiste/)).toBeInTheDocument())
   fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche' } })
-  fireEvent.click(screen.getByText('Así lo entendí'))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche'))
 })
 
@@ -184,4 +185,73 @@ test('muestra "Hoy" en la barra de navegación por defecto', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   renderHoy()
   await waitFor(() => expect(screen.getAllByText('Hoy').length).toBeGreaterThan(0))
+})
+
+const gruposBarrita = [
+  { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
+  { id: 2, name: 'Cereales', abbreviation: 'CER', displayOrder: 2, color: null },
+  { id: 3, name: 'Grasas', abbreviation: 'GRA', displayOrder: 3, color: null },
+]
+
+const reglaBarrita = '1 barrita = 1 Proteínas + 1 Cereales + 1 Grasas'
+
+function entradaBarrita(id: number, foodGroupId: number) {
+  return {
+    id, food: 'barrita', quantity: 1, unit: 'u', foodGroupId, portions: 1, origin: 'REGLA',
+    uncertain: false, originalText: '1 barrita', appliedRule: reglaBarrita, occurrenceId: 'occ-1',
+  }
+}
+
+async function abrirNota() {
+  await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
+  const toggle = screen.queryAllByRole('button', { expanded: false })
+    .find(b => b.className.includes('nota-toggle'))
+  if (toggle) fireEvent.click(toggle)
+  await waitFor(() => expect(screen.getByPlaceholderText(/Qué comiste/)).toBeInTheDocument())
+}
+
+test('muestra un compuesto en una fila con su regla bajo el título Así lo entendí', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: gruposBarrita })
+  mockSaveNota.mockResolvedValue({
+    noteId: 1, text: '1 barrita', date: '2025-01-01', mealId: 1, items: [], comparison: [],
+    entries: [entradaBarrita(11, 1), entradaBarrita(12, 2), entradaBarrita(13, 3)],
+  })
+  renderHoy()
+  await abrirNota()
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: '1 barrita' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+  const titulo = await screen.findByRole('heading', { name: 'Así lo entendí' })
+  expect(titulo).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Así lo entendí' })).not.toBeInTheDocument()
+  expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
+  expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
+})
+
+test('corregir permite repartir un ítem en varios grupos', async () => {
+  const mockPatchItem = vi.mocked(registroApi.patchItem)
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: gruposBarrita })
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteText: 'leche', comparison: [],
+      items: [{ id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
+        origin: 'REGLA', uncertain: true, appliedRule: '1 leche = 1 Proteínas', occurrenceId: 'occ-2' }],
+    }],
+  })
+  mockPatchItem.mockResolvedValue({ replacedItemIds: [21], items: [] })
+  renderHoy()
+  await abrirNota()
+
+  expect(screen.getByText(/cantidad supuesta/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
+  fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar y usar siempre' }))
+
+  await waitFor(() => expect(mockPatchItem).toHaveBeenCalledWith('tok', expect.any(String), 21, {
+    quantity: 1,
+    grupos: [{ foodGroupId: 1, porciones: 1 }, { foodGroupId: 3, porciones: 1 }],
+    saveAsRule: true,
+  }))
 })

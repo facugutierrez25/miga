@@ -40,4 +40,6 @@ Cada ítem interpretado guarda el texto de la regla aplicada (`applied_rule`) y 
 - Consultar o volver a guardar una nota vieja usa la configuración con la que se registró.
 - El historial de versiones puede crecer cuando se edita un plan en uso; cada edición posterior sobre la versión nueva, sin uso todavía, no agrega versiones.
 - Los identificadores de grupos, reglas y hábitos cambian al crearse una versión nueva; la API de edición devuelve siempre el estado completo y vigente para que el cliente no dependa de ids viejos.
+- "Guardar como regla" al corregir un ítem agrega la regla del usuario a la versión vigente sin copiarla: su propósito es aplicarse a los próximos registros. Solo se permite sobre ítems de la versión vigente.
+- Volver a guardar una nota la reinterpreta entera y descarta sus correcciones; para conservar una corrección se guarda como regla.
 - Fuera de alcance: fusionar versiones del plan y edición retroactiva de días pasados.

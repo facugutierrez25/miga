@@ -57,6 +57,7 @@ export interface NoteInterpretationDto {
   date: string
   mealId: number
   items: InterpretedItemDto[]
+  entries: EntryItemDto[]
   comparison: GroupStatusDto[]
 }
 
@@ -69,6 +70,9 @@ export interface EntryItemDto {
   portions: number | null
   origin: string
   uncertain: boolean
+  originalText?: string | null
+  appliedRule?: string | null
+  occurrenceId?: string | null
 }
 
 export interface DailySummaryDto {
@@ -93,12 +97,23 @@ export interface DayRegistroDto {
   summary: DailySummaryDto[]
 }
 
+export interface GroupPortion {
+  foodGroupId: number
+  porciones: number
+}
+
 export interface PatchItemRequest {
-  quantity: number | null
-  unit: string | null
-  foodGroupId: number | null
-  portions: number | null
-  saveAsRule: boolean
+  quantity?: number | null
+  unit?: string | null
+  foodGroupId?: number | null
+  portions?: number | null
+  grupos?: GroupPortion[]
+  saveAsRule?: boolean
+}
+
+export interface PatchItemResultDto {
+  replacedItemIds: number[]
+  items: EntryItemDto[]
 }
 
 export interface RespuestaRequest {
@@ -141,7 +156,7 @@ export async function patchItem(
   date: string,
   itemId: number,
   req: PatchItemRequest,
-): Promise<EntryItemDto> {
+): Promise<PatchItemResultDto> {
   const res = await fetch(`${API_URL}/api/v1/registro/${date}/items/${itemId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

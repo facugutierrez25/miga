@@ -8,9 +8,13 @@ import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanService;
 import uy.miga.reglas.FoodRuleDto;
 import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.Componente;
+import uy.miga.reglas.RuleInput;
+import uy.miga.reglas.RuleText;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -82,24 +86,33 @@ public class RegistroService {
         note.setText(text.strip());
         MealNote saved = noteRepository.save(note);
 
-        entryFacade.deleteReglaEntries(saved.getId());
+        entryFacade.deleteNoteEntries(saved.getId());
 
         List<InterpretedItem> items = interpreter.interpret(text, rules);
-        List<InterpretedItem> expanded = expandCompound(items, rules, planId);
+        Map<Long, String> groupNames = planService.getPlanFoodGroups(planId).stream()
+            .collect(Collectors.toMap(uy.miga.plans.PlanFoodGroupDto::id, uy.miga.plans.PlanFoodGroupDto::name));
+        List<InterpretedItem> expanded = new ArrayList<>();
 
-        for (InterpretedItem item : expanded) {
-            if (!item.recognized() || item.foodGroupId() == null) continue;
-            entryFacade.createNoteEntry(
-                userId, userEmail, mealId, date,
-                item.foodName(),
-                item.quantity().doubleValue(),
-                item.unit(),
-                item.foodGroupId(),
-                saved.getId(),
-                item.originalText(),
-                item.uncertain(),
-                item.portions()
-            );
+        for (InterpretedItem mention : items) {
+            UUID occurrenceId = UUID.randomUUID();
+            String ruleText = describeRule(mention, rules, planId, groupNames);
+            for (InterpretedItem item : expandCompound(List.of(mention), rules, planId)) {
+                expanded.add(item);
+                if (!item.recognized() || item.foodGroupId() == null) continue;
+                entryFacade.createNoteEntry(
+                    userId, userEmail, mealId, date,
+                    item.foodName(),
+                    item.quantity().doubleValue(),
+                    item.unit(),
+                    item.foodGroupId(),
+                    saved.getId(),
+                    item.originalText(),
+                    item.uncertain(),
+                    item.portions(),
+                    ruleText,
+                    occurrenceId
+                );
+            }
         }
 
         Map<Long, BigDecimal> portionsByGroup = buildPortionMap(expanded);
@@ -108,6 +121,7 @@ public class RegistroService {
         return new NoteInterpretationDto(
             saved.getId(), text, date, mealId,
             items.stream().map(this::toItemDto).toList(),
+            entryFacade.findByMealNoteId(saved.getId()).stream().map(this::toEntryItemDto).toList(),
             statuses.stream().map(s -> new GroupStatusDto(
                 s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()
             )).toList()
@@ -182,6 +196,30 @@ public class RegistroService {
         return result;
     }
 
+    // Texto legible de la regla aplicada, con los nombres de los grupos del plan.
+    private String describeRule(InterpretedItem item, List<FoodRuleDto> rules, Long planId,
+                                Map<Long, String> groupNames) {
+        if (item.ruleId() == null) return null;
+        FoodRuleDto rule = rules.stream().filter(r -> r.id().equals(item.ruleId())).findFirst().orElse(null);
+        if (rule == null) return item.appliedRule();
+        if (!"COMPUESTO".equals(rule.tipo())) {
+            return rule.alcance().equals("GLOBAL") ? item.appliedRule() : RuleText.describe(rule, groupNames);
+        }
+        return "1 " + rule.alimento() + " = " + rule.componentes().stream()
+            .map(c -> {
+                Long groupId = c.foodGroupId() != null ? c.foodGroupId() : resolveGroupId(c.standardGroupKey(), planId);
+                String name = groupId == null ? c.standardGroupKey() : groupNames.getOrDefault(groupId, c.standardGroupKey());
+                return BigDecimal.valueOf(c.porciones()).stripTrailingZeros().toPlainString().replace('.', ',') + " " + name;
+            })
+            .collect(Collectors.joining(" + "));
+    }
+
+    private DayRegistroDto.EntryItemDto toEntryItemDto(FoodEntryFacade.EntryData e) {
+        return new DayRegistroDto.EntryItemDto(
+            e.id(), e.food(), e.quantity(), e.unit(), e.foodGroupId(), e.portions(), e.origin(),
+            e.uncertain(), e.originalText(), e.appliedRule(), e.occurrenceId());
+    }
+
     private String getType(InterpretedItem item, List<FoodRuleDto> rules) {
         if (item.ruleId() == null) return "NORMAL";
         return rules.stream().filter(r -> r.id().equals(item.ruleId()))
@@ -225,9 +263,7 @@ public class RegistroService {
             List<FoodEntryFacade.EntryData> mealEntries = byMeal.getOrDefault(mealId, List.of());
 
             List<DayRegistroDto.EntryItemDto> itemDtos = mealEntries.stream()
-                .map(e -> new DayRegistroDto.EntryItemDto(
-                    e.id(), e.food(), e.quantity(), e.unit(),
-                    e.foodGroupId(), e.portions(), e.origin(), e.uncertain()))
+                .map(this::toEntryItemDto)
                 .toList();
 
             mealEntries.stream()
@@ -265,28 +301,74 @@ public class RegistroService {
     }
 
     @Transactional
-    DayRegistroDto.EntryItemDto patchItem(String userEmail, LocalDate date, Long entryId,
-                                          PatchItemRequest req) {
+    PatchItemResultDto patchItem(String userEmail, LocalDate date, Long entryId, PatchItemRequest req) {
         Long userId = userService.findUserIdByEmail(userEmail);
         FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
-        if (entry == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-
-        Double newQty = req.quantity() != null ? req.quantity().doubleValue() : null;
-        entryFacade.updateEntry(entryId, newQty, req.unit(), req.foodGroupId(), req.portions());
-
-        if (req.saveAsRule()) {
-            Long planId = planService.getCurrentPlanId(userEmail);
-            Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
-            ruleService.createUserRule(userId, planId, groupId,
-                entry.food(), null,
-                req.quantity(), req.unit(),
-                req.portions());
+        if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (req.grupos() != null && (req.foodGroupId() != null || req.portions() != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Indicá un grupo o varios grupos, no ambos.");
         }
 
-        FoodEntryFacade.EntryData updated = entryFacade.findEntryByIdAndUserId(entryId, userId);
-        return new DayRegistroDto.EntryItemDto(
-            updated.id(), updated.food(), updated.quantity(), updated.unit(),
-            updated.foodGroupId(), updated.portions(), updated.origin(), updated.uncertain());
+        Long planId = entryPlanId(userId, entry);
+        Set<Long> planGroups = planService.getPlanFoodGroups(planId).stream()
+            .map(uy.miga.plans.PlanFoodGroupDto::id).collect(Collectors.toSet());
+        List<Long> requestedGroups = req.grupos() != null
+            ? req.grupos().stream().map(PatchItemRequest.GroupPortion::foodGroupId).toList()
+            : (req.foodGroupId() != null ? List.of(req.foodGroupId()) : List.of());
+        if (!planGroups.containsAll(requestedGroups)
+            || new HashSet<>(requestedGroups).size() != requestedGroups.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");
+        }
+        if (req.savesRule() && !planId.equals(planService.getCurrentPlanId(userEmail))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Solo se puede guardar como regla un registro del plan vigente.");
+        }
+
+        BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity());
+        List<Long> resultIds;
+        if (req.grupos() != null) {
+            Map<Long, BigDecimal> portionsByGroup = new LinkedHashMap<>();
+            req.grupos().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.porciones()));
+            resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
+            if (req.savesRule()) {
+                List<Componente> components = req.grupos().stream()
+                    .map(g -> new Componente(g.foodGroupId(), null,
+                        g.porciones().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
+                    .toList();
+                ruleService.createUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
+                    null, null, entry.unit(), BigDecimal.ONE, components, null));
+            }
+        } else {
+            BigDecimal portions = req.portions() != null ? req.portions() : scaledPortions(entry, quantity);
+            entryFacade.correctEntry(entryId, quantity.doubleValue(), req.unit(), req.foodGroupId(), portions);
+            resultIds = List.of(entryId);
+            if (req.savesRule()) {
+                Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
+                ruleService.createUserRule(userId, planId, groupId, entry.food(), null,
+                    quantity, req.unit() != null ? req.unit() : entry.unit(), portions);
+            }
+        }
+
+        List<DayRegistroDto.EntryItemDto> items = resultIds.stream()
+            .map(id -> toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId)))
+            .toList();
+        return new PatchItemResultDto(List.of(entryId), items);
+    }
+
+    // Al cambiar solo la cantidad, las porciones se ajustan en la misma proporción.
+    private BigDecimal scaledPortions(FoodEntryFacade.EntryData entry, BigDecimal quantity) {
+        if (entry.portions() == null || entry.quantity() == null || entry.quantity() <= 0) return entry.portions();
+        return entry.portions().multiply(quantity)
+            .divide(BigDecimal.valueOf(entry.quantity()), 3, RoundingMode.HALF_UP);
+    }
+
+    private Long entryPlanId(Long userId, FoodEntryFacade.EntryData entry) {
+        if (entry.mealNoteId() != null) {
+            Long notePlan = noteRepository.findById(entry.mealNoteId()).map(MealNote::getPlanId).orElse(null);
+            if (notePlan != null) return notePlan;
+        }
+        return planService.getPlanIdForDate(userId, entry.date());
     }
 
     @Transactional
