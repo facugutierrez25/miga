@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import {
@@ -144,6 +144,8 @@ export default function MiPlanPage() {
   const [snackbar, setSnackbar] = useState<{ eq: EquivalenceDto } | null>(null)
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const locationDraftMeals = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
+
   useEffect(() => {
     if (!token) return
     getMyPlan(token)
@@ -153,9 +155,8 @@ export default function MiPlanPage() {
       })
       .catch(err => {
         if (err.message === 'sin-plan') {
-          const draft = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
-          if (draft) {
-            setComidas(draft.map(m => ({
+          if (locationDraftMeals) {
+            setComidas(locationDraftMeals.map(m => ({
               nombre: m.name,
               hora: m.suggestedTime ? m.suggestedTime.slice(0, 5) : '',
               porciones: porcionesVacias(DEFAULT_GRUPOS),
@@ -169,7 +170,7 @@ export default function MiPlanPage() {
       .finally(() => setCargando(false))
 
     getPlanHistory(token).then(setHistorial).catch(() => {})
-  }, [token])
+  }, [token, locationDraftMeals])
 
   useEffect(() => {
     if (!token || tab !== 'equivalencias' || equivalences !== null) return

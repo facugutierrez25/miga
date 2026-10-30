@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { login, resendVerification, getMe } from '../api/users'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import './RegisterPage.css'
