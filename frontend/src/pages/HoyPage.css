@@ -981,3 +981,335 @@
   border: 2px solid var(--primary);
   box-shadow: 0 0 0 1px rgba(63, 179, 174, 0.15);
 }
+
+/* ── Nota section ── */
+
+.comida-hoy--anotada {
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+}
+
+.comida-hoy__nota {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.nota-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.nota-toggle__label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.nota-toggle__label--anotado {
+  color: var(--primary);
+}
+
+.nota-toggle__chevron {
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.nota-toggle__chevron--open {
+  transform: rotate(180deg);
+}
+
+.nota-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.nota-sugerencias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nota-sugerencia {
+  background: var(--surface-alt, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.nota-sugerencia:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  border-color: var(--primary);
+}
+
+.nota-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  padding: 10px 12px;
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  line-height: 1.4;
+  transition: border-color 0.15s;
+}
+
+.nota-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.nota-error {
+  font-size: 13px;
+  color: var(--error);
+  margin: 0;
+}
+
+.nota-btn-guardar {
+  align-self: flex-start;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.nota-btn-guardar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nota-btn-guardar:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.nota-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nota-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.nota-item--dudoso {
+  opacity: 0.75;
+}
+
+.nota-item__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.nota-item__food {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nota-item__duda {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.nota-item__qty {
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.nota-item__grupo {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.nota-item__porciones {
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.nota-item__edit {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.nota-item__edit:hover {
+  color: var(--ink);
+  background: var(--line);
+}
+
+.nota-item__qty-input {
+  width: 56px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.nota-item__unit {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nota-item__save,
+.nota-item__cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.nota-item__save { color: var(--primary); }
+.nota-item__cancel { color: var(--muted); }
+
+.nota-comparacion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.comp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.comp-row__name {
+  font-size: 12px;
+  color: var(--muted);
+  width: 80px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comp-row__bar {
+  flex: 1;
+  height: 5px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.comp-row__fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.comp-row__frac {
+  font-size: 11px;
+  color: var(--muted);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.nota-pregunta {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nota-pregunta__texto {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 120px;
+}
+
+.nota-pregunta__acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.nota-pregunta__si,
+.nota-pregunta__no {
+  padding: 6px 16px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.nota-pregunta__si:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.nota-pregunta__no:hover {
+  background: var(--line);
+}
+
+[data-theme="dark"] .comida-hoy--anotada {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
