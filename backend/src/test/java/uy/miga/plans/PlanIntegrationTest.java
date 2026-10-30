@@ -18,6 +18,8 @@ import org.springframework.security.web.FilterChainProxy;
 import uy.miga.users.EmailOutboxWorker;
 import uy.miga.users.MockEmailService;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -400,6 +402,60 @@ class PlanIntegrationTest {
                 .content(planSinVersion))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meals[0].name").value("Cena"));
+    }
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test
+    void versionCopiesConfigurationRulesAndActiveHabits() throws Exception {
+        String t = registerAndLogin("copy-" + java.util.UUID.randomUUID() + "@miga.uy");
+        savePlan(t, PLAN_UNA_COMIDA);
+        long oldId = jdbc.queryForObject("select max(id) from plans", Long.class);
+        jdbc.update("update plans set modo_registro = 'LIBRE', margen_porciones = 1.5 where id = ?", oldId);
+        jdbc.update("insert into plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, meta_diaria, preguntar_si_falta, opcional) values (?, 'Grupo propio', 'ABC', 9, 'propio', '#123456', 3, true, true)", oldId);
+        long groupId = jdbc.queryForObject("select id from plan_food_groups where plan_id = ? and abbreviation = 'ABC'", Long.class, oldId);
+        jdbc.update("insert into food_rules (plan_id, user_id, alcance, alimento, tipo, food_group_id, cantidad_por_porcion, unidad) select id, user_id, 'USUARIO', 'Alimento sintético', 'NORMAL', ?, 100, 'g' from plans where id = ?", groupId, oldId);
+        mockMvc.perform(post("/api/v1/habitos").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Hábito sintético\",\"habitType\":\"SI_NO\",\"displayOrder\":1}"))
+                .andExpect(status().isCreated());
+        jdbc.update("insert into food_rules (plan_id, alcance, alimento, tipo, componentes) values (?, 'PLAN', 'Compuesto sintético', 'COMPUESTO', cast(? as jsonb))",
+                oldId, "[{\"foodGroupId\":" + groupId + ",\"porciones\":2},{\"standardGroupKey\":\"frutas\",\"porciones\":1}]");
+        jdbc.update("insert into plan_habits (plan_id, name, habit_type, archived_at) values (?, 'Archivado', 'SI_NO', now())", oldId);
+        savePlan(t, PLAN_UNA_COMIDA.replace("Desayuno", "Cena"));
+        long newId = jdbc.queryForObject("select max(id) from plans", Long.class);
+        assertThat(newId).isNotEqualTo(oldId);
+        assertThat(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, meta_diaria, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", oldId))
+                .isEqualTo(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, meta_diaria, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", newId));
+        assertThat(jdbc.queryForMap("select modo_registro, margen_porciones from plans where id = ?", oldId))
+                .isEqualTo(jdbc.queryForMap("select modo_registro, margen_porciones from plans where id = ?", newId));
+        assertThat(jdbc.queryForList("select uid, name, habit_type, unit, daily_goal, step, period, display_order, created_at from plan_habits where plan_id = ? and archived_at is null", oldId))
+                .isEqualTo(jdbc.queryForList("select uid, name, habit_type, unit, daily_goal, step, period, display_order, created_at from plan_habits where plan_id = ?", newId));
+        assertThat(jdbc.queryForList("select uid, overrides_rule_uid, alimento, sinonimos, tipo, standard_group_key, cantidad_por_porcion, unidad, porcion_por_defecto, user_id, alcance from food_rules where plan_id = ? order by alimento", oldId))
+                .hasSize(2);
+        long newGroupId = jdbc.queryForObject("select id from plan_food_groups where plan_id = ? and abbreviation = 'ABC'", Long.class, newId);
+        assertThat(jdbc.queryForObject("select (componentes->0->>'foodGroupId')::bigint from food_rules where plan_id = ? and alcance = 'PLAN'", Long.class, newId)).isEqualTo(newGroupId);
+        assertThat(jdbc.queryForObject("select food_group_id from food_rules where plan_id = ? and alcance = 'USUARIO'", Long.class, newId)).isEqualTo(newGroupId);
+        mockMvc.perform(get("/api/v1/habitos").header("Authorization", "Bearer " + t))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].name").value("Hábito sintético"));
+    }
+
+    @Test
+    void unmappedComponentRollsBackNewVersion() throws Exception {
+        String t = registerAndLogin("rollback-" + java.util.UUID.randomUUID() + "@miga.uy");
+        savePlan(t, PLAN_UNA_COMIDA);
+        long oldId = jdbc.queryForObject("select max(id) from plans", Long.class);
+        jdbc.update("insert into food_rules (plan_id, alcance, alimento, tipo, componentes) values (?, 'PLAN', 'Inv�lido', 'COMPUESTO', '[{\"foodGroupId\":-1,\"porciones\":1}]'::jsonb)", oldId);
+        assertThatThrownBy(() -> savePlan(t, PLAN_UNA_COMIDA.replace("Desayuno", "Cena")))
+                .hasRootCauseInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("select is_current from plans where id = ?", Boolean.class, oldId)).isTrue();
+        assertThat(jdbc.queryForObject("select count(*) from plans where user_id = (select user_id from plans where id = ?)", Long.class, oldId)).isEqualTo(1);
+    }
+
+    private void savePlan(String t, String json) throws Exception {
+        mockMvc.perform(put("/api/v1/my-plan").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isOk());
     }
 
     private String registerAndLogin(String email) throws Exception {

@@ -25,7 +25,10 @@ record DayRegistroDto(
         Long foodGroupId,
         BigDecimal portions,
         String origin,
-        Boolean uncertain
+        Boolean uncertain,
+        String originalText,
+        String appliedRule,
+        java.util.UUID occurrenceId
     ) {}
 
     record DailySummaryDto(

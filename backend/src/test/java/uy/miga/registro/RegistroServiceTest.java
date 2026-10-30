@@ -1,0 +1,136 @@
+package uy.miga.registro;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.springframework.web.server.ResponseStatusException;
+import uy.miga.intake.FoodEntryFacade;
+import uy.miga.plans.PlanNotFoundException;
+import uy.miga.plans.PlanService;
+import uy.miga.plans.PlanVersionConflictException;
+import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.RuleInput;
+import uy.miga.users.UserService;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class RegistroServiceTest {
+    private final MealNoteRepository notes = mock(MealNoteRepository.class);
+    private final FoodEntryFacade entries = mock(FoodEntryFacade.class);
+    private final PlanService plans = mock(PlanService.class);
+    private final ReglaService rules = mock(ReglaService.class);
+    private final UserService users = mock(UserService.class);
+    private final RegistroService service = new RegistroService(notes, mock(InterpreterService.class),
+        mock(ComparisonService.class), entries, plans, rules, users);
+    private final LocalDate today = LocalDate.now();
+
+    @BeforeEach
+    void setup() {
+        when(users.findUserIdByEmail("user")).thenReturn(1L);
+        when(plans.lockCurrentPlan(1L)).thenReturn(20L);
+        when(plans.getPlanIdForDate(1L, today)).thenReturn(20L);
+    }
+
+    @Test
+    void newTodayNoteRejectsOldMealAfterTakingLock() {
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(plans.getMealIds(20L)).thenReturn(List.of(11L));
+
+        assertThatThrownBy(() -> service.saveNote("user", today, 10L, "food"))
+            .isInstanceOf(PlanVersionConflictException.class);
+        var order = inOrder(plans, notes);
+        order.verify(plans).lockCurrentPlan(1L);
+        order.verify(plans).mealBelongsToUser(10L, 1L);
+        order.verify(notes).findByUserIdAndDateAndMealId(1L, today, 10L);
+        verify(notes, never()).save(any());
+    }
+
+    @Test
+    void existingNoteValidatesItsOwnPlanEvenWithoutCurrentPlan() {
+        LocalDate yesterday = today.minusDays(1);
+        MealNote note = new MealNote();
+        note.setPlanId(19L);
+        when(plans.lockCurrentPlan(1L)).thenThrow(new PlanNotFoundException());
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(notes.findByUserIdAndDateAndMealId(1L, yesterday, 10L)).thenReturn(Optional.of(note));
+        when(plans.getMealIds(19L)).thenReturn(List.of(9L));
+
+        assertThatThrownBy(() -> service.saveNote("user", yesterday, 10L, "food"))
+            .isInstanceOf(PlanVersionConflictException.class);
+        verify(plans, never()).getPlanIdForDate(any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void patchAlwaysLocksBeforeReadingEntry(boolean saveRule) {
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, saveRule)))
+            .isInstanceOf(ResponseStatusException.class);
+        var order = inOrder(plans, entries);
+        order.verify(plans).lockCurrentPlan(1L);
+        order.verify(entries).findEntryByIdAndUserId(3L, 1L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void respuestaAlwaysLocksAndRejectsStaleMeal(boolean consumed) {
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(plans.getMealIds(20L)).thenReturn(List.of(11L));
+        assertThatThrownBy(() -> service.saveRespuesta("user", today, 10L, new RespuestaRequest(7L, consumed)))
+            .isInstanceOf(PlanVersionConflictException.class);
+        var order = inOrder(plans);
+        order.verify(plans).lockCurrentPlan(1L);
+        order.verify(plans).mealBelongsToUser(10L, 1L);
+        verifyNoInteractions(entries);
+    }
+
+    @Test
+    void patchWithoutRuleToleratesMissingCurrentPlan() {
+        when(plans.lockCurrentPlan(1L)).thenThrow(new PlanNotFoundException());
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, false)))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatusCode().value()).isEqualTo(404));
+        verify(entries).findEntryByIdAndUserId(3L, 1L);
+    }
+
+    private void entryWithPortions(BigDecimal portions) {
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", 2.0, "u", 7L, false, null, "USUARIO", false,
+            portions, today, null, "snapshot", null));
+        when(plans.getMealIds(20L)).thenReturn(List.of(11L));
+    }
+
+    @Test
+    void normalRuleStoresQuantityAndPortionsPerUnit() {
+        entryWithPortions(BigDecimal.ONE);
+        service.patchItem("user", today, 3L,
+            new PatchItemRequest(new BigDecimal("2"), null, null, new BigDecimal("3"), null, true));
+        ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+        assertThat(input.getValue().cantidadPorPorcion()).isEqualByComparingTo("0.667");
+        assertThat(input.getValue().porcionPorDefecto()).isEqualByComparingTo("1.5");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void normalRuleRejectsMissingOrZeroPortionsBeforeWriting(boolean missing) {
+        entryWithPortions(missing ? null : BigDecimal.ZERO);
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, true)))
+            .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                assertThat(exception.getStatusCode().value()).isEqualTo(400);
+                assertThat(exception.getReason()).isEqualTo("Para guardar como regla, indicá porciones mayores a cero");
+            });
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        verifyNoInteractions(rules);
+    }
+}

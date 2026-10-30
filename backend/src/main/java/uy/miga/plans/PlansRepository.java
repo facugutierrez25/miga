@@ -10,6 +10,10 @@ import java.util.Optional;
 
 interface PlansRepository extends JpaRepository<Plan, Long> {
     Optional<Plan> findByUserIdAndCurrentTrue(Long userId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Plan p WHERE p.userId = :userId AND p.current = true")
+    Optional<Plan> lockCurrentByUserId(@Param("userId") Long userId);
+
     List<Plan> findAllByUserIdAndCurrentFalseOrderBySupersededAtDesc(Long userId);
 
     @Query(value = """

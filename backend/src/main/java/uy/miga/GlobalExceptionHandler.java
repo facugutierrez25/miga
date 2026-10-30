@@ -63,6 +63,12 @@ class GlobalExceptionHandler {
         return Map.of("error", ex.getMessage());
     }
 
+    @ExceptionHandler(uy.miga.plans.PlanVersionConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    Map<String, Object> handlePlanVersionConflict(uy.miga.plans.PlanVersionConflictException ex) {
+        return Map.of("code", "VERSION_CONFLICT", "error", ex.getMessage());
+    }
+
     @ExceptionHandler(PlanConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     Map<String, Object> handlePlanConflict(PlanConflictException ex) {

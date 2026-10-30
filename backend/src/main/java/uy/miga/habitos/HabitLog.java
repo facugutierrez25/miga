@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "habit_logs",
@@ -19,6 +20,9 @@ class HabitLog {
 
     @Column(name = "plan_habit_id", nullable = false)
     private Long planHabitId;
+
+    @Column(name = "habit_uid", nullable = false)
+    private UUID habitUid;
 
     @Column(name = "log_date", nullable = false)
     private LocalDate logDate;
@@ -41,11 +45,13 @@ class HabitLog {
     Long getId() { return id; }
     Long getUserId() { return userId; }
     Long getPlanHabitId() { return planHabitId; }
+    UUID getHabitUid() { return habitUid; }
     LocalDate getLogDate() { return logDate; }
     BigDecimal getValue() { return value; }
 
     void setUserId(Long userId) { this.userId = userId; }
     void setPlanHabitId(Long planHabitId) { this.planHabitId = planHabitId; }
+    void setHabitUid(UUID habitUid) { this.habitUid = habitUid; }
     void setLogDate(LocalDate logDate) { this.logDate = logDate; }
     void setValue(BigDecimal value) { this.value = value; }
 }

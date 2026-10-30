@@ -50,12 +50,14 @@ class WeekService {
         }
 
         List<HabitDto> habits = planId == null ? List.of() :
-            habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream()
+            habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream().filter(h -> h.getArchivedAt() == null)
                 .map(this::toDto)
                 .toList();
 
         BigDecimal totalGoal = planId == null ? BigDecimal.ZERO : computeTotalGoal(planId);
 
+        Map<java.util.UUID, Long> currentHabitIds = planId == null ? Map.of() : habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream()
+            .filter(h -> h.getArchivedAt() == null).collect(Collectors.toMap(PlanHabit::getUid, PlanHabit::getId));
         List<HabitLog> weekLogs = logRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
         Map<LocalDate, List<HabitLog>> logsByDate = weekLogs.stream()
             .collect(Collectors.groupingBy(HabitLog::getLogDate));
@@ -72,7 +74,8 @@ class WeekService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             List<HabitLogDto> habitLogs = logsByDate.getOrDefault(day, List.of()).stream()
-                .map(l -> new HabitLogDto(l.getPlanHabitId(), l.getLogDate(), l.getValue()))
+                .filter(l -> currentHabitIds.containsKey(l.getHabitUid()))
+                .map(l -> new HabitLogDto(currentHabitIds.get(l.getHabitUid()), l.getLogDate(), l.getValue()))
                 .toList();
 
             days.add(new WeekDayDto(day, hasData, totalRecorded, totalGoal, habitLogs));
@@ -89,7 +92,7 @@ class WeekService {
         } catch (Exception e) {
             return List.of();
         }
-        return habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream()
+        return habitRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream().filter(h -> h.getArchivedAt() == null)
             .map(this::toDto).toList();
     }
 
@@ -111,19 +114,26 @@ class WeekService {
     @Transactional
     HabitLogDto logHabit(String email, Long habitId, LocalDate date, BigDecimal value) {
         Long userId = userService.findUserIdByEmail(email);
+        try {
+            planService.lockCurrentPlan(userId);
+        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+            // La validación posterior determina si el hábito se puede registrar.
+        }
         PlanHabit habit = habitRepository.findById(habitId).orElseThrow();
         Long planId = planService.getCurrentPlanId(email);
-        if (!habit.getPlanId().equals(planId)) {
+        if (!habit.getPlanId().equals(planId) || habit.getArchivedAt() != null) {
             throw new IllegalArgumentException("Hábito no pertenece al plan activo.");
         }
-        HabitLog log = logRepository.findByUserIdAndPlanHabitIdAndLogDate(userId, habitId, date)
+        HabitLog log = logRepository.findByUserIdAndHabitUidAndLogDate(userId, habit.getUid(), date)
             .orElseGet(() -> {
                 HabitLog l = new HabitLog();
                 l.setUserId(userId);
                 l.setPlanHabitId(habitId);
+                l.setHabitUid(habit.getUid());
                 l.setLogDate(date);
                 return l;
             });
+        log.setPlanHabitId(habitId);
         log.setValue(value);
         logRepository.save(log);
         return new HabitLogDto(habitId, date, value);

@@ -9,5 +9,6 @@ record NoteInterpretationDto(
     LocalDate date,
     Long mealId,
     List<InterpretedItemDto> items,
+    List<DayRegistroDto.EntryItemDto> entries,
     List<GroupStatusDto> comparison
 ) {}
