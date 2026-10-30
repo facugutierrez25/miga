@@ -59,6 +59,11 @@ public class RegistroService {
     @Transactional
     NoteInterpretationDto saveNote(String userEmail, LocalDate date, Long mealId, String text) {
         Long userId = userService.findUserIdByEmail(userEmail);
+        try {
+            planService.lockCurrentPlan(userId);
+        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+            // Un registro histórico puede existir sin plan vigente.
+        }
 
         if (!planService.mealBelongsToUser(mealId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -303,6 +308,7 @@ public class RegistroService {
     @Transactional
     PatchItemResultDto patchItem(String userEmail, LocalDate date, Long entryId, PatchItemRequest req) {
         Long userId = userService.findUserIdByEmail(userEmail);
+        Long currentPlanId = req.savesRule() ? planService.lockCurrentPlan(userId) : null;
         FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
         if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         if (req.grupos() != null && (req.foodGroupId() != null || req.portions() != null)) {
@@ -311,6 +317,9 @@ public class RegistroService {
         }
 
         Long planId = entryPlanId(userId, entry);
+        if (req.savesRule() && !planId.equals(currentPlanId)) {
+            throw new uy.miga.plans.PlanVersionConflictException();
+        }
         Set<Long> planGroups = planService.getPlanFoodGroups(planId).stream()
             .map(uy.miga.plans.PlanFoodGroupDto::id).collect(Collectors.toSet());
         List<Long> requestedGroups = req.grupos() != null
@@ -319,10 +328,6 @@ public class RegistroService {
         if (!planGroups.containsAll(requestedGroups)
             || new HashSet<>(requestedGroups).size() != requestedGroups.size()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");
-        }
-        if (req.savesRule() && !planId.equals(planService.getCurrentPlanId(userEmail))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Solo se puede guardar como regla un registro del plan vigente.");
         }
 
         BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity());
@@ -336,7 +341,7 @@ public class RegistroService {
                     .map(g -> new Componente(g.foodGroupId(), null,
                         g.porciones().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
                     .toList();
-                ruleService.createUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
+                ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
                     null, null, entry.unit(), BigDecimal.ONE, components, null));
             }
         } else {
@@ -345,11 +350,14 @@ public class RegistroService {
             resultIds = List.of(entryId);
             if (req.savesRule()) {
                 Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
-                ruleService.createUserRule(userId, planId, groupId, entry.food(), null,
-                    quantity, req.unit() != null ? req.unit() : entry.unit(), portions);
+                ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
+                    groupId, quantity, req.unit() != null ? req.unit() : entry.unit(), portions, List.of(), null));
             }
         }
 
+        if (req.savesRule()) {
+            planService.bumpVersion(planId);
+        }
         List<DayRegistroDto.EntryItemDto> items = resultIds.stream()
             .map(id -> toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId)))
             .toList();

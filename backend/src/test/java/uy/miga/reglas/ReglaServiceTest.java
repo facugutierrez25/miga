@@ -49,4 +49,34 @@ class ReglaServiceTest {
         assertThat(RuleText.describe(service.findApplicable(1L,2L).getFirst(),Map.of(3L,"Proteínas",4L,"Cereales")))
             .isEqualTo("1 barrita = 0,5 Proteínas + 1 Cereales");
     }
+    @Test
+    void upsertMatchesNormalizedNameAndPreservesIdentityAndOverride() {
+        FoodRule existing = rule("USUARIO", "  ÁRBOL ");
+        existing.setUserId(2L);
+        existing.setPlanId(1L);
+        UUID uid = existing.getUid();
+        UUID override = UUID.randomUUID();
+        existing.setOverridesRuleUid(override);
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("arbol", List.of(), "NORMAL",
+            7L, BigDecimal.valueOf(2), "u", BigDecimal.ONE, List.of(), null));
+        assertThat(result.uid()).isEqualTo(uid);
+        assertThat(result.overridesRuleUid()).isEqualTo(override);
+        assertThat(result.cantidadPorPorcion()).isEqualByComparingTo("2");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void upsertCreatesMissingRuleAndNullSynonymsAreEmpty() {
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("Nuevo", null, "LIBRE",
+            null, null, null, null, List.of(), null));
+        assertThat(result.alimento()).isEqualTo("Nuevo");
+        assertThat(result.sinonimos()).isEmpty();
+        FoodRule persisted = rule("PLAN", "Sin alias");
+        persisted.setSinonimos(null);
+        when(repository.findApplicable(1L, 2L)).thenReturn(List.of(persisted));
+        assertThat(service.findApplicable(1L, 2L).getFirst().sinonimos()).isEmpty();
+    }
+
 }

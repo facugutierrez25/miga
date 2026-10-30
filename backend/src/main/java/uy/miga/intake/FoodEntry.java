@@ -34,7 +34,7 @@ class FoodEntry {
     @Column(nullable = false, length = 20)
     private String unit;
 
-    @Column(name = "food_group_id", nullable = false)
+    @Column(name = "food_group_id")
     private Long foodGroupId;
 
     @Column(nullable = false)
@@ -97,6 +97,7 @@ class FoodEntry {
     String getAppliedRule()  { return appliedRule; }
     java.util.UUID getOccurrenceId() { return occurrenceId; }
 
+    void setMealId(Long mealId)                    { this.mealId = mealId; }
     void setQuantity(Double quantity)              { this.quantity = quantity; }
     void setUnit(String unit)                      { this.unit = unit; }
     void setFoodGroupId(Long foodGroupId)          { this.foodGroupId = foodGroupId; }

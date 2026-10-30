@@ -147,7 +147,7 @@ class PlanRulesIntegrationTest {
     @Test void usedVersionIsCopiedOnceAndHistoricalNotesAndItemsStayIntact() throws Exception {
         long old=state.path("planId").asLong(); long meal=meals().getFirst();
         state=request(post(BASE+"alimentos"),body(Map.of("alimento","sintetico","tipo","NORMAL","groupUid",group("Proteínas").path("uid").asText())),201);
-        note(meal,LocalDate.now(),"1 sintetico");
+        note(meal,LocalDate.now().minusDays(1),"1 sintetico");
         var oldNotes=jdbc.queryForList("select * from meal_notes where plan_id=?",old);
         var oldItems=jdbc.queryForList("select * from food_entries where meal_id=?",meal);
         assertThat(oldItems).hasSize(1);
@@ -298,4 +298,86 @@ class PlanRulesIntegrationTest {
         request(post(BASE+"alimentos"),Map.of("planVersion",0,"alimento","Nuevo","tipo","LIBRE"),404);
         request(post(BASE+"habitos"),Map.of("planVersion",0,"name","Nuevo","habitType","SI_NO","period","DIA"),404);
     }
+    @Test
+    void successiveMealSavesIncreaseRevisionAndRejectStaleMutation() throws Exception {
+        long previous = state.path("planVersion").asLong();
+        for (int portions : List.of(2, 3)) {
+            request(put("/api/v1/my-plan"), Map.of("meals", List.of(
+                Map.of("name", "Desayuno", "displayOrder", 1, "portions",
+                    List.of(Map.of("foodGroupAbbr", "PRO", "portions", portions))))), 200);
+            state = request(get(BASE + "reglas"), null, 200);
+            assertThat(state.path("planVersion").asLong()).isGreaterThan(previous);
+            JsonNode error = request(post(BASE + "grupos"),
+                Map.of("name", "Obsoleto", "planVersion", previous), 409);
+            assertThat(error.path("code").asText()).isEqualTo("VERSION_CONFLICT");
+            previous = state.path("planVersion").asLong();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void todayRecordsFollowNewVersionButYesterdayStays(boolean saveMeals) throws Exception {
+        addHabit("Agua", "CANTIDAD", "DIA", 2, 0.5);
+        long oldHabit = habit("Agua").path("id").asLong();
+        String habitUid = habit("Agua").path("uid").asText();
+        long oldPlan = state.path("planId").asLong();
+        long meal = meals().getFirst();
+        LocalDate today = LocalDate.now();
+        state = request(post(BASE + "alimentos"), body(Map.of("alimento", "sintetico", "tipo", "NORMAL",
+            "groupUid", group("Proteínas").path("uid").asText())), 201);
+        note(meal, today.minusDays(1), "1 sintetico");
+        note(meal, today, "2 sintetico");
+        for (LocalDate date : List.of(today.minusDays(1), today)) {
+            request(put("/api/v1/habitos/" + oldHabit + "/log").param("date", date.toString()), Map.of("value", 1), 201);
+        }
+        var yesterdayNotes = jdbc.queryForList("select * from meal_notes where plan_id=? and fecha=?", oldPlan, today.minusDays(1));
+        var yesterdayItems = jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, today.minusDays(1));
+        if (saveMeals) {
+            request(put("/api/v1/my-plan"), Map.of("meals", List.of(Map.of("name", "Desayuno", "displayOrder", 1,
+                "portions", List.of(Map.of("foodGroupAbbr", "PRO", "portions", 2))))), 200);
+            state = request(get(BASE + "reglas"), null, 200);
+        } else {
+            state = request(put(BASE + "habitos/" + habitUid), body(Map.of("name", "Agua editada",
+                "habitType", "CANTIDAD", "period", "DIA", "goal", 3, "step", 0.5)), 200);
+        }
+        assertThat(state.path("planId").asLong()).isNotEqualTo(oldPlan);
+        JsonNode day = request(get("/api/v1/registro/" + today), null, 200);
+        assertThat(day.path("meals").get(0).path("noteText").asText()).isEqualTo("2 sintetico");
+        assertThat(day.path("meals").get(0).path("items").size()).isEqualTo(1);
+        assertThat(day.path("summary").get(0).path("totalRecorded").asDouble()).isEqualTo(2);
+        assertThat(jdbc.queryForList("select * from meal_notes where plan_id=? and fecha=?", oldPlan, today.minusDays(1))).isEqualTo(yesterdayNotes);
+        assertThat(jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, today.minusDays(1))).isEqualTo(yesterdayItems);
+        assertThat(jdbc.queryForObject("select plan_habit_id from habit_logs where habit_uid=? and log_date=?", Long.class,
+            UUID.fromString(habitUid), today)).isNotEqualTo(oldHabit);
+        assertThat(jdbc.queryForObject("select plan_habit_id from habit_logs where habit_uid=? and log_date=?", Long.class,
+            UUID.fromString(habitUid), today.minusDays(1))).isEqualTo(oldHabit);
+    }
+
+    @Test
+    void nullSynonymsAndNormalizedDuplicateFoodContract() throws Exception {
+        long planId = state.path("planId").asLong();
+        jdbc.update("insert into food_rules(plan_id,user_id,alcance,alimento,sinonimos,tipo) select id,user_id,'USUARIO','Árbol',NULL,'LIBRE' from plans where id=?", planId);
+        state = request(get(BASE + "reglas"), null, 200);
+        assertThat(state.path("alimentos").get(0).path("sinonimos").isArray()).isTrue();
+        assertThat(state.path("alimentos").get(0).path("sinonimos").size()).isZero();
+        JsonNode error = request(post(BASE + "alimentos"), body(Map.of("alimento", "  ARBOL  ", "tipo", "LIBRE")), 409);
+        assertThat(error.path("code").asText()).isEqualTo("DUPLICATE");
+        assertThat(error.path("error").asText()).isEqualTo("Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
+        UUID uid = UUID.randomUUID();
+        jdbc.update("insert into food_rules(uid,alcance,alimento,sinonimos,tipo) values (?,'GLOBAL','Catalogo nulo',NULL,'LIBRE')", uid);
+        JsonNode catalog = request(get(BASE + "catalogo").param("q", "Catalogo nulo"), null, 200);
+        assertThat(catalog.get(0).path("sinonimos").isArray()).isTrue();
+        assertThat(catalog.get(0).path("sinonimos").size()).isZero();
+    }
+
+    @Test
+    void zeroPortionsDoNotPreventDeletingGroup() throws Exception {
+        long groupId = group("Proteínas").path("id").asLong();
+        String uid = group("Proteínas").path("uid").asText();
+        jdbc.update("update meal_portions set portions=0 where food_group_id=?", groupId);
+        state = request(delete(BASE + "grupos/" + uid).param("planVersion", state.path("planVersion").asText()), null, 200);
+        assertThat(jdbc.queryForObject("select count(*) from meal_portions where food_group_id=?", Integer.class, groupId)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from plan_food_groups where id=?", Integer.class, groupId)).isZero();
+    }
+
 }

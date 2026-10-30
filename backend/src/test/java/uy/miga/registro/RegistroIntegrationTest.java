@@ -320,6 +320,52 @@ class RegistroIntegrationTest {
             .andExpect(status().isOk());
     }
 
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void repeatedCorrectionsAsRuleUseLatestValuesAndBumpRevision(boolean compound) throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode entry = putNote(date, "leche").path("entries").get(0);
+        long id = entry.path("id").asLong();
+        long revision = planRules().path("planVersion").asLong();
+        for (int portions : java.util.List.of(2, 3)) {
+            String body = compound
+                ? """
+                    {"quantity":1,"saveAsRule":true,"grupos":[{"foodGroupId":%d,"porciones":%d},{"foodGroupId":%d,"porciones":1}]}
+                    """.formatted(groupId("Proteínas"), portions, groupId("Grasas"))
+                : """
+                    {"quantity":1,"unit":"u","foodGroupId":%d,"portions":%d,"saveAsRule":true}
+                    """.formatted(entry.path("foodGroupId").asLong(), portions);
+            JsonNode patched = objectMapper.readTree(patchItem(date, id, body).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+            id = patched.path("items").get(0).path("id").asLong();
+            JsonNode rules = planRules();
+            assertThat(rules.path("planVersion").asLong()).isGreaterThan(revision);
+            revision = rules.path("planVersion").asLong();
+            assertThat(rules.path("alimentos").size()).isEqualTo(1);
+        }
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "1 leche").path("entries");
+        assertThat(next.size()).isEqualTo(compound ? 2 : 1);
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList()).contains(3.0);
+    }
+
+    @Test
+    void savingHistoricalCorrectionAsRuleReturnsVersionConflict() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().minusDays(1).toString();
+        JsonNode entry = putNote(date, "leche").path("entries").get(0);
+        JsonNode rules = planRules();
+        mockMvc.perform(post("/api/v1/my-plan/grupos").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of("name", "Nuevo", "planVersion", rules.path("planVersion").asLong()))))
+            .andExpect(status().isCreated());
+        patchItem(date, entry.path("id").asLong(), "{\"saveAsRule\":true}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("VERSION_CONFLICT"))
+            .andExpect(jsonPath("$.error").value("El plan cambió en otra sesión. Recargá para ver la versión actual."));
+    }
+
     @Test
     void putNota_returnsPersistedEntriesWithRealIds() throws Exception {
         createUniqueUserPlan();

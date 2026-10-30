@@ -85,7 +85,8 @@ public class PlanService {
         validatePortions(dto);
         Long userId = userService.findUserIdByEmail(email);
 
-        var existing = plansRepository.findByUserIdAndCurrentTrue(userId);
+        var existing = plansRepository.lockCurrentByUserId(userId)
+            .or(() -> plansRepository.lockCurrentByUserId(userId));
         if (existing.isPresent()) {
             Plan old = existing.get();
             if (dto.clientVersion() != null && !dto.clientVersion().equals(old.getVersion())) {
@@ -107,6 +108,9 @@ public class PlanService {
 
         buildMeals(savedPlan, dto, abbrToId);
         plansRepository.flush();
+        if (existing.isPresent()) {
+            completeVersion(existing.get(), savedPlan);
+        }
         return toDto(savedPlan);
     }
 
@@ -157,14 +161,6 @@ public class PlanService {
             createDefaultFoodGroups(plan);
         }
         Plan savedPlan = plansRepository.saveAndFlush(plan);
-        if (existing.isPresent()) {
-            Map<java.util.UUID, Long> idsByUid = savedPlan.getFoodGroups().stream()
-                .collect(Collectors.toMap(PlanFoodGroup::getUid, PlanFoodGroup::getId));
-            Map<Long, Long> groupIdMap = existing.get().getFoodGroups().stream()
-                .collect(Collectors.toMap(PlanFoodGroup::getId, g -> idsByUid.get(g.getUid())));
-            events.publishEvent(new PlanVersionCreated(userId, existing.get().getId(),
-                savedPlan.getId(), Map.copyOf(groupIdMap)));
-        }
 
         return savedPlan;
     }
@@ -332,7 +328,9 @@ public class PlanService {
 
     @Transactional
     public Long forkCurrentPlan(Long userId) {
-        Plan old = plansRepository.findByUserIdAndCurrentTrue(userId).orElseThrow(PlanNotFoundException::new);
+        Plan old = plansRepository.lockCurrentByUserId(userId)
+            .or(() -> plansRepository.lockCurrentByUserId(userId))
+            .orElseThrow(PlanNotFoundException::new);
         old.setCurrent(false);
         old.setSupersededAt(OffsetDateTime.now());
         plansRepository.flush();
@@ -344,10 +342,48 @@ public class PlanService {
         buildMeals(copy, new PlanSaveDto(meals, null), copy.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getAbbreviation, PlanFoodGroup::getId)));
         plansRepository.flush();
-        entityManager.createNativeQuery("UPDATE plans SET version = :version WHERE id = :id")
-            .setParameter("id", copy.getId()).setParameter("version", Math.max(copy.getVersion(), old.getVersion()) + 1).executeUpdate();
-        entityManager.refresh(copy);
+        completeVersion(old, copy);
         return copy.getId();
+    }
+
+    private void completeVersion(Plan old, Plan copy) {
+        entityManager.createNativeQuery("UPDATE plans SET version = :version WHERE id = :id")
+            .setParameter("id", copy.getId())
+            .setParameter("version", Math.max(copy.getVersion(), old.getVersion()) + 1)
+            .executeUpdate();
+        entityManager.refresh(copy);
+        Map<java.util.UUID, Long> groupsByUid = copy.getFoodGroups().stream()
+            .collect(Collectors.toMap(PlanFoodGroup::getUid, PlanFoodGroup::getId));
+        Map<Long, Long> groupIdMap = old.getFoodGroups().stream()
+            .collect(Collectors.toMap(PlanFoodGroup::getId, g -> groupsByUid.get(g.getUid())));
+        Map<Long, Long> mealIdMap = new java.util.HashMap<>();
+        for (Meal source : old.getMeals()) {
+            copy.getMeals().stream()
+                .filter(m -> m.getDisplayOrder() == source.getDisplayOrder() && m.getName().equals(source.getName()))
+                .findFirst().ifPresent(m -> mealIdMap.put(source.getId(), m.getId()));
+        }
+        events.publishEvent(new PlanVersionCreated(old.getUserId(), old.getId(), copy.getId(),
+            Map.copyOf(groupIdMap), Map.copyOf(mealIdMap), LocalDate.now()));
+    }
+
+    @Transactional(noRollbackFor = PlanNotFoundException.class)
+    public Long lockCurrentPlan(Long userId) {
+        return plansRepository.lockCurrentByUserId(userId)
+            .or(() -> plansRepository.lockCurrentByUserId(userId))
+            .map(Plan::getId)
+            .orElseThrow(PlanNotFoundException::new);
+    }
+
+    @Transactional
+    public void bumpVersion(Long planId) {
+        entityManager.flush();
+        int changed = entityManager.createNativeQuery("UPDATE plans SET version = version + 1 WHERE id = :id AND is_current = true")
+            .setParameter("id", planId)
+            .executeUpdate();
+        if (changed != 1) {
+            throw new PlanVersionConflictException();
+        }
+        entityManager.refresh(entityManager.find(Plan.class, planId));
     }
 
     private PlanFoodGroup group(Long planId, java.util.UUID uid) {
@@ -412,6 +448,11 @@ public class PlanService {
     @Transactional
     public void deleteGroup(Long planId, java.util.UUID uid) {
         PlanFoodGroup group = group(planId, uid);
+        for (Meal meal : mealRepository.findByPlanIdOrderByDisplayOrderAsc(planId)) {
+            meal.getPortions().removeIf(portion -> portion.getFoodGroupId().equals(group.getId())
+                && portion.getPortions().signum() == 0);
+        }
+        mealRepository.flush();
         group.getPlan().getFoodGroups().remove(group);
         groupRepository.flush();
     }
@@ -419,6 +460,7 @@ public class PlanService {
     @Transactional(readOnly = true)
     public int countMealPortions(Long planId, Long groupId) {
         return (int)mealRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream()
-            .filter(m -> m.getPortions().stream().anyMatch(portion -> portion.getFoodGroupId().equals(groupId))).count();
+            .filter(m -> m.getPortions().stream().anyMatch(portion -> portion.getFoodGroupId().equals(groupId)
+                && portion.getPortions().signum() > 0)).count();
     }
 }

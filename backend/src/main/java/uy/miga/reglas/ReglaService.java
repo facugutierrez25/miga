@@ -91,7 +91,7 @@ public class ReglaService {
     }
 
     private String normalize(String s) {
-        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+        return java.text.Normalizer.normalize(s == null ? "" : s.strip(), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
     }
 
     @Transactional(readOnly = true)
@@ -109,8 +109,30 @@ public class ReglaService {
 
     @Transactional
     public FoodRuleDto createUserRule(Long userId, Long planId, RuleInput in) {
-        FoodRule rule = new FoodRule(); rule.setUserId(userId); rule.setPlanId(planId); rule.setAlcance("USUARIO");
+        if (repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
+            .anyMatch(r -> normalize(r.getAlimento()).equals(normalize(in.alimento())))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
+        }
+        FoodRule rule = new FoodRule();
+        rule.setUserId(userId);
+        rule.setPlanId(planId);
+        rule.setAlcance("USUARIO");
         apply(rule, in); return toDto(repository.save(rule));
+    }
+
+    @Transactional
+    public FoodRuleDto upsertUserRule(Long userId, Long planId, RuleInput in) {
+        var existing = repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
+            .filter(r -> normalize(r.getAlimento()).equals(normalize(in.alimento())))
+            .findFirst();
+        if (existing.isEmpty()) {
+            return createUserRule(userId, planId, in);
+        }
+        FoodRule rule = existing.get();
+        apply(rule, new RuleInput(in.alimento(), in.sinonimos(), in.tipo(), in.foodGroupId(),
+            in.cantidadPorPorcion(), in.unidad(), in.porcionPorDefecto(), in.componentes(), rule.getOverridesRuleUid()));
+        return toDto(rule);
     }
 
     @Transactional

@@ -50,6 +50,7 @@ class PlanRulesService {
     }
     private PlanRulesDto mutate(String email, Long version, Consumer<PlanRef> validate, java.util.function.BiConsumer<Long, Long> change) {
         Long user = users.findUserIdByEmail(email);
+        plans.lockCurrentPlan(user);
         PlanRef cur = plans.currentPlanRef(user);
         if (!Objects.equals(cur.version(), version)) throw new PlanVersionConflictException();
         validate.accept(cur);
