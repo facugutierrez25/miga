@@ -223,6 +223,7 @@
 }
 
 .comida-hoy__nombre {
+  margin: 0;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 16px;
@@ -257,7 +258,7 @@
 .comida-hoy__grupos {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .grupo-badge {
@@ -277,20 +278,24 @@
 }
 
 .grupo-badge__label {
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 800;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
 }
 
-/* color-mix sobre --surface: se adapta a light y dark sin tokens extra */
-.grupo-badge--PROTEINS   { background: color-mix(in srgb, var(--g-prot) 14%, transparent); color: var(--g-prot); }
-.grupo-badge--GRAINS     { background: color-mix(in srgb, var(--g-cer)  14%, transparent); color: var(--g-cer);  }
-.grupo-badge--FRUITS     { background: color-mix(in srgb, var(--g-frut) 14%, transparent); color: var(--g-frut); }
-.grupo-badge--DAIRY      { background: color-mix(in srgb, var(--g-lac)  14%, transparent); color: var(--g-lac);  }
-.grupo-badge--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, transparent); color: var(--g-gras); }
-.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); color: var(--g-verd); }
+/* El color del grupo va en el tinte y el borde; el texto usa --ink para tener contraste
+   suficiente en ambos temas (el color del grupo sobre su propio tinte no llega a 4,5:1). */
+.grupo-badge {
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+.grupo-badge--PROTEINS { background: color-mix(in srgb, var(--g-prot) 14%, transparent); border-color: color-mix(in srgb, var(--g-prot) 55%, transparent); }
+.grupo-badge--GRAINS { background: color-mix(in srgb, var(--g-cer) 14%, transparent); border-color: color-mix(in srgb, var(--g-cer) 55%, transparent); }
+.grupo-badge--FRUITS { background: color-mix(in srgb, var(--g-frut) 14%, transparent); border-color: color-mix(in srgb, var(--g-frut) 55%, transparent); }
+.grupo-badge--DAIRY { background: color-mix(in srgb, var(--g-lac) 14%, transparent); border-color: color-mix(in srgb, var(--g-lac) 55%, transparent); }
+.grupo-badge--FATS { background: color-mix(in srgb, var(--g-gras) 14%, transparent); border-color: color-mix(in srgb, var(--g-gras) 55%, transparent); }
+.grupo-badge--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); border-color: color-mix(in srgb, var(--g-verd) 55%, transparent); }
 
 /* ── Desktop ── */
 
@@ -345,12 +350,12 @@
   }
 
   .comida-hoy__grupos {
-    gap: 5px;
+    gap: 4px;
   }
 
   .grupo-badge {
-    padding: 4px 9px;
-    gap: 5px;
+    padding: 4px 8px;
+    gap: 4px;
   }
 
   .grupo-badge__numero {
@@ -358,7 +363,7 @@
   }
 
   .grupo-badge__label {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   /* Grid de 2 columnas */
@@ -463,7 +468,7 @@
 }
 
 .hoy-anillo__nombre {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--muted);
   text-align: center;
@@ -1086,7 +1091,7 @@
 .nota-btn-guardar {
   align-self: flex-start;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   border: none;
   border-radius: var(--radius-sm, 8px);
   padding: 9px 18px;
@@ -1240,7 +1245,7 @@
 }
 
 .nota-item--dudoso {
-  opacity: 0.75;
+  font-style: italic;
 }
 
 .nota-item__dot {
@@ -1422,7 +1427,7 @@
 .nota-pregunta__si:hover {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .nota-pregunta__no:hover {
@@ -1431,4 +1436,23 @@
 
 [data-theme="dark"] .comida-hoy--anotada {
   background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+/* Zonas táctiles de 44 px (guía) para todos los controles de las notas. */
+.nota-toggle,
+.nota-sugerencia,
+.nota-btn-guardar,
+.nota-pregunta__si,
+.nota-pregunta__no,
+.nota-item__edit,
+.nota-item__save,
+.nota-item__cancel,
+.nota-btn-recargar {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.nota-textarea,
+.nota-item__qty-input {
+  border-color: var(--control-border, var(--border));
 }

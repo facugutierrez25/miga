@@ -138,6 +138,13 @@ interface ItemRowProps {
 
 function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
   const [editando, setEditando] = useState(false)
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  const wasEditing = useRef(false)
+  // Al cerrar la corrección, el foco vuelve al botón «Corregir» de este ítem.
+  useEffect(() => {
+    if (wasEditing.current && !editando) editButtonRef.current?.focus()
+    wasEditing.current = editando
+  }, [editando])
   const [repartiendo, setRepartiendo] = useState(false)
   const [qty, setQty] = useState(String(item.quantity ?? ''))
   const [reparto, setReparto] = useState<{ foodGroupId: string; porciones: string }[]>([])
@@ -198,6 +205,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
               onChange={e => setQty(e.target.value)}
               min={0}
               step="any"
+              autoFocus
               aria-label={`Cantidad de ${item.food}`}
             />
             <span className="nota-item__unit">{item.unit ?? ''}</span>
@@ -217,7 +225,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
               <span className="nota-item__porciones">{fmt(item.portions)} p.</span>
             )}
             {editable && (
-              <button type="button" className="nota-item__edit" onClick={() => setEditando(true)} aria-label={`Corregir ${item.food}`}>
+              <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => setEditando(true)} aria-label={`Corregir ${item.food}`}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                   <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -416,7 +424,7 @@ function NotaMealSection({
       await saveRespuesta(token, date, meal.id, { foodGroupId, consumed })
       onRespuestaGuardada(meal.id)
     } catch {
-      // no-op
+      setError('No se pudo guardar la respuesta. Intentá de nuevo.')
     }
   }
 
@@ -467,12 +475,14 @@ function NotaMealSection({
             onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
             rows={3}
             aria-label="Nota de la comida"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `nota-error-${meal.id}` : undefined}
           />
 
           <DictationButton disabled={guardando} onTranscript={transcript => {
             editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
           }} />
-          {error && <p className="nota-error" role="alert">{error}</p>}
+          {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
           {conflict && (
             <button type="button" className="nota-btn-recargar" disabled={guardando}
               onClick={async () => {
@@ -503,7 +513,7 @@ function NotaMealSection({
 
           {items.length > 0 && (
             <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
-              <h4 id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h4>
+              <h3 id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
               <ul className="nota-items">
                 {agruparPorMencion(items).map(mencion => {
                   const fila = (item: EntryItemDto) => (
@@ -747,7 +757,7 @@ function HoyContent() {
         ) : (
           <>
             {diaError && (
-              <p className="hoy-intake-error">
+              <p className="hoy-intake-error" role="alert">
                 No se pudo cargar el registro del día.{' '}
                 <button
                   className="hoy-intake-error__retry"
@@ -828,7 +838,7 @@ function HoyContent() {
                   >
                     <div className="comida-hoy__encabezado">
                       <div className="comida-hoy__nombre-wrap">
-                        <span className="comida-hoy__nombre">{meal.name}</span>
+                        <h2 className="comida-hoy__nombre">{meal.name}</h2>
                         {mealDay?.noteText && (
                           <svg className="comida-hoy__done-icon" viewBox="0 0 16 16" fill="none" aria-label="Anotada" width="14" height="14">
                             <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.15"/>
