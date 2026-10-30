@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,14 @@ public class PlanService {
     public Long getCurrentPlanId(String email) {
         Long userId = userService.findUserIdByEmail(email);
         return plansRepository.findByUserIdAndCurrentTrue(userId)
+            .map(Plan::getId)
+            .orElseThrow(PlanNotFoundException::new);
+    }
+
+    @Transactional(readOnly = true)
+    public Long getPlanIdForDate(Long userId, LocalDate date) {
+        return plansRepository.findActiveOnDate(userId, date)
+            .or(() -> plansRepository.findOldestByUserId(userId))
             .map(Plan::getId)
             .orElseThrow(PlanNotFoundException::new);
     }
