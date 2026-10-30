@@ -32,9 +32,13 @@ class ComparisonService {
 
         Map<Long, String> groupNames = new HashMap<>();
         Map<Long, Boolean> askIfMissing = new HashMap<>();
+        Map<Long, Boolean> optional = new HashMap<>();
+        Map<Long, BigDecimal> dailyGoal = new HashMap<>();
         for (PlanFoodGroupDto g : groups) {
             groupNames.put(g.id(), g.name());
             askIfMissing.put(g.id(), Boolean.TRUE.equals(g.preguntarSiFalta()));
+            optional.put(g.id(), Boolean.TRUE.equals(g.opcional()));
+            dailyGoal.put(g.id(), g.metaDiaria());
         }
 
         List<GroupStatus> result = new ArrayList<>();
@@ -45,6 +49,9 @@ class ComparisonService {
             BigDecimal recorded = recordedPortions.getOrDefault(gid, BigDecimal.ZERO);
             BigDecimal expected = plan.portions();
             BigDecimal diff     = recorded.subtract(expected).abs();
+
+            // Grupos opcionales no penalizan cuando no están registrados
+            if (Boolean.TRUE.equals(optional.get(gid)) && recorded.compareTo(BigDecimal.ZERO) == 0) continue;
 
             String status;
             if (recorded.compareTo(BigDecimal.ZERO) == 0) {
@@ -57,11 +64,12 @@ class ComparisonService {
                 status = OVER;
             }
 
-            result.add(new GroupStatus(gid, groupNames.getOrDefault(gid, ""), expected, recorded, status));
+            result.add(new GroupStatus(gid, groupNames.getOrDefault(gid, ""), expected, recorded, status,
+                dailyGoal.get(gid)));
         }
         return result;
     }
 
     record GroupStatus(Long foodGroupId, String name, BigDecimal expected,
-                       BigDecimal recorded, String status) {}
+                       BigDecimal recorded, String status, BigDecimal dailyGoal) {}
 }

@@ -210,7 +210,7 @@ public class PlanService {
     public List<PlanFoodGroupDto> getPlanFoodGroups(Long planId) {
         return groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
             .stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria()))
             .toList();
     }
 
@@ -243,6 +243,12 @@ public class PlanService {
     }
 
     @Transactional(readOnly = true)
+    public List<Long> getMealIds(Long planId) {
+        return mealRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
+            .stream().map(Meal::getId).toList();
+    }
+
+    @Transactional(readOnly = true)
     public Long findGroupIdByClave(Long planId, String clave) {
         if (clave == null) return null;
         return groupRepository.findByPlanIdAndClave(planId, clave)
@@ -254,7 +260,7 @@ public class PlanService {
 
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {
         return groups.stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria()))
             .toList();
     }
 }

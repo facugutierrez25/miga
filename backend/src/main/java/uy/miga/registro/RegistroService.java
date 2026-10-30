@@ -99,7 +99,7 @@ class RegistroService {
             saved.getId(), text, date, mealId,
             items.stream().map(this::toItemDto).toList(),
             statuses.stream().map(s -> new GroupStatusDto(
-                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()
+                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()
             )).toList()
         );
     }
@@ -108,17 +108,17 @@ class RegistroService {
     DayComparisonDto getDayComparison(String userEmail, LocalDate date) {
         Long userId = userService.findUserIdByEmail(userEmail);
         Long planId = planService.getCurrentPlanId(userEmail);
-        List<FoodRuleDto> rules = ruleService.findApplicable(planId, userId);
 
         List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserEmailAndDate(userEmail, date);
-        List<MealNote> notes = noteRepository.findByUserIdAndDate(userId, date);
-
         Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
             .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
 
+        // All plan meals — not only those with a note (absence of note ≠ zero confirmed)
+        List<Long> planMealIds = planService.getMealIds(planId);
+
         List<MealComparisonDto> mealComparisons = new ArrayList<>();
-        for (MealNote note : notes) {
-            List<FoodEntryFacade.EntryData> mealEntries = byMeal.getOrDefault(note.getMealId(), List.of());
+        for (Long mealId : planMealIds) {
+            List<FoodEntryFacade.EntryData> mealEntries = byMeal.getOrDefault(mealId, List.of());
             Map<Long, BigDecimal> portionsByGroup = mealEntries.stream()
                 .filter(e -> e.foodGroupId() != null && e.portions() != null)
                 .collect(Collectors.groupingBy(
@@ -128,9 +128,10 @@ class RegistroService {
                         BigDecimal::add)
                 ));
             List<ComparisonService.GroupStatus> statuses =
-                comparison.compare(planId, note.getMealId(), portionsByGroup);
-            mealComparisons.add(new MealComparisonDto(note.getMealId(), statuses.stream()
-                .map(s -> new GroupStatusDto(s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()))
+                comparison.compare(planId, mealId, portionsByGroup);
+            mealComparisons.add(new MealComparisonDto(mealId, statuses.stream()
+                .map(s -> new GroupStatusDto(
+                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()))
                 .toList()));
         }
         return new DayComparisonDto(date, mealComparisons);
