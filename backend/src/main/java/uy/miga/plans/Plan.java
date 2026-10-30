@@ -34,7 +34,7 @@ class Plan {
     private String modoRegistro = "PORCIONES";
 
     @Column(name = "margen_porciones", nullable = false)
-    private java.math.BigDecimal margenPorciones = new java.math.BigDecimal("0.20");
+    private java.math.BigDecimal margenPorciones = new java.math.BigDecimal("0.5");
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

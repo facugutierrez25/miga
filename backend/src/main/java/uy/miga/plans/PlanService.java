@@ -24,13 +24,16 @@ public class PlanService {
 
     private final PlansRepository plansRepository;
     private final PlanFoodGroupRepository groupRepository;
+    private final MealRepository mealRepository;
     private final UserService userService;
 
     PlanService(PlansRepository plansRepository,
                 PlanFoodGroupRepository groupRepository,
+                MealRepository mealRepository,
                 UserService userService) {
         this.plansRepository = plansRepository;
         this.groupRepository = groupRepository;
+        this.mealRepository = mealRepository;
         this.userService = userService;
     }
 
@@ -187,9 +190,49 @@ public class PlanService {
         return new PlanDto(groups, meals);
     }
 
+    // ── API pública para módulos externos ─────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<PlanFoodGroupDto> getPlanFoodGroups(Long planId) {
+        return groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
+            .stream()
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta()))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MealPortionSummary> getMealPortions(Long mealId) {
+        return mealRepository.findById(mealId)
+            .map(meal -> meal.getPortions().stream()
+                .map(p -> new MealPortionSummary(p.getFoodGroupId(), p.getPortions()))
+                .toList())
+            .orElse(List.of());
+    }
+
+    @Transactional(readOnly = true)
+    public String getModoRegistro(Long planId) {
+        return plansRepository.findById(planId)
+            .map(Plan::getModoRegistro)
+            .orElse("PORCIONES");
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getMargenPorciones(Long planId) {
+        return plansRepository.findById(planId)
+            .map(Plan::getMargenPorciones)
+            .orElse(new BigDecimal("0.5"));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean mealBelongsToUser(Long mealId, Long userId) {
+        return mealRepository.findByIdAndPlan_UserId(mealId, userId).isPresent();
+    }
+
+    // ── privados ──────────────────────────────────────────────────────────────
+
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {
         return groups.stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta()))
             .toList();
     }
 }
