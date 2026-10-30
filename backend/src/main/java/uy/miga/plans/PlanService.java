@@ -105,7 +105,7 @@ public class PlanService {
 
     private void createDefaultFoodGroups(Plan plan) {
         for (Object[] g : DEFAULT_GROUPS) {
-            plan.getFoodGroups().add(new PlanFoodGroup(plan, (String) g[0], (String) g[1], (int) g[2]));
+            plan.getFoodGroups().add(new PlanFoodGroup(plan, (String) g[0], (String) g[1], (short)(int) g[2]));
         }
     }
 
