@@ -19,6 +19,12 @@ class PlanHabit {
     @Column(name = "archived_at")
     private OffsetDateTime archivedAt;
 
+    @Column(name = "counts_flexible_meals", nullable = false)
+    private boolean countsFlexibleMeals;
+
+    boolean isCountsFlexibleMeals() { return countsFlexibleMeals; }
+    void setCountsFlexibleMeals(boolean value) { countsFlexibleMeals = value; }
+
     @Column(name = "plan_id", nullable = false)
     private Long planId;
 

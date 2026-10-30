@@ -64,7 +64,7 @@ public class PlanService {
             .orElseThrow(PlanNotFoundException::new);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = PlanNotFoundException.class)
     public Long getPlanIdForDate(Long userId, LocalDate date) {
         return plansRepository.findActiveOnDate(userId, date)
             .or(() -> plansRepository.findOldestByUserId(userId))
@@ -308,6 +308,14 @@ public class PlanService {
             .map(PlanFoodGroup::getId)
             .orElse(null);
     }
+
+    @Transactional(readOnly = true)
+    public List<MealRef> getMeals(Long planId) {
+        return mealRepository.findByPlanIdOrderByDisplayOrderAsc(planId).stream()
+            .map(m -> new MealRef(m.getId(), m.getName())).toList();
+    }
+
+    public record MealRef(Long id, String name) {}
 
     // ── privados ──────────────────────────────────────────────────────────────
 

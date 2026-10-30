@@ -22,6 +22,7 @@ class PlanVersionListener {
             copy.setPlanId(event.newPlanId());
             copy.setUid(source.getUid());
             copy.setCreatedAt(source.getCreatedAt());
+            copy.setCountsFlexibleMeals(source.isCountsFlexibleMeals());
             copy.setName(source.getName());
             copy.setHabitType(source.getHabitType());
             copy.setUnit(source.getUnit());

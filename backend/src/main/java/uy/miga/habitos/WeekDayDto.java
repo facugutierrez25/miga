@@ -9,5 +9,7 @@ record WeekDayDto(
     boolean hasData,
     BigDecimal totalRecorded,
     BigDecimal totalGoal,
-    List<HabitLogDto> habitLogs
+    List<HabitLogDto> habitLogs,
+    List<uy.miga.registro.WeekMealData> meals,
+    List<Long> habitIds
 ) {}

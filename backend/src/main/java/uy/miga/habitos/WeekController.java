@@ -60,22 +60,18 @@ class WeekController {
                     HttpServletResponse response) throws IOException {
         LocalDate ref = date != null ? date : LocalDate.now();
         WeekSummaryDto week = service.getWeek(auth.getName(), ref);
-        response.setContentType("text/csv; charset=UTF-8");
-        response.setHeader("Content-Disposition",
-            "attachment; filename=\"semana-" + week.weekStart() + ".csv\"");
-        response.getWriter().write(buildCsv(week));
-    }
-
-    private String buildCsv(WeekSummaryDto week) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Fecha,Datos,Porciones registradas,Meta de porciones\n");
-        for (WeekDayDto day : week.days()) {
-            sb.append(day.date()).append(',')
-              .append(day.hasData() ? "sí" : "no").append(',')
-              .append(day.totalRecorded()).append(',')
-              .append(day.totalGoal()).append('\n');
+        if (!List.of("csv", "xlsx").contains(format)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato inválido.");
         }
-        return sb.toString();
+        response.setHeader("Content-Disposition", "attachment; filename=\"semana-" + week.weekStart() + "." + format + "\"");
+        if ("xlsx".equals(format)) {
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            WeekExport.writeXlsx(week, response.getOutputStream());
+        } else {
+            response.setContentType("text/csv");
+            response.setCharacterEncoding("UTF-8");
+            response.getWriter().write(WeekExport.csv(week));
+        }
     }
 
     record LogValueRequest(BigDecimal value) {}
