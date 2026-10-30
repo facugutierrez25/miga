@@ -3,19 +3,17 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import HoyPage from './HoyPage'
 import * as plansApi from '../api/plans'
-import * as intakeApi from '../api/intake'
-import * as equivalencesApi from '../api/equivalences'
+import * as registroApi from '../api/registro'
 import * as AuthContext from '../auth/authTypes'
 
 vi.mock('../api/plans')
-vi.mock('../api/intake')
-vi.mock('../api/equivalences')
+vi.mock('../api/registro')
 vi.mock('../auth/authTypes')
 
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
-const mockGetIntake = vi.mocked(intakeApi.getIntake)
-const mockMarkMealConsumed = vi.mocked(intakeApi.markMealConsumed)
-const mockGetEquivalences = vi.mocked(equivalencesApi.getEquivalences)
+const mockGetDayRegistro = vi.mocked(registroApi.getDayRegistro)
+const mockSaveNota = vi.mocked(registroApi.saveNota)
+const mockGetSugerencias = vi.mocked(registroApi.getSugerencias)
 
 const gruposPRO = [{ id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null }]
 
@@ -30,9 +28,10 @@ const planConComida = {
   }],
 }
 
-const entradaConsumo = {
-  id: 10, mealId: 1, food: 'Pechuga de pollo',
-  quantity: 200, unit: 'G', foodGroupId: 1, consumed: false, portions: 1,
+const dayVacio = {
+  date: '2025-01-01',
+  meals: [],
+  summary: [],
 }
 
 beforeEach(() => {
@@ -44,9 +43,8 @@ beforeEach(() => {
     setFirstName: vi.fn(),
     logout: vi.fn(),
   })
-  mockGetIntake.mockResolvedValue([])
-  mockGetEquivalences.mockResolvedValue([])
-  mockMarkMealConsumed.mockResolvedValue()
+  mockGetDayRegistro.mockResolvedValue(dayVacio)
+  mockGetSugerencias.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -128,20 +126,58 @@ test('muestra el resumen de porciones cuando hay un plan', async () => {
   await waitFor(() => expect(screen.getByText('porciones')).toBeInTheDocument())
 })
 
-test('el botón "Ya lo comí" marca la comida como hecha', async () => {
+test('muestra botón "Anotar" para comidas sin nota', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
-  mockGetIntake.mockResolvedValue([entradaConsumo])
   renderHoy()
-  await waitFor(() => expect(screen.getByText('Ya lo comí')).toBeInTheDocument())
-  fireEvent.click(screen.getByText('Ya lo comí'))
-  await waitFor(() => expect(mockMarkMealConsumed).toHaveBeenCalledWith('tok', expect.any(String), 1))
+  await waitFor(() => expect(screen.getByText('Anotar')).toBeInTheDocument())
 })
 
-test('marca como comida las que ya están en el log', async () => {
+test('muestra nota guardada si el día tiene texto', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
-  mockGetIntake.mockResolvedValue([{ ...entradaConsumo, consumed: true }])
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01',
+    meals: [{
+      mealId: 1,
+      noteId: 5,
+      noteText: 'leche con pan',
+      items: [],
+      comparison: [],
+    }],
+    summary: [],
+  })
   renderHoy()
-  await waitFor(() => expect(screen.getByText('✓ Hecho')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText('0 ítems')).toBeInTheDocument())
+})
+
+test('el botón guardar envía la nota al backend', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockSaveNota.mockResolvedValue({
+    noteId: 1,
+    text: 'leche',
+    date: '2025-01-01',
+    mealId: 1,
+    items: [],
+    comparison: [],
+  })
+  renderHoy()
+  await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
+
+  // abrir la sección si está cerrada
+  const toggles = screen.queryAllByRole('button', { expanded: false })
+  const toggle = toggles.find(b => b.className.includes('nota-toggle'))
+  if (toggle) fireEvent.click(toggle)
+
+  await waitFor(() => expect(screen.getByPlaceholderText(/Qué comiste/)).toBeInTheDocument())
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche' } })
+  fireEvent.click(screen.getByText('Así lo entendí'))
+  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche'))
+})
+
+test('muestra error si getDayRegistro falla', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockRejectedValue(new Error('red error'))
+  renderHoy()
+  await waitFor(() => expect(screen.getByText(/No se pudo cargar/)).toBeInTheDocument())
 })
 
 test('muestra "Hoy" en la barra de navegación por defecto', async () => {
