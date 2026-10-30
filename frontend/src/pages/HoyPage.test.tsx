@@ -518,3 +518,28 @@ test('dictado agrega texto al borrador sin guardarlo', async () => {
   expect(draft).toHaveValue('mate con pan')
   expect(mockSaveNota).not.toHaveBeenCalled()
 })
+
+test('lo dictado mientras se guarda no se pierde al terminar el guardado', async () => {
+  let result!: (event: unknown) => void
+  vi.stubGlobal('SpeechRecognition', class {
+    set onresult(handler: (event: unknown) => void) { result = handler }
+    start() {}
+    abort() {}
+  })
+  let terminarGuardado!: (value: unknown) => void
+  mockSaveNota.mockReturnValue(new Promise(resolve => { terminarGuardado = resolve }) as never)
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  renderHoy()
+  await abrirNota()
+  const draft = screen.getByRole('textbox', { name: 'Nota de la comida' })
+  fireEvent.change(draft, { target: { value: 'mate' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar', pressed: false }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+  act(() => result({ results: [[{ transcript: 'con pan' }]] }))
+  await act(async () => {
+    terminarGuardado({ noteId: 1, text: 'mate', date: '2025-01-01', mealId: 1, version: 1, items: [], entries: [], comparison: [] })
+  })
+
+  await waitFor(() => expect(draft).toHaveValue('mate con pan'))
+})

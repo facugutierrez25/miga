@@ -345,6 +345,7 @@ function NotaMealSection({
   const [isOpen, setIsOpen] = useState(isAhora)
   const [texto, setTexto] = useState(mealDay?.noteText ?? '')
   const dirty = useRef(false)
+  const draftRevision = useRef(0)
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
   const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
@@ -378,16 +379,25 @@ function NotaMealSection({
   }, [isOpen, meal.id, token])
 
   const saveInFlight = useRef(false)
+  // Cada edición del borrador (teclado o dictado) sube la revisión: si cambia mientras se
+  // guarda, el borrador sigue marcado como modificado y la respuesta no lo reemplaza.
+  function editarBorrador(update: (current: string) => string) {
+    dirty.current = true
+    draftRevision.current += 1
+    setTexto(update)
+  }
+
   async function handleGuardar(value = texto) {
     if (!meal.id || !value.trim() || saveInFlight.current || conflict) return
     saveInFlight.current = true
     dirty.current = true
+    const revisionEnviada = draftRevision.current
     setTexto(value)
     setGuardando(true)
     setError(null)
     try {
       const interp = await saveNota(token, date, meal.id, value.trim(), baseVersion.current)
-      dirty.current = false
+      dirty.current = draftRevision.current !== revisionEnviada
       baseVersion.current = interp.version
       setConflict(false)
       onNotaSaved(interp, meal.id)
@@ -454,14 +464,13 @@ function NotaMealSection({
             className="nota-textarea"
             placeholder="¿Qué comiste? Escribí en texto libre…"
             value={texto}
-            onChange={e => { dirty.current = true; setTexto(e.target.value) }}
+            onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
             rows={3}
             aria-label="Nota de la comida"
           />
 
           <DictationButton disabled={guardando} onTranscript={transcript => {
-            dirty.current = true
-            setTexto(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
+            editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
           }} />
           {error && <p className="nota-error" role="alert">{error}</p>}
           {conflict && (
