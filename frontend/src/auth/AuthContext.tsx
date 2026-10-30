@@ -1,13 +1,6 @@
-import { createContext, useContext, useState } from 'react'
-
-interface AuthContextValue {
-  token: string | null
-  email: string | null
-  firstName: string | null
-  login: (token: string, firstName: string | null) => void
-  setFirstName: (name: string) => void
-  logout: () => void
-}
+import { useState, type ReactNode } from 'react'
+import type { AuthContextValue } from './authTypes'
+import { AuthContext } from './authTypes'
 
 function emailFromToken(token: string): string | null {
   try {
@@ -18,9 +11,7 @@ function emailFromToken(token: string): string | null {
   }
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(
     () => localStorage.getItem('token')
   )
@@ -59,15 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFirstNameState(null)
   }
 
+  const value: AuthContextValue = { token, email, firstName, login, setFirstName, logout }
   return (
-    <AuthContext.Provider value={{ token, email, firstName, login, setFirstName, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider')
-  return ctx
 }

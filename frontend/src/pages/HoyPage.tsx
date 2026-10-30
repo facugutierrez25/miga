@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
@@ -326,6 +326,8 @@ export default function HoyPage() {
   const [sinPlan, setSinPlan] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [entries, setEntries] = useState<FoodEntryDto[]>([])
+  const [intakeError, setIntakeError] = useState(false)
+  const [intakeRetry, setIntakeRetry] = useState(0)
   const [equivalences, setEquivalences] = useState<EquivalenceDto[]>([])
 
   const hoyAnterior = useRef(HOY)
@@ -351,10 +353,15 @@ export default function HoyPage() {
 
   useEffect(() => {
     if (!token) return
-    getIntake(token, fecha)
-      .then(setEntries)
-      .catch(() => setEntries([]))
-  }, [token, fecha])
+    const controller = new AbortController()
+    getIntake(token, fecha, controller.signal)
+      .then(data => { setEntries(data); setIntakeError(false) })
+      .catch(err => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setIntakeError(true)
+      })
+    return () => controller.abort()
+  }, [token, fecha, intakeRetry])
 
   function irDia(delta: number) {
     setEntries([])
@@ -474,6 +481,18 @@ export default function HoyPage() {
           </div>
         ) : (
           <>
+            {intakeError && (
+              <p className="hoy-intake-error">
+                No se pudo cargar el registro del día.{' '}
+                <button
+                  className="hoy-intake-error__retry"
+                  onClick={() => setIntakeRetry(n => n + 1)}
+                  type="button"
+                >
+                  Reintentar
+                </button>
+              </p>
+            )}
             {total > 0 && (
               <div className="hoy-resumen">
                 <div className="hoy-resumen__porciones">

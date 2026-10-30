@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/authTypes'
 import { useTheme, type Theme } from '../hooks/useTheme'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
