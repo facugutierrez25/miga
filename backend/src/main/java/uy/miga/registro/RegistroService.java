@@ -58,9 +58,6 @@ class RegistroService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
-        Long planId = planService.getCurrentPlanId(userEmail);
-        List<FoodRuleDto> rules = ruleService.findApplicable(planId, userId);
-
         MealNote note = noteRepository.findByUserIdAndDateAndMealId(userId, date, mealId)
             .orElseGet(() -> {
                 MealNote n = new MealNote();
@@ -69,6 +66,17 @@ class RegistroService {
                 n.setMealId(mealId);
                 return n;
             });
+
+        Long planId = note.getPlanId() != null
+            ? note.getPlanId()
+            : planService.getPlanIdForDate(userId, date);
+
+        if (note.getPlanId() == null) {
+            note.setPlanId(planId);
+        }
+
+        List<FoodRuleDto> rules = ruleService.findApplicable(planId, userId);
+
         note.setText(text.strip());
         MealNote saved = noteRepository.save(note);
 
@@ -107,7 +115,7 @@ class RegistroService {
     @Transactional(readOnly = true)
     DayComparisonDto getDayComparison(String userEmail, LocalDate date) {
         Long userId = userService.findUserIdByEmail(userEmail);
-        Long planId = planService.getCurrentPlanId(userEmail);
+        Long planId = planService.getPlanIdForDate(userId, date);
 
         List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserIdAndDate(userId, date);
         Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
@@ -193,7 +201,7 @@ class RegistroService {
     @Transactional(readOnly = true)
     DayRegistroDto getDayRegistro(String userEmail, LocalDate date) {
         Long userId = userService.findUserIdByEmail(userEmail);
-        Long planId = planService.getCurrentPlanId(userEmail);
+        Long planId = planService.getPlanIdForDate(userId, date);
 
         List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserIdAndDate(userId, date);
         Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
@@ -286,8 +294,7 @@ class RegistroService {
         }
         if (!req.consumed()) return; // negativa: no crear entrada
 
-        // Buscar grupo para obtener el nombre del alimento
-        Long planId = planService.getCurrentPlanId(userEmail);
+        Long planId = planService.getPlanIdForDate(userId, date);
         String food = planService.getPlanFoodGroups(planId).stream()
             .filter(g -> g.id().equals(req.foodGroupId()))
             .findFirst().map(uy.miga.plans.PlanFoodGroupDto::name).orElse("alimento");
