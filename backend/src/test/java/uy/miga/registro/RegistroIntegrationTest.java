@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import uy.miga.MigaApplication;
+import uy.miga.users.EmailOutboxWorker;
 import uy.miga.users.MockEmailService;
 
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ class RegistroIntegrationTest {
     @Autowired private WebApplicationContext context;
     @Autowired private FilterChainProxy springSecurityFilterChain;
     @Autowired private MockEmailService mockEmailService;
+    @Autowired private EmailOutboxWorker outboxWorker;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
         .findAndRegisterModules();
@@ -180,6 +182,7 @@ class RegistroIntegrationTest {
                     """.formatted(email)));
         } catch (Exception ignored) {}
 
+        outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
         if (verifyToken != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));

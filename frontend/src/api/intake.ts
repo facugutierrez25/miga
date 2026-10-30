@@ -11,9 +11,10 @@ export interface FoodEntryDto {
   portions: number | null
 }
 
-export async function getIntake(token: string, date: string): Promise<FoodEntryDto[]> {
+export async function getIntake(token: string, date: string, signal?: AbortSignal): Promise<FoodEntryDto[]> {
   const res = await fetch(`${API_URL}/api/v1/intake/${date}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   })
   if (!res.ok) throw new Error('Error al cargar el registro de ingesta.')
   return res.json()

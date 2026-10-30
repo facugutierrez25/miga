@@ -36,10 +36,19 @@ export interface MealSaveDto {
 export interface PlanDto {
   foodGroups: PlanFoodGroupDto[]
   meals: MealDto[]
+  version?: number
 }
 
 export interface PlanSaveDto {
   meals: MealSaveDto[]
+  clientVersion?: number
+}
+
+export class PlanConflictError extends Error {
+  constructor() {
+    super('PLAN_CONFLICT')
+    this.name = 'PlanConflictError'
+  }
 }
 
 export async function getMyPlan(token: string): Promise<PlanDto> {
@@ -81,6 +90,7 @@ export async function saveMyPlan(token: string, plan: PlanSaveDto): Promise<Plan
     },
     body: JSON.stringify(plan),
   })
+  if (res.status === 409) throw new PlanConflictError()
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`${res.status}: ${body}`)

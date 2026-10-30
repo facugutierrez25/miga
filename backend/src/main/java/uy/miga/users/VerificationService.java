@@ -11,23 +11,25 @@ class VerificationService {
 
     private final VerificationTokenRepository tokenRepository;
     private final UsersRepository usersRepository;
-    private final EmailService emailService;
+    private final EmailOutboxJobRepository outboxRepository;
 
     VerificationService(
             VerificationTokenRepository tokenRepository,
             UsersRepository usersRepository,
-            EmailService emailService) {
+            EmailOutboxJobRepository outboxRepository) {
         this.tokenRepository = tokenRepository;
         this.usersRepository = usersRepository;
-        this.emailService = emailService;
+        this.outboxRepository = outboxRepository;
     }
 
     @Transactional
     void sendVerificationFor(User user) {
         tokenRepository.deleteByUser(user);
+        outboxRepository.deleteByUserIdAndJobTypeAndStatus(user.getId(), "VERIFY_EMAIL", "PENDING");
+
         String token = UUID.randomUUID().toString();
         tokenRepository.save(new VerificationToken(user, token, OffsetDateTime.now().plusHours(24)));
-        emailService.sendVerificationEmail(user.getEmail(), token);
+        outboxRepository.save(new EmailOutboxJob(user.getId(), user.getEmail(), "VERIFY_EMAIL"));
     }
 
     @Transactional

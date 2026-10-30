@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.security.web.FilterChainProxy;
+import uy.miga.users.EmailOutboxWorker;
 import uy.miga.users.MockEmailService;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -32,6 +33,9 @@ class PlanIntegrationTest {
 
     @Autowired
     private MockEmailService mockEmailService;
+
+    @Autowired
+    private EmailOutboxWorker outboxWorker;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
@@ -258,6 +262,146 @@ class PlanIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    private static final String PLAN_UNA_COMIDA = """
+            {
+              "meals": [{
+                "name": "Desayuno",
+                "displayOrder": 1,
+                "portions": [
+                  { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                  { "foodGroupAbbr": "CER", "portions": 2.0 },
+                  { "foodGroupAbbr": "FRU", "portions": 1.0 },
+                  { "foodGroupAbbr": "LAC", "portions": 1.0 },
+                  { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                  { "foodGroupAbbr": "VER", "portions": 0.0 }
+                ]
+              }]
+            }
+            """;
+
+    @Test
+    void saveMyPlan_returnsVersion() throws Exception {
+        String t = registerAndLogin("version-" + java.util.UUID.randomUUID() + "@miga.uy");
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_UNA_COMIDA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").isNumber());
+    }
+
+    @Test
+    void saveMyPlan_withCorrectClientVersion_returns200() throws Exception {
+        String t = registerAndLogin("version-ok-" + java.util.UUID.randomUUID() + "@miga.uy");
+
+        MvcResult first = mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_UNA_COMIDA))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        long version = objectMapper.readTree(first.getResponse().getContentAsString())
+                .get("version").asLong();
+
+        String planConVersion = """
+                {
+                  "meals": [{
+                    "name": "Almuerzo",
+                    "displayOrder": 1,
+                    "portions": [
+                      { "foodGroupAbbr": "PRO", "portions": 2.0 },
+                      { "foodGroupAbbr": "CER", "portions": 1.0 },
+                      { "foodGroupAbbr": "FRU", "portions": 0.0 },
+                      { "foodGroupAbbr": "LAC", "portions": 0.0 },
+                      { "foodGroupAbbr": "GRA", "portions": 1.0 },
+                      { "foodGroupAbbr": "VER", "portions": 1.0 }
+                    ]
+                  }],
+                  "clientVersion": %d
+                }
+                """.formatted(version);
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(planConVersion))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meals[0].name").value("Almuerzo"));
+    }
+
+    @Test
+    void saveMyPlan_withOutdatedClientVersion_returns409() throws Exception {
+        String t = registerAndLogin("version-conflict-" + java.util.UUID.randomUUID() + "@miga.uy");
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_UNA_COMIDA))
+                .andExpect(status().isOk());
+
+        String planVersionObsoleta = """
+                {
+                  "meals": [{
+                    "name": "Cena",
+                    "displayOrder": 1,
+                    "portions": [
+                      { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                      { "foodGroupAbbr": "CER", "portions": 0.0 },
+                      { "foodGroupAbbr": "FRU", "portions": 0.0 },
+                      { "foodGroupAbbr": "LAC", "portions": 0.0 },
+                      { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                      { "foodGroupAbbr": "VER", "portions": 1.0 }
+                    ]
+                  }],
+                  "clientVersion": 9999
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(planVersionObsoleta))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PLAN_CONFLICT"));
+    }
+
+    @Test
+    void saveMyPlan_withoutClientVersion_allowsOverwrite() throws Exception {
+        String t = registerAndLogin("version-noenvio-" + java.util.UUID.randomUUID() + "@miga.uy");
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_UNA_COMIDA))
+                .andExpect(status().isOk());
+
+        String planSinVersion = """
+                {
+                  "meals": [{
+                    "name": "Cena",
+                    "displayOrder": 1,
+                    "portions": [
+                      { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                      { "foodGroupAbbr": "CER", "portions": 0.0 },
+                      { "foodGroupAbbr": "FRU", "portions": 0.0 },
+                      { "foodGroupAbbr": "LAC", "portions": 0.0 },
+                      { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                      { "foodGroupAbbr": "VER", "portions": 1.0 }
+                    ]
+                  }]
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(planSinVersion))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meals[0].name").value("Cena"));
+    }
+
     private String registerAndLogin(String email) throws Exception {
         try {
             mockMvc.perform(post("/api/v1/users")
@@ -267,6 +411,7 @@ class PlanIntegrationTest {
                             """.formatted(email)));
         } catch (Exception ignored) {}
 
+        outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
         if (verifyToken != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));

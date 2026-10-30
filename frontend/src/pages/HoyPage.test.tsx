@@ -5,12 +5,12 @@ import HoyPage from './HoyPage'
 import * as plansApi from '../api/plans'
 import * as intakeApi from '../api/intake'
 import * as equivalencesApi from '../api/equivalences'
-import * as AuthContext from '../auth/AuthContext'
+import * as AuthContext from '../auth/authTypes'
 
 vi.mock('../api/plans')
 vi.mock('../api/intake')
 vi.mock('../api/equivalences')
-vi.mock('../auth/AuthContext')
+vi.mock('../auth/authTypes')
 
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockGetIntake = vi.mocked(intakeApi.getIntake)

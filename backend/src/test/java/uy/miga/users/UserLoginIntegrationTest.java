@@ -26,6 +26,9 @@ class UserLoginIntegrationTest {
     @Autowired
     private MockEmailService mockEmailService;
 
+    @Autowired
+    private EmailOutboxWorker outboxWorker;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -39,6 +42,7 @@ class UserLoginIntegrationTest {
                         { "email": "login@miga.uy", "password": "Segura1234!" }
                         """));
 
+        outboxWorker.processJobs();
         String token = mockEmailService.getLastToken();
         if (token != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + token));

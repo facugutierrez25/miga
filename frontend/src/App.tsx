@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
-import { useAuth } from './auth/AuthContext'
+import { useAuth } from './auth/authTypes'
 import AppLayout from './components/AppLayout'
 import LandingPage from './pages/LandingPage'
 import RegisterPage from './pages/RegisterPage'

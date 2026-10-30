@@ -5,3 +5,7 @@ spring:
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     username: test
     password: test
+
+app:
+  rate-limit:
+    enabled: false

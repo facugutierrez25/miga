@@ -817,6 +817,39 @@
   padding: 10px 14px;
 }
 
+.plan-conflicto {
+  background: var(--error-bg);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-conflicto p {
+  color: var(--error);
+  font-size: 14px;
+  margin: 0;
+  text-align: center;
+}
+
+.btn-recargar {
+  align-self: center;
+  background: transparent;
+  border: 1.5px solid var(--error);
+  color: var(--error);
+  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-recargar:hover {
+  background: var(--error);
+  color: #fff;
+}
+
 @media (min-width: 640px) {
   .mi-plan-header {
     padding: 28px 24px 0;

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import './LandingPage.css'

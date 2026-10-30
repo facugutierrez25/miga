@@ -3,15 +3,20 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MiPlanPage from './MiPlanPage'
 import * as plansApi from '../api/plans'
-import * as AuthContext from '../auth/AuthContext'
+import * as AuthContext from '../auth/authTypes'
+import * as equivalencesApi from '../api/equivalences'
 
 vi.mock('../api/plans')
-vi.mock('../auth/AuthContext')
+vi.mock('../auth/authTypes')
+vi.mock('../api/equivalences')
 
 const mockUseAuth = vi.mocked(AuthContext.useAuth)
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockSaveMyPlan = vi.mocked(plansApi.saveMyPlan)
 const mockGetPlanHistory = vi.mocked(plansApi.getPlanHistory)
+const mockGetEquivalences = vi.mocked(equivalencesApi.getEquivalences)
+const mockAddEquivalence = vi.mocked(equivalencesApi.addEquivalence)
+const mockDeleteEquivalence = vi.mocked(equivalencesApi.deleteEquivalence)
 
 const gruposDefault = [
   { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
@@ -22,9 +27,17 @@ const gruposDefault = [
   { id: 6, name: 'Verduras',  abbreviation: 'VER', displayOrder: 6, color: null },
 ]
 
+const planConGrupos = {
+  foodGroups: gruposDefault,
+  meals: [{ name: 'Desayuno', displayOrder: 1, portions: gruposDefault.map(g => ({ foodGroupId: g.id, portions: 0 })) }],
+}
+
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
+  mockGetEquivalences.mockResolvedValue([])
+  mockAddEquivalence.mockResolvedValue({ id: 1, foodGroupId: 1, food: '', quantity: 0, unit: 'G' })
+  mockDeleteEquivalence.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -160,4 +173,84 @@ test('cierra el modal al hacer click en el overlay', async () => {
   expect(screen.getByRole('dialog')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('dialog'))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+// ── Pestaña equivalencias ──────────────────────────────────────────────────
+
+test('muestra cargando equivalencias al cambiar a la pestaña', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  mockGetEquivalences.mockReturnValue(new Promise(() => {}))
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('Desayuno'))
+  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
+  expect(screen.getByText('Cargando equivalencias…')).toBeInTheDocument()
+})
+
+test('muestra los grupos del plan en la pestaña de equivalencias', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('Desayuno'))
+  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
+  await waitFor(() => screen.getByText('Proteínas'))
+  expect(screen.getByText('Cereales')).toBeInTheDocument()
+  expect(screen.getByText('Frutas')).toBeInTheDocument()
+  expect(screen.getByText('Lácteos')).toBeInTheDocument()
+  expect(screen.getByText('Grasas')).toBeInTheDocument()
+  expect(screen.getByText('Verduras')).toBeInTheDocument()
+})
+
+test('expandir un grupo muestra el formulario de agregar', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('Desayuno'))
+  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
+  await waitFor(() => screen.getByText('Proteínas'))
+  fireEvent.click(screen.getByText('Proteínas'))
+  expect(screen.getByPlaceholderText('Alimento')).toBeInTheDocument()
+})
+
+test('agregar una equivalencia llama a la API y la muestra en la lista', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  mockAddEquivalence.mockResolvedValue({ id: 99, foodGroupId: 1, food: 'Pollo', quantity: 200, unit: 'G' })
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('Desayuno'))
+  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
+  await waitFor(() => screen.getByText('Proteínas'))
+  fireEvent.click(screen.getByText('Proteínas'))
+  fireEvent.change(screen.getByPlaceholderText('Alimento'), { target: { value: 'Pollo' } })
+  fireEvent.change(screen.getByPlaceholderText('Cant.'), { target: { value: '200' } })
+  fireEvent.click(screen.getByLabelText('Agregar equivalencia'))
+  await waitFor(() => expect(mockAddEquivalence).toHaveBeenCalledWith('tok', 1, 'Pollo', 200, 'G'))
+  await waitFor(() => expect(screen.getAllByText('Pollo').length).toBeGreaterThan(0))
+})
+
+test('eliminar equivalencia muestra snackbar y no llama a la API de inmediato', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  mockGetEquivalences.mockResolvedValue([{ id: 5, foodGroupId: 1, food: 'Leche', quantity: 1, unit: 'TAZA' }])
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('Desayuno'))
+  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
+  await waitFor(() => screen.getByText('Proteínas'))
+  fireEvent.click(screen.getByText('Proteínas'))
+  await waitFor(() => screen.getByLabelText('Eliminar Leche'))
+  fireEvent.click(screen.getByLabelText('Eliminar Leche'))
+  await waitFor(() => screen.getByRole('status'))
+  expect(screen.getByText('Deshacer')).toBeInTheDocument()
+  expect(mockDeleteEquivalence).not.toHaveBeenCalled()
+})
+
+test('deshacer eliminar restaura el ítem y no llama a la API', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  mockGetEquivalences.mockResolvedValue([{ id: 5, foodGroupId: 1, food: 'Leche', quantity: 1, unit: 'TAZA' }])
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('Desayuno'))
+  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
+  await waitFor(() => screen.getByText('Proteínas'))
+  fireEvent.click(screen.getByText('Proteínas'))
+  await waitFor(() => screen.getByLabelText('Eliminar Leche'))
+  fireEvent.click(screen.getByLabelText('Eliminar Leche'))
+  await waitFor(() => screen.getByText('Deshacer'))
+  fireEvent.click(screen.getByText('Deshacer'))
+  await waitFor(() => expect(screen.getByText('Leche')).toBeInTheDocument())
+  expect(mockDeleteEquivalence).not.toHaveBeenCalled()
 })
