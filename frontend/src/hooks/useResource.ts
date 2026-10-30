@@ -17,7 +17,10 @@ export function useResource<T>(key: string, enabled: boolean,
   const active = useRef<{ key: string; attempt: number; controller: AbortController; sequence: number } | null>(null)
   // La clave cambia durante el render para que no se conserve la sesión anterior.
   if (state && state.key !== key) setState(null)
-  const current = state?.key === key && state.attempt === attempt ? state : null
+  // Al reintentar la misma clave se conservan los datos anteriores: la vista no se
+  // desmonta y no se pierden borradores mientras llega la respuesta nueva.
+  const current = state?.key !== key ? null
+    : state.attempt === attempt ? state : { ...state, status: 'loading' as LoadStatus }
 
   useEffect(() => {
     if (!enabled) return
@@ -30,7 +33,10 @@ export function useResource<T>(key: string, enabled: boolean,
       }
     }).catch((error: unknown) => {
       if (!controller.signal.aborted && session.sequence === 0 && !isAbortError(error)) {
-        setState({ key, attempt, data: null, status: 'error', error })
+        setState(previous => ({
+          key, attempt, status: 'error', error,
+          data: previous?.key === key ? previous.data : null,
+        }))
       }
     })
     return () => controller.abort()
@@ -51,7 +57,10 @@ export function useResource<T>(key: string, enabled: boolean,
       return data
     } catch (error) {
       if (!session.controller.signal.aborted && session.sequence === sequence && !isAbortError(error)) {
-        setState({ key, attempt, data: null, status: 'error', error })
+        setState(previous => ({
+          key, attempt, status: 'error', error,
+          data: previous?.key === key ? previous.data : null,
+        }))
       }
       throw error
     }

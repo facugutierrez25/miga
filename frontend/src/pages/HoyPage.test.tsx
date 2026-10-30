@@ -422,3 +422,28 @@ test('permite reintentar un error del plan aunque el día siga pendiente', async
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
   await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
 })
+
+test('un reintento general del día no borra el borrador ni su versión base', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const dia = (noteVersion: number) => ({
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion, items: [], comparison: [] }],
+  })
+  mockGetDayRegistro
+    .mockResolvedValueOnce(dia(2))
+    .mockRejectedValueOnce(new Error('sin red'))
+    .mockResolvedValue(dia(3))
+  mockSaveNota.mockRejectedValue(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Recargar' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
+  await waitFor(() => expect(mockGetDayRegistro).toHaveBeenCalledTimes(3))
+
+  expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
+  expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+  expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 2)
+})

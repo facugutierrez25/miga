@@ -606,7 +606,7 @@ function HoyContent() {
   const plan = planLoad.data
   const sinPlan = planLoad.status === 'empty' && !plan
   const { data: dayRegistro, setData: setDayRegistro, status: dayStatus, retry: retryDay, reload: reloadDay } = useDayRegistro(token, email, fecha)
-  const cargando = planLoad.status === 'loading' || (!!plan && dayStatus === 'loading')
+  const cargando = planLoad.status === 'loading' || (!!plan && dayStatus === 'loading' && !dayRegistro)
   const diaError = dayStatus === 'error'
 
   const [previousToday, setPreviousToday] = useState(HOY)

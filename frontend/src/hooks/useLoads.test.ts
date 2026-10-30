@@ -47,6 +47,20 @@ for (const entry of cases) {
     await waitFor(() => expect(result.current.status).toBe('empty'))
     expect(entry.mock).toHaveBeenCalledTimes(2)
   })
+  it(`${entry.name}: conserva los datos si una recarga falla y durante el reintento`, async () => {
+    entry.mock.mockResolvedValueOnce(entry.data as never)
+    const { result } = renderHook(() => entry.useLoad('token', 'a@b.uy'))
+    await waitFor(() => expect(result.current.status).not.toBe('loading'))
+    const loaded = result.current.data
+    entry.mock.mockRejectedValueOnce(new Error('Sin conexión'))
+    await act(async () => { await result.current.reload().catch(() => {}) })
+    expect(result.current.status).toBe('error')
+    expect(result.current.data).toBe(loaded)
+    entry.mock.mockReturnValueOnce(new Promise(() => {}) as never)
+    act(() => result.current.retry())
+    expect(result.current.status).toBe('loading')
+    expect(result.current.data).toBe(loaded)
+  })
   it(`${entry.name}: limpia datos al cambiar de usuario y al cerrar sesión`, async () => {
     entry.mock.mockResolvedValueOnce(entry.data as never).mockImplementation(() => new Promise<never>(() => {}))
     const { result, rerender } = renderHook(({ token, user }) => entry.useLoad(token, user), {
@@ -93,7 +107,7 @@ it('distingue éxito, error de recarga y reintento', async () => {
   await waitFor(() => expect(result.current.status).toBe('success'))
   await act(async () => { await expect(result.current.reload()).rejects.toThrow('Sin conexión') })
   expect(result.current.status).toBe('error')
-  expect(result.current.data).toBeNull()
+  expect(result.current.data).toEqual(recordedDay)
   act(() => result.current.retry())
   await waitFor(() => expect(result.current.status).toBe('success'))
 })
