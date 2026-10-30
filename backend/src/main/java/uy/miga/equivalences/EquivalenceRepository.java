@@ -1,7 +1,6 @@
 package uy.miga.equivalences;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import uy.miga.plans.FoodGroup;
 
 import java.util.List;
 import java.util.Optional;
