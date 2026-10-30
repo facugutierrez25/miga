@@ -3,6 +3,7 @@
   color-scheme: light;
   --bg: #F2F7F6; --surface: #FFFFFF; --surface-2: #F8FBFA;
   --ink: #102624; --muted: #5A706E; --muted-2: #6E8482; --done: #7C918F;
+  --text-secondary: #526865; --control-border: #708784; --group-text: var(--ink);
   --primary: #0E6E6B; --on-primary: #FFFFFF; --on-primary-muted: #CFE6E4; --primary-soft: #EAF4F3;
   --accent: #F6C344; --accent-soft: #FDF1D2; --on-accent-soft: #7A5A0B;
   --line: #DCE9E7; --line-soft: #E8F1EF; --rail: #CFE0DE; --border: #C6DCDA; --control: #7A9290;
@@ -34,19 +35,20 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0A0A0A; --surface: #141414; --surface-2: #1C1C1C;
-    --ink: #F0F0F0; --muted: #888888; --muted-2: #707070; --done: #595959;
+    --bg: #0B1716; --surface: #132322; --surface-2: #0F1D1C;
+    --ink: #E6F0EF; --muted: #9BB1AF; --muted-2: #7F9795; --done: #6E8684;
+    --text-secondary: #9BB1AF; --control-border: #789592;
     --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
     --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
-    --line: #242424; --line-soft: #1E1E1E; --rail: #2A2A2A; --border: #303030; --control: #606060;
+    --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
     --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
     --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
     --error: #F97066; --error-bg: #3A1C1A;
     --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.5);
-    --glass-bg: rgba(255, 255, 255, 0.04);
-    --glass-bg-strong: rgba(255, 255, 255, 0.07);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-blur: blur(12px);
+    --glass-bg: rgba(30, 56, 54, 0.42);
+    --glass-bg-strong: rgba(24, 46, 44, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-blur: blur(24px) saturate(180%);
     --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     --glass-shadow-ahora: 0 0 0 2px var(--primary);
     --btn-primary-bg: linear-gradient(180deg, #57C6C1, #3FB3AE);
@@ -60,19 +62,20 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0A0A0A; --surface: #141414; --surface-2: #1C1C1C;
-  --ink: #F0F0F0; --muted: #888888; --muted-2: #707070; --done: #595959;
+  --bg: #0B1716; --surface: #132322; --surface-2: #0F1D1C;
+  --ink: #E6F0EF; --muted: #9BB1AF; --muted-2: #7F9795; --done: #6E8684;
+  --text-secondary: #9BB1AF; --control-border: #789592;
   --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
   --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
-  --line: #242424; --line-soft: #1E1E1E; --rail: #2A2A2A; --border: #303030; --control: #606060;
+  --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
   --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
   --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
   --error: #F97066; --error-bg: #3A1C1A;
   --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.5);
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-bg-strong: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur: blur(12px);
+  --glass-bg: rgba(30, 56, 54, 0.42);
+  --glass-bg-strong: rgba(24, 46, 44, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(24px) saturate(180%);
   --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   --glass-shadow-ahora: 0 0 0 2px var(--primary);
   --btn-primary-bg: linear-gradient(180deg, #57C6C1, #3FB3AE);
@@ -119,7 +122,7 @@ body::before {
     --btn-primary-shadow: none;
     --radius-card: 16px;
     --radius-control: 12px;
-    --radius-pill: 12px;
+    --radius-pill: 999px;
     --radius-chip: 8px;
   }
   body::before { display: none; }
@@ -137,7 +140,7 @@ body::before {
 
 /* Si el sistema pide menos transparencias, o el navegador no difumina, el vidrio pasa a ser sólido */
 @media (prefers-reduced-transparency: reduce) {
-  :root {
+  html:root:not([data-x]) {
     --glass-bg: var(--surface);
     --glass-bg-strong: var(--surface);
     --glass-border: var(--line-soft);
@@ -146,7 +149,7 @@ body::before {
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root {
+  html:root:not([data-x]) {
     --glass-bg: var(--surface);
     --glass-bg-strong: var(--surface);
   }
@@ -209,4 +212,33 @@ h1, h2, h3 {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  border-color: var(--control-border);
+}
+
+.dictation-button {
+  min-height: 44px;
+  padding: 8px 20px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-pill);
+  color: var(--primary);
+  background: var(--primary-soft);
+  cursor: pointer;
+}
+
+.dictation-button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
 }

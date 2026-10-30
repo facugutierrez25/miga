@@ -59,11 +59,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   min-width: 44px;
   height: 54px;
   padding: 0 8px;
-  color: var(--muted-2);
+  color: var(--text-secondary);
   text-decoration: none;
   border-radius: var(--radius-pill);
   -webkit-tap-highlight-color: transparent;
@@ -92,6 +92,11 @@
 
 @media (min-width: 640px) {
 
+  /* Hoy ya tiene un encabezado visible dentro del contenido de escritorio. */
+  .app-layout__main .hoy-header {
+    display: none;
+  }
+
   .app-layout {
     flex-direction: row;
   }
@@ -110,12 +115,6 @@
     min-height: 100dvh;
   }
 
-  /* Ocultar los headers mobile de cada página (la nav lateral los reemplaza) */
-  .app-layout__main .hoy-header,
-  .app-layout__main .mi-plan-header,
-  .app-layout__main .perfil-header {
-    display: none;
-  }
 
   /* Sidebar */
   .app-nav {
@@ -176,11 +175,11 @@
   }
 
   .app-nav__toggle {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border: none;
     background: transparent;
-    color: var(--muted-2);
+    color: var(--text-secondary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -199,7 +198,7 @@
   .app-nav__items {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     padding: 0 8px;
     /* cancelar display:contents del mobile */
   }
@@ -208,8 +207,8 @@
     flex: none;
     height: auto;
     flex-direction: row;
-    gap: 10px;
-    padding: 9px 12px;
+    gap: 12px;
+    padding: 8px 12px;
     border-radius: var(--radius-sm);
     min-height: 44px;
     justify-content: flex-start;
@@ -224,7 +223,7 @@
   }
 
   .app-layout--collapsed .nav-item {
-    padding: 9px 0;
+    padding: 8px 0;
     justify-content: center;
   }
 

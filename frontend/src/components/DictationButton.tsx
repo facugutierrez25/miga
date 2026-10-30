@@ -57,7 +57,7 @@ export default function DictationButton({ disabled, onTranscript }: {
     }
   }
   return <>
-    <button type="button" disabled={disabled} aria-pressed={listening} onClick={toggle}>
+    <button type="button" className="dictation-button" disabled={disabled} aria-pressed={listening} onClick={toggle}>
       {listening ? 'Dejar de dictar' : 'Dictar'}
     </button>
     {error && <p role="alert">No se pudo dictar. Podés seguir escribiendo.</p>}
