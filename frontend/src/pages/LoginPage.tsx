@@ -21,6 +21,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [notVerified, setNotVerified] = useState(false)
   const [resendDone, setResendDone] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendError, setResendError] = useState('')
 
   function validateEmail(v: string) {
     if (!v) return 'El email es obligatorio.'
@@ -62,8 +64,16 @@ export default function LoginPage() {
   }
 
   async function handleResend() {
-    await resendVerification(email)
-    setResendDone(true)
+    setResending(true)
+    setResendError('')
+    try {
+      await resendVerification(email)
+      setResendDone(true)
+    } catch {
+      setResendError('No se pudo reenviar el link. Probá de nuevo.')
+    } finally {
+      setResending(false)
+    }
   }
 
   return (
@@ -136,14 +146,15 @@ export default function LoginPage() {
         </form>
 
         {notVerified && (
-          <div role="alert" className="login-unverified">
-            <p className="login-unverified__msg">
+          <div className="login-unverified">
+            <p role="alert" className="login-unverified__msg">
               Verificá tu email antes de ingresar.
             </p>
+            {resendError && <p role="alert">{resendError}</p>}
             {resendDone
-              ? <p className="login-unverified__ok">Link reenviado, revisá tu bandeja.</p>
-              : <button type="button" className="login-unverified__resend" onClick={handleResend}>
-                  Reenviar link de verificación
+              ? <p role="status" className="login-unverified__ok">Link reenviado, revisá tu bandeja.</p>
+              : <button type="button" className="login-unverified__resend" disabled={resending} onClick={handleResend}>
+                  {resending ? 'Enviando…' : 'Reenviar link de verificación'}
                 </button>
             }
           </div>
