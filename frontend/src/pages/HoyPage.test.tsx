@@ -332,3 +332,30 @@ test('conserva el borrador ante conflicto, recarga la versión y usa la nueva al
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
   await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'segunda edición', 4))
 })
+
+test('un borrador empezado sobre una versión vieja sigue dando conflicto tras una recarga automática', async () => {
+  const mockSaveRespuesta = vi.mocked(registroApi.saveRespuesta)
+  mockSaveRespuesta.mockResolvedValue(undefined)
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const dia = (noteVersion: number) => ({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteText: 'leche', noteVersion, items: [],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTA', dailyGoal: null }],
+    }],
+  })
+  mockGetDayRegistro.mockResolvedValueOnce(dia(2)).mockResolvedValue(dia(3))
+  mockSaveNota.mockResolvedValue({
+    noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 3,
+    items: [], entries: [], comparison: [],
+  })
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Sí' }))
+  await waitFor(() => expect(mockGetDayRegistro).toHaveBeenCalledTimes(2))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche y pan', 2))
+})

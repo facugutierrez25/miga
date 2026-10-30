@@ -345,6 +345,10 @@ function NotaMealSection({
   const [isOpen, setIsOpen] = useState(isAhora)
   const [texto, setTexto] = useState(mealDay?.noteText ?? '')
   const dirty = useRef(false)
+  // Versión de la nota sobre la que se empezó el borrador: una recarga automática
+  // no la cambia, así guardar un borrador viejo sigue dando conflicto.
+  const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
+  const acceptReloadedVersion = useRef(false)
   const [conflict, setConflict] = useState(false)
   const [sugerencias, setSugerencias] = useState<string[]>([])
   const [cargandoSug, setCargandoSug] = useState(false)
@@ -358,8 +362,14 @@ function NotaMealSection({
   const preguntas = comparison.filter(s => s.status === 'PREGUNTA')
 
   useEffect(() => {
-    if (!dirty.current) setTexto(mealDay?.noteText ?? '')
-  }, [mealDay?.noteText])
+    if (!dirty.current) {
+      setTexto(mealDay?.noteText ?? '')
+      baseVersion.current = mealDay?.noteVersion ?? null
+    } else if (acceptReloadedVersion.current) {
+      acceptReloadedVersion.current = false
+      baseVersion.current = mealDay?.noteVersion ?? null
+    }
+  }, [mealDay?.noteText, mealDay?.noteVersion])
 
   useEffect(() => {
     if (!isOpen || !meal.id) return
@@ -377,8 +387,9 @@ function NotaMealSection({
     setGuardando(true)
     setError(null)
     try {
-      const interp = await saveNota(token, date, meal.id, texto.trim(), mealDay?.noteVersion ?? null)
+      const interp = await saveNota(token, date, meal.id, texto.trim(), baseVersion.current)
       dirty.current = false
+      baseVersion.current = interp.version
       setConflict(false)
       onNotaSaved(interp, meal.id)
     } catch (err) {
@@ -453,6 +464,7 @@ function NotaMealSection({
               onClick={async () => {
                 setGuardando(true)
                 try {
+                  acceptReloadedVersion.current = true
                   await onReload()
                   setConflict(false)
                   setError(null)
