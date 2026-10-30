@@ -141,21 +141,30 @@ class RegistroService {
                                                   Long planId) {
         List<InterpretedItem> result = new ArrayList<>();
         for (InterpretedItem item : items) {
-            if (!"COMPUESTO".equals(getType(item, rules)) || item.components() == null) {
-                result.add(item);
-                continue;
-            }
-            // Expand each component into a separate item mapped to the plan food group
-            for (var comp : item.components()) {
-                Long groupId = resolveGroupId(comp.standardGroupKey(), rules, planId);
-                if (groupId == null) continue;
+            if ("COMPUESTO".equals(getType(item, rules)) && item.components() != null) {
+                // Expand each component, mapping to plan food group via standardGroupKey → clave
+                for (var comp : item.components()) {
+                    Long groupId = resolveGroupId(comp.standardGroupKey(), planId);
+                    if (groupId == null) continue;
+                    result.add(new InterpretedItem(
+                        item.originalText(), item.foodName(),
+                        item.quantity(), item.unit(),
+                        groupId, comp.standardGroupKey(),
+                        BigDecimal.valueOf(comp.porciones()).multiply(item.quantity()).setScale(3, java.math.RoundingMode.HALF_UP),
+                        item.appliedRule(), item.uncertain(), item.ruleId(), null
+                    ));
+                }
+            } else if (item.recognized() && item.foodGroupId() == null && item.standardGroupKey() != null) {
+                // Resolve foodGroupId via plan clave for GLOBAL rules
+                Long groupId = resolveGroupId(item.standardGroupKey(), planId);
                 result.add(new InterpretedItem(
                     item.originalText(), item.foodName(),
                     item.quantity(), item.unit(),
-                    groupId, comp.standardGroupKey(),
-                    BigDecimal.valueOf(comp.porciones()).multiply(item.quantity()).setScale(3, java.math.RoundingMode.HALF_UP),
-                    item.appliedRule(), item.uncertain(), item.ruleId(), null
+                    groupId, item.standardGroupKey(),
+                    item.portions(), item.appliedRule(), item.uncertain(), item.ruleId(), null
                 ));
+            } else {
+                result.add(item);
             }
         }
         return result;
@@ -167,10 +176,8 @@ class RegistroService {
             .findFirst().map(FoodRuleDto::tipo).orElse("NORMAL");
     }
 
-    private Long resolveGroupId(String standardGroupKey, List<FoodRuleDto> rules, Long planId) {
-        return rules.stream()
-            .filter(r -> standardGroupKey.equals(r.standardGroupKey()) && r.foodGroupId() != null)
-            .findFirst().map(FoodRuleDto::foodGroupId).orElse(null);
+    private Long resolveGroupId(String standardGroupKey, Long planId) {
+        return planService.findGroupIdByClave(planId, standardGroupKey);
     }
 
     private Map<Long, BigDecimal> buildPortionMap(List<InterpretedItem> items) {
