@@ -44,6 +44,8 @@ WHERE fe.meal_id = m.id
    OR (fe.food_group = 'VEGETABLES' AND pfg.abbreviation = 'VER')
   );
 
+DELETE FROM food_entries WHERE food_group_id IS NULL;
+
 ALTER TABLE food_entries
     ALTER COLUMN food_group_id SET NOT NULL;
 
