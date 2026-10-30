@@ -42,3 +42,37 @@ export function isAbortError(err: unknown): boolean {
 export function isUnauthorized(err: unknown): boolean {
   return err instanceof ApiError && err.status === 401
 }
+
+// Un único punto para la sesión vencida: cualquier respuesta 401 a una petición
+// autenticada avisa una sola vez, aunque el módulo de API use fetch directo.
+let unauthorizedListener: (() => void) | null = null
+let interceptor: typeof window.fetch | null = null
+
+function hasBearer(input: RequestInfo | URL, init?: RequestInit): boolean {
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+  return headers.get('Authorization')?.startsWith('Bearer ') ?? false
+}
+
+// Se reinstala si otro código reemplazó window.fetch después de instalarlo.
+function installUnauthorizedInterceptor() {
+  if (interceptor && window.fetch === interceptor) return
+  const originalFetch = window.fetch.bind(window)
+  interceptor = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const res = await originalFetch(input, init)
+    if (res.status === 401 && unauthorizedListener && hasBearer(input, init)) {
+      const notify = unauthorizedListener
+      unauthorizedListener = null
+      notify()
+    }
+    return res
+  }
+  window.fetch = interceptor
+}
+
+export function onUnauthorizedResponse(handler: () => void): () => void {
+  installUnauthorizedInterceptor()
+  unauthorizedListener = handler
+  return () => {
+    if (unauthorizedListener === handler) unauthorizedListener = null
+  }
+}

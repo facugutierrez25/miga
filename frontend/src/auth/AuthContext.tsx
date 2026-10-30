@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { onUnauthorizedResponse } from '../api/client'
 import type { AuthContextValue } from './authTypes'
 import { AuthContext } from './authTypes'
 
@@ -15,9 +16,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [firstName, setFirstNameState] = useState<string | null>(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  useEffect(() => {
+    if (!token) return
+    return onUnauthorizedResponse(() => {
+      setToken(null)
+      setEmail(null)
+      setFirstNameState(null)
+      setSessionExpired(true)
+    })
+  }, [token])
 
   function login(newToken: string, newFirstName: string | null) {
     setToken(newToken)
+    setSessionExpired(false)
     setEmail(emailFromToken(newToken))
     setFirstNameState(newFirstName)
   }
@@ -32,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setFirstNameState(null)
   }
 
-  const value: AuthContextValue = { token, email, firstName, login, setFirstName, logout }
+  const value: AuthContextValue = { token, email, firstName, sessionExpired, login, setFirstName, logout }
   return (
     <AuthContext.Provider value={value}>
       {children}

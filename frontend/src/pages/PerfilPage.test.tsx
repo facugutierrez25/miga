@@ -15,6 +15,7 @@ beforeEach(() => {
     firstName: null,
     login: vi.fn(),
     setFirstName: vi.fn(),
+    sessionExpired: false,
     logout: mockLogout,
   })
 })
