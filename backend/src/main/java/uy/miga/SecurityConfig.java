@@ -29,9 +29,12 @@ class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/status", "/actuator/health",
+                .requestMatchers("/api/v1/status",
+                        "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness",
                         "/api/v1/users", "/api/v1/users/login",
                         "/api/v1/auth/verify", "/api/v1/auth/resend-verification").permitAll()
+                // /actuator/metrics e /actuator/info solo accesibles con autenticación
+                .requestMatchers("/actuator/**").authenticated()
                 .anyRequest().authenticated())
             .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
             .httpBasic(http2 -> http2.disable())
