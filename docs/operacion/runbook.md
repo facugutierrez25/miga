@@ -123,17 +123,25 @@ ls -lh nutriplan_*.dump
 2. Desplegar el backend: Flyway aplica las migraciones pendientes al arrancar.
 3. Verificar `GET /actuator/health/readiness` = 200 y la versión en `flyway_schema_history`.
 
-Si una migración falla, el backend **no arranca** y readiness no responde:
+Si una migración falla, el backend **no arranca** y readiness no responde. Flyway confirma
+cada migración por separado: las anteriores a la que falló **quedan aplicadas**, y solo la que
+falló se revierte (PostgreSQL ejecuta cada migración en su propia transacción).
 
-- PostgreSQL ejecuta cada migración en una transacción, así que una migración que falla
-  se revierte entera. Volver a desplegar la versión anterior del backend (la base sigue en
-  la versión previa) y corregir la migración con un archivo **nuevo**; nunca editar una
-  migración aplicada.
-- Si `flyway_schema_history` quedó con una fila `success = false`, no forzar `repair` en
-  producción sin entender la causa: restaurar el backup del paso 1 en una base nueva,
-  apuntar el backend anterior a ella y verificar con las consultas de integridad (sección 5).
-- Las migraciones con verificación previa (por ejemplo V23 o V26) abortan con un mensaje
-  que explica qué datos lo impiden: corregir esos datos y volver a desplegar.
+1. Ver hasta dónde llegó: `SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;`
+2. **Si falló por datos** (por ejemplo, una verificación previa como V23 o V26 que aborta con
+   un mensaje): corregir esos datos y volver a desplegar la misma versión; la migración se
+   reintenta.
+3. **Si falló por un error en su SQL:** como se revirtió y nunca quedó aplicada, se corrige
+   **ese mismo archivo** y se despliega una versión nueva. (Un archivo nuevo no alcanza: Flyway
+   volvería a ejecutar primero el fallido.) Las migraciones que sí quedaron aplicadas nunca se
+   editan; si hay que cambiarlas, se agrega una migración nueva.
+4. **Para volver al backend anterior** mientras se corrige: solo si las migraciones que quedaron
+   aplicadas son compatibles con esa versión (por ejemplo, agregan columnas opcionales o tablas
+   que el backend anterior ignora). Si no lo son, restaurar el backup del paso 1 de despliegue en
+   una base nueva, apuntar el backend anterior a ella y verificar con las consultas de integridad
+   (sección 5).
+5. No usar `flyway repair` en producción sin entender la causa: solo limpia el historial, no
+   deshace cambios.
 
 ---
 
