@@ -41,10 +41,10 @@ class PlanRulesIntegrationTest {
     @BeforeEach void setup() throws Exception {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security).build();
         token = account();
-        request(put("/api/v1/my-plan"), Map.of("meals", List.of(
+        request(put("/api/v1/my-plan"), uy.miga.PlanVersions.withCurrentVersion(mvc, token, Map.of("meals", List.of(
             Map.of("name", "Desayuno", "displayOrder", 1, "portions", List.of(Map.of("foodGroupAbbr", "PRO", "portions", 1))),
             Map.of("name", "Almuerzo", "displayOrder", 2, "portions", List.of(Map.of("foodGroupAbbr", "CER", "portions", 1))),
-            Map.of("name", "Cena", "displayOrder", 3, "portions", List.of(Map.of("foodGroupAbbr", "GRA", "portions", 1))))), 200);
+            Map.of("name", "Cena", "displayOrder", 3, "portions", List.of(Map.of("foodGroupAbbr", "GRA", "portions", 1)))))), 200);
         state = request(get(BASE+"reglas"), null, 200);
     }
     String account() throws Exception {
@@ -119,7 +119,7 @@ class PlanRulesIntegrationTest {
         // The UID is real, but belongs to a different user.
         String owner = token; JsonNode ownerState = state;
         token = account();
-        request(put("/api/v1/my-plan"), Map.of("meals",List.of(Map.of("name","Otra", "displayOrder",1,"portions",List.of(Map.of("foodGroupAbbr","PRO","portions",1))))),200);
+        request(put("/api/v1/my-plan"), uy.miga.PlanVersions.withCurrentVersion(mvc, token, Map.of("meals",List.of(Map.of("name","Otra", "displayOrder",1,"portions",List.of(Map.of("foodGroupAbbr","PRO","portions",1)))))),200);
         state = request(get(BASE+"reglas"),null,200);
         Map<String,Object> foreignValues = new HashMap<>(values);
         if (resource.equals("alimentos")) foreignValues.put("groupUid", group("Proteínas").path("uid").asText());
@@ -296,7 +296,7 @@ class PlanRulesIntegrationTest {
         long own=state.path("planId").asLong();
         String ownerToken=token;
         token=account();
-        request(put("/api/v1/my-plan"),Map.of("meals",List.of(Map.of("name","Ajena","displayOrder",1,"portions",List.of(Map.of("foodGroupAbbr","PRO","portions",1))))),200);
+        request(put("/api/v1/my-plan"),uy.miga.PlanVersions.withCurrentVersion(mvc, token, Map.of("meals",List.of(Map.of("name","Ajena","displayOrder",1,"portions",List.of(Map.of("foodGroupAbbr","PRO","portions",1)))))),200);
         long foreign=request(get(BASE+"reglas"),null,200).path("planId").asLong(); token=ownerToken;
         UUID uid=UUID.randomUUID();
         jdbc.update("insert into food_rules(uid,plan_id,alcance,alimento,tipo) values (?,?,'PLAN','Ajeno','LIBRE')",uid,foreign);
@@ -318,9 +318,9 @@ class PlanRulesIntegrationTest {
     void successiveMealSavesIncreaseRevisionAndRejectStaleMutation() throws Exception {
         long previous = state.path("planVersion").asLong();
         for (int portions : List.of(2, 3)) {
-            request(put("/api/v1/my-plan"), Map.of("meals", List.of(
+            request(put("/api/v1/my-plan"), uy.miga.PlanVersions.withCurrentVersion(mvc, token, Map.of("meals", List.of(
                 Map.of("name", "Desayuno", "displayOrder", 1, "portions",
-                    List.of(Map.of("foodGroupAbbr", "PRO", "portions", portions))))), 200);
+                    List.of(Map.of("foodGroupAbbr", "PRO", "portions", portions)))))), 200);
             state = request(get(BASE + "reglas"), null, 200);
             assertThat(state.path("planVersion").asLong()).isGreaterThan(previous);
             JsonNode error = request(post(BASE + "grupos"),
@@ -349,8 +349,8 @@ class PlanRulesIntegrationTest {
         var yesterdayNotes = jdbc.queryForList("select * from meal_notes where plan_id=? and fecha=?", oldPlan, today.minusDays(1));
         var yesterdayItems = jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, today.minusDays(1));
         if (saveMeals) {
-            request(put("/api/v1/my-plan"), Map.of("meals", List.of(Map.of("name", "Desayuno", "displayOrder", 1,
-                "portions", List.of(Map.of("foodGroupAbbr", "PRO", "portions", 2))))), 200);
+            request(put("/api/v1/my-plan"), uy.miga.PlanVersions.withCurrentVersion(mvc, token, Map.of("meals", List.of(Map.of("name", "Desayuno", "displayOrder", 1,
+                "portions", List.of(Map.of("foodGroupAbbr", "PRO", "portions", 2)))))), 200);
             state = request(get(BASE + "reglas"), null, 200);
         } else {
             state = request(put(BASE + "habitos/" + habitUid), body(Map.of("name", "Agua editada",

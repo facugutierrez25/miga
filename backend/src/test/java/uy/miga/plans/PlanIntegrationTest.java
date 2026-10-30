@@ -87,7 +87,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(planJson))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, planJson)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.foodGroups").isArray())
                 .andExpect(jsonPath("$.meals[0].name").value("Desayuno"))
@@ -104,7 +104,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, """
                         {
                           "meals": [
                             {
@@ -116,7 +116,7 @@ class PlanIntegrationTest {
                             }
                           ]
                         }
-                        """))
+                        """)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -185,13 +185,13 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + histToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(primerPlan))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, histToken, primerPlan)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + histToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(segundoPlan))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, histToken, segundoPlan)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meals[0].name").value("Almuerzo"))
                 .andExpect(jsonPath("$.meals[1].name").value("Cena"));
@@ -249,13 +249,13 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(plan))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, plan)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(plan))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, plan)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/my-plan/historial")
@@ -288,7 +288,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_UNA_COMIDA))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").isNumber());
     }
@@ -300,7 +300,7 @@ class PlanIntegrationTest {
         MvcResult first = mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_UNA_COMIDA))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -340,7 +340,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_UNA_COMIDA))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
                 .andExpect(status().isOk());
 
         String planVersionObsoleta = """
@@ -370,13 +370,13 @@ class PlanIntegrationTest {
     }
 
     @Test
-    void saveMyPlan_withoutClientVersion_allowsOverwrite() throws Exception {
+    void saveMyPlan_withoutClientVersion_whenPlanExists_returnsConflict() throws Exception {
         String t = registerAndLogin("version-noenvio-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_UNA_COMIDA))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
                 .andExpect(status().isOk());
 
         String planSinVersion = """
@@ -400,12 +400,75 @@ class PlanIntegrationTest {
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(planSinVersion))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.meals[0].name").value("Cena"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PLAN_CONFLICT"));
     }
 
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test
+    void concurrentFirstCreations_leaveOneCurrentPlanAndLoserGetsConflict() throws Exception {
+        String email = "primera-" + java.util.UUID.randomUUID() + "@miga.uy";
+        String t = registerAndLogin(email);
+
+        java.util.List<Integer> statuses = runConcurrently(2, () -> mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_UNA_COMIDA))
+            .andReturn().getResponse().getStatus());
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(jdbc.queryForObject("""
+            select count(*) from plans p join users u on u.id = p.user_id
+            where p.is_current and u.email = ?
+            """, Long.class, email)).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentUpdatesWithSameVersion_onlyOneWins() throws Exception {
+        String t = registerAndLogin("dos-ediciones-" + java.util.UUID.randomUUID() + "@miga.uy");
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(PLAN_UNA_COMIDA))
+            .andExpect(status().isOk());
+        String edited = uy.miga.PlanVersions.withCurrentVersion(mockMvc, t,
+            PLAN_UNA_COMIDA.replace("Desayuno", "Desayuno editado"));
+
+        java.util.List<Integer> statuses = runConcurrently(2, () -> mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(edited))
+            .andReturn().getResponse().getStatus());
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+    }
+
+    // Lanza las tareas a la vez (con una barrera) y devuelve el status HTTP de cada una.
+    private java.util.List<Integer> runConcurrently(int count, java.util.concurrent.Callable<Integer> task)
+            throws Exception {
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(count);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int i = 0; i < count; i++) {
+                futures.add(executor.submit(() -> {
+                    start.await();
+                    return task.call();
+                }));
+            }
+            start.countDown();
+            var statuses = new java.util.ArrayList<Integer>();
+            for (var future : futures) {
+                statuses.add(future.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+            return statuses;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
 
     @Test
     void versionCopiesConfigurationRulesAndActiveHabits() throws Exception {
@@ -455,7 +518,7 @@ class PlanIntegrationTest {
 
     private void savePlan(String t, String json) throws Exception {
         mockMvc.perform(put("/api/v1/my-plan").header("Authorization", "Bearer " + t)
-                .contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, json))).andExpect(status().isOk());
     }
 
     private String registerAndLogin(String email) throws Exception {

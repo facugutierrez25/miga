@@ -65,7 +65,7 @@ class WeekIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk());
     }
 
@@ -173,7 +173,7 @@ class WeekIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + tokenB)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, tokenB, PLAN_JSON)))
             .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(get("/api/v1/semana")
