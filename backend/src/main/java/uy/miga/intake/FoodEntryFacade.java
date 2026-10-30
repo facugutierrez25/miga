@@ -38,6 +38,17 @@ public class FoodEntryFacade {
         return repository.save(entry).getId();
     }
 
+    @Transactional
+    public Long createMentionEntry(Long userId, String userEmail, Long mealId, LocalDate date,
+                                   String food, Double quantity, String unit, Long mealNoteId,
+                                   String originalText, Boolean uncertain, String appliedRule,
+                                   UUID occurrenceId, boolean recognized) {
+        Long id = createNoteEntry(userId, userEmail, mealId, date, food, quantity, unit,
+            null, mealNoteId, originalText, uncertain, null, appliedRule, occurrenceId);
+        repository.findById(id).orElseThrow().setOrigen(recognized ? "MENTION" : "UNKNOWN");
+        return id;
+    }
+
     // Volver a guardar una nota la reinterpreta entera: se descartan sus ítems,
     // incluidas las correcciones (para conservarlas se guardan como regla).
     @Transactional

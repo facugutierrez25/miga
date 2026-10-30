@@ -148,6 +148,12 @@ public class RegistroService {
         for (InterpretedItem mention : items) {
             UUID occurrenceId = UUID.randomUUID();
             String ruleText = describeRule(mention, rules, planId, groupNames);
+            if (!mention.recognized() || Set.of("LIBRE", "FLEXIBLE", "NO_CUENTA").contains(mention.tipo())) {
+                entryFacade.createMentionEntry(userId, userEmail, mealId, date, mention.foodName(),
+                    mention.quantity().doubleValue(), mention.unit(), saved.getId(), mention.originalText(),
+                    mention.recognized() && mention.uncertain(), ruleText, occurrenceId, mention.recognized());
+                continue;
+            }
             for (InterpretedItem item : expandCompound(List.of(mention), rules, planId)) {
                 if (!item.recognized() || item.foodGroupId() == null) continue;
                 entryFacade.createNoteEntry(
@@ -354,6 +360,9 @@ public class RegistroService {
         Long currentPlanId = lockCurrentPlanIfPresent(userId);
         FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
         if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (Set.of("MENTION", "UNKNOWN").contains(entry.origin() == null ? "" : entry.origin())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta mención no admite correcciones.");
+        }
         if (req.grupos() != null && (req.foodGroupId() != null || req.portions() != null)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Indicá un grupo o varios grupos, no ambos.");
