@@ -10,6 +10,7 @@ import {
 import type { PlanRules } from '../api/planRules'
 import PlanRulesSection from './plan/PlanRulesSection'
 import './MiPlanPage.css'
+import { usePlan } from '../hooks/usePlan'
 
 const DEFAULT_GRUPOS: PlanFoodGroupDto[] = [
   { id: -1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
@@ -119,23 +120,51 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
 type Tab = 'comidas' | 'rules'
 
 export default function MiPlanPage() {
+  const { token, email } = useAuth()
+  return <PlanLoader key={JSON.stringify([email, token])} />
+}
+
+function PlanLoader() {
+  useTitle('Mi plan | Miga')
+  const { token, email } = useAuth()
+  const { data, status, retry } = usePlan(token, email)
+  const [tab, setTab] = useState<Tab>('comidas')
+  return <PlanEditor initialPlan={data} loading={status === 'loading'} loadError={status === 'error'} retry={retry} tab={tab} setTab={setTab} />
+}
+
+function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
+  initialPlan: PlanDto | null; loading: boolean; loadError: boolean; retry: () => void
+  tab: Tab; setTab: (tab: Tab) => void
+}) {
   useTitle('Mi plan | Miga')
   const { token } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const desdeWizard = !!(location.state as { meals?: unknown } | null)?.meals
-  const [tab, setTab] = useState<Tab>('comidas')
-  const [grupos, setGrupos] = useState<PlanFoodGroupDto[]>(DEFAULT_GRUPOS)
-  const [comidas, setComidas] = useState<ComidaLocal[]>([])
-  const [cargando, setCargando] = useState(true)
+
+  const [grupos, setGrupos] = useState<PlanFoodGroupDto[]>(initialPlan?.foodGroups ?? DEFAULT_GRUPOS)
+  const [comidas, setComidas] = useState<ComidaLocal[]>(() => initialPlan ? planALocal(initialPlan) :
+    ((location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals ?? []).map(meal => ({
+      nombre: meal.name, hora: meal.suggestedTime?.slice(0, 5) ?? '',
+      porciones: porcionesVacias(DEFAULT_GRUPOS), minimizada: false,
+    })))
+  const [cargando, setCargando] = useState(false)
   const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
   const [planDetalle, setPlanDetalle] = useState<PlanSummaryDto | null>(null)
-  const [planVersion, setPlanVersion] = useState<number | undefined>(undefined)
+  const [planVersion, setPlanVersion] = useState<number | undefined>(initialPlan?.version)
   const [confirmando, setConfirmando] = useState(false)
   const [confirmado, setConfirmado] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conflicto, setConflicto] = useState(false)
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null)
+  const [loadedPlan, setLoadedPlan] = useState(initialPlan)
+  if (loadedPlan !== initialPlan) {
+    setLoadedPlan(initialPlan)
+    setGrupos(initialPlan?.foodGroups ?? DEFAULT_GRUPOS)
+    setComidas(initialPlan ? planALocal(initialPlan) : [])
+    setPlanVersion(initialPlan?.version)
+  }
+
 
   // Una edición de reglas puede crear una versión nueva del plan con otros ids de
   // grupos: se recargan las comidas para no confirmar porciones con ids viejos.
@@ -152,34 +181,14 @@ export default function MiPlanPage() {
       .catch(() => {})
   }, [token])
 
-  const locationDraftMeals = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
-
   useEffect(() => {
     if (!token) return
-    getMyPlan(token)
-      .then(dto => {
-        setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
-        setComidas(planALocal(dto))
-        setPlanVersion(dto.version)
-      })
-      .catch(err => {
-        if (err.message === 'sin-plan') {
-          if (locationDraftMeals) {
-            setComidas(locationDraftMeals.map(m => ({
-              nombre: m.name,
-              hora: m.suggestedTime ? m.suggestedTime.slice(0, 5) : '',
-              porciones: porcionesVacias(DEFAULT_GRUPOS),
-              minimizada: false,
-            })))
-          }
-        } else {
-          console.error(err)
-        }
-      })
-      .finally(() => setCargando(false))
-
-    getPlanHistory(token).then(setHistorial).catch(() => {})
-  }, [token, locationDraftMeals])
+    const controller = new AbortController()
+    getPlanHistory(token, controller.signal).then(data => {
+      if (!controller.signal.aborted) setHistorial(data)
+    }).catch(() => {})
+    return () => controller.abort()
+  }, [token])
 
   function actualizarNombre(i: number, nombre: string) {
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, nombre } : c))
@@ -294,7 +303,9 @@ export default function MiPlanPage() {
         <div id="plan-panel" role="tabpanel" aria-labelledby={tab === 'rules' ? 'plan-tab-rules' : 'plan-tab-meals'}>
         {tab === 'rules' ? (
           <PlanRulesSection token={token} onChanged={handleRulesChanged} />
-        ) : cargando ? (
+        ) : loadError ? (
+          <p role="alert">No se pudo cargar el plan. <button onClick={retry}>Reintentar</button></p>
+        ) : cargando || loading ? (
           <p className="mi-plan-loading">Cargando tu plan…</p>
         ) : (
           <>

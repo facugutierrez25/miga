@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
-import { exportWeekCsv, getWeek, logHabit, type HabitDto, type HabitLogDto, type WeekDayDto, type WeekSummaryDto } from '../api/semana'
+import { exportWeekCsv, logHabit, type HabitDto, type HabitLogDto, type WeekDayDto } from '../api/semana'
 import './SemanaPage.css'
+import { useWeek } from '../hooks/useWeek'
+import { useAhora } from '../hooks/useAhora'
 
 const DIAS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -140,32 +142,11 @@ function DayCard({ day, habits, token, todayISO, onLogUpdated }: DayCardProps) {
 
 export default function SemanaPage() {
   useTitle('Semana | Miga')
-  const { token } = useAuth()
+  const { token, email } = useAuth()
   const [refDate, setRefDate] = useState(() => mondayOf(toISO(new Date())))
-  const [week, setWeek] = useState<WeekSummaryDto | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!token) return
-    const controller = new AbortController()
-    setLoading(true)
-    setError(null)
-    getWeek(token, refDate, controller.signal)
-      .then(w => { setWeek(w); setLoading(false) })
-      .catch((e: Error) => {
-        if (e.name !== 'AbortError') {
-          setError('No se pudo cargar la semana.')
-          setLoading(false)
-        }
-      })
-    return () => controller.abort()
-  }, [token, refDate])
-
-  const load = useCallback(
-    (date: string) => { setRefDate(date) },
-    [],
-  )
+  const { data: week, setData: setWeek, status, retry } = useWeek(token, email, refDate)
+  const loading = status === 'loading'
+  const error = status === 'error' ? 'No se pudo cargar la semana.' : null
 
   function handleLogUpdated(log: HabitLogDto) {
     setWeek(prev => {
@@ -184,7 +165,7 @@ export default function SemanaPage() {
     })
   }
 
-  const hoy = useMemo(() => toISO(new Date()), [])
+  const hoy = toISO(useAhora())
   const isCurrentWeek = week ? week.weekStart <= hoy && hoy <= week.weekEnd : false
 
   return (
@@ -227,7 +208,7 @@ export default function SemanaPage() {
       {error && (
         <div className="semana-estado semana-estado--error">
           <span>{error}</span>
-          <button onClick={() => load(refDate)} className="semana-retry">Reintentar</button>
+          <button onClick={retry} className="semana-retry">Reintentar</button>
         </div>
       )}
 

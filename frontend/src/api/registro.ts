@@ -1,29 +1,17 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+import { apiRequest, ApiError } from './client'
 
 // ── Legacy endpoints (mantenidos por compatibilidad) ──────────────────────
 
 export async function getLog(token: string, date: string): Promise<number[]> {
-  const res = await fetch(`${API_URL}/api/v1/meal-log/${date}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al cargar el registro.')
-  return res.json()
+  return apiRequest(`/api/v1/meal-log/${date}`, { errorMessage: 'Error al cargar el registro.', token })
 }
 
 export async function markMealEaten(token: string, mealId: number, date: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/meal-log/${date}/${mealId}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al marcar la comida.')
+  return apiRequest(`/api/v1/meal-log/${date}/${mealId}`, { errorMessage: 'Error al marcar la comida.', token, method: 'POST' })
 }
 
 export async function unmarkMealEaten(token: string, mealId: number, date: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/meal-log/${date}/${mealId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al desmarcar la comida.')
+  return apiRequest(`/api/v1/meal-log/${date}/${mealId}`, { errorMessage: 'Error al desmarcar la comida.', token, method: 'DELETE' })
 }
 
 // ── Tipos del registro nuevo ──────────────────────────────────────────────
@@ -130,15 +118,12 @@ export async function getDayRegistro(
   date: string,
   signal?: AbortSignal,
 ): Promise<DayRegistroDto> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal,
-  })
-  if (!res.ok) throw new Error('Error al cargar el registro del día.')
-  return res.json()
+  return apiRequest(`/api/v1/registro/${date}`, { errorMessage: 'Error al cargar el registro del día.', token, signal })
 }
 
-export class NoteConflictError extends Error {}
+export class NoteConflictError extends ApiError {
+  constructor(message: string, details: Record<string, unknown> = {}) { super(409, message, details) }
+}
 
 export async function saveNota(
   token: string,
@@ -147,17 +132,13 @@ export async function saveNota(
   text: string,
   version: number | null,
 ): Promise<NoteInterpretationDto> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}/comidas/${mealId}/nota`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ text, version }),
-  })
-  if (res.status === 409) {
-    const body = await res.json()
-    if (body.code === 'NOTE_CONFLICT') throw new NoteConflictError(body.error)
+  try {
+    return await apiRequest(`/api/v1/registro/${date}/comidas/${mealId}/nota`, { errorMessage: 'Error al guardar la nota.', token, method: 'PUT', body: { text, version } })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    throw err
   }
-  if (!res.ok) throw new Error('Error al guardar la nota.')
-  return res.json()
+
 }
 
 export async function patchItem(
@@ -166,13 +147,7 @@ export async function patchItem(
   itemId: number,
   req: PatchItemRequest,
 ): Promise<PatchItemResultDto> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}/items/${itemId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Error al actualizar el ítem.')
-  return res.json()
+  return apiRequest(`/api/v1/registro/${date}/items/${itemId}`, { errorMessage: 'Error al actualizar el ítem.', token, method: 'PATCH', body: req })
 }
 
 export async function saveRespuesta(
@@ -181,12 +156,7 @@ export async function saveRespuesta(
   mealId: number,
   req: RespuestaRequest,
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}/comidas/${mealId}/respuestas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Error al guardar la respuesta.')
+  return apiRequest(`/api/v1/registro/${date}/comidas/${mealId}/respuestas`, { errorMessage: 'Error al guardar la respuesta.', token, method: 'POST', body: req })
 }
 
 export async function getSugerencias(
@@ -194,10 +164,10 @@ export async function getSugerencias(
   mealId: number,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  const res = await fetch(`${API_URL}/api/v1/registro/sugerencias?mealId=${mealId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal,
-  })
-  if (!res.ok) return []
-  return res.json()
+  try {
+    return await apiRequest(`/api/v1/registro/sugerencias?mealId=${mealId}`, { token, signal })
+  } catch (err) {
+    if (err instanceof ApiError) return []
+    throw err
+  }
 }

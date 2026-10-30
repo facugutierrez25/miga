@@ -1,3 +1,5 @@
+import { apiRequest, ApiError } from './client'
+
 export interface PlanGroup {
   id: number; uid: string; name: string; abbreviation: string; displayOrder: number
   color: string | null; clave: string | null; metaDiaria: number | null; preguntarSiFalta: boolean; opcional: boolean
@@ -16,21 +18,26 @@ export interface PlanRules { planId: number; planVersion: number; modoRegistro: 
 export interface GroupInput { name: string; abbreviation?: string; clave: string | null; color: string | null; metaDiaria: number | null; preguntarSiFalta: boolean; opcional: boolean }
 export interface CatalogItem { uid: string; alcance: string; alimento: string; sinonimos: string[]; tipo: RuleType; groupUid: string | null; textoRegla: string; ajustadoPorUid: string | null }
 export type ErrorCode = 'VERSION_CONFLICT' | 'GROUP_IN_USE' | 'DUPLICATE' | 'VALIDATION' | 'NOT_FOUND'
-export class PlanRulesError extends Error {
-  code: ErrorCode
-  error: string
-  comidas?: number
-  alimentos?: number
-  constructor(code: ErrorCode, error: string, comidas?: number, alimentos?: number) { super(error); this.code = code; this.error = error; this.comidas = comidas; this.alimentos = alimentos }
-}
-const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api/v1/my-plan`
-async function request<T>(token: string, path: string, method = 'GET', body?: unknown): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) })
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}))
-    throw new PlanRulesError(data.code, data.error ?? 'No se pudo guardar. Intentá de nuevo.', data.comidas, data.alimentos)
+export class PlanRulesError extends ApiError {
+  declare readonly code: ErrorCode
+  declare readonly error: string
+  readonly comidas?: number
+  readonly alimentos?: number
+  constructor(code: ErrorCode, error: string, comidas?: number, alimentos?: number, status = 409) {
+    super(status, error, { code, error, comidas, alimentos })
+    this.comidas = comidas
+    this.alimentos = alimentos
   }
-  return response.json()
+}
+async function request<T>(token: string, path: string, method = 'GET', body?: unknown): Promise<T> {
+  try {
+    return await apiRequest<T>(`/api/v1/my-plan${path}`, { token, method, body })
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err
+    throw new PlanRulesError(err.code as ErrorCode, err.error ?? 'No se pudo guardar. Intentá de nuevo.',
+      typeof err.details.comidas === 'number' ? err.details.comidas : undefined,
+      typeof err.details.alimentos === 'number' ? err.details.alimentos : undefined, err.status)
+  }
 }
 export const getPlanRules = (token: string) => request<PlanRules>(token, '/reglas')
 export const createGroup = (token: string, body: GroupInput & { planVersion: number }) => request<PlanRules>(token, '/grupos', 'POST', body)

@@ -4,13 +4,15 @@ import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
-import { getMyPlan, type PlanFoodGroupDto, type MealDto, type PlanDto } from '../api/plans'
+import { type PlanFoodGroupDto, type MealDto } from '../api/plans'
 import {
-  NoteConflictError, getDayRegistro, saveNota, patchItem, saveRespuesta, getSugerencias,
+  NoteConflictError, saveNota, patchItem, saveRespuesta, getSugerencias,
   type DayRegistroDto, type MealDayDto, type EntryItemDto,
   type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
 import './HoyPage.css'
+import { usePlan } from '../hooks/usePlan'
+import { useDayRegistro } from '../hooks/useDayRegistro'
 
 const ABBR_DOT: Record<string, string> = {
   PRO: 'var(--g-prot)', CER: 'var(--g-cer)', FRU: 'var(--g-frut)',
@@ -350,7 +352,7 @@ function NotaMealSection({
   const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
   const [conflict, setConflict] = useState(false)
   const [sugerencias, setSugerencias] = useState<string[]>([])
-  const [cargandoSug, setCargandoSug] = useState(false)
+  const [cargandoSug, setCargandoSug] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -370,7 +372,6 @@ function NotaMealSection({
   useEffect(() => {
     if (!isOpen || !meal.id) return
     const controller = new AbortController()
-    setCargandoSug(true)
     getSugerencias(token, meal.id!, controller.signal)
       .then(s => { if (!controller.signal.aborted) setSugerencias(s) })
       .catch(() => {})
@@ -591,48 +592,30 @@ function calcResumenDeDay(
 // ── HoyPage ────────────────────────────────────────────────────────────────
 
 export default function HoyPage() {
+  const { token, email } = useAuth()
+  return <HoyContent key={JSON.stringify([email, token])} />
+}
+
+function HoyContent() {
   useTitle('Hoy | Miga')
   const ahora = useAhora()
   const HOY = toISO(ahora)
   const { token, email, firstName } = useAuth()
   const [fecha, setFecha] = useState(HOY)
-  const [plan, setPlan] = useState<PlanDto | null>(null)
-  const [sinPlan, setSinPlan] = useState(false)
-  const [cargando, setCargando] = useState(true)
-  const [dayRegistro, setDayRegistro] = useState<DayRegistroDto | null>(null)
-  const [diaError, setDiaError] = useState(false)
-  const [diaRetry, setDiaRetry] = useState(0)
+  const planLoad = usePlan(token, email)
+  const plan = planLoad.data
+  const sinPlan = planLoad.status === 'empty' && !plan
+  const { data: dayRegistro, setData: setDayRegistro, status: dayStatus, retry: retryDay, reload: reloadDay } = useDayRegistro(token, email, fecha)
+  const cargando = planLoad.status === 'loading' || (!!plan && dayStatus === 'loading' && !dayRegistro)
+  const diaError = dayStatus === 'error'
 
-  const hoyAnterior = useRef(HOY)
-  useEffect(() => {
-    if (hoyAnterior.current === HOY) return
-    const anterior = hoyAnterior.current
-    hoyAnterior.current = HOY
-    setFecha(f => (f === anterior ? HOY : f))
-  }, [HOY])
-
-  useEffect(() => {
-    if (!token) return
-    getMyPlan(token)
-      .then(data => setPlan(data))
-      .catch(err => { if (err.message === 'sin-plan') setSinPlan(true) })
-      .finally(() => setCargando(false))
-  }, [token])
-
-  useEffect(() => {
-    if (!token) return
-    const controller = new AbortController()
-    getDayRegistro(token, fecha, controller.signal)
-      .then(data => { setDayRegistro(data); setDiaError(false) })
-      .catch(err => {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        setDiaError(true)
-      })
-    return () => controller.abort()
-  }, [token, fecha, diaRetry])
+  const [previousToday, setPreviousToday] = useState(HOY)
+  if (previousToday !== HOY) {
+    setPreviousToday(HOY)
+    if (fecha === previousToday) setFecha(HOY)
+  }
 
   function irDia(delta: number) {
-    setDayRegistro(null)
     setFecha(f => sumarDias(f, delta))
   }
 
@@ -668,7 +651,7 @@ export default function HoyPage() {
         : [...prev.meals, updatedMeal]
       return { ...prev, meals }
     })
-  }, [])
+  }, [setDayRegistro])
 
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRegistro(prev => {
@@ -684,16 +667,15 @@ export default function HoyPage() {
       return { ...prev, meals }
     })
     if (token) {
-      getDayRegistro(token, fecha).then(setDayRegistro).catch(() => {})
+      reloadDay().catch(() => {})
     }
-  }, [token, fecha])
+  }, [token, reloadDay, setDayRegistro])
 
   const handleRespuestaGuardada = useCallback((_mealId: number) => {
     if (!token) return
-    getDayRegistro(token, fecha)
-      .then(data => setDayRegistro(data))
+    reloadDay()
       .catch(() => {})
-  }, [token, fecha])
+  }, [token, reloadDay])
 
   const esHoy = fecha === HOY
   const nombre = firstName ?? formatNombre(email ?? undefined)
@@ -749,6 +731,8 @@ export default function HoyPage() {
 
         {cargando ? (
           <p className="hoy-loading">Cargando tu día…</p>
+        ) : planLoad.status === 'error' ? (
+          <p role="alert">No se pudo cargar el plan. <button onClick={planLoad.retry}>Reintentar</button></p>
         ) : sinPlan ? (
           <div className="hoy-sin-plan">
             <p className="hoy-sin-plan__titulo">Todavía no tenés un plan</p>
@@ -765,7 +749,7 @@ export default function HoyPage() {
                 No se pudo cargar el registro del día.{' '}
                 <button
                   className="hoy-intake-error__retry"
-                  onClick={() => setDiaRetry(n => n + 1)}
+                  onClick={retryDay}
                   type="button"
                 >
                   Reintentar
@@ -876,11 +860,7 @@ export default function HoyPage() {
                     {meal.id !== undefined && (
                       <NotaMealSection
                         key={fecha}
-                        onReload={async () => {
-                          const data = await getDayRegistro(token!, fecha)
-                          setDayRegistro(data)
-                          return data
-                        }}
+                        onReload={reloadDay}
                         meal={meal}
                         mealDay={mealDay}
                         date={fecha}
