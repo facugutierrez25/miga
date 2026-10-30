@@ -72,8 +72,8 @@ test('expande una comida al hacer clic en editar', async () => {
     meals: [{ name: 'Almuerzo', displayOrder: 1, portions: [] }],
   })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByLabelText('Editar comida'))
-  fireEvent.click(screen.getByLabelText('Editar comida'))
+  await waitFor(() => screen.getByLabelText('Editar Almuerzo'))
+  fireEvent.click(screen.getByLabelText('Editar Almuerzo'))
   expect(screen.getByDisplayValue('Almuerzo')).toBeInTheDocument()
 })
 
@@ -166,8 +166,31 @@ test('cierra el modal al hacer click en el overlay', async () => {
   await waitFor(() => screen.getByText('1 comidas'))
   fireEvent.click(screen.getByText('1 comidas'))
   expect(screen.getByRole('dialog')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('dialog'))
+  fireEvent.click(screen.getByRole('dialog').parentElement!)
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+test('el detalle del plan enfoca su primer control, cierra con Escape y devuelve el foco', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  mockGetPlanHistory.mockResolvedValue([{
+    createdAt: '2026-09-01',
+    supersededAt: '2026-10-01',
+    mealCount: 1,
+    foodGroups: gruposDefault,
+    meals: [{ name: 'Cena', portions: [] }],
+  }])
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => screen.getByText('1 comidas'))
+  const trigger = screen.getByText('1 comidas').closest('button') ?? screen.getByText('1 comidas')
+  ;(trigger as HTMLElement).focus()
+  fireEvent.click(trigger)
+
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.contains(document.activeElement)).toBe(true)
+  fireEvent.keyDown(document, { key: 'Escape' })
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
 })
 
 test('abre Reglas de tu plan con una pestaña accesible', async () => {

@@ -24,10 +24,10 @@
 }
 
 .mi-plan-body {
-  padding: 14px 14px 32px;
+  padding: 16px 16px 32px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   max-width: 480px;
   margin: 0 auto;
 }
@@ -350,12 +350,15 @@
   gap: 4px;
 }
 
+/* Número y nombre en --ink: el color del grupo sobre su propio tinte no llega a 4,5:1.
+   El color del grupo queda en el tinte y en el borde. */
 .porcion-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border-radius: var(--radius-sm);
-  padding: 3px 8px;
+  gap: 4px;
+  border-radius: var(--radius-chip);
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  padding: 4px 8px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -377,12 +380,6 @@
 .porcion-chip--FATS       { background: color-mix(in srgb, var(--g-gras) 14%, transparent); color: var(--ink); }
 .porcion-chip--VEGETABLES { background: color-mix(in srgb, var(--g-verd) 14%, transparent); color: var(--ink); }
 
-.porcion-chip--PROTEINS   .porcion-chip__num { color: var(--g-prot); }
-.porcion-chip--GRAINS     .porcion-chip__num { color: var(--g-cer);  }
-.porcion-chip--FRUITS     .porcion-chip__num { color: var(--g-frut); }
-.porcion-chip--DAIRY      .porcion-chip__num { color: var(--g-lac);  }
-.porcion-chip--FATS       .porcion-chip__num { color: var(--g-gras); }
-.porcion-chip--VEGETABLES .porcion-chip__num { color: var(--g-verd); }
 
 .btn-editar {
   grid-area: edit;
@@ -838,8 +835,9 @@
   background: transparent;
   border: 1.5px solid var(--error);
   color: var(--error);
-  border-radius: var(--radius-sm);
-  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  min-height: 44px;
+  padding: 8px 16px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
