@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import uy.miga.plans.PlanService;
+import uy.miga.users.UserService;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -11,36 +14,48 @@ import java.util.List;
 class FoodEntryService {
 
     private final FoodEntryRepository repository;
+    private final UserService userService;
+    private final PlanService planService;
 
-    FoodEntryService(FoodEntryRepository repository) {
+    FoodEntryService(FoodEntryRepository repository, UserService userService, PlanService planService) {
         this.repository = repository;
+        this.userService = userService;
+        this.planService = planService;
     }
 
     @Transactional(readOnly = true)
     List<FoodEntryDto> getEntriesForDay(String userEmail, LocalDate date) {
-        return repository.findByUserEmailAndDateOrderByIdAsc(userEmail, date)
-            .stream()
-            .map(this::toDto)
-            .toList();
+        Long userId = userService.findUserIdByEmail(userEmail);
+        return repository.findByUserIdAndDateOrderByIdAsc(userId, date)
+            .stream().map(this::toDto).toList();
     }
 
     @Transactional
     FoodEntryDto addEntry(String userEmail, Long mealId, LocalDate date,
                           String food, Double quantity, String unit, Long foodGroupId) {
-        FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
+        Long userId = userService.findUserIdByEmail(userEmail);
+        if (!planService.mealBelongsToUser(mealId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
         return toDto(repository.save(entry));
     }
 
     @Transactional
     void deleteEntry(String userEmail, Long id) {
-        FoodEntry entry = repository.findByIdAndUserEmail(id, userEmail)
+        Long userId = userService.findUserIdByEmail(userEmail);
+        FoodEntry entry = repository.findByIdAndUserId(id, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         repository.delete(entry);
     }
 
     @Transactional
     void markConsumed(String userEmail, Long mealId, LocalDate date, boolean consumed) {
-        repository.setConsumedByMeal(userEmail, mealId, date, consumed);
+        Long userId = userService.findUserIdByEmail(userEmail);
+        if (!planService.mealBelongsToUser(mealId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        repository.setConsumedByMeal(userId, mealId, date, consumed);
     }
 
     private FoodEntryDto toDto(FoodEntry e) {

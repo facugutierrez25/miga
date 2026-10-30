@@ -13,6 +13,9 @@ class FoodEntry {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
     @Column(name = "user_email", nullable = false)
     private String userEmail;
 
@@ -57,8 +60,9 @@ class FoodEntry {
 
     FoodEntry() {}
 
-    FoodEntry(String userEmail, Long mealId, LocalDate date,
+    FoodEntry(Long userId, String userEmail, Long mealId, LocalDate date,
               String food, Double quantity, String unit, Long foodGroupId) {
+        this.userId = userId;
         this.userEmail = userEmail;
         this.mealId = mealId;
         this.date = date;
@@ -69,6 +73,7 @@ class FoodEntry {
     }
 
     Long getId()             { return id; }
+    Long getUserId()         { return userId; }
     String getUserEmail()    { return userEmail; }
     Long getMealId()         { return mealId; }
     LocalDate getDate()      { return date; }

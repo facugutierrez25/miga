@@ -10,12 +10,16 @@ import java.util.List;
 import java.util.Optional;
 
 interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
+    List<FoodEntry> findByUserIdAndDateOrderByIdAsc(Long userId, LocalDate date);
+    Optional<FoodEntry> findByIdAndUserId(Long id, Long userId);
+
+    // Legacy queries kept for backward compatibility during transition
     List<FoodEntry> findByUserEmailAndDateOrderByIdAsc(String userEmail, LocalDate date);
     Optional<FoodEntry> findByIdAndUserEmail(Long id, String userEmail);
 
     @Modifying
-    @Query("UPDATE FoodEntry e SET e.consumed = :consumed WHERE e.userEmail = :userEmail AND e.mealId = :mealId AND e.date = :date")
-    void setConsumedByMeal(@Param("userEmail") String userEmail,
+    @Query("UPDATE FoodEntry e SET e.consumed = :consumed WHERE e.userId = :userId AND e.mealId = :mealId AND e.date = :date")
+    void setConsumedByMeal(@Param("userId") Long userId,
                            @Param("mealId") Long mealId,
                            @Param("date") LocalDate date,
                            @Param("consumed") boolean consumed);
