@@ -82,3 +82,8 @@ info:
     name: '@project.name@'
     version: '@project.version@'
     description: '@project.description@'
+
+logging:
+  pattern:
+    # Cada línea lleva el correlationId de la petición (vacío fuera de una petición HTTP).
+    level: "%5p [correlationId=%X{correlationId:-}]"
