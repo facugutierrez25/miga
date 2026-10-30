@@ -109,11 +109,7 @@ public class ReglaService {
 
     @Transactional
     public FoodRuleDto createUserRule(Long userId, Long planId, RuleInput in) {
-        if (repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
-            .anyMatch(r -> normalize(r.getAlimento()).equals(normalize(in.alimento())))) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
-        }
+        checkDuplicateName(userId, planId, null, in.alimento());
         FoodRule rule = new FoodRule();
         rule.setUserId(userId);
         rule.setPlanId(planId);
@@ -130,18 +126,37 @@ public class ReglaService {
             return createUserRule(userId, planId, in);
         }
         FoodRule rule = existing.get();
-        apply(rule, new RuleInput(in.alimento(), in.sinonimos(), in.tipo(), in.foodGroupId(),
+        var aliases = new java.util.LinkedHashMap<String, String>();
+        if (rule.getSinonimos() != null) {
+            rule.getSinonimos().forEach(alias -> aliases.putIfAbsent(normalize(alias), alias));
+        }
+        if (in.sinonimos() != null) {
+            in.sinonimos().forEach(alias -> aliases.putIfAbsent(normalize(alias), alias));
+        }
+        apply(rule, new RuleInput(in.alimento(), List.copyOf(aliases.values()), in.tipo(), in.foodGroupId(),
             in.cantidadPorPorcion(), in.unidad(), in.porcionPorDefecto(), in.componentes(), rule.getOverridesRuleUid()));
         return toDto(rule);
     }
 
     @Transactional
     public FoodRuleDto updateUserRule(Long userId, Long planId, java.util.UUID uid, RuleInput in) {
-        FoodRule rule = userRule(userId, planId, uid); apply(rule, in); return toDto(rule);
+        FoodRule rule = userRule(userId, planId, uid);
+        checkDuplicateName(userId, planId, uid, in.alimento());
+        apply(rule, in);
+        return toDto(rule);
     }
 
     @Transactional
     public void deleteUserRule(Long userId, Long planId, java.util.UUID uid) { repository.delete(userRule(userId, planId, uid)); }
+
+    private void checkDuplicateName(Long userId, Long planId, java.util.UUID excludedUid, String name) {
+        if (repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
+            .anyMatch(rule -> !rule.getUid().equals(excludedUid)
+                && normalize(rule.getAlimento()).equals(normalize(name)))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
+        }
+    }
 
     private void apply(FoodRule rule, RuleInput in) {
         if (in.alimento() == null || in.alimento().isBlank() || in.alimento().length() > 200 ||

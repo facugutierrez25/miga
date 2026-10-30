@@ -115,6 +115,12 @@ public class FoodEntryFacade {
         return repository.save(entry).getId();
     }
 
+    @Transactional
+    public void detachGroup(Long groupId) {
+        repository.findByFoodGroupId(groupId).forEach(entry -> entry.setFoodGroupId(null));
+        repository.flush();
+    }
+
     private EntryData toEntryData(FoodEntry e) {
         return new EntryData(
             e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),

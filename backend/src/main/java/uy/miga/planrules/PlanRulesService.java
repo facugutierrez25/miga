@@ -75,6 +75,7 @@ class PlanRulesService {
             Long groupId = plans.findGroupIdByUid(id, uid);
             int meals = plans.countMealPortions(id, groupId), foods = rules.countGroupReferences(id, groupId);
             if (meals + foods > 0) throw new GroupInUseException(plans.getPlanFoodGroups(id).stream().filter(g -> g.uid().equals(uid)).findFirst().orElseThrow().name(), meals, foods);
+            entries.detachGroup(groupId);
             plans.deleteGroup(id, uid);
         });
     }

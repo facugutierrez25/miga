@@ -380,4 +380,77 @@ class PlanRulesIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from plan_food_groups where id=?", Integer.class, groupId)).isZero();
     }
 
+    @Test
+    void newTodayNoteRejectsMealFromOldVersionAfterFork() throws Exception {
+        long staleMeal = meals().getFirst();
+        note(staleMeal, LocalDate.now().minusDays(1), "1 manzana");
+        addGroup("Dispara copia", Map.of());
+
+        JsonNode error = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + staleMeal + "/nota"),
+            Map.of("text", "1 manzana"), 409);
+
+        assertThat(error.path("code").asText()).isEqualTo("VERSION_CONFLICT");
+        note(staleMeal, LocalDate.now().minusDays(1), "2 manzanas");
+    }
+
+    @Test
+    void deletingGroupDetachesMovedGlobalEntryAndPreservesSnapshot() throws Exception {
+        addGroup("Grupo global", Map.of("clave", "review2_global"));
+        String uid = group("Grupo global").path("uid").asText();
+        long oldGroup = group("Grupo global").path("id").asLong();
+        jdbc.update("insert into food_rules(uid,alcance,alimento,tipo,standard_group_key,cantidad_por_porcion,unidad,porcion_por_defecto) values (?,'GLOBAL','prueba global review','NORMAL','review2_global',1,'u',1)", UUID.randomUUID());
+        long oldPlan = state.path("planId").asLong();
+        note(meals().getFirst(), LocalDate.now(), "2 prueba global review u");
+        addGroup("Copia", Map.of());
+        assertThat(state.path("planId").asLong()).isNotEqualTo(oldPlan);
+        long movedGroup = group("Grupo global").path("id").asLong();
+        assertThat(movedGroup).isNotEqualTo(oldGroup);
+        var snapshot = jdbc.queryForMap("select id, porciones, applied_rule from food_entries where food_group_id=?", movedGroup);
+
+        state = request(delete(BASE + "grupos/" + uid).param("planVersion", state.path("planVersion").asText()), null, 200);
+
+        assertThat(jdbc.queryForMap("select id, porciones, applied_rule from food_entries where id=?", snapshot.get("id")))
+            .isEqualTo(snapshot);
+        assertThat(jdbc.queryForObject("select food_group_id from food_entries where id=?", Long.class, snapshot.get("id"))).isNull();
+        JsonNode day = request(get("/api/v1/registro/" + LocalDate.now()), null, 200);
+        assertThat(day.path("meals").get(0).path("items").get(0).path("foodGroupId").isNull()).isTrue();
+        assertThat(jdbc.queryForObject("select count(*) from plan_food_groups where id=?", Integer.class, oldGroup)).isEqualTo(1);
+    }
+
+    @Test
+    void renamingFoodRejectsNormalizedDuplicateAndAllowsSameUid() throws Exception {
+        state = request(post(BASE + "alimentos"), body(Map.of("alimento", "Árbol", "tipo", "LIBRE")), 201);
+        String first = state.path("alimentos").get(0).path("uid").asText();
+        state = request(post(BASE + "alimentos"), body(Map.of("alimento", "Otro", "tipo", "LIBRE")), 201);
+        String second = state.path("alimentos").get(1).path("uid").asText();
+        JsonNode error = request(put(BASE + "alimentos/" + second),
+            body(Map.of("alimento", " ARBOL ", "tipo", "LIBRE")), 409);
+        assertThat(error.path("code").asText()).isEqualTo("DUPLICATE");
+        state = request(put(BASE + "alimentos/" + first), body(Map.of("alimento", "ARBOL", "tipo", "LIBRE")), 200);
+    }
+
+    @Test
+    void normalCorrectionUsesQuantityPerPortionAndKeepsSynonyms() throws Exception {
+        state = request(post(BASE + "alimentos"), body(Map.of("alimento", "yogur prueba", "sinonimos", List.of("yogurt"),
+            "tipo", "NORMAL", "groupUid", group("Proteínas").path("uid").asText(),
+            "cantidadPorPorcion", 1, "unidad", "u")), 201);
+        long meal = meals().getFirst();
+        JsonNode saved = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + meal + "/nota"),
+            Map.of("text", "2 yogur prueba u"), 201);
+        long entry = saved.path("entries").get(0).path("id").asLong();
+        request(patch("/api/v1/registro/" + LocalDate.now() + "/items/" + entry),
+            Map.of("quantity", 2, "portions", 3, "saveAsRule", true), 200);
+        state = request(get(BASE + "reglas"), null, 200);
+        JsonNode rule = state.path("alimentos").get(0);
+        assertThat(rule.path("cantidadPorPorcion").asDouble()).isEqualTo(0.667);
+        assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1);
+        assertThat(rule.path("sinonimos").get(0).asText()).isEqualTo("yogurt");
+        for (String food : List.of("yogur prueba", "yogurt")) {
+            JsonNode reinterpreted = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + meal + "/nota"),
+                Map.of("text", "2 " + food + " u"), 201);
+            assertThat(reinterpreted.path("entries").get(0).path("portions").asDouble())
+                .isCloseTo(3, org.assertj.core.data.Offset.offset(0.01));
+        }
+    }
+
 }

@@ -114,6 +114,11 @@ class WeekService {
     @Transactional
     HabitLogDto logHabit(String email, Long habitId, LocalDate date, BigDecimal value) {
         Long userId = userService.findUserIdByEmail(email);
+        try {
+            planService.lockCurrentPlan(userId);
+        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+            // La validación posterior determina si el hábito se puede registrar.
+        }
         PlanHabit habit = habitRepository.findById(habitId).orElseThrow();
         Long planId = planService.getCurrentPlanId(email);
         if (!habit.getPlanId().equals(planId) || habit.getArchivedAt() != null) {

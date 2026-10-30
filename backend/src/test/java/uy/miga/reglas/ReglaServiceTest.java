@@ -79,4 +79,36 @@ class ReglaServiceTest {
         assertThat(service.findApplicable(1L, 2L).getFirst().sinonimos()).isEmpty();
     }
 
+    @Test
+    void upsertUnionsSynonymsUsingNormalizedComparison() {
+        FoodRule existing = rule("USUARIO", "yogur");
+        existing.setSinonimos(List.of("yogurt", "Álias"));
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+
+        FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("yogur",
+            List.of(" YOGURT ", "alias", "nuevo"), "NORMAL", 7L, new BigDecimal("0.667"),
+            "u", BigDecimal.ONE, List.of(), null));
+
+        assertThat(result.sinonimos()).containsExactly("yogurt", "Álias", "nuevo");
+        result = service.upsertUserRule(2L, 1L, new RuleInput("yogur", null, "NORMAL", 7L,
+            BigDecimal.ONE, "u", BigDecimal.ONE, List.of(), null));
+        assertThat(result.sinonimos()).containsExactly("yogurt", "Álias", "nuevo");
+    }
+
+    @Test
+    void updateRejectsNormalizedDuplicateButAllowsOwnName() {
+        FoodRule first = rule("USUARIO", "Árbol");
+        FoodRule second = rule("USUARIO", "Otro");
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO"))
+            .thenReturn(List.of(first, second));
+        RuleInput input = new RuleInput(" ARBOL ", List.of(), "LIBRE", null, null, null,
+            BigDecimal.ONE, List.of(), null);
+
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, second.getUid(), input))
+            .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                exception -> assertThat(exception.getStatusCode().value()).isEqualTo(409));
+        assertThat(second.getAlimento()).isEqualTo("Otro");
+        assertThat(service.updateUserRule(2L, 1L, first.getUid(), input).alimento()).isEqualTo("ARBOL");
+    }
+
 }

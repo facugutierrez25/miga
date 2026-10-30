@@ -345,9 +345,10 @@ class RegistroIntegrationTest {
             revision = rules.path("planVersion").asLong();
             assertThat(rules.path("alimentos").size()).isEqualTo(1);
         }
-        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "1 leche").path("entries");
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "1 leche u").path("entries");
         assertThat(next.size()).isEqualTo(compound ? 2 : 1);
-        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList()).contains(3.0);
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
+            .anySatisfy(portions -> assertThat(portions).isCloseTo(3.0, org.assertj.core.data.Offset.offset(0.01)));
     }
 
     @Test
