@@ -1,7 +1,6 @@
 package uy.miga.intake;
 
 import jakarta.persistence.*;
-import uy.miga.plans.FoodGroup;
 
 import java.time.LocalDate;
 
@@ -31,9 +30,8 @@ class FoodEntry {
     @Column(nullable = false, length = 20)
     private String unit;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "food_group", nullable = false, length = 20)
-    private FoodGroup foodGroup;
+    @Column(name = "food_group_id", nullable = false)
+    private Long foodGroupId;
 
     @Column(nullable = false)
     private boolean consumed = false;
@@ -44,24 +42,24 @@ class FoodEntry {
     FoodEntry() {}
 
     FoodEntry(String userEmail, Long mealId, LocalDate date,
-              String food, Double quantity, String unit, FoodGroup foodGroup) {
+              String food, Double quantity, String unit, Long foodGroupId) {
         this.userEmail = userEmail;
         this.mealId = mealId;
         this.date = date;
         this.food = food;
         this.quantity = quantity;
         this.unit = unit;
-        this.foodGroup = foodGroup;
+        this.foodGroupId = foodGroupId;
     }
 
-    Long getId()              { return id; }
-    String getUserEmail()     { return userEmail; }
-    Long getMealId()          { return mealId; }
-    LocalDate getDate()       { return date; }
-    String getFood()          { return food; }
-    Double getQuantity()      { return quantity; }
-    String getUnit()          { return unit; }
-    FoodGroup getFoodGroup()  { return foodGroup; }
-    boolean isConsumed()      { return consumed; }
-    Long getDishId()          { return dishId; }
+    Long getId()          { return id; }
+    String getUserEmail() { return userEmail; }
+    Long getMealId()      { return mealId; }
+    LocalDate getDate()   { return date; }
+    String getFood()      { return food; }
+    Double getQuantity()  { return quantity; }
+    String getUnit()      { return unit; }
+    Long getFoodGroupId() { return foodGroupId; }
+    boolean isConsumed()  { return consumed; }
+    Long getDishId()      { return dishId; }
 }

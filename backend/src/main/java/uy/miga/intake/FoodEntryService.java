@@ -4,8 +4,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import uy.miga.plans.FoodGroup;
-
 import java.time.LocalDate;
 import java.util.List;
 
@@ -28,8 +26,8 @@ class FoodEntryService {
 
     @Transactional
     FoodEntryDto addEntry(String userEmail, Long mealId, LocalDate date,
-                          String food, Double quantity, String unit, FoodGroup foodGroup) {
-        FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroup);
+                          String food, Double quantity, String unit, Long foodGroupId) {
+        FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
         return toDto(repository.save(entry));
     }
 
@@ -46,6 +44,6 @@ class FoodEntryService {
     }
 
     private FoodEntryDto toDto(FoodEntry e) {
-        return new FoodEntryDto(e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(), e.getFoodGroup(), e.isConsumed());
+        return new FoodEntryDto(e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(), e.getFoodGroupId(), e.isConsumed());
     }
 }
