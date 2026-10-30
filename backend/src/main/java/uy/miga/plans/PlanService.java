@@ -14,12 +14,24 @@ import java.util.stream.Collectors;
 public class PlanService {
 
     private static final List<Object[]> DEFAULT_GROUPS = List.of(
-        new Object[]{"Proteínas", "PRO", 1},
-        new Object[]{"Cereales",  "CER", 2},
-        new Object[]{"Frutas",    "FRU", 3},
-        new Object[]{"Lácteos",   "LAC", 4},
-        new Object[]{"Grasas",    "GRA", 5},
-        new Object[]{"Verduras",  "VER", 6}
+        new Object[]{"Proteínas", "PRO", 1, "proteinas"},
+        new Object[]{"Cereales",  "CER", 2, "cereales_tuberculos"},
+        new Object[]{"Frutas",    "FRU", 3, "frutas"},
+        new Object[]{"Lácteos",   "LAC", 4, "lacteos"},
+        new Object[]{"Grasas",    "GRA", 5, "aceites_grasas"},
+        new Object[]{"Verduras",  "VER", 6, "verduras"}
+    );
+
+    static final Map<String, String> ABBR_TO_CLAVE = Map.of(
+        "PRO", "proteinas",
+        "CER", "cereales_tuberculos",
+        "PAN", "panificados",
+        "VER", "verduras",
+        "FRU", "frutas",
+        "LAC", "lacteos",
+        "HUE", "huevos",
+        "GRA", "aceites_grasas",
+        "DUL", "dulces"
     );
 
     private final PlansRepository plansRepository;
@@ -108,7 +120,9 @@ public class PlanService {
 
     private void createDefaultFoodGroups(Plan plan) {
         for (Object[] g : DEFAULT_GROUPS) {
-            plan.getFoodGroups().add(new PlanFoodGroup(plan, (String) g[0], (String) g[1], (short)(int) g[2]));
+            PlanFoodGroup group = new PlanFoodGroup(plan, (String) g[0], (String) g[1], (short)(int) g[2]);
+            group.setClave((String) g[3]);
+            plan.getFoodGroups().add(group);
         }
     }
 
@@ -196,7 +210,7 @@ public class PlanService {
     public List<PlanFoodGroupDto> getPlanFoodGroups(Long planId) {
         return groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
             .stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria()))
             .toList();
     }
 
@@ -228,11 +242,25 @@ public class PlanService {
         return mealRepository.findByIdAndPlan_UserId(mealId, userId).isPresent();
     }
 
+    @Transactional(readOnly = true)
+    public List<Long> getMealIds(Long planId) {
+        return mealRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
+            .stream().map(Meal::getId).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Long findGroupIdByClave(Long planId, String clave) {
+        if (clave == null) return null;
+        return groupRepository.findByPlanIdAndClave(planId, clave)
+            .map(PlanFoodGroup::getId)
+            .orElse(null);
+    }
+
     // ── privados ──────────────────────────────────────────────────────────────
 
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {
         return groups.stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria()))
             .toList();
     }
 }

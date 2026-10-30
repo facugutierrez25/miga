@@ -84,7 +84,10 @@ class FoodEntry {
     Boolean getSupuesto()    { return supuesto; }
     BigDecimal getPorciones(){ return porciones; }
 
-    void setConsumed(boolean consumed) { this.consumed = consumed; }
+    void setQuantity(Double quantity)              { this.quantity = quantity; }
+    void setUnit(String unit)                      { this.unit = unit; }
+    void setFoodGroupId(Long foodGroupId)          { this.foodGroupId = foodGroupId; }
+    void setConsumed(boolean consumed)             { this.consumed = consumed; }
     void setMealNoteId(Long mealNoteId)       { this.mealNoteId = mealNoteId; }
     void setTextoOriginal(String textoOriginal){ this.textoOriginal = textoOriginal; }
     void setOrigen(String origen)             { this.origen = origen; }

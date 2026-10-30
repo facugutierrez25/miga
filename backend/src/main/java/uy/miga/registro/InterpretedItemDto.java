@@ -8,8 +8,10 @@ record InterpretedItemDto(
     BigDecimal quantity,
     String unit,
     Long foodGroupId,
+    String standardGroupKey,
     BigDecimal portions,
     String appliedRule,
     boolean uncertain,
-    boolean recognized
+    boolean recognized,
+    String tipo
 ) {}
