@@ -4,6 +4,7 @@ import { AuthProvider } from './AuthContext'
 import { useAuth } from './authTypes'
 
 const TOKEN = 'a.eyJzdWIiOiJ4QG1pZ2EudXkifQ.b'
+const OTHER_TOKEN = 'c.eyJzdWIiOiJ4QG1pZ2EudXkifQ.d'
 
 function Consumer() {
   const auth = useAuth()
@@ -11,6 +12,7 @@ function Consumer() {
     <>
       <p>{auth.token ? 'con sesión' : auth.sessionExpired ? 'sesión vencida' : 'sin sesión'}</p>
       <button type="button" onClick={() => auth.login(TOKEN, 'Ana')}>Ingresar</button>
+      <button type="button" onClick={() => auth.login(OTHER_TOKEN, 'Ana')}>Ingresar otra vez</button>
     </>
   )
 }
@@ -31,9 +33,9 @@ function renderWithSession() {
   fireEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
 }
 
-async function authenticatedFetch(path: string) {
+async function authenticatedFetch(path: string, token = TOKEN) {
   await act(async () => {
-    await window.fetch(path, { headers: { Authorization: 'Bearer x' } })
+    await window.fetch(path, { headers: { Authorization: `Bearer ${token}` } })
   })
 }
 
@@ -75,6 +77,18 @@ test('volver a ingresar limpia el aviso de sesión vencida', async () => {
   expect(screen.getByText('sesión vencida')).toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
+
+  expect(screen.getByText('con sesión')).toBeInTheDocument()
+})
+
+test('un 401 de una petición con el token anterior no cierra la sesión nueva', async () => {
+  renderWithSession()
+  responses.push(401)
+  await authenticatedFetch('/api/v1/my-plan')
+  fireEvent.click(screen.getByRole('button', { name: 'Ingresar otra vez' }))
+  responses.push(401)
+
+  await authenticatedFetch('/api/v1/registro/2025-01-01', TOKEN)
 
   expect(screen.getByText('con sesión')).toBeInTheDocument()
 })

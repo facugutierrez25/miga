@@ -43,14 +43,16 @@ export function isUnauthorized(err: unknown): boolean {
   return err instanceof ApiError && err.status === 401
 }
 
-// Un único punto para la sesión vencida: cualquier respuesta 401 a una petición
-// autenticada avisa una sola vez, aunque el módulo de API use fetch directo.
-let unauthorizedListener: (() => void) | null = null
+// Un único punto para la sesión vencida: una respuesta 401 a una petición hecha con
+// el token de la sesión activa avisa una sola vez, aunque el módulo use fetch directo.
+// Un 401 de una petición con un token anterior no afecta a la sesión nueva.
+let unauthorizedListener: { token: string; notify: () => void } | null = null
 let interceptor: typeof window.fetch | null = null
 
-function hasBearer(input: RequestInfo | URL, init?: RequestInit): boolean {
+function bearerToken(input: RequestInfo | URL, init?: RequestInit): string | null {
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
-  return headers.get('Authorization')?.startsWith('Bearer ') ?? false
+  const value = headers.get('Authorization')
+  return value?.startsWith('Bearer ') ? value.slice('Bearer '.length) : null
 }
 
 // Se reinstala si otro código reemplazó window.fetch después de instalarlo.
@@ -59,8 +61,8 @@ function installUnauthorizedInterceptor() {
   const originalFetch = window.fetch.bind(window)
   interceptor = async (input: RequestInfo | URL, init?: RequestInit) => {
     const res = await originalFetch(input, init)
-    if (res.status === 401 && unauthorizedListener && hasBearer(input, init)) {
-      const notify = unauthorizedListener
+    if (res.status === 401 && unauthorizedListener && bearerToken(input, init) === unauthorizedListener.token) {
+      const { notify } = unauthorizedListener
       unauthorizedListener = null
       notify()
     }
@@ -69,10 +71,11 @@ function installUnauthorizedInterceptor() {
   window.fetch = interceptor
 }
 
-export function onUnauthorizedResponse(handler: () => void): () => void {
+export function onUnauthorizedResponse(token: string, handler: () => void): () => void {
   installUnauthorizedInterceptor()
-  unauthorizedListener = handler
+  const listener = { token, notify: handler }
+  unauthorizedListener = listener
   return () => {
-    if (unauthorizedListener === handler) unauthorizedListener = null
+    if (unauthorizedListener === listener) unauthorizedListener = null
   }
 }

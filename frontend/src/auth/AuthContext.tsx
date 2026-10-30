@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return
-    return onUnauthorizedResponse(() => {
+    return onUnauthorizedResponse(token, () => {
       setToken(null)
       setEmail(null)
       setFirstNameState(null)
