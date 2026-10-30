@@ -5,8 +5,11 @@ import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
 import { getMyPlan, type PlanFoodGroupDto, type MealDto, type PlanDto } from '../api/plans'
-import { getIntake, addFoodEntry, deleteFoodEntry, markMealConsumed, unmarkMealConsumed, type FoodEntryDto } from '../api/intake'
-import { getEquivalences, type EquivalenceDto } from '../api/equivalences'
+import {
+  getDayRegistro, saveNota, patchItem, saveRespuesta, getSugerencias,
+  type DayRegistroDto, type MealDayDto, type EntryItemDto,
+  type GroupStatusDto, type NoteInterpretationDto,
+} from '../api/registro'
 import './HoyPage.css'
 
 const ABBR_DOT: Record<string, string> = {
@@ -18,6 +21,7 @@ const ABBR_CSS: Record<string, string> = {
   PRO: 'PROTEINS', CER: 'GRAINS', FRU: 'FRUITS',
   LAC: 'DAIRY',    GRA: 'FATS',   VER: 'VEGETABLES',
 }
+
 
 interface GrupoInfo {
   name: string
@@ -87,7 +91,7 @@ function esPasada(suggestedTime: string | undefined, ahora: Date): boolean {
   return h * 60 + m < nowMin - 90
 }
 
-function findIndexAhora(meals: MealDto[], consumedSet: Set<number>, ahora: Date): number {
+function findIndexAhora(meals: MealDto[], ahora: Date): number {
   if (meals.length === 0) return -1
   const nowMin = ahora.getHours() * 60 + ahora.getMinutes()
 
@@ -102,18 +106,309 @@ function findIndexAhora(meals: MealDto[], consumedSet: Set<number>, ahora: Date)
 
   if (byTime) return byTime.i
 
-  const firstUneaten = meals
-    .map((m, i) => ({ m, i }))
-    .find(({ m }) => m.id === undefined || !consumedSet.has(m.id))
-
-  return firstUneaten ? firstUneaten.i : meals.length - 1
+  const firstWithoutNote = meals.map((m, i) => ({ m, i })).find(({ m }) =>
+    m.id === undefined
+  )
+  return firstWithoutNote ? firstWithoutNote.i : meals.length - 1
 }
 
-function calcResumen(
+function fmt(n: number): string {
+  return n % 1 === 0 ? String(n) : n.toFixed(1).replace('.', ',')
+}
+
+function statusColor(status: string): string {
+  if (status === 'OK' || status === 'CUMPLIDO') return 'var(--g-verd)'
+  if (status === 'EXCEDIDO') return 'var(--error)'
+  if (status === 'INCOMPLETO' || status === 'SIN_ANOTAR') return 'var(--muted)'
+  return 'var(--muted)'
+}
+
+// ── ItemRow ───────────────────────────────────────────────────────────────
+
+interface ItemRowProps {
+  item: EntryItemDto
+  date: string
+  token: string
+  gruposMap: Record<number, GrupoInfo>
+  onPatched: (updated: EntryItemDto) => void
+}
+
+function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
+  const [editando, setEditando] = useState(false)
+  const [qty, setQty] = useState(String(item.quantity ?? ''))
+  const [saving, setSaving] = useState(false)
+  const info = item.foodGroupId !== null ? gruposMap[item.foodGroupId] : null
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const updated = await patchItem(token, date, item.id, {
+        quantity: qty ? Number(qty) : null,
+        unit: item.unit,
+        foodGroupId: item.foodGroupId,
+        portions: null,
+        saveAsRule: false,
+      })
+      onPatched(updated)
+      setEditando(false)
+    } catch {
+      // no-op
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const dot = info?.token ?? (item.foodGroupId === null ? 'var(--muted)' : 'var(--g-prot)')
+  const label = info?.name ?? (item.foodGroupId === null ? 'Sin grupo en tu plan' : String(item.foodGroupId))
+
+  return (
+    <li className={`nota-item${item.uncertain ? ' nota-item--dudoso' : ''}`}>
+      <span className="nota-item__dot" style={{ background: dot }} />
+      <span className="nota-item__food">
+        {item.food}
+        {item.uncertain && <span className="nota-item__duda" title="Interpretación incierta">?</span>}
+      </span>
+      {editando ? (
+        <>
+          <input
+            className="nota-item__qty-input"
+            type="number"
+            value={qty}
+            onChange={e => setQty(e.target.value)}
+            min={0}
+            step="any"
+            aria-label="Cantidad"
+          />
+          <span className="nota-item__unit">{item.unit ?? ''}</span>
+          <button className="nota-item__save" onClick={handleSave} disabled={saving}>✓</button>
+          <button className="nota-item__cancel" onClick={() => { setEditando(false); setQty(String(item.quantity ?? '')) }}>✕</button>
+        </>
+      ) : (
+        <>
+          {item.quantity !== null && (
+            <span className="nota-item__qty">{item.quantity} {item.unit ?? ''}</span>
+          )}
+          <span className="nota-item__grupo">{label}</span>
+          {item.portions !== null && (
+            <span className="nota-item__porciones">{fmt(item.portions)} p.</span>
+          )}
+          <button className="nota-item__edit" onClick={() => setEditando(true)} aria-label="Corregir">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </>
+      )}
+    </li>
+  )
+}
+
+// ── ComparisonRow ─────────────────────────────────────────────────────────
+
+function ComparisonRow({ status }: { status: GroupStatusDto }) {
+  const pct = status.expected > 0
+    ? Math.min(100, Math.round((status.recorded / status.expected) * 100))
+    : 0
+  const color = statusColor(status.status)
+
+  return (
+    <div className="comp-row">
+      <span className="comp-row__name">{status.name}</span>
+      <div className="comp-row__bar">
+        <div className="comp-row__fill" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="comp-row__frac">{fmt(status.recorded)}/{fmt(status.expected)}</span>
+    </div>
+  )
+}
+
+// ── NotaMealSection ───────────────────────────────────────────────────────
+
+interface NotaMealSectionProps {
+  meal: MealDto
+  mealDay: MealDayDto | undefined
+  date: string
+  token: string
+  gruposMap: Record<number, GrupoInfo>
+  isAhora: boolean
+  onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
+  onItemPatched: (mealId: number, item: EntryItemDto) => void
+  onRespuestaGuardada: (mealId: number) => void
+}
+
+function NotaMealSection({
+  meal, mealDay, date, token, gruposMap, isAhora,
+  onNotaSaved, onItemPatched, onRespuestaGuardada,
+}: NotaMealSectionProps) {
+  const [isOpen, setIsOpen] = useState(isAhora)
+  const [texto, setTexto] = useState(mealDay?.noteText ?? '')
+  const [sugerencias, setSugerencias] = useState<string[]>([])
+  const [cargandoSug, setCargandoSug] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const hasNote = !!mealDay?.noteText
+  const items = mealDay?.items ?? []
+  const comparison = mealDay?.comparison ?? []
+  const preguntas = comparison.filter(s => s.status === 'PREGUNTA')
+
+  useEffect(() => {
+    setTexto(mealDay?.noteText ?? '')
+  }, [mealDay?.noteText])
+
+  useEffect(() => {
+    if (!isOpen || !meal.id) return
+    const controller = new AbortController()
+    setCargandoSug(true)
+    getSugerencias(token, meal.id!, controller.signal)
+      .then(s => { if (!controller.signal.aborted) setSugerencias(s) })
+      .catch(() => {})
+      .finally(() => { if (!controller.signal.aborted) setCargandoSug(false) })
+    return () => controller.abort()
+  }, [isOpen, meal.id, token])
+
+  async function handleGuardar() {
+    if (!meal.id || !texto.trim()) return
+    setGuardando(true)
+    setError(null)
+    try {
+      const interp = await saveNota(token, date, meal.id, texto.trim())
+      onNotaSaved(interp, meal.id)
+    } catch {
+      setError('No se pudo guardar. Intentá de nuevo.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function handleRespuesta(foodGroupId: number, consumed: boolean) {
+    if (!meal.id) return
+    try {
+      await saveRespuesta(token, date, meal.id, { foodGroupId, consumed })
+      onRespuestaGuardada(meal.id)
+    } catch {
+      // no-op
+    }
+  }
+
+  const summaryLabel = !hasNote
+    ? 'Anotar'
+    : `${items.length} ${items.length === 1 ? 'ítem' : 'ítems'}`
+
+  return (
+    <div className="comida-hoy__nota">
+      <button
+        className="nota-toggle"
+        onClick={() => setIsOpen(o => !o)}
+        aria-expanded={isOpen}
+      >
+        <span className={`nota-toggle__label${hasNote ? ' nota-toggle__label--anotado' : ''}`}>
+          {summaryLabel}
+        </span>
+        <svg
+          className={`nota-toggle__chevron${isOpen ? ' nota-toggle__chevron--open' : ''}`}
+          viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6"
+        >
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="nota-body">
+          {!cargandoSug && sugerencias.length > 0 && !hasNote && (
+            <div className="nota-sugerencias" aria-label="Lo de siempre">
+              {sugerencias.map((s, i) => (
+                <button
+                  key={i}
+                  className="nota-sugerencia"
+                  onClick={() => { setTexto(s); textareaRef.current?.focus() }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <textarea
+            ref={textareaRef}
+            className="nota-textarea"
+            placeholder="¿Qué comiste? Escribí en texto libre…"
+            value={texto}
+            onChange={e => setTexto(e.target.value)}
+            rows={3}
+            aria-label="Nota de la comida"
+          />
+
+          {error && <p className="nota-error" role="alert">{error}</p>}
+
+          <button
+            className="nota-btn-guardar"
+            onClick={handleGuardar}
+            disabled={guardando || !texto.trim()}
+          >
+            {guardando ? 'Guardando…' : hasNote ? 'Actualizar' : 'Así lo entendí'}
+          </button>
+
+          {items.length > 0 && (
+            <ul className="nota-items" aria-label="Ítems interpretados">
+              {items.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  date={date}
+                  token={token}
+                  gruposMap={gruposMap}
+                  onPatched={updated => onItemPatched(meal.id!, updated)}
+                />
+              ))}
+            </ul>
+          )}
+
+          {comparison.length > 0 && (
+            <div className="nota-comparacion">
+              {comparison
+                .filter(s => s.status !== 'PREGUNTA' && s.status !== 'LIBRE')
+                .map(s => <ComparisonRow key={s.foodGroupId} status={s} />)}
+            </div>
+          )}
+
+          {preguntas.map(p => (
+            <div key={p.foodGroupId} className="nota-pregunta">
+              <span className="nota-pregunta__texto">
+                ¿Consumiste <strong>{p.name}</strong>?
+              </span>
+              <div className="nota-pregunta__acciones">
+                <button className="nota-pregunta__si" onClick={() => handleRespuesta(p.foodGroupId, true)}>Sí</button>
+                <button className="nota-pregunta__no" onClick={() => handleRespuesta(p.foodGroupId, false)}>No</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Resumen diario ────────────────────────────────────────────────────────
+
+function calcResumenDeDay(
+  dayRegistro: DayRegistroDto | null,
   meals: MealDto[],
-  entries: FoodEntryDto[],
   gruposMap: Record<number, GrupoInfo>,
 ) {
+  if (!dayRegistro) {
+    const totalById: Record<number, number> = {}
+    for (const meal of meals) {
+      for (const p of meal.portions) {
+        if (p.portions <= 0) continue
+        totalById[p.foodGroupId] = (totalById[p.foodGroupId] ?? 0) + Number(p.portions)
+      }
+    }
+    const total = Object.values(totalById).reduce((s, v) => s + v, 0)
+    return { total, done: 0, porGrupo: {} as Record<number, { total: number; done: number; info: GrupoInfo }> }
+  }
+
   const totalById: Record<number, number> = {}
   const doneById: Record<number, number> = {}
 
@@ -124,8 +419,8 @@ function calcResumen(
     }
   }
 
-  for (const entry of entries.filter(e => e.consumed && e.portions != null)) {
-    doneById[entry.foodGroupId] = (doneById[entry.foodGroupId] ?? 0) + (entry.portions ?? 0)
+  for (const s of dayRegistro.summary) {
+    doneById[s.foodGroupId] = Number(s.totalRecorded)
   }
 
   const total = Object.values(totalById).reduce((s, v) => s + v, 0)
@@ -141,179 +436,6 @@ function calcResumen(
   return { total, done, porGrupo }
 }
 
-function fmt(n: number): string {
-  return n % 1 === 0 ? String(n) : n.toFixed(1).replace('.', ',')
-}
-
-// ── IntakeMealSection ──────────────────────────────────────────────────────
-
-interface IntakeMealSectionProps {
-  mealId: number
-  entries: FoodEntryDto[]
-  equivalences: EquivalenceDto[]
-  mealFoodGroupIds: number[]
-  gruposMap: Record<number, GrupoInfo>
-  onAdd: (mealId: number, food: string, qty: number, unit: string, foodGroupId: number) => Promise<void>
-  onDelete: (id: number) => Promise<void>
-  onToggleConsumed: (mealId: number) => Promise<void>
-  isConsumed: boolean
-  isAhora: boolean
-}
-
-function IntakeMealSection({
-  mealId, entries, equivalences, mealFoodGroupIds, gruposMap,
-  onAdd, onDelete, onToggleConsumed, isConsumed, isAhora,
-}: IntakeMealSectionProps) {
-  const [isOpen, setIsOpen] = useState(isAhora)
-  const [selectedEquivId, setSelectedEquivId] = useState<string>('')
-  const [qty, setQty] = useState('')
-  const [adding, setAdding] = useState(false)
-
-  const relevantEquivs = equivalences.filter(e => mealFoodGroupIds.includes(e.foodGroupId))
-  const selectedEquiv = equivalences.find(e => String(e.id) === selectedEquivId)
-  const hasEntries = entries.length > 0
-  const unitLabel = selectedEquiv?.unit.toLowerCase() ?? ''
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedEquiv) return
-    const q = parseFloat(qty)
-    if (!q || q <= 0) return
-    setAdding(true)
-    try {
-      await onAdd(mealId, selectedEquiv.food, q, selectedEquiv.unit, selectedEquiv.foodGroupId)
-      setQty('')
-      setSelectedEquivId('')
-    } finally {
-      setAdding(false)
-    }
-  }
-
-  const summaryLabel = !hasEntries
-    ? 'Registrar'
-    : isConsumed
-      ? `✓ ${entries.length} alimento${entries.length !== 1 ? 's' : ''}`
-      : `${entries.length} alimento${entries.length !== 1 ? 's' : ''}`
-
-  // Group relevant equivalences by foodGroupId for the select optgroups
-  const groupedEquivs = mealFoodGroupIds
-    .filter(gId => relevantEquivs.some(e => e.foodGroupId === gId))
-    .map(gId => ({
-      id: gId,
-      info: gruposMap[gId],
-      items: relevantEquivs.filter(e => e.foodGroupId === gId),
-    }))
-
-  return (
-    <div className="comida-hoy__intake">
-      <button
-        className="intake-toggle"
-        onClick={() => setIsOpen(o => !o)}
-        aria-expanded={isOpen}
-        aria-controls={`intake-body-${mealId}`}
-      >
-        <span className={`intake-toggle__label${isConsumed ? ' intake-toggle__label--consumed' : ''}`}>
-          {summaryLabel}
-        </span>
-        <svg
-          className={`intake-toggle__chevron${isOpen ? ' intake-toggle__chevron--open' : ''}`}
-          viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6"
-        >
-          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="intake-body" id={`intake-body-${mealId}`}>
-          {hasEntries && (
-            <ul className="intake-entries" aria-label="Lo que comiste">
-              {entries.map(e => (
-                <li key={e.id} className="intake-entry">
-                  <span className="intake-entry__food">{e.food}</span>
-                  <span className="intake-entry__qty">{e.quantity} {e.unit.toLowerCase()}</span>
-                  <button
-                    className="intake-entry__del"
-                    onClick={() => onDelete(e.id)}
-                    aria-label={`Eliminar ${e.food}`}
-                    type="button"
-                  >×</button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <form className="intake-form" onSubmit={handleSubmit}>
-            {relevantEquivs.length === 0 ? (
-              <span className="intake-form__hint">
-                Agregá equivalencias en{' '}
-                <Link to="/mi-plan" className="intake-form__hint-link">Mi plan</Link>
-                {' '}para registrar lo que comés
-              </span>
-            ) : (
-              <>
-                <div className="intake-form__equiv-wrap">
-                  <select
-                    className="intake-form__equiv"
-                    value={selectedEquivId}
-                    onChange={e => { setSelectedEquivId(e.target.value); setQty('') }}
-                    aria-label="Alimento"
-                  >
-                    <option value="">Alimento…</option>
-                    {groupedEquivs.map(({ id, info, items }) => (
-                      <optgroup key={id} label={info?.name ?? String(id)}>
-                        {items.map(e => (
-                          <option key={e.id} value={String(e.id)}>
-                            {e.food}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <svg className="intake-form__chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6">
-                    <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <input
-                  className="intake-form__qty"
-                  type="number"
-                  placeholder="Cant."
-                  value={qty}
-                  onChange={e => setQty(e.target.value)}
-                  min={0.01}
-                  step="any"
-                  aria-label="Cantidad"
-                  disabled={!selectedEquiv}
-                />
-                {unitLabel && <span className="intake-form__unit-label">{unitLabel}</span>}
-                <button
-                  className="intake-form__add"
-                  type="submit"
-                  disabled={adding || !selectedEquiv || !qty}
-                  aria-label="Agregar alimento"
-                >+</button>
-              </>
-            )}
-          </form>
-
-          {hasEntries && (
-            <button
-              className={[
-                'btn-ya-lo-comi',
-                isConsumed ? 'btn-ya-lo-comi--hecha' : '',
-                !isAhora ? 'btn-ya-lo-comi--secondary' : '',
-              ].filter(Boolean).join(' ')}
-              aria-pressed={isConsumed}
-              onClick={() => onToggleConsumed(mealId)}
-            >
-              {isConsumed ? '✓ Hecho' : isAhora ? 'Ya lo comí' : 'Marcar como comido'}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── HoyPage ────────────────────────────────────────────────────────────────
 
 export default function HoyPage() {
@@ -325,10 +447,9 @@ export default function HoyPage() {
   const [plan, setPlan] = useState<PlanDto | null>(null)
   const [sinPlan, setSinPlan] = useState(false)
   const [cargando, setCargando] = useState(true)
-  const [entries, setEntries] = useState<FoodEntryDto[]>([])
-  const [intakeError, setIntakeError] = useState(false)
-  const [intakeRetry, setIntakeRetry] = useState(0)
-  const [equivalences, setEquivalences] = useState<EquivalenceDto[]>([])
+  const [dayRegistro, setDayRegistro] = useState<DayRegistroDto | null>(null)
+  const [diaError, setDiaError] = useState(false)
+  const [diaRetry, setDiaRetry] = useState(0)
 
   const hoyAnterior = useRef(HOY)
   useEffect(() => {
@@ -348,80 +469,90 @@ export default function HoyPage() {
 
   useEffect(() => {
     if (!token) return
-    getEquivalences(token).then(setEquivalences).catch(() => {})
-  }, [token])
-
-  useEffect(() => {
-    if (!token) return
     const controller = new AbortController()
-    getIntake(token, fecha, controller.signal)
-      .then(data => { setEntries(data); setIntakeError(false) })
+    getDayRegistro(token, fecha, controller.signal)
+      .then(data => { setDayRegistro(data); setDiaError(false) })
       .catch(err => {
         if (err instanceof DOMException && err.name === 'AbortError') return
-        setIntakeError(true)
+        setDiaError(true)
       })
     return () => controller.abort()
-  }, [token, fecha, intakeRetry])
+  }, [token, fecha, diaRetry])
 
   function irDia(delta: number) {
-    setEntries([])
+    setDayRegistro(null)
     setFecha(f => sumarDias(f, delta))
   }
 
-  const addEntry = useCallback(async (
-    mealId: number, food: string, qty: number, unit: string, foodGroupId: number,
-  ) => {
+  const handleNotaSaved = useCallback((interp: NoteInterpretationDto, mealId: number) => {
+    setDayRegistro(prev => {
+      if (!prev) return prev
+      const exists = prev.meals.find(m => m.mealId === mealId)
+      const updatedMeal: MealDayDto = exists
+        ? {
+            ...exists,
+            noteText: interp.text,
+            noteId: interp.noteId,
+            items: interp.items.map(it => ({
+              id: it.foodGroupId ?? 0,
+              food: it.foodName,
+              quantity: it.quantity,
+              unit: it.unit,
+              foodGroupId: it.foodGroupId,
+              portions: it.portions,
+              origin: 'NOTA',
+              uncertain: it.uncertain,
+            })),
+            comparison: interp.comparison,
+          }
+        : {
+            mealId,
+            noteId: interp.noteId,
+            noteText: interp.text,
+            items: interp.items.map(it => ({
+              id: it.foodGroupId ?? 0,
+              food: it.foodName,
+              quantity: it.quantity,
+              unit: it.unit,
+              foodGroupId: it.foodGroupId,
+              portions: it.portions,
+              origin: 'NOTA',
+              uncertain: it.uncertain,
+            })),
+            comparison: interp.comparison,
+          }
+      const meals = exists
+        ? prev.meals.map(m => m.mealId === mealId ? updatedMeal : m)
+        : [...prev.meals, updatedMeal]
+      return { ...prev, meals }
+    })
+  }, [])
+
+  const handleItemPatched = useCallback((mealId: number, updated: EntryItemDto) => {
+    setDayRegistro(prev => {
+      if (!prev) return prev
+      const meals = prev.meals.map(m =>
+        m.mealId === mealId
+          ? { ...m, items: m.items.map(it => it.id === updated.id ? updated : it) }
+          : m
+      )
+      return { ...prev, meals }
+    })
+  }, [])
+
+  const handleRespuestaGuardada = useCallback((_mealId: number) => {
     if (!token) return
-    const entry = await addFoodEntry(token, fecha, mealId, food, qty, unit, foodGroupId)
-    setEntries(prev => [...prev, entry])
+    getDayRegistro(token, fecha)
+      .then(data => setDayRegistro(data))
+      .catch(() => {})
   }, [token, fecha])
-
-  const deleteEntry = useCallback(async (id: number) => {
-    if (!token) return
-    setEntries(prev => prev.filter(e => e.id !== id))
-    try {
-      await deleteFoodEntry(token, id)
-    } catch {
-      getIntake(token, fecha).then(setEntries).catch(() => {})
-    }
-  }, [token, fecha])
-
-  const toggleConsumed = useCallback(async (mealId: number) => {
-    if (!token) return
-    const mealEntries = entries.filter(e => e.mealId === mealId)
-    if (mealEntries.length === 0) return
-    const wasConsumed = mealEntries.every(e => e.consumed)
-
-    setEntries(prev => prev.map(e =>
-      e.mealId === mealId ? { ...e, consumed: !wasConsumed } : e
-    ))
-    try {
-      if (wasConsumed) await unmarkMealConsumed(token, fecha, mealId)
-      else await markMealConsumed(token, fecha, mealId)
-    } catch {
-      setEntries(prev => prev.map(e =>
-        e.mealId === mealId ? { ...e, consumed: wasConsumed } : e
-      ))
-    }
-  }, [token, fecha, entries])
 
   const esHoy = fecha === HOY
   const nombre = firstName ?? formatNombre(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
   const gruposMap = plan ? buildGruposMap(plan.foodGroups ?? []) : {}
-
-  const consumedMealIds = new Set(
-    meals
-      .filter(m => m.id !== undefined)
-      .filter(m => {
-        const mealEntries = entries.filter(e => e.mealId === m.id)
-        return mealEntries.length > 0 && mealEntries.every(e => e.consumed)
-      })
-      .map(m => m.id!)
-  )
-
-  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, consumedMealIds, ahora) : -1
-  const { total, done, porGrupo } = calcResumen(meals, entries, gruposMap)
+  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, ahora) : -1
+  const { total, done, porGrupo } = calcResumenDeDay(dayRegistro, meals, gruposMap)
 
   const navFecha = (
     <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
@@ -481,18 +612,19 @@ export default function HoyPage() {
           </div>
         ) : (
           <>
-            {intakeError && (
+            {diaError && (
               <p className="hoy-intake-error">
                 No se pudo cargar el registro del día.{' '}
                 <button
                   className="hoy-intake-error__retry"
-                  onClick={() => setIntakeRetry(n => n + 1)}
+                  onClick={() => setDiaRetry(n => n + 1)}
                   type="button"
                 >
                   Reintentar
                 </button>
               </p>
             )}
+
             {total > 0 && (
               <div className="hoy-resumen">
                 <div className="hoy-resumen__porciones">
@@ -508,33 +640,33 @@ export default function HoyPage() {
                     const circ = 2 * Math.PI * 15
                     return (
                       <Fragment key={id}>
-                      <div className="hoy-grupo-prog" title={info.name}>
-                        <span className="hoy-grupo-prog__nombre">{info.name}</span>
-                        <div className="hoy-grupo-prog__bar">
-                          <div
-                            className="hoy-grupo-prog__fill"
-                            style={{ width: `${pct}%`, background: info.token }}
-                          />
+                        <div className="hoy-grupo-prog" title={info.name}>
+                          <span className="hoy-grupo-prog__nombre">{info.name}</span>
+                          <div className="hoy-grupo-prog__bar">
+                            <div
+                              className="hoy-grupo-prog__fill"
+                              style={{ width: `${pct}%`, background: info.token }}
+                            />
+                          </div>
+                          <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
                         </div>
-                        <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
-                      </div>
-                      <div
-                        className="hoy-anillo"
-                        role="img"
-                        aria-label={`${info.name}: ${fmt(d)} de ${fmt(t)}`}
-                      >
-                        <svg className="hoy-anillo__svg" viewBox="0 0 40 40" aria-hidden="true">
-                          <circle className="hoy-anillo__pista" cx="20" cy="20" r="15" />
-                          <circle
-                            className="hoy-anillo__valor"
-                            cx="20" cy="20" r="15"
-                            style={{ stroke: info.token, opacity: pct > 0 ? 1 : 0 }}
-                            strokeDasharray={`${(pct / 100) * circ} ${circ}`}
-                          />
-                        </svg>
-                        <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
-                        <span className="hoy-anillo__nombre" aria-hidden="true">{info.name}</span>
-                      </div>
+                        <div
+                          className="hoy-anillo"
+                          role="img"
+                          aria-label={`${info.name}: ${fmt(d)} de ${fmt(t)}`}
+                        >
+                          <svg className="hoy-anillo__svg" viewBox="0 0 40 40" aria-hidden="true">
+                            <circle className="hoy-anillo__pista" cx="20" cy="20" r="15" />
+                            <circle
+                              className="hoy-anillo__valor"
+                              cx="20" cy="20" r="15"
+                              style={{ stroke: info.token, opacity: pct > 0 ? 1 : 0 }}
+                              strokeDasharray={`${(pct / 100) * circ} ${circ}`}
+                            />
+                          </svg>
+                          <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
+                          <span className="hoy-anillo__nombre" aria-hidden="true">{info.name}</span>
+                        </div>
                       </Fragment>
                     )
                   })}
@@ -546,32 +678,31 @@ export default function HoyPage() {
               {meals.map((meal, i) => {
                 const noVacias = meal.portions.filter(p => p.portions > 0)
                 const esAhora = i === ahoraIdx
-                const isConsumed = meal.id !== undefined && consumedMealIds.has(meal.id)
-                const pasada = esHoy && !isConsumed && !esAhora && esPasada(meal.suggestedTime, ahora)
-                const mealFoodGroupIds = noVacias.map(p => p.foodGroupId)
+                const mealDay = dayRegistro?.meals.find(m => m.mealId === meal.id)
+                const pasada = esHoy && !mealDay?.noteText && !esAhora && esPasada(meal.suggestedTime, ahora)
 
                 return (
                   <div
                     key={i}
                     className={[
                       'comida-hoy',
-                      esAhora && !isConsumed ? 'comida-hoy--ahora' : '',
-                      isConsumed ? 'comida-hoy--hecha' : '',
+                      esAhora && !mealDay?.noteText ? 'comida-hoy--ahora' : '',
+                      mealDay?.noteText ? 'comida-hoy--anotada' : '',
                       pasada ? 'comida-hoy--pasada' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <div className="comida-hoy__encabezado">
                       <div className="comida-hoy__nombre-wrap">
                         <span className="comida-hoy__nombre">{meal.name}</span>
-                        {isConsumed && (
-                          <svg className="comida-hoy__done-icon" viewBox="0 0 16 16" fill="none" aria-label="Consumida" width="14" height="14">
+                        {mealDay?.noteText && (
+                          <svg className="comida-hoy__done-icon" viewBox="0 0 16 16" fill="none" aria-label="Anotada" width="14" height="14">
                             <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.15"/>
                             <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         )}
                       </div>
                       {meal.suggestedTime && (
-                        <div className={`comida-hoy__hora-wrap${esAhora && !isConsumed ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
+                        <div className={`comida-hoy__hora-wrap${esAhora && !mealDay?.noteText ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
                           <span className="comida-hoy__hora">
                             {meal.suggestedTime.slice(0, 5)}
                           </span>
@@ -595,17 +726,16 @@ export default function HoyPage() {
                     )}
 
                     {meal.id !== undefined && (
-                      <IntakeMealSection
-                        mealId={meal.id}
-                        entries={entries.filter(e => e.mealId === meal.id)}
-                        equivalences={equivalences}
-                        mealFoodGroupIds={mealFoodGroupIds}
+                      <NotaMealSection
+                        meal={meal}
+                        mealDay={mealDay}
+                        date={fecha}
+                        token={token!}
                         gruposMap={gruposMap}
-                        onAdd={addEntry}
-                        onDelete={deleteEntry}
-                        onToggleConsumed={toggleConsumed}
-                        isConsumed={isConsumed}
                         isAhora={esAhora}
+                        onNotaSaved={handleNotaSaved}
+                        onItemPatched={handleItemPatched}
+                        onRespuestaGuardada={handleRespuestaGuardada}
                       />
                     )}
                   </div>
