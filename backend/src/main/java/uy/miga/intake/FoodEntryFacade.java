@@ -20,14 +20,14 @@ public class FoodEntryFacade {
     public Long createNoteEntry(String userEmail, Long mealId, LocalDate date,
                                 String food, Double quantity, String unit,
                                 Long foodGroupId, Long mealNoteId,
-                                String textoOriginal, Boolean supuesto,
-                                BigDecimal porciones) {
+                                String originalText, Boolean uncertain,
+                                BigDecimal portions) {
         FoodEntry entry = new FoodEntry(userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
         entry.setMealNoteId(mealNoteId);
-        entry.setTextoOriginal(textoOriginal);
+        entry.setTextoOriginal(originalText);
         entry.setOrigen("REGLA");
-        entry.setSupuesto(supuesto);
-        entry.setPorciones(porciones);
+        entry.setSupuesto(uncertain);
+        entry.setPorciones(portions);
         return repository.save(entry).getId();
     }
 
@@ -50,6 +50,6 @@ public class FoodEntryFacade {
     public record EntryData(
         Long id, Long mealId, String food, Double quantity, String unit,
         Long foodGroupId, boolean consumed, Long mealNoteId,
-        String origen, Boolean supuesto, BigDecimal porciones
+        String origin, Boolean uncertain, BigDecimal portions
     ) {}
 }
