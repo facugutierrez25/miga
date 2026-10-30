@@ -1,3 +1,3 @@
 package uy.miga.reglas;
 
-public record Componente(String standardGroupKey, double porciones) {}
+public record Componente(Long foodGroupId, String standardGroupKey, double porciones) {}

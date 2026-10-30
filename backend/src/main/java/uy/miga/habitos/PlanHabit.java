@@ -48,7 +48,10 @@ class PlanHabit {
     private OffsetDateTime createdAt;
 
     @PrePersist
-    void prePersist() { createdAt = OffsetDateTime.now(); }
+    void prePersist() { if (createdAt == null) createdAt = OffsetDateTime.now(); }
+
+    OffsetDateTime getCreatedAt() { return createdAt; }
+    void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 
     Long getId() { return id; }
     UUID getUid() { return uid; }

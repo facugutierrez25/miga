@@ -1,6 +1,7 @@
 package uy.miga.plans;
 
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import uy.miga.users.UserService;
 
@@ -39,11 +40,13 @@ public class PlanService {
     private final PlanFoodGroupRepository groupRepository;
     private final MealRepository mealRepository;
     private final UserService userService;
+    private final ApplicationEventPublisher events;
 
     PlanService(PlansRepository plansRepository,
                 PlanFoodGroupRepository groupRepository,
                 MealRepository mealRepository,
-                UserService userService) {
+                UserService userService, ApplicationEventPublisher events) {
+        this.events = events;
         this.plansRepository = plansRepository;
         this.groupRepository = groupRepository;
         this.mealRepository = mealRepository;
@@ -96,8 +99,33 @@ public class PlanService {
 
         Plan plan = new Plan();
         plan.setUserId(userId);
-        createDefaultFoodGroups(plan);
-        Plan savedPlan = plansRepository.save(plan);
+        if (existing.isPresent()) {
+            Plan old = existing.get();
+            plan.setModoRegistro(old.getModoRegistro());
+            plan.setMargenPorciones(old.getMargenPorciones());
+            for (PlanFoodGroup source : old.getFoodGroups()) {
+                PlanFoodGroup group = new PlanFoodGroup(plan, source.getName(),
+                    source.getAbbreviation(), (short) source.getDisplayOrder());
+                group.setUid(source.getUid());
+                group.setClave(source.getClave());
+                group.setColor(source.getColor());
+                group.setMetaDiaria(source.getMetaDiaria());
+                group.setPreguntarSiFalta(source.isPreguntarSiFalta());
+                group.setOpcional(source.isOpcional());
+                plan.getFoodGroups().add(group);
+            }
+        } else {
+            createDefaultFoodGroups(plan);
+        }
+        Plan savedPlan = plansRepository.saveAndFlush(plan);
+        if (existing.isPresent()) {
+            Map<java.util.UUID, Long> idsByUid = savedPlan.getFoodGroups().stream()
+                .collect(Collectors.toMap(PlanFoodGroup::getUid, PlanFoodGroup::getId));
+            Map<Long, Long> groupIdMap = existing.get().getFoodGroups().stream()
+                .collect(Collectors.toMap(PlanFoodGroup::getId, g -> idsByUid.get(g.getUid())));
+            events.publishEvent(new PlanVersionCreated(userId, existing.get().getId(),
+                savedPlan.getId(), Map.copyOf(groupIdMap)));
+        }
 
         Map<String, Long> abbrToId = savedPlan.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getAbbreviation, PlanFoodGroup::getId));

@@ -64,6 +64,10 @@ class PlanFoodGroup {
     boolean isPreguntarSiFalta()          { return preguntarSiFalta; }
     boolean isOpcional()                  { return opcional; }
 
+    void setUid(UUID uid) { this.uid = uid; }
+    void setMetaDiaria(java.math.BigDecimal metaDiaria) { this.metaDiaria = metaDiaria; }
+    void setPreguntarSiFalta(boolean preguntarSiFalta) { this.preguntarSiFalta = preguntarSiFalta; }
+    void setOpcional(boolean opcional) { this.opcional = opcional; }
     void setPlan(Plan plan)        { this.plan = plan; }
     void setColor(String color)    { this.color = color; }
     void setClave(String clave)    { this.clave = clave; }

@@ -153,7 +153,8 @@ class RegistroService {
             if ("COMPUESTO".equals(getType(item, rules)) && item.components() != null) {
                 // Expand each component, mapping to plan food group via standardGroupKey → clave
                 for (var comp : item.components()) {
-                    Long groupId = resolveGroupId(comp.standardGroupKey(), planId);
+                    Long groupId = comp.foodGroupId() != null ? comp.foodGroupId()
+                        : resolveGroupId(comp.standardGroupKey(), planId);
                     if (groupId == null) continue;
                     result.add(new InterpretedItem(
                         item.originalText(), item.foodName(),
