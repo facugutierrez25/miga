@@ -283,6 +283,28 @@ class WeekIntegrationTest {
             .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void habitOfAnEarlierPlanCanBeLoggedOnItsDayButNotToday() throws Exception {
+        long oldHabit = createHabit("Agua", "CANTIDAD", "lt");
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token,
+                    PLAN_JSON.replace("Desayuno", "Desayuno nuevo"))))
+            .andExpect(status().isOk());
+        String yesterday = java.time.LocalDate.now().minusDays(1).toString();
+
+        logHabit(oldHabit, yesterday, 1.5);
+
+        int todayStatus = mockMvc.perform(put("/api/v1/habitos/" + oldHabit + "/log")
+                .param("date", java.time.LocalDate.now().toString())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":1}"))
+            .andReturn().getResponse().getStatus();
+        org.assertj.core.api.Assertions.assertThat(todayStatus).isEqualTo(400);
+    }
+
     private long createHabit(String name, String type, String unit) throws Exception {
         String unitJson = unit != null ? "\"" + unit + "\"" : "null";
         MvcResult result = mockMvc.perform(post("/api/v1/habitos")

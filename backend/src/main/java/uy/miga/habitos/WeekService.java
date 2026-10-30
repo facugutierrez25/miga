@@ -125,9 +125,11 @@ class WeekService {
             // La validación posterior determina si el hábito se puede registrar.
         }
         PlanHabit habit = habitRepository.findById(habitId).orElseThrow();
-        Long planId = planService.getCurrentPlanId(email);
+        // Un día se registra contra el plan que regía ese día (ADR 0002), igual que lo muestra Semana.
+        Long planId = planService.getPlanIdForDate(userId, date);
         if (!habit.getPlanId().equals(planId) || habit.getArchivedAt() != null) {
-            throw new IllegalArgumentException("Hábito no pertenece al plan activo.");
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+                "El hábito no pertenece al plan de ese día.");
         }
         if (habit.isCountsFlexibleMeals()) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
