@@ -1,0 +1,261 @@
+.semana-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 0 0 80px;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.semana-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.semana-nav {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.semana-nav__btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+.semana-nav__btn:hover { background: var(--primary-soft); }
+
+.semana-nav__title {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.semana-export-btn {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: none;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.semana-export-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ── Grid ── */
+.semana-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 16px 10px;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+/* ── Day card ── */
+.semana-day {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  min-width: 0;
+  transition: border-color 0.15s;
+}
+
+.semana-day--hoy {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.semana-day--datos {
+  border-color: var(--line);
+}
+
+.semana-day__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.semana-day__dow {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.semana-day__num {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.semana-day--hoy .semana-day__num {
+  color: var(--primary);
+}
+
+/* ── Portions bar ── */
+.semana-day__porciones {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.semana-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--rail);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.semana-bar__fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.semana-bar__fill--ok {
+  background: var(--g-verd);
+}
+
+.semana-day__frac {
+  font-size: 9px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.semana-day__frac-sep {
+  margin: 0 1px;
+}
+
+/* ── Habits ── */
+.semana-day__habitos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.semana-habito {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 3px 5px;
+  cursor: pointer;
+  font-size: 9px;
+  color: var(--muted);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.semana-habito--ok {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.semana-habito__check {
+  font-size: 8px;
+  min-width: 8px;
+  text-align: center;
+}
+
+.semana-habito__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.semana-habito__val {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 8px;
+}
+
+/* ── Empty / status ── */
+.semana-day__vacio {
+  font-size: 11px;
+  color: var(--done);
+  text-align: center;
+  margin: auto;
+}
+
+.semana-estado {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px 16px;
+  font-size: 14px;
+}
+
+.semana-estado--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--error);
+}
+
+.semana-retry {
+  background: none;
+  border: 1px solid var(--error);
+  color: var(--error);
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.semana-vacia {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 16px 24px 0;
+}
+
+/* ── Responsive: stack to 2-col on very narrow ── */
+@media (max-width: 340px) {
+  .semana-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
