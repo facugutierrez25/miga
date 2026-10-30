@@ -4,18 +4,35 @@ import { useAuth } from '../auth/AuthContext'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
-import { getMyPlan, type FoodGroup, type MealDto, type PlanDto } from '../api/plans'
+import { getMyPlan, type PlanFoodGroupDto, type MealDto, type PlanDto } from '../api/plans'
 import { getIntake, addFoodEntry, deleteFoodEntry, markMealConsumed, unmarkMealConsumed, type FoodEntryDto } from '../api/intake'
 import { getEquivalences, type EquivalenceDto } from '../api/equivalences'
 import './HoyPage.css'
 
-const GRUPOS: Record<FoodGroup, { label: string; token: string }> = {
-  PROTEINS:   { label: 'Proteínas', token: 'var(--g-prot)' },
-  GRAINS:     { label: 'Cereales',  token: 'var(--g-cer)'  },
-  FRUITS:     { label: 'Frutas',    token: 'var(--g-frut)' },
-  DAIRY:      { label: 'Lácteos',   token: 'var(--g-lac)'  },
-  FATS:       { label: 'Grasas',    token: 'var(--g-gras)' },
-  VEGETABLES: { label: 'Verduras',  token: 'var(--g-verd)' },
+const ABBR_DOT: Record<string, string> = {
+  PRO: 'var(--g-prot)', CER: 'var(--g-cer)', FRU: 'var(--g-frut)',
+  LAC: 'var(--g-lac)',  GRA: 'var(--g-gras)', VER: 'var(--g-verd)',
+}
+
+const ABBR_CSS: Record<string, string> = {
+  PRO: 'PROTEINS', CER: 'GRAINS', FRU: 'FRUITS',
+  LAC: 'DAIRY',    GRA: 'FATS',   VER: 'VEGETABLES',
+}
+
+interface GrupoInfo {
+  name: string
+  token: string
+  cssKey: string
+}
+
+function buildGruposMap(foodGroups: PlanFoodGroupDto[]): Record<number, GrupoInfo> {
+  return Object.fromEntries(
+    foodGroups.map(g => [g.id, {
+      name: g.name,
+      token: ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)',
+      cssKey: ABBR_CSS[g.abbreviation] ?? g.abbreviation,
+    }])
+  )
 }
 
 function toISO(d: Date): string {
@@ -93,34 +110,40 @@ function findIndexAhora(meals: MealDto[], consumedSet: Set<number>, ahora: Date)
 }
 
 function calcPortions(entry: FoodEntryDto, equivalences: EquivalenceDto[]): number {
-  const equiv = equivalences.find(e => e.food === entry.food && e.foodGroup === entry.foodGroup)
+  const equiv = equivalences.find(e => e.food === entry.food && e.foodGroupId === entry.foodGroupId)
   if (!equiv || equiv.quantity === 0) return 0
   return entry.quantity / equiv.quantity
 }
 
-function calcResumen(meals: MealDto[], entries: FoodEntryDto[], equivalences: EquivalenceDto[]) {
-  const totalByGroup: Partial<Record<FoodGroup, number>> = {}
-  const doneByGroup: Partial<Record<FoodGroup, number>> = {}
+function calcResumen(
+  meals: MealDto[],
+  entries: FoodEntryDto[],
+  equivalences: EquivalenceDto[],
+  gruposMap: Record<number, GrupoInfo>,
+) {
+  const totalById: Record<number, number> = {}
+  const doneById: Record<number, number> = {}
 
   for (const meal of meals) {
     for (const p of meal.portions) {
       if (p.portions <= 0) continue
-      const n = Number(p.portions)
-      totalByGroup[p.foodGroup] = (totalByGroup[p.foodGroup] ?? 0) + n
+      totalById[p.foodGroupId] = (totalById[p.foodGroupId] ?? 0) + Number(p.portions)
     }
   }
 
   for (const entry of entries.filter(e => e.consumed)) {
     const portions = calcPortions(entry, equivalences)
-    doneByGroup[entry.foodGroup] = (doneByGroup[entry.foodGroup] ?? 0) + portions
+    doneById[entry.foodGroupId] = (doneById[entry.foodGroupId] ?? 0) + portions
   }
 
-  const total = Object.values(totalByGroup).reduce((s, v) => s + v, 0)
-  const done = Object.values(doneByGroup).reduce((s, v) => s + v, 0)
+  const total = Object.values(totalById).reduce((s, v) => s + v, 0)
+  const done = Object.values(doneById).reduce((s, v) => s + v, 0)
 
-  const porGrupo: Partial<Record<FoodGroup, { total: number; done: number }>> = {}
-  for (const [g, t] of Object.entries(totalByGroup) as [FoodGroup, number][]) {
-    porGrupo[g] = { total: t, done: doneByGroup[g] ?? 0 }
+  const porGrupo: Record<number, { total: number; done: number; info: GrupoInfo }> = {}
+  for (const [idStr, t] of Object.entries(totalById)) {
+    const id = Number(idStr)
+    const info = gruposMap[id]
+    if (info) porGrupo[id] = { total: t, done: doneById[id] ?? 0, info }
   }
 
   return { total, done, porGrupo }
@@ -136,8 +159,9 @@ interface IntakeMealSectionProps {
   mealId: number
   entries: FoodEntryDto[]
   equivalences: EquivalenceDto[]
-  mealFoodGroups: FoodGroup[]
-  onAdd: (mealId: number, food: string, qty: number, unit: string, foodGroup: FoodGroup) => Promise<void>
+  mealFoodGroupIds: number[]
+  gruposMap: Record<number, GrupoInfo>
+  onAdd: (mealId: number, food: string, qty: number, unit: string, foodGroupId: number) => Promise<void>
   onDelete: (id: number) => Promise<void>
   onToggleConsumed: (mealId: number) => Promise<void>
   isConsumed: boolean
@@ -145,7 +169,7 @@ interface IntakeMealSectionProps {
 }
 
 function IntakeMealSection({
-  mealId, entries, equivalences, mealFoodGroups,
+  mealId, entries, equivalences, mealFoodGroupIds, gruposMap,
   onAdd, onDelete, onToggleConsumed, isConsumed, isAhora,
 }: IntakeMealSectionProps) {
   const [isOpen, setIsOpen] = useState(isAhora)
@@ -153,7 +177,7 @@ function IntakeMealSection({
   const [qty, setQty] = useState('')
   const [adding, setAdding] = useState(false)
 
-  const relevantEquivs = equivalences.filter(e => mealFoodGroups.includes(e.foodGroup))
+  const relevantEquivs = equivalences.filter(e => mealFoodGroupIds.includes(e.foodGroupId))
   const selectedEquiv = equivalences.find(e => String(e.id) === selectedEquivId)
   const hasEntries = entries.length > 0
   const unitLabel = selectedEquiv?.unit.toLowerCase() ?? ''
@@ -165,7 +189,7 @@ function IntakeMealSection({
     if (!q || q <= 0) return
     setAdding(true)
     try {
-      await onAdd(mealId, selectedEquiv.food, q, selectedEquiv.unit, selectedEquiv.foodGroup)
+      await onAdd(mealId, selectedEquiv.food, q, selectedEquiv.unit, selectedEquiv.foodGroupId)
       setQty('')
       setSelectedEquivId('')
     } finally {
@@ -178,6 +202,15 @@ function IntakeMealSection({
     : isConsumed
       ? `✓ ${entries.length} alimento${entries.length !== 1 ? 's' : ''}`
       : `${entries.length} alimento${entries.length !== 1 ? 's' : ''}`
+
+  // Group relevant equivalences by foodGroupId for the select optgroups
+  const groupedEquivs = mealFoodGroupIds
+    .filter(gId => relevantEquivs.some(e => e.foodGroupId === gId))
+    .map(gId => ({
+      id: gId,
+      info: gruposMap[gId],
+      items: relevantEquivs.filter(e => e.foodGroupId === gId),
+    }))
 
   return (
     <div className="comida-hoy__intake">
@@ -234,19 +267,15 @@ function IntakeMealSection({
                     aria-label="Alimento"
                   >
                     <option value="">Alimento…</option>
-                    {(Object.keys(GRUPOS) as FoodGroup[])
-                      .filter(g => relevantEquivs.some(e => e.foodGroup === g))
-                      .map(g => (
-                        <optgroup key={g} label={GRUPOS[g].label}>
-                          {relevantEquivs
-                            .filter(e => e.foodGroup === g)
-                            .map(e => (
-                              <option key={e.id} value={String(e.id)}>
-                                {e.food}
-                              </option>
-                            ))}
-                        </optgroup>
-                      ))}
+                    {groupedEquivs.map(({ id, info, items }) => (
+                      <optgroup key={id} label={info?.name ?? String(id)}>
+                        {items.map(e => (
+                          <option key={e.id} value={String(e.id)}>
+                            {e.food}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                   <svg className="intake-form__chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6">
                     <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -297,7 +326,6 @@ function IntakeMealSection({
 
 export default function HoyPage() {
   useTitle('Hoy | Miga')
-  // Hora del dispositivo, al día aunque la app vuelva de segundo plano
   const ahora = useAhora()
   const HOY = toISO(ahora)
   const { token, email, firstName } = useAuth()
@@ -308,8 +336,6 @@ export default function HoyPage() {
   const [entries, setEntries] = useState<FoodEntryDto[]>([])
   const [equivalences, setEquivalences] = useState<EquivalenceDto[]>([])
 
-  // Si pasó la medianoche con la app abierta (o en segundo plano) y estaba viendo
-  // "hoy", se pasa solo al día nuevo. Si estaba mirando otro día, no se toca.
   const hoyAnterior = useRef(HOY)
   useEffect(() => {
     if (hoyAnterior.current === HOY) return
@@ -343,9 +369,11 @@ export default function HoyPage() {
     setFecha(f => sumarDias(f, delta))
   }
 
-  const addEntry = useCallback(async (mealId: number, food: string, qty: number, unit: string, foodGroup: FoodGroup) => {
+  const addEntry = useCallback(async (
+    mealId: number, food: string, qty: number, unit: string, foodGroupId: number,
+  ) => {
     if (!token) return
-    const entry = await addFoodEntry(token, fecha, mealId, food, qty, unit, foodGroup)
+    const entry = await addFoodEntry(token, fecha, mealId, food, qty, unit, foodGroupId)
     setEntries(prev => [...prev, entry])
   }, [token, fecha])
 
@@ -381,6 +409,7 @@ export default function HoyPage() {
   const esHoy = fecha === HOY
   const nombre = firstName ?? formatNombre(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
+  const gruposMap = plan ? buildGruposMap(plan.foodGroups ?? []) : {}
 
   const consumedMealIds = new Set(
     meals
@@ -393,7 +422,7 @@ export default function HoyPage() {
   )
 
   const ahoraIdx = esHoy && plan ? findIndexAhora(meals, consumedMealIds, ahora) : -1
-  const { total, done, porGrupo } = calcResumen(meals, entries, equivalences)
+  const { total, done, porGrupo } = calcResumen(meals, entries, equivalences, gruposMap)
 
   const navFecha = (
     <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
@@ -462,44 +491,42 @@ export default function HoyPage() {
                   <span className="hoy-resumen__label">porciones</span>
                 </div>
                 <div className="hoy-resumen__grupos">
-                  {(Object.keys(GRUPOS) as FoodGroup[])
-                    .filter(g => porGrupo[g] && porGrupo[g]!.total > 0)
-                    .map(g => {
-                      const { total: t, done: d } = porGrupo[g]!
-                      const pct = Math.min(100, Math.round((d / t) * 100))
-                      const circ = 2 * Math.PI * 15
-                      return (
-                        <Fragment key={g}>
-                        <div className="hoy-grupo-prog" title={GRUPOS[g].label}>
-                          <span className="hoy-grupo-prog__nombre">{GRUPOS[g].label}</span>
-                          <div className="hoy-grupo-prog__bar">
-                            <div
-                              className="hoy-grupo-prog__fill"
-                              style={{ width: `${pct}%`, background: GRUPOS[g].token }}
-                            />
-                          </div>
-                          <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
+                  {Object.entries(porGrupo).map(([idStr, { total: t, done: d, info }]) => {
+                    const id = Number(idStr)
+                    const pct = Math.min(100, Math.round((d / t) * 100))
+                    const circ = 2 * Math.PI * 15
+                    return (
+                      <Fragment key={id}>
+                      <div className="hoy-grupo-prog" title={info.name}>
+                        <span className="hoy-grupo-prog__nombre">{info.name}</span>
+                        <div className="hoy-grupo-prog__bar">
+                          <div
+                            className="hoy-grupo-prog__fill"
+                            style={{ width: `${pct}%`, background: info.token }}
+                          />
                         </div>
-                        <div
-                          className="hoy-anillo"
-                          role="img"
-                          aria-label={`${GRUPOS[g].label}: ${fmt(d)} de ${fmt(t)}`}
-                        >
-                          <svg className="hoy-anillo__svg" viewBox="0 0 40 40" aria-hidden="true">
-                            <circle className="hoy-anillo__pista" cx="20" cy="20" r="15" />
-                            <circle
-                              className="hoy-anillo__valor"
-                              cx="20" cy="20" r="15"
-                              style={{ stroke: GRUPOS[g].token, opacity: pct > 0 ? 1 : 0 }}
-                              strokeDasharray={`${(pct / 100) * circ} ${circ}`}
-                            />
-                          </svg>
-                          <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
-                          <span className="hoy-anillo__nombre" aria-hidden="true">{GRUPOS[g].label}</span>
-                        </div>
-                        </Fragment>
-                      )
-                    })}
+                        <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
+                      </div>
+                      <div
+                        className="hoy-anillo"
+                        role="img"
+                        aria-label={`${info.name}: ${fmt(d)} de ${fmt(t)}`}
+                      >
+                        <svg className="hoy-anillo__svg" viewBox="0 0 40 40" aria-hidden="true">
+                          <circle className="hoy-anillo__pista" cx="20" cy="20" r="15" />
+                          <circle
+                            className="hoy-anillo__valor"
+                            cx="20" cy="20" r="15"
+                            style={{ stroke: info.token, opacity: pct > 0 ? 1 : 0 }}
+                            strokeDasharray={`${(pct / 100) * circ} ${circ}`}
+                          />
+                        </svg>
+                        <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
+                        <span className="hoy-anillo__nombre" aria-hidden="true">{info.name}</span>
+                      </div>
+                      </Fragment>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -510,7 +537,7 @@ export default function HoyPage() {
                 const esAhora = i === ahoraIdx
                 const isConsumed = meal.id !== undefined && consumedMealIds.has(meal.id)
                 const pasada = esHoy && !isConsumed && !esAhora && esPasada(meal.suggestedTime, ahora)
-                const mealFoodGroups = noVacias.map(p => p.foodGroup)
+                const mealFoodGroupIds = noVacias.map(p => p.foodGroupId)
 
                 return (
                   <div
@@ -543,12 +570,16 @@ export default function HoyPage() {
 
                     {noVacias.length > 0 && (
                       <div className="comida-hoy__grupos">
-                        {noVacias.map(p => (
-                          <span key={p.foodGroup} className={`grupo-badge grupo-badge--${p.foodGroup}`}>
-                            <span className="grupo-badge__numero">{fmt(Number(p.portions))}</span>
-                            <span className="grupo-badge__label">{GRUPOS[p.foodGroup].label}</span>
-                          </span>
-                        ))}
+                        {noVacias.map(p => {
+                          const info = gruposMap[p.foodGroupId]
+                          if (!info) return null
+                          return (
+                            <span key={p.foodGroupId} className={`grupo-badge grupo-badge--${info.cssKey}`}>
+                              <span className="grupo-badge__numero">{fmt(Number(p.portions))}</span>
+                              <span className="grupo-badge__label">{info.name}</span>
+                            </span>
+                          )
+                        })}
                       </div>
                     )}
 
@@ -557,7 +588,8 @@ export default function HoyPage() {
                         mealId={meal.id}
                         entries={entries.filter(e => e.mealId === meal.id)}
                         equivalences={equivalences}
-                        mealFoodGroups={mealFoodGroups}
+                        mealFoodGroupIds={mealFoodGroupIds}
+                        gruposMap={gruposMap}
                         onAdd={addEntry}
                         onDelete={deleteEntry}
                         onToggleConsumed={toggleConsumed}
