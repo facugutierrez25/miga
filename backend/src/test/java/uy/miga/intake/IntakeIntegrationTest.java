@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import uy.miga.users.EmailOutboxWorker;
 import uy.miga.users.MockEmailService;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -26,6 +27,7 @@ class IntakeIntegrationTest {
     @Autowired private WebApplicationContext context;
     @Autowired private FilterChainProxy springSecurityFilterChain;
     @Autowired private MockEmailService mockEmailService;
+    @Autowired private EmailOutboxWorker outboxWorker;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
@@ -51,6 +53,7 @@ class IntakeIntegrationTest {
                 { "email": "%s", "password": "Segura1234!" }
                 """.formatted(email)));
 
+        outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
         if (verifyToken != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
