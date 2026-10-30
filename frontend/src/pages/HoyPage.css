@@ -426,8 +426,8 @@
 
 .hoy-resumen__grupos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 4px;
 }
 
 /* Celular: anillos por grupo. Escritorio: barras (como antes). */
@@ -473,7 +473,7 @@
   color: var(--muted);
   text-align: center;
   line-height: 1.2;
-  max-width: 44px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

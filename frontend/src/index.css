@@ -228,6 +228,7 @@ textarea {
 }
 
 .dictation-button {
+  align-self: flex-start;
   min-height: 44px;
   padding: 8px 20px;
   border: 1px solid var(--control-border);
