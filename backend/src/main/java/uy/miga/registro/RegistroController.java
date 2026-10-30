@@ -1,5 +1,8 @@
 package uy.miga.registro;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -31,7 +34,7 @@ class RegistroController {
     NoteInterpretationDto saveNota(Authentication auth,
                                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                    @PathVariable Long mealId,
-                                   @RequestBody NoteRequest req) {
+                                   @RequestBody @Valid NoteRequest req) {
         return service.saveNote(auth.getName(), date, mealId, req.text());
     }
 
@@ -49,7 +52,7 @@ class RegistroController {
     NoteInterpretationDto saveNoteLegacy(Authentication auth,
                                          @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                          @PathVariable Long mealId,
-                                         @RequestBody NoteRequest req) {
+                                         @RequestBody @Valid NoteRequest req) {
         return service.saveNote(auth.getName(), date, mealId, req.text());
     }
 
@@ -86,5 +89,5 @@ class RegistroController {
         return service.getSugerencias(auth.getName(), mealId);
     }
 
-    record NoteRequest(String text) {}
+    record NoteRequest(@NotBlank @Size(max = 10_000) String text) {}
 }

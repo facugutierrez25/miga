@@ -1,11 +1,15 @@
 package uy.miga.users;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UsersRepository repository;
     private final PasswordEncoder passwordEncoder;
@@ -66,7 +70,8 @@ public class UserService {
         try {
             verificationService.sendVerificationFor(saved);
         } catch (Exception e) {
-            // El registro no falla si el email no se puede enviar; el usuario puede reenviar
+            log.warn("No se pudo enviar el email de verificación al registrar usuario (clase: {}). El usuario puede reenviar.",
+                    e.getClass().getSimpleName());
         }
         return saved;
     }

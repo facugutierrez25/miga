@@ -31,6 +31,11 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
   mail:
     from: ${MAIL_FROM:noreply@miga.uy}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    login-per-minute: ${RATE_LIMIT_LOGIN_PER_MIN:20}
+    register-per-hour: ${RATE_LIMIT_REGISTER_PER_HOUR:20}
+    resend-per-hour: ${RATE_LIMIT_RESEND_PER_HOUR:5}
 
 jwt:
   secret: ${JWT_SECRET:dev-secret-local-must-be-at-least-32-chars}
