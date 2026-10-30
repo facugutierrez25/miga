@@ -4,7 +4,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import uy.miga.plans.FoodGroup;
 
 import java.util.List;
 
@@ -26,8 +25,9 @@ class EquivalenceService {
     }
 
     @Transactional
-    EquivalenceDto addEquivalence(String userEmail, FoodGroup foodGroup, String food, Double quantity, Unit unit) {
-        Equivalence eq = new Equivalence(userEmail, foodGroup, food.strip(), quantity, unit);
+    EquivalenceDto addEquivalence(String userEmail, Long planId, Long foodGroupId,
+                                  String food, Double quantity, Unit unit) {
+        Equivalence eq = new Equivalence(userEmail, planId, foodGroupId, food.strip(), quantity, unit);
         return toDto(repository.save(eq));
     }
 
@@ -39,6 +39,6 @@ class EquivalenceService {
     }
 
     private EquivalenceDto toDto(Equivalence eq) {
-        return new EquivalenceDto(eq.getId(), eq.getFoodGroup(), eq.getFood(), eq.getQuantity(), eq.getUnit());
+        return new EquivalenceDto(eq.getId(), eq.getFoodGroupId(), eq.getFood(), eq.getQuantity(), eq.getUnit());
     }
 }

@@ -26,7 +26,7 @@ class EquivalenceController {
     @ResponseStatus(HttpStatus.CREATED)
     EquivalenceDto addEquivalence(Authentication auth,
                                   @Valid @RequestBody AddEquivalenceRequest req) {
-        return service.addEquivalence(auth.getName(), req.foodGroup(), req.food(), req.quantity(), req.unit());
+        return service.addEquivalence(auth.getName(), req.planId(), req.foodGroupId(), req.food(), req.quantity(), req.unit());
     }
 
     @DeleteMapping("/{id}")

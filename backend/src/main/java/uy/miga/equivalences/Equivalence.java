@@ -1,7 +1,6 @@
 package uy.miga.equivalences;
 
 import jakarta.persistence.*;
-import uy.miga.plans.FoodGroup;
 
 @Entity
 @Table(name = "equivalences")
@@ -14,9 +13,11 @@ class Equivalence {
     @Column(name = "user_email", nullable = false)
     private String userEmail;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "food_group", nullable = false)
-    private FoodGroup foodGroup;
+    @Column(name = "plan_id", nullable = false)
+    private Long planId;
+
+    @Column(name = "food_group_id", nullable = false)
+    private Long foodGroupId;
 
     @Column(nullable = false, length = 120)
     private String food;
@@ -30,18 +31,20 @@ class Equivalence {
 
     Equivalence() {}
 
-    Equivalence(String userEmail, FoodGroup foodGroup, String food, Double quantity, Unit unit) {
+    Equivalence(String userEmail, Long planId, Long foodGroupId, String food, Double quantity, Unit unit) {
         this.userEmail = userEmail;
-        this.foodGroup = foodGroup;
+        this.planId = planId;
+        this.foodGroupId = foodGroupId;
         this.food = food;
         this.quantity = quantity;
         this.unit = unit;
     }
 
-    Long getId()              { return id; }
-    String getUserEmail()     { return userEmail; }
-    FoodGroup getFoodGroup()  { return foodGroup; }
-    String getFood()          { return food; }
-    Double getQuantity()      { return quantity; }
-    Unit getUnit()            { return unit; }
+    Long getId()          { return id; }
+    String getUserEmail() { return userEmail; }
+    Long getPlanId()      { return planId; }
+    Long getFoodGroupId() { return foodGroupId; }
+    String getFood()      { return food; }
+    Double getQuantity()  { return quantity; }
+    Unit getUnit()        { return unit; }
 }
