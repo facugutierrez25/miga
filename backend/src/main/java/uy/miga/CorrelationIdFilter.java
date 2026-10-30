@@ -14,7 +14,9 @@ import java.util.UUID;
 
 /**
  * Filtro que asigna un ID de correlación único a cada petición HTTP.
- * El ID se almacena en MDC bajo la clave {@code correlationId} y se devuelve
+ * Acepta un UUID recibido en {@code X-Correlation-Id} o genera uno nuevo.
+ * El ID se almacena en MDC bajo la clave {@code correlationId}, aparece en cada línea
+ * de log (patrón en application.yml) y se devuelve
  * en la cabecera {@code X-Correlation-Id} de la respuesta.
  *
  * <p>Restricción de privacidad: nunca loguear email, userId, tokens ni datos de salud.</p>
@@ -30,10 +32,7 @@ class CorrelationIdFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String correlationId = request.getHeader(CORRELATION_ID_HEADER);
-        if (correlationId == null || correlationId.isBlank()) {
-            correlationId = UUID.randomUUID().toString();
-        }
+        String correlationId = validOrNew(request.getHeader(CORRELATION_ID_HEADER));
 
         MDC.put(MDC_KEY, correlationId);
         response.setHeader(CORRELATION_ID_HEADER, correlationId);
@@ -43,5 +42,18 @@ class CorrelationIdFilter extends OncePerRequestFilter {
         } finally {
             MDC.remove(MDC_KEY);
         }
+    }
+
+    // Solo se acepta un UUID del cliente: cualquier otro valor (vacío, largo, con saltos
+    // de línea) se reemplaza para no inyectar texto arbitrario en los logs.
+    static String validOrNew(String header) {
+        if (header != null) {
+            try {
+                return UUID.fromString(header.strip()).toString();
+            } catch (IllegalArgumentException ignored) {
+                // Se genera uno nuevo.
+            }
+        }
+        return UUID.randomUUID().toString();
     }
 }
