@@ -399,7 +399,9 @@ test('si recargar falla, la versión base no cambia', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Recargar' }))
   expect(await screen.findByText('No se pudo recargar. Intentá de nuevo.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
-  await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 2))
+  expect(mockSaveNota).toHaveBeenCalledTimes(1)
+  expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 2)
+  expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+  expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
 })
