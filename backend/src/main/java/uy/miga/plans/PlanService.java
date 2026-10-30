@@ -91,6 +91,7 @@ public class PlanService {
             old.setCurrent(false);
             old.setSupersededAt(OffsetDateTime.now());
             plansRepository.save(old);
+            plansRepository.flush();
         }
 
         Plan plan = new Plan();
@@ -102,7 +103,8 @@ public class PlanService {
             .collect(Collectors.toMap(PlanFoodGroup::getAbbreviation, PlanFoodGroup::getId));
 
         buildMeals(savedPlan, dto, abbrToId);
-        return toDto(plansRepository.save(savedPlan));
+        plansRepository.flush();
+        return toDto(savedPlan);
     }
 
     @Transactional(readOnly = true)
