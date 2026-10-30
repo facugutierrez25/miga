@@ -30,6 +30,8 @@ class EquivalenceIntegrationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
     private String token;
+    private long proGroupId;
+    private long lacGroupId;
 
     @BeforeEach
     void setup() throws Exception {
@@ -51,15 +53,35 @@ class EquivalenceIntegrationTest {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
         }
 
-        MvcResult result = mockMvc.perform(post("/api/v1/users/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/users/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 { "email": "equiv@miga.uy", "password": "Segura1234!" }
                 """))
             .andReturn();
 
-        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        token = json.get("token").asText();
+        JsonNode loginJson = objectMapper.readTree(loginResult.getResponse().getContentAsString());
+        token = loginJson.get("token").asText();
+
+        // Guardar un plan para obtener los IDs de los grupos
+        MvcResult planResult = mockMvc.perform(put("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                { "meals": [{ "name": "Desayuno", "displayOrder": 1,
+                  "portions": [
+                    { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                    { "foodGroupAbbr": "LAC", "portions": 1.0 }
+                  ] }] }
+                """))
+            .andReturn();
+
+        JsonNode planJson = objectMapper.readTree(planResult.getResponse().getContentAsString());
+        for (JsonNode g : planJson.get("foodGroups")) {
+            String abbr = g.get("abbreviation").asText();
+            if ("PRO".equals(abbr)) proGroupId = g.get("id").asLong();
+            if ("LAC".equals(abbr)) lacGroupId = g.get("id").asLong();
+        }
     }
 
     @Test
@@ -76,11 +98,11 @@ class EquivalenceIntegrationTest {
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "foodGroup": "PROTEINS", "food": "Pechuga de pollo", "quantity": 200, "unit": "G" }
-                """))
+                { "foodGroupId": %d, "food": "Pechuga de pollo", "quantity": 200, "unit": "G" }
+                """.formatted(proGroupId)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").isNumber())
-            .andExpect(jsonPath("$.foodGroup").value("PROTEINS"))
+            .andExpect(jsonPath("$.foodGroupId").value(proGroupId))
             .andExpect(jsonPath("$.food").value("Pechuga de pollo"))
             .andExpect(jsonPath("$.quantity").value(200.0))
             .andExpect(jsonPath("$.unit").value("G"));
@@ -92,15 +114,15 @@ class EquivalenceIntegrationTest {
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "foodGroup": "PROTEINS", "food": "Pechuga de pollo", "quantity": 200, "unit": "G" }
-                """));
+                { "foodGroupId": %d, "food": "Pechuga de pollo", "quantity": 200, "unit": "G" }
+                """.formatted(proGroupId)));
 
         mockMvc.perform(post("/api/v1/equivalences")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "foodGroup": "PROTEINS", "food": "Garbanzos cocidos", "quantity": 100, "unit": "G" }
-                """));
+                { "foodGroupId": %d, "food": "Garbanzos cocidos", "quantity": 100, "unit": "G" }
+                """.formatted(proGroupId)));
 
         mockMvc.perform(get("/api/v1/equivalences")
             .header("Authorization", "Bearer " + token))
@@ -116,8 +138,8 @@ class EquivalenceIntegrationTest {
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                { "foodGroup": "DAIRY", "food": "Leche", "quantity": 1, "unit": "TAZA" }
-                """))
+                { "foodGroupId": %d, "food": "Leche", "quantity": 1, "unit": "TAZA" }
+                """.formatted(lacGroupId)))
             .andReturn();
 
         long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
