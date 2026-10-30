@@ -32,7 +32,7 @@ curl -s https://<host>/actuator/health/liveness | jq .
 curl -s https://<host>/actuator/health/readiness | jq .
 ```
 
-Los endpoints `/actuator/metrics` e `/actuator/info` requieren autenticación (JWT válido).
+Los endpoints `/actuator/metrics` e `/actuator/info` son operativos: solo responden con el encabezado `X-Ops-Key` igual a la variable `OPS_API_KEY`. Un JWT de paciente no da acceso. Si `OPS_API_KEY` está vacía, nadie accede.
 
 ### Cabecera de correlación
 
@@ -69,6 +69,7 @@ export CORS_ALLOWED_ORIGINS=https://<dominio-frontend>
 export APP_BASE_URL=https://<dominio-frontend>
 export MAIL_FROM=noreply@<dominio>
 export RESEND_API_KEY=<clave>
+export OPS_API_KEY=<clave-operativa-larga-y-aleatoria>
 
 # Iniciar
 java -jar miga-backend.jar
@@ -147,11 +148,11 @@ Con un JWT válido en `Authorization: Bearer <token>`:
 
 ```bash
 # Estado del pool de conexiones
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/metrics/hikaricp.connections.active
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/metrics/hikaricp.connections.pending
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/hikaricp.connections.active
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/hikaricp.connections.pending
 
 # Memoria JVM
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/metrics/jvm.memory.used
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/jvm.memory.used
 
 # Versión desplegada
 curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/info
