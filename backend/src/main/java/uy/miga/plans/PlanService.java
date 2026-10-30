@@ -80,15 +80,18 @@ public class PlanService {
         Long userId = userService.findUserIdByEmail(email);
 
         var existing = plansRepository.findByUserIdAndCurrentTrue(userId);
-        if (existing.isPresent() && !planChanged(existing.get(), dto)) {
-            return toDto(existing.get());
-        }
-
-        existing.ifPresent(old -> {
+        if (existing.isPresent()) {
+            Plan old = existing.get();
+            if (dto.clientVersion() != null && !dto.clientVersion().equals(old.getVersion())) {
+                throw new PlanConflictException();
+            }
+            if (!planChanged(old, dto)) {
+                return toDto(old);
+            }
             old.setCurrent(false);
             old.setSupersededAt(OffsetDateTime.now());
             plansRepository.save(old);
-        });
+        }
 
         Plan plan = new Plan();
         plan.setUserId(userId);
@@ -210,7 +213,7 @@ public class PlanService {
                 .toList();
             return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
         }).toList();
-        return new PlanDto(groups, meals);
+        return new PlanDto(groups, meals, plan.getVersion());
     }
 
     // ── API pública para módulos externos ─────────────────────────────────────
