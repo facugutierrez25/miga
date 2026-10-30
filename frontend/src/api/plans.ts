@@ -6,6 +6,11 @@ export interface PlanFoodGroupDto {
   abbreviation: string
   displayOrder: number
   color: string | null
+  clave?: string | null
+  preguntarSiFalta?: boolean
+  opcional?: boolean
+  metaDiaria?: number | null
+  uid?: string
 }
 
 export interface MealPortionDto {

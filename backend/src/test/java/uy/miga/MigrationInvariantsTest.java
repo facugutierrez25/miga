@@ -379,13 +379,117 @@ class MigrationInvariantsTest {
         }
     }
 
+    @Test
+    void v8RejectsMealLogLossUnlessExplicitlyAllowed() throws Exception {
+        buildFlyway("7").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "legacy-log@example.test");
+            long mealId = insertMeal(c, insertPlan(c, userId), "Desayuno");
+            c.createStatement().execute("INSERT INTO meal_logs (user_id, meal_id, logged_date) VALUES (%d, %d, CURRENT_DATE)"
+                .formatted(userId, mealId));
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V8 abortada: se perderían 1 filas de meal_logs")
+            .hasStackTraceContaining("app.migrations.allow-legacy-data-loss=true");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM meal_logs")).isEqualTo(1);
+        }
+        buildFlyway(null, true).migrate();
+        try (Connection c = connect()) {
+            assertTableNotExists(c, "meal_logs");
+        }
+    }
+
+    @Test
+    void v12RejectsUnresolvedEntriesFromV7UnlessExplicitlyAllowed() throws Exception {
+        buildFlyway("7").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "legacy-entry@example.test");
+            insertPlan(c, userId);
+            // V7 permite entradas sin una comida existente; V8 les asigna PROTEINS.
+            c.createStatement().execute("""
+                INSERT INTO food_entries (user_email, meal_id, date, food, quantity, unit)
+                VALUES ('legacy-entry@example.test', -1, CURRENT_DATE, 'Sintético', 1, 'G')
+                """);
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V12 abortada: se perderían 1 filas de food_entries");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isEqualTo(1);
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries WHERE food_group = 'PROTEINS'"))
+                .isEqualTo(1);
+        }
+        buildFlyway(null, true).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isZero();
+        }
+    }
+
+    @Test
+    void v12RejectsUnknownGroupEvenWhenMealExists() throws Exception {
+        buildFlyway("9").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "unknown-group@example.test");
+            long mealId = insertMeal(c, insertPlan(c, userId), "Desayuno");
+            c.createStatement().execute("""
+                INSERT INTO food_entries (user_email, meal_id, date, food, quantity, unit, food_group)
+                VALUES ('unknown-group@example.test', %d, CURRENT_DATE, 'Sintético', 1, 'G', 'UNKNOWN')
+                """.formatted(mealId));
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V12 abortada: se perderían 1 filas de food_entries");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries WHERE food_group = 'UNKNOWN'"))
+                .isEqualTo(1);
+        }
+        buildFlyway(null, true).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isZero();
+        }
+    }
+
+    @Test
+    void springStartsWithHibernateValidationAfterUpgradeFromV9() throws Exception {
+        buildFlyway("9").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "upgrade@example.test");
+            long mealId = insertMeal(c, insertPlan(c, userId), "Desayuno");
+            insertMealPortionWithVarcharGroup(c, mealId, "PROTEINS", 1);
+            insertEquivalenceWithVarcharGroup(c, "upgrade@example.test", "PROTEINS", "Pollo sintético", 100, "G");
+            c.createStatement().execute("""
+                INSERT INTO food_entries (user_email, meal_id, date, food, quantity, unit, food_group)
+                VALUES ('upgrade@example.test', %d, CURRENT_DATE, 'Pollo sintético', 100, 'G', 'PROTEINS')
+                """.formatted(mealId));
+        }
+        try (var context = new org.springframework.boot.builder.SpringApplicationBuilder(MigaApplication.class)
+                .profiles("test")
+                .run("--spring.datasource.url=" + postgres.getJdbcUrl(),
+                    "--spring.datasource.driver-class-name=org.postgresql.Driver",
+                    "--spring.datasource.username=" + postgres.getUsername(),
+                    "--spring.datasource.password=" + postgres.getPassword(),
+                    "--spring.jpa.hibernate.ddl-auto=validate", "--server.port=0")) {
+            assertThat(context.isActive()).isTrue();
+            assertThat(context.getBean(jakarta.persistence.EntityManagerFactory.class).isOpen()).isTrue();
+            try (Connection c = connect()) {
+                assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isEqualTo(1);
+                assertThat(queryLong(c, "SELECT COUNT(*) FROM food_rules WHERE alimento = 'Pollo sintético'"))
+                    .isEqualTo(1);
+            }
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private Flyway buildFlyway(String target) {
+        return buildFlyway(target, false);
+    }
+
+    private Flyway buildFlyway(String target, boolean allowDataLoss) {
         var cfg = Flyway.configure()
             .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
             .locations("classpath:db/migration")
-            .cleanDisabled(false);
+            .cleanDisabled(false)
+            .callbacks(new FlywayConfig().legacyDataLossCallback(allowDataLoss));
         if (target != null) {
             cfg = cfg.target(target);
         }
@@ -399,8 +503,8 @@ class MigrationInvariantsTest {
 
     private long insertUser(Connection c, String email) throws SQLException {
         c.createStatement().execute("""
-            INSERT INTO users (email, password_hash, role, email_verified)
-            VALUES ('%s', 'hash', 'PATIENT', true)
+            INSERT INTO users (email, password_hash, role)
+            VALUES ('%s', 'hash', 'PATIENT')
             """.formatted(email));
         return queryLong(c, "SELECT MAX(id) FROM users");
     }

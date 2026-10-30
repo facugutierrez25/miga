@@ -65,7 +65,7 @@ class RegistroIntegrationTest {
             .addFilters(springSecurityFilterChain)
             .build();
         mockEmailService.reset();
-        token = registerAndLogin("registro@miga.uy");
+        token = registerAndLogin("registro-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         MvcResult planResult = mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
@@ -299,25 +299,25 @@ class RegistroIntegrationTest {
     }
 
     private String registerAndLogin(String email) throws Exception {
-        try {
-            mockMvc.perform(post("/api/v1/users")
+        mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     { "email": "%s", "password": "Segura1234!" }
-                    """.formatted(email)));
-        } catch (Exception ignored) {}
+                    """.formatted(email)))
+            .andExpect(status().isCreated());
 
         outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
-        if (verifyToken != null) {
-            mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
-        }
+        assertThat(verifyToken).isNotBlank();
+        mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken))
+            .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(post("/api/v1/users/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 { "email": "%s", "password": "Segura1234!" }
                 """.formatted(email)))
+            .andExpect(status().isOk())
             .andReturn();
 
         return objectMapper.readTree(result.getResponse().getContentAsString())

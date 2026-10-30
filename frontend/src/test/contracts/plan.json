@@ -1,0 +1,26 @@
+{
+  "foodGroups" : [ {
+    "id" : 1,
+    "name" : "Sintético",
+    "abbreviation" : "Sintético",
+    "displayOrder" : 1,
+    "color" : "Sintético",
+    "clave" : "Sintético",
+    "preguntarSiFalta" : true,
+    "opcional" : true,
+    "metaDiaria" : 1.5,
+    "uid" : "00000000-0000-0000-0000-000000000001"
+  } ],
+  "meals" : [ {
+    "id" : 1,
+    "name" : "Sintético",
+    "suggestedTime" : "08:30:00",
+    "displayOrder" : 1,
+    "portions" : [ {
+      "foodGroupId" : 1,
+      "portions" : 1.5
+    } ]
+  } ],
+  "version" : 1,
+  "createdAt" : "2026-01-05"
+}
