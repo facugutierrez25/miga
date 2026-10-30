@@ -143,6 +143,20 @@ falló se revierte (PostgreSQL ejecuta cada migración en su propia transacción
 5. No usar `flyway repair` en producción sin entender la causa: solo limpia el historial, no
    deshace cambios.
 
+**El backend no repara el historial al arrancar.** Si una migración aplicada cambió o una
+falló, el arranque se detiene con el error de Flyway. Para una reparación puntual, ya
+entendida la causa: arrancar una vez con `FLYWAY_REPAIR_ON_START=true` y volver a `false`.
+
+**Antes del primer despliegue sin reparación automática:** verificar que el historial de
+producción coincide con las migraciones del repo, contra una copia restaurada (sección 5):
+
+```bash
+docker run --rm --network host -v "$PWD/backend/src/main/resources/db/migration:/flyway/sql"   flyway/flyway:11 -url=jdbc:postgresql://localhost:5433/nutriplan_drill -user=drill -password=drill validate
+```
+
+Si `validate` informa diferencias de checksum, revisar qué migración cambió antes de desplegar
+y, si corresponde, hacer una reparación puntual con la variable anterior.
+
 ---
 
 ## 4. Guía de incidentes

@@ -14,10 +14,16 @@ class FlywayConfig {
         return new LegacyDataLossCallback(allowDataLoss);
     }
 
+    // repair reescribe checksums y borra migraciones fallidas del historial: si corriera en
+    // cada arranque ocultaría una migración aplicada que cambió o una que falló. Solo se
+    // usa de forma puntual y consciente, con FLYWAY_REPAIR_ON_START=true.
     @Bean
-    FlywayMigrationStrategy flywayMigrationStrategy() {
+    FlywayMigrationStrategy flywayMigrationStrategy(
+            @Value("${app.migrations.repair-on-start:false}") boolean repairOnStart) {
         return flyway -> {
-            flyway.repair();
+            if (repairOnStart) {
+                flyway.repair();
+            }
             flyway.migrate();
         };
     }

@@ -42,6 +42,9 @@ app:
     login-per-minute: ${RATE_LIMIT_LOGIN_PER_MIN:20}
     register-per-hour: ${RATE_LIMIT_REGISTER_PER_HOUR:20}
     resend-per-hour: ${RATE_LIMIT_RESEND_PER_HOUR:5}
+  migrations:
+    # Solo para una reparación puntual del historial de Flyway (ver runbook). Nunca dejarlo activo.
+    repair-on-start: ${FLYWAY_REPAIR_ON_START:false}
   ops:
     # Clave para /actuator/metrics e /actuator/info (encabezado X-Ops-Key). Vacía = sin acceso.
     api-key: ${OPS_API_KEY:}
