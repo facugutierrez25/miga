@@ -42,8 +42,9 @@ class EmailVerificationIntegrationTest {
         mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        { "email": "verificar1@miga.uy", "password": "Segura1234!" }
-                        """));
+                        { "email": "%s@miga.uy", "password": "Segura1234!" }
+                        """.formatted(java.util.UUID.randomUUID())))
+                .andExpect(status().isCreated());
 
         outboxWorker.processJobs();
         String token = mockEmailService.getLastToken();

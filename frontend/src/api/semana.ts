@@ -25,7 +25,7 @@ export interface WeekDayDto {
   totalGoal: number
   habitLogs: HabitLogDto[]
   habitIds?: number[]
-  meals?: { mealId: number; name: string; noteText: string | null; status: string }[]
+  meals?: { mealId: number; name: string; noteText: string | null; status: string; flexibleCount?: number }[]
 }
 
 export interface WeekSummaryDto {

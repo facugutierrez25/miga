@@ -50,12 +50,12 @@ class PlanIntegrationTest {
                 .build();
 
         mockEmailService.reset();
-        token = registerAndLogin("plan@miga.uy");
+        token = registerAndLogin("plan-" + java.util.UUID.randomUUID() + "@miga.uy");
     }
 
     @Test
     void getMyPlan_whenNoPlan_returns404() throws Exception {
-        String sinPlanToken = registerAndLogin("sinplan@miga.uy");
+        String sinPlanToken = registerAndLogin("sinplan-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         mockMvc.perform(get("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + sinPlanToken))
@@ -132,7 +132,7 @@ class PlanIntegrationTest {
 
     @Test
     void updateMyPlan_secondSaveArchivesFirstAndReturnsNewPlan() throws Exception {
-        String histToken = registerAndLogin("historial@miga.uy");
+        String histToken = registerAndLogin("historial-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         String primerPlan = """
                 {
@@ -211,7 +211,7 @@ class PlanIntegrationTest {
 
     @Test
     void getPlanHistory_withNoHistory_returnsEmptyArray() throws Exception {
-        String freshToken = registerAndLogin("sinhistorial@miga.uy");
+        String freshToken = registerAndLogin("sinhistorial-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         mockMvc.perform(get("/api/v1/my-plan/historial")
                 .header("Authorization", "Bearer " + freshToken))
@@ -227,7 +227,7 @@ class PlanIntegrationTest {
 
     @Test
     void saveMyPlan_withSameContent_doesNotCreateHistoryEntry() throws Exception {
-        String token = registerAndLogin("sincambios@miga.uy");
+        String token = registerAndLogin("sincambios-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         String plan = """
                 {
@@ -522,25 +522,25 @@ class PlanIntegrationTest {
     }
 
     private String registerAndLogin(String email) throws Exception {
-        try {
-            mockMvc.perform(post("/api/v1/users")
+        mockMvc.perform(post("/api/v1/users")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             { "email": "%s", "password": "Segura1234!" }
-                            """.formatted(email)));
-        } catch (Exception ignored) {}
+                            """.formatted(email)))
+            .andExpect(status().isCreated());
 
         outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
-        if (verifyToken != null) {
-            mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
-        }
+        assertThat(verifyToken).isNotBlank();
+        mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken))
+            .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(post("/api/v1/users/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         { "email": "%s", "password": "Segura1234!" }
                         """.formatted(email)))
+                .andExpect(status().isOk())
                 .andReturn();
 
         return objectMapper.readTree(result.getResponse().getContentAsString())

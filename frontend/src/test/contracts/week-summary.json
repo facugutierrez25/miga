@@ -1,0 +1,34 @@
+{
+  "weekStart" : "2026-01-05",
+  "weekEnd" : "2026-01-05",
+  "habits" : [ {
+    "id" : 1,
+    "name" : "Sintético",
+    "habitType" : "CANTIDAD",
+    "unit" : "Sintético",
+    "dailyGoal" : 1.5,
+    "step" : 1.5,
+    "period" : "DIA",
+    "countsFlexibleMeals" : true,
+    "displayOrder" : 1
+  } ],
+  "days" : [ {
+    "date" : "2026-01-05",
+    "hasData" : true,
+    "totalRecorded" : 1.5,
+    "totalGoal" : 1.5,
+    "habitLogs" : [ {
+      "habitId" : 1,
+      "date" : "2026-01-05",
+      "value" : 1.5
+    } ],
+    "meals" : [ {
+      "mealId" : 1,
+      "name" : "Sintético",
+      "noteText" : "Sintético",
+      "status" : "OK",
+      "flexibleCount" : 1
+    } ],
+    "habitIds" : [ 1 ]
+  } ]
+}

@@ -1,0 +1,46 @@
+{
+  "planId" : 1,
+  "planVersion" : 1,
+  "modoRegistro" : "Sintético",
+  "grupos" : [ {
+    "id" : 1,
+    "name" : "Sintético",
+    "abbreviation" : "Sintético",
+    "displayOrder" : 1,
+    "color" : "Sintético",
+    "clave" : "Sintético",
+    "preguntarSiFalta" : true,
+    "opcional" : true,
+    "metaDiaria" : 1.5,
+    "uid" : "00000000-0000-0000-0000-000000000001"
+  } ],
+  "alimentos" : [ {
+    "uid" : "00000000-0000-0000-0000-000000000001",
+    "alcance" : "Sintético",
+    "alimento" : "Sintético",
+    "sinonimos" : [ "Sintético" ],
+    "tipo" : "NORMAL",
+    "groupUid" : "00000000-0000-0000-0000-000000000001",
+    "cantidadPorPorcion" : 1.5,
+    "unidad" : "Sintético",
+    "porcionPorDefecto" : 1.5,
+    "componentes" : [ {
+      "groupUid" : "00000000-0000-0000-0000-000000000001",
+      "porciones" : 1.5
+    } ],
+    "overridesRuleUid" : "00000000-0000-0000-0000-000000000001",
+    "textoRegla" : "Sintético"
+  } ],
+  "habitos" : [ {
+    "uid" : "00000000-0000-0000-0000-000000000001",
+    "id" : 1,
+    "name" : "Sintético",
+    "habitType" : "CANTIDAD",
+    "unit" : "Sintético",
+    "goal" : 1.5,
+    "period" : "DIA",
+    "step" : 1.5,
+    "displayOrder" : 1,
+    "countsFlexibleMeals" : true
+  } ]
+}
