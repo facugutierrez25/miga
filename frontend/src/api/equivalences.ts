@@ -21,7 +21,6 @@ export async function getEquivalences(token: string): Promise<EquivalenceDto[]> 
 
 export async function addEquivalence(
   token: string,
-  planId: number,
   foodGroupId: number,
   food: string,
   quantity: number,
@@ -30,7 +29,7 @@ export async function addEquivalence(
   const res = await fetch(BASE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ planId, foodGroupId, food, quantity, unit }),
+    body: JSON.stringify({ foodGroupId, food, quantity, unit }),
   })
   if (!res.ok) throw new Error('equivalences-add-error')
   return res.json()
