@@ -423,4 +423,58 @@ class RegistroIntegrationTest {
                 """))
             .andExpect(status().isForbidden());
     }
+
+    @Test
+    void historicalNote_afterPlanChange_preservesOriginalPlanContext() throws Exception {
+        createUniqueUserPlan();
+        String yesterday = LocalDate.now().minusDays(1).toString();
+        String today = LocalDate.now().toString();
+
+        // Guarda nota con plan original (ayer)
+        JsonNode firstNote = putNote(yesterday, "leche");
+        long noteId = firstNote.path("noteId").asLong();
+
+        // Activa un plan nuevo hoy con estructura diferente
+        mockMvc.perform(put("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(PLAN_JSON))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        // Re-guarda la nota de ayer — debe usar el plan original (el noteId debe ser el mismo)
+        MvcResult reNoteResult = mockMvc.perform(put("/api/v1/registro/" + yesterday + "/comidas/" + mealId + "/nota")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"text": "leche"}
+                """))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        JsonNode reNoteJson = objectMapper.readTree(reNoteResult.getResponse().getContentAsString());
+        assertThat(reNoteJson.path("noteId").asLong()).isEqualTo(noteId);
+    }
+
+    @Test
+    void getDayRegistro_usesHistoricalPlan_notCurrentPlan() throws Exception {
+        createUniqueUserPlan();
+        String yesterday = LocalDate.now().minusDays(1).toString();
+
+        putNote(yesterday, "leche");
+
+        // Activa plan nuevo (misma estructura, pero crea nueva versión)
+        mockMvc.perform(put("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(PLAN_JSON))
+            .andExpect(status().isOk());
+
+        // GET día de ayer debe devolver datos sin error aunque el plan cambió
+        mockMvc.perform(get("/api/v1/registro/" + yesterday)
+            .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.meals").isArray())
+            .andExpect(jsonPath("$.date").value(yesterday));
+    }
 }
