@@ -31,7 +31,7 @@ class IntakeController {
                           @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                           @PathVariable Long mealId,
                           @Valid @RequestBody AddFoodEntryRequest req) {
-        return service.addEntry(auth.getName(), mealId, date, req.food(), req.quantity(), req.unit(), req.foodGroup());
+        return service.addEntry(auth.getName(), mealId, date, req.food(), req.quantity(), req.unit(), req.foodGroupId());
     }
 
     @DeleteMapping("/entries/{id}")
