@@ -18,8 +18,8 @@ public class ReglaService {
     }
 
     @Transactional(readOnly = true)
-    public List<FoodRule> findApplicable(Long planId, Long userId) {
-        return repository.findApplicable(planId, userId);
+    public List<FoodRuleDto> findApplicable(Long planId, Long userId) {
+        return repository.findApplicable(planId, userId).stream().map(this::toDto).toList();
     }
 
     @Transactional(readOnly = true)

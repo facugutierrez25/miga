@@ -2,6 +2,7 @@ package uy.miga.reglas;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -24,7 +25,8 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
             END ASC,
             r.id ASC
         """)
-    List<FoodRule> findApplicable(Long planId, Long userId);
+    List<FoodRule> findApplicable(@Param("planId") Long planId,
+                                  @Param("userId") Long userId);
 
     List<FoodRule> findByUserIdAndPlanIdAndAlcance(Long userId, Long planId, String alcance);
 
