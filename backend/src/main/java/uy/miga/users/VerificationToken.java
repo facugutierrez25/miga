@@ -21,6 +21,8 @@ class VerificationToken {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
+    Long getId() { return id; }
+
     VerificationToken() {}
 
     VerificationToken(User user, String token, OffsetDateTime expiresAt) {

@@ -34,4 +34,6 @@ interface EmailOutboxJobRepository extends JpaRepository<EmailOutboxJob, Long> {
     @Query("DELETE FROM EmailOutboxJob j WHERE j.status IN ('SENT', 'FAILED') AND j.processedAt < :cutoff")
     @org.springframework.data.jpa.repository.Modifying
     int deleteOldJobs(@Param("cutoff") OffsetDateTime cutoff);
+
+    long countByStatusIn(java.util.Collection<String> statuses);
 }

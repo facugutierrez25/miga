@@ -31,6 +31,8 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
   mail:
     from: ${MAIL_FROM:noreply@miga.uy}
+    # Solo perfil local sin proveedor: muestra en el log el enlace de verificación.
+    log-links: ${MAIL_LOG_LINKS:false}
     connect-timeout-ms: ${MAIL_CONNECT_TIMEOUT_MS:5000}
     read-timeout-ms: ${MAIL_READ_TIMEOUT_MS:10000}
   email-outbox:

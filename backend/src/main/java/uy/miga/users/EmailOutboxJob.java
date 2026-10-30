@@ -41,12 +41,16 @@ class EmailOutboxJob {
     @Column(name = "locked_until")
     private OffsetDateTime lockedUntil;
 
+    @Column(name = "token_id")
+    private Long tokenId;
+
     EmailOutboxJob() {}
 
-    EmailOutboxJob(Long userId, String recipient, String jobType) {
+    EmailOutboxJob(Long userId, String recipient, String jobType, Long tokenId) {
         this.userId = userId;
         this.recipient = recipient;
         this.jobType = jobType;
+        this.tokenId = tokenId;
     }
 
     Long getId() { return id; }
@@ -58,6 +62,7 @@ class EmailOutboxJob {
     int getMaxAttempts() { return maxAttempts; }
     OffsetDateTime getNextAttemptAt() { return nextAttemptAt; }
     OffsetDateTime getLockedUntil() { return lockedUntil; }
+    Long getTokenId() { return tokenId; }
     OffsetDateTime getProcessedAt() { return processedAt; }
 
     void setStatus(String status) { this.status = status; }

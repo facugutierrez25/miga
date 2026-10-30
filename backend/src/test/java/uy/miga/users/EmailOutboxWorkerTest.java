@@ -24,7 +24,7 @@ class EmailOutboxWorkerTest {
     private final VerificationTokenRepository tokens = mock(VerificationTokenRepository.class);
     private final EmailService email = mock(EmailService.class);
     private final RecordingTransactionManager transactions = new RecordingTransactionManager();
-    private final EmailOutboxWorker worker = new EmailOutboxWorker(jobs, tokens, email, transactions, 300000);
+    private final EmailOutboxWorker worker = new EmailOutboxWorker(jobs, tokens, email, transactions, new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), 300000);
 
     @BeforeEach
     void setup() {
@@ -139,7 +139,7 @@ class EmailOutboxWorkerTest {
     }
 
     private EmailOutboxJob job(Long id) {
-        var job = new EmailOutboxJob(id, id + "@miga.uy", "VERIFY_EMAIL");
+        var job = new EmailOutboxJob(id, id + "@miga.uy", "VERIFY_EMAIL", null);
         ReflectionTestUtils.setField(job, "id", id);
         return job;
     }
