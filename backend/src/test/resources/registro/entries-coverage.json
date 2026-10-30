@@ -35,7 +35,7 @@
   {"text":"te","expected":null,"shouldRecognize":true},
   {"text":"cafe","expected":null,"shouldRecognize":true},
   {"text":"pizza","expected":null,"shouldRecognize":false},
-  {"text":"hamburguesa con queso y papas fritas","expected":null,"shouldRecognize":false},
+  {"text":"strudel de ciruelas y crema chantilly","expected":null,"shouldRecognize":false},
   {"text":"helado de chocolate","expected":null,"shouldRecognize":false},
   {"text":"medialunas","expected":null,"shouldRecognize":false},
   {"text":"galletitas","expected":null,"shouldRecognize":false}

@@ -186,12 +186,14 @@ class InterpreterServiceTest {
     }
 
     @Test
-    void interpret_libre_returnsOnePortionNoGroup() {
+    void interpret_libre_returnsZeroPortionsNoGroup() {
         var rules = List.of(
             rule(1L, "te", List.of(), "LIBRE", null, null, null, null, BigDecimal.ONE, null)
         );
         var item = interpreter.interpret("te", rules).get(0);
-        assertThat(item.portions()).isEqualByComparingTo("1");
+        // LIBRE suma 0 porciones: se registra pero no penaliza en la comparación
+        assertThat(item.portions()).isEqualByComparingTo("0");
+        assertThat(item.recognized()).isTrue();
     }
 
     @Test
