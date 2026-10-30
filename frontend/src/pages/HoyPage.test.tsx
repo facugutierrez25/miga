@@ -17,19 +17,22 @@ const mockGetIntake = vi.mocked(intakeApi.getIntake)
 const mockMarkMealConsumed = vi.mocked(intakeApi.markMealConsumed)
 const mockGetEquivalences = vi.mocked(equivalencesApi.getEquivalences)
 
+const gruposPRO = [{ id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null }]
+
 const planConComida = {
+  foodGroups: gruposPRO,
   meals: [{
     id: 1,
     name: 'Desayuno',
     suggestedTime: '08:00:00',
     displayOrder: 1,
-    portions: [{ foodGroup: 'PROTEINS' as const, portions: 2 }],
+    portions: [{ foodGroupId: 1, portions: 2 }],
   }],
 }
 
 const entradaConsumo = {
   id: 10, mealId: 1, food: 'Pechuga de pollo',
-  quantity: 200, unit: 'G', foodGroup: 'PROTEINS' as const, consumed: false,
+  quantity: 200, unit: 'G', foodGroupId: 1, consumed: false, portions: 1,
 }
 
 beforeEach(() => {
@@ -69,9 +72,13 @@ test('muestra link a mi plan cuando no hay plan cargado', async () => {
 
 test('muestra las comidas del plan ordenadas', async () => {
   mockGetMyPlan.mockResolvedValue({
+    foodGroups: [
+      { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
+      { id: 2, name: 'Cereales',  abbreviation: 'CER', displayOrder: 2, color: null },
+    ],
     meals: [
-      { id: 2, name: 'Almuerzo', displayOrder: 2, portions: [{ foodGroup: 'PROTEINS', portions: 2 }] },
-      { id: 1, name: 'Desayuno', displayOrder: 1, portions: [{ foodGroup: 'GRAINS', portions: 1 }] },
+      { id: 2, name: 'Almuerzo', displayOrder: 2, portions: [{ foodGroupId: 1, portions: 2 }] },
+      { id: 1, name: 'Desayuno', displayOrder: 1, portions: [{ foodGroupId: 2, portions: 1 }] },
     ],
   })
   renderHoy()
@@ -83,7 +90,8 @@ test('muestra las comidas del plan ordenadas', async () => {
 
 test('muestra la hora sugerida cuando está presente', async () => {
   mockGetMyPlan.mockResolvedValue({
-    meals: [{ id: 1, name: 'Desayuno', suggestedTime: '08:00:00', displayOrder: 1, portions: [{ foodGroup: 'DAIRY', portions: 1 }] }],
+    foodGroups: [{ id: 4, name: 'Lácteos', abbreviation: 'LAC', displayOrder: 4, color: null }],
+    meals: [{ id: 1, name: 'Desayuno', suggestedTime: '08:00:00', displayOrder: 1, portions: [{ foodGroupId: 4, portions: 1 }] }],
   })
   renderHoy()
   await waitFor(() => expect(screen.getByText('08:00')).toBeInTheDocument())
@@ -91,11 +99,15 @@ test('muestra la hora sugerida cuando está presente', async () => {
 
 test('muestra solo los grupos con porciones mayores a cero', async () => {
   mockGetMyPlan.mockResolvedValue({
+    foodGroups: [
+      { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
+      { id: 2, name: 'Cereales',  abbreviation: 'CER', displayOrder: 2, color: null },
+    ],
     meals: [{
       id: 1, name: 'Desayuno', displayOrder: 1,
       portions: [
-        { foodGroup: 'PROTEINS', portions: 1 },
-        { foodGroup: 'GRAINS',   portions: 0 },
+        { foodGroupId: 1, portions: 1 },
+        { foodGroupId: 2, portions: 0 },
       ],
     }],
   })

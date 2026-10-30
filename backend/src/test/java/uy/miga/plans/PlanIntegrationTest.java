@@ -66,12 +66,12 @@ class PlanIntegrationTest {
                       "suggestedTime": "08:00:00",
                       "displayOrder": 1,
                       "portions": [
-                        { "foodGroup": "PROTEINS", "portions": 1.0 },
-                        { "foodGroup": "GRAINS",   "portions": 2.0 },
-                        { "foodGroup": "FRUITS",   "portions": 1.0 },
-                        { "foodGroup": "DAIRY",    "portions": 1.0 },
-                        { "foodGroup": "FATS",     "portions": 0.5 },
-                        { "foodGroup": "VEGETABLES","portions": 0.0 }
+                        { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                        { "foodGroupAbbr": "CER", "portions": 2.0 },
+                        { "foodGroupAbbr": "FRU", "portions": 1.0 },
+                        { "foodGroupAbbr": "LAC", "portions": 1.0 },
+                        { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                        { "foodGroupAbbr": "VER", "portions": 0.0 }
                       ]
                     }
                   ]
@@ -83,6 +83,7 @@ class PlanIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(planJson))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.foodGroups").isArray())
                 .andExpect(jsonPath("$.meals[0].name").value("Desayuno"))
                 .andExpect(jsonPath("$.meals[0].portions").isArray());
 
@@ -104,7 +105,7 @@ class PlanIntegrationTest {
                               "name": "Desayuno",
                               "displayOrder": 1,
                               "portions": [
-                                { "foodGroup": "PROTEINS", "portions": 0.3 }
+                                { "foodGroupAbbr": "PRO", "portions": 0.3 }
                               ]
                             }
                           ]
@@ -133,12 +134,12 @@ class PlanIntegrationTest {
                     "name": "Desayuno",
                     "displayOrder": 1,
                     "portions": [
-                      { "foodGroup": "PROTEINS",   "portions": 1.0 },
-                      { "foodGroup": "GRAINS",     "portions": 1.0 },
-                      { "foodGroup": "FRUITS",     "portions": 1.0 },
-                      { "foodGroup": "DAIRY",      "portions": 1.0 },
-                      { "foodGroup": "FATS",       "portions": 0.5 },
-                      { "foodGroup": "VEGETABLES", "portions": 0.0 }
+                      { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                      { "foodGroupAbbr": "CER", "portions": 1.0 },
+                      { "foodGroupAbbr": "FRU", "portions": 1.0 },
+                      { "foodGroupAbbr": "LAC", "portions": 1.0 },
+                      { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                      { "foodGroupAbbr": "VER", "portions": 0.0 }
                     ]
                   }]
                 }
@@ -151,24 +152,24 @@ class PlanIntegrationTest {
                       "name": "Almuerzo",
                       "displayOrder": 1,
                       "portions": [
-                        { "foodGroup": "PROTEINS",   "portions": 2.0 },
-                        { "foodGroup": "GRAINS",     "portions": 2.0 },
-                        { "foodGroup": "FRUITS",     "portions": 1.0 },
-                        { "foodGroup": "DAIRY",      "portions": 0.0 },
-                        { "foodGroup": "FATS",       "portions": 1.0 },
-                        { "foodGroup": "VEGETABLES", "portions": 1.0 }
+                        { "foodGroupAbbr": "PRO", "portions": 2.0 },
+                        { "foodGroupAbbr": "CER", "portions": 2.0 },
+                        { "foodGroupAbbr": "FRU", "portions": 1.0 },
+                        { "foodGroupAbbr": "LAC", "portions": 0.0 },
+                        { "foodGroupAbbr": "GRA", "portions": 1.0 },
+                        { "foodGroupAbbr": "VER", "portions": 1.0 }
                       ]
                     },
                     {
                       "name": "Cena",
                       "displayOrder": 2,
                       "portions": [
-                        { "foodGroup": "PROTEINS",   "portions": 1.5 },
-                        { "foodGroup": "GRAINS",     "portions": 1.0 },
-                        { "foodGroup": "FRUITS",     "portions": 0.0 },
-                        { "foodGroup": "DAIRY",      "portions": 0.0 },
-                        { "foodGroup": "FATS",       "portions": 0.5 },
-                        { "foodGroup": "VEGETABLES", "portions": 2.0 }
+                        { "foodGroupAbbr": "PRO", "portions": 1.5 },
+                        { "foodGroupAbbr": "CER", "portions": 1.0 },
+                        { "foodGroupAbbr": "FRU", "portions": 0.0 },
+                        { "foodGroupAbbr": "LAC", "portions": 0.0 },
+                        { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                        { "foodGroupAbbr": "VER", "portions": 2.0 }
                       ]
                     }
                   ]
@@ -228,12 +229,12 @@ class PlanIntegrationTest {
                     "name": "Desayuno",
                     "displayOrder": 1,
                     "portions": [
-                      { "foodGroup": "PROTEINS",   "portions": 1.0 },
-                      { "foodGroup": "GRAINS",     "portions": 2.0 },
-                      { "foodGroup": "FRUITS",     "portions": 1.0 },
-                      { "foodGroup": "DAIRY",      "portions": 1.0 },
-                      { "foodGroup": "FATS",       "portions": 0.5 },
-                      { "foodGroup": "VEGETABLES", "portions": 0.0 }
+                      { "foodGroupAbbr": "PRO", "portions": 1.0 },
+                      { "foodGroupAbbr": "CER", "portions": 2.0 },
+                      { "foodGroupAbbr": "FRU", "portions": 1.0 },
+                      { "foodGroupAbbr": "LAC", "portions": 1.0 },
+                      { "foodGroupAbbr": "GRA", "portions": 0.5 },
+                      { "foodGroupAbbr": "VER", "portions": 0.0 }
                     ]
                   }]
                 }

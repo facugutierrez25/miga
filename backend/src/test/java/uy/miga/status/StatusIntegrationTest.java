@@ -7,8 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import uy.miga.MigaApplication;
 
-@SpringBootTest
+@SpringBootTest(classes = MigaApplication.class)
 @ActiveProfiles("test")
 class StatusIntegrationTest {
 

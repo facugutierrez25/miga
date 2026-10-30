@@ -1,10 +1,8 @@
-import type { FoodGroup } from './plans'
-
 export type Unit = 'G' | 'ML' | 'UNIDAD' | 'TAZA'
 
 export interface EquivalenceDto {
   id: number
-  foodGroup: FoodGroup
+  foodGroupId: number
   food: string
   quantity: number
   unit: Unit
@@ -23,7 +21,7 @@ export async function getEquivalences(token: string): Promise<EquivalenceDto[]> 
 
 export async function addEquivalence(
   token: string,
-  foodGroup: FoodGroup,
+  foodGroupId: number,
   food: string,
   quantity: number,
   unit: Unit,
@@ -31,7 +29,7 @@ export async function addEquivalence(
   const res = await fetch(BASE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ foodGroup, food, quantity, unit }),
+    body: JSON.stringify({ foodGroupId, food, quantity, unit }),
   })
   if (!res.ok) throw new Error('equivalences-add-error')
   return res.json()
