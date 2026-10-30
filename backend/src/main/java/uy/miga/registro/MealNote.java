@@ -26,6 +26,9 @@ class MealNote {
     @Column(name = "texto", nullable = false, columnDefinition = "text")
     private String text;
 
+    @Column(name = "plan_id")
+    private Long planId;
+
     @Column(name = "actualizado", nullable = false)
     private OffsetDateTime updatedAt;
 
@@ -38,10 +41,12 @@ class MealNote {
     LocalDate getDate()           { return date; }
     Long getMealId()              { return mealId; }
     String getText()              { return text; }
+    Long getPlanId()              { return planId; }
     OffsetDateTime getUpdatedAt() { return updatedAt; }
 
     void setUserId(Long userId)   { this.userId = userId; }
     void setDate(LocalDate date)  { this.date = date; }
     void setMealId(Long mealId)   { this.mealId = mealId; }
     void setText(String text)     { this.text = text; }
+    void setPlanId(Long planId)   { this.planId = planId; }
 }
