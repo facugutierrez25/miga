@@ -1,21 +1,5 @@
 import { apiRequest, ApiError } from './client'
 
-// ── Legacy endpoints (mantenidos por compatibilidad) ──────────────────────
-
-export async function getLog(token: string, date: string): Promise<number[]> {
-  return apiRequest(`/api/v1/meal-log/${date}`, { errorMessage: 'Error al cargar el registro.', token })
-}
-
-export async function markMealEaten(token: string, mealId: number, date: string): Promise<void> {
-  return apiRequest(`/api/v1/meal-log/${date}/${mealId}`, { errorMessage: 'Error al marcar la comida.', token, method: 'POST' })
-}
-
-export async function unmarkMealEaten(token: string, mealId: number, date: string): Promise<void> {
-  return apiRequest(`/api/v1/meal-log/${date}/${mealId}`, { errorMessage: 'Error al desmarcar la comida.', token, method: 'DELETE' })
-}
-
-// ── Tipos del registro nuevo ──────────────────────────────────────────────
-
 export interface InterpretedItemDto {
   originalText: string
   foodName: string

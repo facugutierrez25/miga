@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
+import DictationButton from '../components/DictationButton'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
@@ -143,7 +144,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const info = item.foodGroupId !== null ? gruposMap[item.foodGroupId] : null
-  const editable = item.id > 0
+  const editable = item.id > 0 && !['MENTION', 'UNKNOWN'].includes(item.origin ?? '')
 
   async function enviar(req: PatchItemRequest) {
     setSaving(true)
@@ -281,9 +282,6 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
   )
 }
 
-// Tipos de regla que se reconocen pero no generan ítems guardados.
-const TIPOS_SIN_ITEM = new Set(['LIBRE', 'FLEXIBLE', 'NO_CUENTA'])
-
 // Agrupa los ítems de una misma mención (p. ej. los grupos de un alimento compuesto).
 function agruparPorMencion(items: EntryItemDto[]): EntryItemDto[][] {
   const grupos: EntryItemDto[][] = []
@@ -347,6 +345,7 @@ function NotaMealSection({
   const [isOpen, setIsOpen] = useState(isAhora)
   const [texto, setTexto] = useState(mealDay?.noteText ?? '')
   const dirty = useRef(false)
+  const draftRevision = useRef(0)
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
   const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
@@ -379,13 +378,26 @@ function NotaMealSection({
     return () => controller.abort()
   }, [isOpen, meal.id, token])
 
-  async function handleGuardar() {
-    if (!meal.id || !texto.trim()) return
+  const saveInFlight = useRef(false)
+  // Cada edición del borrador (teclado o dictado) sube la revisión: si cambia mientras se
+  // guarda, el borrador sigue marcado como modificado y la respuesta no lo reemplaza.
+  function editarBorrador(update: (current: string) => string) {
+    dirty.current = true
+    draftRevision.current += 1
+    setTexto(update)
+  }
+
+  async function handleGuardar(value = texto) {
+    if (!meal.id || !value.trim() || saveInFlight.current || conflict) return
+    saveInFlight.current = true
+    dirty.current = true
+    const revisionEnviada = draftRevision.current
+    setTexto(value)
     setGuardando(true)
     setError(null)
     try {
-      const interp = await saveNota(token, date, meal.id, texto.trim(), baseVersion.current)
-      dirty.current = false
+      const interp = await saveNota(token, date, meal.id, value.trim(), baseVersion.current)
+      dirty.current = draftRevision.current !== revisionEnviada
       baseVersion.current = interp.version
       setConflict(false)
       onNotaSaved(interp, meal.id)
@@ -393,6 +405,7 @@ function NotaMealSection({
       setConflict(err instanceof NoteConflictError)
       setError(err instanceof NoteConflictError ? err.message : 'No se pudo guardar. Intentá de nuevo.')
     } finally {
+      saveInFlight.current = false
       setGuardando(false)
     }
   }
@@ -437,7 +450,8 @@ function NotaMealSection({
                 <button
                   key={i}
                   className="nota-sugerencia"
-                  onClick={() => { dirty.current = true; setTexto(s); textareaRef.current?.focus() }}
+                  disabled={guardando || conflict}
+                  onClick={() => void handleGuardar(s)}
                 >
                   {s}
                 </button>
@@ -450,11 +464,14 @@ function NotaMealSection({
             className="nota-textarea"
             placeholder="¿Qué comiste? Escribí en texto libre…"
             value={texto}
-            onChange={e => { dirty.current = true; setTexto(e.target.value) }}
+            onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
             rows={3}
             aria-label="Nota de la comida"
           />
 
+          <DictationButton disabled={guardando} onTranscript={transcript => {
+            editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
+          }} />
           {error && <p className="nota-error" role="alert">{error}</p>}
           {conflict && (
             <button type="button" className="nota-btn-recargar" disabled={guardando}
@@ -478,7 +495,7 @@ function NotaMealSection({
 
           <button
             className="nota-btn-guardar"
-            onClick={handleGuardar}
+            onClick={() => void handleGuardar()}
             disabled={guardando || conflict || !texto.trim()}
           >
             {guardando ? 'Guardando…' : hasNote ? 'Guardar cambios' : 'Guardar'}
@@ -622,27 +639,12 @@ function HoyContent() {
   const handleNotaSaved = useCallback((interp: NoteInterpretationDto, mealId: number) => {
     setDayRegistro(prev => {
       if (!prev) return prev
-      // Lo que no genera ítems guardados (no reconocido, o reconocido sin grupo:
-      // libre, flexible, no cuenta) se muestra igual, sin opción de corregir.
-      const sinItem: EntryItemDto[] = interp.items
-        .filter(it => !it.recognized || TIPOS_SIN_ITEM.has(it.tipo))
-        .map((it, i) => ({
-          id: -(i + 1),
-          food: it.foodName,
-          quantity: it.quantity,
-          unit: it.unit,
-          foodGroupId: null,
-          portions: null,
-          origin: 'NOTA',
-          uncertain: it.recognized && it.uncertain,
-          appliedRule: it.recognized ? it.appliedRule : null,
-        }))
       const updatedMeal: MealDayDto = {
         mealId,
         noteId: interp.noteId,
         noteVersion: interp.version,
         noteText: interp.text,
-        items: [...interp.entries, ...sinItem],
+        items: interp.entries,
         comparison: interp.comparison,
       }
       const exists = prev.meals.some(m => m.mealId === mealId)
@@ -757,6 +759,7 @@ function HoyContent() {
               </p>
             )}
 
+            <p>Según tu plan{plan?.createdAt && ` · cargado el ${plan.createdAt.slice(8, 10)}/${plan.createdAt.slice(5, 7)}`}</p>
             {total > 0 && (
               <div className="hoy-resumen">
                 <div className="hoy-resumen__porciones">

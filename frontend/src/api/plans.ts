@@ -34,6 +34,7 @@ export interface MealSaveDto {
 }
 
 export interface PlanDto {
+  createdAt?: string
   foodGroups: PlanFoodGroupDto[]
   meals: MealDto[]
   version?: number

@@ -254,7 +254,7 @@ public class PlanService {
                 .toList();
             return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
         }).toList();
-        return new PlanDto(groups, meals, plan.getVersion());
+        return new PlanDto(groups, meals, plan.getVersion(), plan.getCreatedAt().toLocalDate());
     }
 
     // ── API pública para módulos externos ─────────────────────────────────────

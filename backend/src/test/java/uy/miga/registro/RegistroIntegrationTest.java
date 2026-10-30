@@ -79,6 +79,67 @@ class RegistroIntegrationTest {
     }
 
     @Test
+    void longUnrecognizedMentionSurvivesReload() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        String text = "z".repeat(700);
+        putNote(date, text);
+        JsonNode item = getDay(date).path("meals").get(0).path("items").get(0);
+        assertThat(item.path("food").asText()).isEqualTo(text);
+        assertThat(item.path("originalText").asText()).isEqualTo(text);
+        assertThat(item.path("portions").isNull()).isTrue();
+    }
+
+    @Test
+    void mentionsSurviveReloadWithoutAddingPortions() throws Exception {
+        createUniqueUserPlan();
+        for (String type : java.util.List.of("FLEXIBLE", "NO_CUENTA")) {
+            JsonNode rules = planRules();
+            mockMvc.perform(post("/api/v1/my-plan/alimentos")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of(
+                    "planVersion", rules.path("planVersion").asLong(), "alimento", type.toLowerCase(),
+                    "sinonimos", java.util.List.of(), "tipo", type))))
+                .andExpect(status().isCreated());
+        }
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "mate, flexible, no_cuenta, xyzdesconocido");
+        assertThat(saved.path("entries").size()).isEqualTo(4);
+        JsonNode day = getDay(date);
+        JsonNode meal = day.path("meals").get(0);
+        assertThat(meal.path("items")).isEqualTo(saved.path("entries"));
+        for (JsonNode item : meal.path("items")) {
+            assertThat(item.path("foodGroupId").isNull()).isTrue();
+            assertThat(item.path("portions").isNull()).isTrue();
+            assertThat(item.path("occurrenceId").asText()).isNotBlank();
+            assertThat(item.path("origin").asText()).isIn("MENTION", "UNKNOWN");
+            if ("MENTION".equals(item.path("origin").asText())) {
+                assertThat(item.path("appliedRule").asText()).isNotBlank();
+            }
+            patchItem(date, item.path("id").asLong(), "{\"quantity\":2}")
+                .andExpect(status().isBadRequest());
+        }
+        for (JsonNode group : meal.path("comparison")) {
+            assertThat(group.path("recorded").asDouble()).isZero();
+        }
+        for (JsonNode group : day.path("summary")) {
+            assertThat(group.path("totalRecorded").asDouble()).isZero();
+        }
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        boolean found = false;
+        for (JsonNode weekDay : week.path("days")) {
+            if (!date.equals(weekDay.path("date").asText())) continue;
+            found = true;
+            assertThat(weekDay.path("totalRecorded").decimalValue()).isZero();
+            assertThat(weekDay.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
+        }
+        assertThat(found).isTrue();
+    }
+
+    @Test
     void saveNote_withRecognizedFood_returnsInterpretation() throws Exception {
         String date = LocalDate.now().toString();
 

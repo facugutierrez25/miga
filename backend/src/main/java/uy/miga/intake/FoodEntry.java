@@ -25,7 +25,7 @@ class FoodEntry {
     @Column(nullable = false)
     private LocalDate date;
 
-    @Column(nullable = false, length = 120)
+    @Column(nullable = false, length = 10000)
     private String food;
 
     @Column(nullable = false)
@@ -47,7 +47,7 @@ class FoodEntry {
     @Column(name = "meal_note_id")
     private Long mealNoteId;
 
-    @Column(name = "texto_original", length = 500)
+    @Column(name = "texto_original", length = 10000)
     private String textoOriginal;
 
     @Column(length = 10)

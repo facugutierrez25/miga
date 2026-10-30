@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import HoyPage from './HoyPage'
@@ -54,6 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
 
 function renderHoy() {
@@ -264,7 +265,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
 test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockSaveNota.mockResolvedValue({
-    noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [],
+    noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 99, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: 'MENTION', uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
     items: [{
       originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
@@ -446,4 +447,99 @@ test('un reintento general del día no borra el borrador ni su versión base', a
   expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
   expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
   expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 2)
+})
+
+
+test('lo de siempre guarda en un toque, bloquea doble envío y permite editar después', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, createdAt: '2026-10-03' })
+  mockGetSugerencias.mockResolvedValue(['leche con pan'])
+  let finish!: (value: registroApi.NoteInterpretationDto) => void
+  mockSaveNota.mockReturnValue(new Promise(resolve => { finish = resolve }))
+  renderHoy()
+  await abrirNota()
+  expect(screen.getByText('Según tu plan · cargado el 03/10')).toBeInTheDocument()
+  const suggestion = await screen.findByRole('button', { name: 'leche con pan' })
+  fireEvent.click(suggestion)
+  fireEvent.click(suggestion)
+  expect(suggestion).toBeDisabled()
+  expect(mockSaveNota).toHaveBeenCalledTimes(1)
+  expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche con pan', null)
+  finish({ noteId: 1, version: 1, text: 'leche con pan', date: dayVacio.date, mealId: 1, items: [], entries: [], comparison: [] })
+  await screen.findByRole('button', { name: 'Guardar cambios' })
+  fireEvent.change(screen.getByRole('textbox', { name: 'Nota de la comida' }), { target: { value: 'otra nota' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'otra nota', 1)
+})
+
+test('un error al guardar una sugerencia conserva el borrador y permite reintentar', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetSugerencias.mockResolvedValue(['mate'])
+  mockSaveNota.mockRejectedValueOnce(new Error('sin red')).mockResolvedValueOnce({ noteId: 1, version: 0,
+    text: 'mate', date: dayVacio.date, mealId: 1, items: [], entries: [], comparison: [] })
+  renderHoy()
+  await abrirNota()
+  fireEvent.click(await screen.findByRole('button', { name: 'mate' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar')
+  expect(screen.getByRole('textbox', { name: 'Nota de la comida' })).toHaveValue('mate')
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  await screen.findByRole('button', { name: 'Guardar cambios' })
+  expect(mockSaveNota).toHaveBeenCalledTimes(2)
+})
+
+test('al recargar muestra menciones persistidas sin corrección ni porciones', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{ mealId: 1, noteId: 5, noteVersion: 2,
+    noteText: 'mate, algo raro', comparison: [], items: [
+      { id: 51, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: 'MENTION', uncertain: false, appliedRule: 'libre' },
+      { id: 52, food: 'algo raro', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: 'UNKNOWN', uncertain: false },
+    ] }] })
+  renderHoy()
+  await abrirNota()
+  expect(screen.getByText('mate')).toBeInTheDocument()
+  expect(screen.getByText('algo raro')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Corregir/ })).not.toBeInTheDocument()
+})
+
+
+test('dictado agrega texto al borrador sin guardarlo', async () => {
+  let result!: (event: unknown) => void
+  vi.stubGlobal('SpeechRecognition', class {
+    set onresult(handler: (event: unknown) => void) { result = handler }
+    start() {}
+    abort() {}
+  })
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  renderHoy()
+  await abrirNota()
+  const draft = screen.getByRole('textbox', { name: 'Nota de la comida' })
+  fireEvent.change(draft, { target: { value: 'mate' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar', pressed: false }))
+  act(() => result({ results: [[{ transcript: 'con pan' }]] }))
+  expect(draft).toHaveValue('mate con pan')
+  expect(mockSaveNota).not.toHaveBeenCalled()
+})
+
+test('lo dictado mientras se guarda no se pierde al terminar el guardado', async () => {
+  let result!: (event: unknown) => void
+  vi.stubGlobal('SpeechRecognition', class {
+    set onresult(handler: (event: unknown) => void) { result = handler }
+    start() {}
+    abort() {}
+  })
+  let terminarGuardado!: (value: unknown) => void
+  mockSaveNota.mockReturnValue(new Promise(resolve => { terminarGuardado = resolve }) as never)
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  renderHoy()
+  await abrirNota()
+  const draft = screen.getByRole('textbox', { name: 'Nota de la comida' })
+  fireEvent.change(draft, { target: { value: 'mate' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar', pressed: false }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+  act(() => result({ results: [[{ transcript: 'con pan' }]] }))
+  await act(async () => {
+    terminarGuardado({ noteId: 1, text: 'mate', date: '2025-01-01', mealId: 1, version: 1, items: [], entries: [], comparison: [] })
+  })
+
+  await waitFor(() => expect(draft).toHaveValue('mate con pan'))
 })

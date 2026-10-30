@@ -39,6 +39,31 @@ class RegistroServiceTest {
         when(plans.getPlanIdForDate(1L, today)).thenReturn(20L);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"LIBRE", "FLEXIBLE", "NO_CUENTA", "UNKNOWN"})
+    void persistsNonCountingMentionsWithTheirMetadata(String type) {
+        InterpreterService interpreter = mock(InterpreterService.class);
+        RegistroService service = new RegistroService(notes, interpreter,
+            mock(ComparisonService.class), entries, plans, rules, users);
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(plans.getMealIds(20L)).thenReturn(List.of(10L));
+        when(notes.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        boolean recognized = !"UNKNOWN".equals(type);
+        InterpretedItem mention = recognized
+            ? new InterpretedItem("mate", "mate", BigDecimal.ONE, "u", null, null,
+                BigDecimal.ZERO, "free", false, null, null, type)
+            : InterpretedItem.unrecognized("mate");
+        when(interpreter.interpret(eq("mate"), anyList())).thenReturn(List.of(mention));
+
+        service.saveNote("user", today, 10L, "mate");
+
+        verify(entries).createMentionEntry(eq(1L), eq("user"), eq(10L), eq(today), eq("mate"),
+            eq(1.0), eq("u"), isNull(), eq("mate"), eq(false), isNull(),
+            any(java.util.UUID.class), eq(recognized));
+        verify(entries, never()).createNoteEntry(any(), any(), any(), any(), any(), any(),
+            any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
     @Test
     void newTodayNoteRejectsOldMealAfterTakingLock() {
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
