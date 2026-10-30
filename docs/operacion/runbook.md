@@ -171,6 +171,8 @@ Para correlacionar un error reportado por el usuario:
 
 ---
 
+El outbox de correo entrega al menos una vez: si el proceso cae durante el envío, el trabajo se reintenta al vencer el lease (`EMAIL_OUTBOX_LEASE_MS`, por defecto 5 minutos) y puede duplicarse un correo.
+
 ## 5. Simulacro de restauración (restore drill)
 
 Objetivo: verificar periódicamente que un backup puede restaurarse en una base aislada
