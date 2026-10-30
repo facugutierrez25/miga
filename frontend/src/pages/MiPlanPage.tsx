@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
@@ -7,7 +7,8 @@ import {
   getMyPlan, getPlanHistory, saveMyPlan, PlanConflictError,
   type PlanFoodGroupDto, type PlanDto, type PlanSummaryDto,
 } from '../api/plans'
-import { getEquivalences, addEquivalence, deleteEquivalence, type EquivalenceDto, type Unit } from '../api/equivalences'
+import type { PlanRules } from '../api/planRules'
+import PlanRulesSection from './plan/PlanRulesSection'
 import './MiPlanPage.css'
 
 const DEFAULT_GRUPOS: PlanFoodGroupDto[] = [
@@ -115,7 +116,7 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
   )
 }
 
-type Tab = 'comidas' | 'equivalencias'
+type Tab = 'comidas' | 'rules'
 
 export default function MiPlanPage() {
   useTitle('Mi plan | Miga')
@@ -134,17 +135,12 @@ export default function MiPlanPage() {
   const [confirmado, setConfirmado] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conflicto, setConflicto] = useState(false)
-  const [equivalences, setEquivalences] = useState<EquivalenceDto[] | null>(null)
-  const [equivError, setEquivError] = useState<string | null>(null)
-  const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
-  const [newFood, setNewFood] = useState('')
-  const [newQuantity, setNewQuantity] = useState('')
-  const [newUnit, setNewUnit] = useState<Unit>('G')
-  const [equivAdding, setEquivAdding] = useState(false)
-  const [equivAdded, setEquivAdded] = useState(false)
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null)
-  const [snackbar, setSnackbar] = useState<{ eq: EquivalenceDto } | null>(null)
-  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleRulesChanged = useCallback((dto: PlanRules) => {
+    setGrupos(dto.grupos)
+    setPlanVersion(dto.planVersion)
+  }, [])
 
   const locationDraftMeals = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
 
@@ -174,13 +170,6 @@ export default function MiPlanPage() {
 
     getPlanHistory(token).then(setHistorial).catch(() => {})
   }, [token, locationDraftMeals])
-
-  useEffect(() => {
-    if (!token || tab !== 'equivalencias' || equivalences !== null) return
-    getEquivalences(token)
-      .then(dtos => setEquivalences(dtos))
-      .catch(() => setEquivError('No se pudieron cargar las equivalencias.'))
-  }, [token, tab, equivalences])
 
   function actualizarNombre(i: number, nombre: string) {
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, nombre } : c))
@@ -214,62 +203,6 @@ export default function MiPlanPage() {
   function eliminarComida(i: number) {
     setComidas(prev => prev.filter((_, j) => j !== i))
     setConfirmDeleteIdx(null)
-  }
-
-  function toggleGroup(groupId: number) {
-    setExpandedGroup(prev => prev === groupId ? null : groupId)
-    setNewFood('')
-    setNewQuantity('')
-    setNewUnit('G')
-    setEquivError(null)
-  }
-
-  async function handleAddEquivalence(groupId: number) {
-    const qty = parseFloat(newQuantity)
-    if (!token || !newFood.trim() || !qty || qty <= 0) return
-    setEquivAdding(true)
-    setEquivError(null)
-    try {
-      const created = await addEquivalence(token, groupId, newFood.trim(), qty, newUnit)
-      setEquivalences(prev => [...(prev ?? []), created])
-      setNewFood('')
-      setNewQuantity('')
-      setNewUnit('G')
-      setEquivAdded(true)
-      setTimeout(() => setEquivAdded(false), 2000)
-    } catch {
-      setEquivError('No se pudo agregar. Intentá de nuevo.')
-    } finally {
-      setEquivAdding(false)
-    }
-  }
-
-  function handleDeleteEquivalence(id: number) {
-    if (!token) return
-    const eq = equivalences?.find(e => e.id === id)
-    if (!eq) return
-
-    setEquivalences(prev => prev?.filter(e => e.id !== id) ?? null)
-
-    if (snackbarTimer.current) clearTimeout(snackbarTimer.current)
-    setSnackbar({ eq })
-
-    snackbarTimer.current = setTimeout(async () => {
-      setSnackbar(null)
-      try {
-        await deleteEquivalence(token, id)
-      } catch {
-        setEquivalences(prev => prev ? [...prev, eq] : [eq])
-        setEquivError('No se pudo eliminar. Intentá de nuevo.')
-      }
-    }, 5000)
-  }
-
-  function handleUndoDelete() {
-    if (!snackbar) return
-    if (snackbarTimer.current) clearTimeout(snackbarTimer.current)
-    setEquivalences(prev => prev ? [...prev, snackbar.eq] : [snackbar.eq])
-    setSnackbar(null)
   }
 
   async function confirmarPlan() {
@@ -315,13 +248,6 @@ export default function MiPlanPage() {
 
   return (
     <div className="mi-plan-page">
-      {snackbar && (
-        <div className="snackbar" role="status">
-          <span>"{snackbar.eq.food}" eliminada</span>
-          <button className="snackbar__undo" onClick={handleUndoDelete}>Deshacer</button>
-        </div>
-      )}
-
       <header className="mi-plan-header">
         <div className="mi-plan-header__meta">
           <Brand size={20} />
@@ -332,7 +258,10 @@ export default function MiPlanPage() {
       <div className="mi-plan-body">
         <div className="plan-tabs" role="tablist">
           <button
+            type="button"
             role="tab"
+            id="plan-tab-meals"
+            aria-controls="plan-panel"
             aria-selected={tab === 'comidas'}
             className={`plan-tab${tab === 'comidas' ? ' plan-tab--active' : ''}`}
             onClick={() => setTab('comidas')}
@@ -340,122 +269,21 @@ export default function MiPlanPage() {
             Comidas
           </button>
           <button
+            type="button"
             role="tab"
-            aria-selected={tab === 'equivalencias'}
-            className={`plan-tab${tab === 'equivalencias' ? ' plan-tab--active' : ''}`}
-            onClick={() => setTab('equivalencias')}
+            id="plan-tab-rules"
+            aria-controls="plan-panel"
+            aria-selected={tab === 'rules'}
+            className={`plan-tab${tab === 'rules' ? ' plan-tab--active' : ''}`}
+            onClick={() => setTab('rules')}
           >
-            Equivalencias
+            Reglas de tu plan
           </button>
         </div>
 
-        {tab === 'equivalencias' ? (
-          equivalences === null ? (
-            <p className="mi-plan-loading">Cargando equivalencias…</p>
-          ) : (
-            <>
-              <p className="equiv-intro">
-                Las equivalencias son los alimentos que podés elegir para cada porción de tu plan.
-                Por ejemplo, si tu plan indica "1 porción de proteínas", podés elegir entre los alimentos de esa lista.
-              </p>
-              {equivAdded && (
-                <p className="equiv-success" role="status">¡Equivalencia agregada!</p>
-              )}
-              {grupos.map(g => {
-                const items = equivalences.filter(e => e.foodGroupId === g.id)
-                const open = expandedGroup === g.id
-                const dot = ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)'
-                return (
-                  <div key={g.id} className={`equiv-group${open ? ' equiv-group--open' : ''}`}>
-                    <button
-                      className="equiv-group__header"
-                      onClick={() => toggleGroup(g.id)}
-                      aria-expanded={open}
-                    >
-                      <span className="equiv-group__dot" style={{ background: dot }} />
-                      <span className="equiv-group__label">{g.name}</span>
-                      <span className="equiv-group__count">
-                        {items.length > 0 ? `${items.length} equiv.` : ''}
-                      </span>
-                      <svg className={`equiv-group__chevron${open ? ' equiv-group__chevron--open' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-
-                    {open && (
-                      <div className="equiv-group__body">
-                        {items.length === 0 && (
-                          <p className="equiv-empty">Todavía no cargaste equivalencias para este grupo.</p>
-                        )}
-                        {items.map(eq => (
-                          <div key={eq.id} className="equiv-item">
-                            <span className="equiv-item__food">{eq.food}</span>
-                            <span className="equiv-item__amount">{eq.quantity} {eq.unit.toLowerCase()}</span>
-                            <button
-                              className="equiv-item__delete"
-                              onClick={() => handleDeleteEquivalence(eq.id)}
-                              aria-label={`Eliminar ${eq.food}`}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
-                        <div className="equiv-add">
-                          <input
-                            className="equiv-add__input"
-                            type="text"
-                            placeholder="Alimento"
-                            value={newFood}
-                            onChange={e => setNewFood(e.target.value)}
-                            aria-label="Nombre del alimento"
-                          />
-                          <input
-                            className="equiv-add__input equiv-add__input--qty"
-                            type="number"
-                            min="0.01"
-                            step="0.5"
-                            placeholder="Cant."
-                            value={newQuantity}
-                            onChange={e => setNewQuantity(e.target.value)}
-                            aria-label="Cantidad numérica"
-                          />
-                          <div className="equiv-add__unit-wrap">
-                            <select
-                              value={newUnit}
-                              onChange={e => setNewUnit(e.target.value as Unit)}
-                              aria-label="Unidad"
-                            >
-                              <option value="G">g</option>
-                              <option value="ML">ml</option>
-                              <option value="UNIDAD">unidad</option>
-                              <option value="TAZA">taza</option>
-                            </select>
-                            <svg className="equiv-add__unit-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                              <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </div>
-                          <button
-                            className="equiv-add__btn"
-                            onClick={() => handleAddEquivalence(g.id)}
-                            disabled={equivAdding || !newFood.trim() || !newQuantity || parseFloat(newQuantity) <= 0}
-                            aria-label="Agregar equivalencia"
-                          >
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                              <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {equivError && <p className="plan-error" role="alert">{equivError}</p>}
-            </>
-          )
+        <div id="plan-panel" role="tabpanel" aria-labelledby={tab === 'rules' ? 'plan-tab-rules' : 'plan-tab-meals'}>
+        {tab === 'rules' ? (
+          <PlanRulesSection token={token} onChanged={handleRulesChanged} />
         ) : cargando ? (
           <p className="mi-plan-loading">Cargando tu plan…</p>
         ) : (
@@ -622,6 +450,7 @@ export default function MiPlanPage() {
             )}
           </>
         )}
+        </div>
       </div>
     </div>
   )

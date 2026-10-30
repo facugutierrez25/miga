@@ -1,0 +1,30 @@
+.plan-rules { color: var(--ink); display: grid; gap: 12px; }
+.plan-rules section, .rules-form { display: grid; gap: 12px; }
+.rules-list { list-style: none; padding: 0; display: grid; gap: 12px; }
+.rules-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; overflow-wrap: anywhere; }
+.plan-rules h2, .plan-rules h3 { font-family: var(--font-display); }
+.rules-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.plan-rules label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.plan-rules input:not([type=checkbox]):not([type=radio]), .plan-rules select { width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 16px; padding: 8px; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; }
+.plan-rules input[type=checkbox], .plan-rules input[type=radio] { width: 22px; height: 22px; }
+.plan-rules label:has(input[type=checkbox]), .plan-rules label:has(input[type=radio]) { min-height: 44px; }
+.plan-rules button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--primary-soft); color: var(--primary); font: inherit; cursor: pointer; }
+.plan-rules button[type=submit], .plan-rules button[aria-pressed=true] { background: var(--primary); color: var(--on-primary); }
+.plan-rules button:disabled { opacity: .65; cursor: default; }
+.plan-rules :focus-visible, .plan-tabs :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.plan-rules fieldset { min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.plan-rules .rules-editor { border: 0; padding: 0; margin: 0; }
+.rules-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+.rules-chip { background: var(--primary-soft); border-radius: 8px; padding: 4px 8px; }
+@media (min-width: 641px) {
+  .mi-plan-page .plan-tabs { background: var(--primary-soft); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: var(--border); }
+}
+@media (max-width: 640px) {
+  .plan-rules input, .plan-rules select { font-size: 16px; }
+  @supports (backdrop-filter: blur(1px)) {
+    .rules-card { background: var(--glass-bg); backdrop-filter: var(--glass-blur); border-color: var(--glass-border); box-shadow: var(--glass-shadow); }
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .rules-card { background: var(--surface); backdrop-filter: none; }
+}

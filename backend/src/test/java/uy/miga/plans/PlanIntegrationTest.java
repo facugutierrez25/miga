@@ -415,15 +415,12 @@ class PlanIntegrationTest {
         jdbc.update("update plans set modo_registro = 'LIBRE', margen_porciones = 1.5 where id = ?", oldId);
         jdbc.update("insert into plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, meta_diaria, preguntar_si_falta, opcional) values (?, 'Grupo propio', 'ABC', 9, 'propio', '#123456', 3, true, true)", oldId);
         long groupId = jdbc.queryForObject("select id from plan_food_groups where plan_id = ? and abbreviation = 'ABC'", Long.class, oldId);
-        mockMvc.perform(post("/api/v1/equivalences").header("Authorization", "Bearer " + t)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"foodGroupId\":" + groupId + ",\"food\":\"Alimento sint�tico\",\"quantity\":100,\"unit\":\"G\"}"))
-                .andExpect(status().isCreated());
+        jdbc.update("insert into food_rules (plan_id, user_id, alcance, alimento, tipo, food_group_id, cantidad_por_porcion, unidad) select id, user_id, 'USUARIO', 'Alimento sintético', 'NORMAL', ?, 100, 'g' from plans where id = ?", groupId, oldId);
         mockMvc.perform(post("/api/v1/habitos").header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"H�bito sint�tico\",\"habitType\":\"SI_NO\",\"displayOrder\":1}"))
+                .content("{\"name\":\"Hábito sintético\",\"habitType\":\"SI_NO\",\"displayOrder\":1}"))
                 .andExpect(status().isCreated());
-        jdbc.update("insert into food_rules (plan_id, alcance, alimento, tipo, componentes) values (?, 'PLAN', 'Compuesto sint�tico', 'COMPUESTO', cast(? as jsonb))",
+        jdbc.update("insert into food_rules (plan_id, alcance, alimento, tipo, componentes) values (?, 'PLAN', 'Compuesto sintético', 'COMPUESTO', cast(? as jsonb))",
                 oldId, "[{\"foodGroupId\":" + groupId + ",\"porciones\":2},{\"standardGroupKey\":\"frutas\",\"porciones\":1}]");
         jdbc.update("insert into plan_habits (plan_id, name, habit_type, archived_at) values (?, 'Archivado', 'SI_NO', now())", oldId);
         savePlan(t, PLAN_UNA_COMIDA.replace("Desayuno", "Cena"));
@@ -439,10 +436,9 @@ class PlanIntegrationTest {
                 .hasSize(2);
         long newGroupId = jdbc.queryForObject("select id from plan_food_groups where plan_id = ? and abbreviation = 'ABC'", Long.class, newId);
         assertThat(jdbc.queryForObject("select (componentes->0->>'foodGroupId')::bigint from food_rules where plan_id = ? and alcance = 'PLAN'", Long.class, newId)).isEqualTo(newGroupId);
-        mockMvc.perform(get("/api/v1/equivalences").header("Authorization", "Bearer " + t))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].foodGroupId").value(newGroupId));
+        assertThat(jdbc.queryForObject("select food_group_id from food_rules where plan_id = ? and alcance = 'USUARIO'", Long.class, newId)).isEqualTo(newGroupId);
         mockMvc.perform(get("/api/v1/habitos").header("Authorization", "Bearer " + t))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].name").value("H�bito sint�tico"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].name").value("Hábito sintético"));
     }
 
     @Test
