@@ -359,3 +359,47 @@ test('un borrador empezado sobre una versión vieja sigue dando conflicto tras u
 
   await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche y pan', 2))
 })
+
+test('recargar desde el conflicto adopta la versión actual aunque no haya cambiado', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const dia = {
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 3, items: [], comparison: [] }],
+  }
+  mockGetDayRegistro.mockResolvedValue(dia)
+  mockSaveNota
+    .mockRejectedValueOnce(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
+    .mockResolvedValue({ noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 4, items: [], entries: [], comparison: [] })
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Recargar' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Recargar' })).not.toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+  await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 3))
+  expect(screen.getByPlaceholderText(/Qué comiste/)).toHaveValue('leche y pan')
+})
+
+test('si recargar falla, la versión base no cambia', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro
+    .mockResolvedValueOnce({
+      date: '2025-01-01', summary: [],
+      meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 2, items: [], comparison: [] }],
+    })
+    .mockRejectedValue(new Error('sin red'))
+  mockSaveNota.mockRejectedValue(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Recargar' }))
+  expect(await screen.findByText('No se pudo recargar. Intentá de nuevo.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+  await waitFor(() => expect(mockSaveNota).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 2))
+})

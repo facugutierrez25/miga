@@ -334,7 +334,7 @@ interface NotaMealSectionProps {
   isAhora: boolean
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
-  onReload: () => Promise<void>
+  onReload: () => Promise<DayRegistroDto>
   onRespuestaGuardada: (mealId: number) => void
 }
 
@@ -348,7 +348,6 @@ function NotaMealSection({
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
   const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
-  const acceptReloadedVersion = useRef(false)
   const [conflict, setConflict] = useState(false)
   const [sugerencias, setSugerencias] = useState<string[]>([])
   const [cargandoSug, setCargandoSug] = useState(false)
@@ -364,9 +363,6 @@ function NotaMealSection({
   useEffect(() => {
     if (!dirty.current) {
       setTexto(mealDay?.noteText ?? '')
-      baseVersion.current = mealDay?.noteVersion ?? null
-    } else if (acceptReloadedVersion.current) {
-      acceptReloadedVersion.current = false
       baseVersion.current = mealDay?.noteVersion ?? null
     }
   }, [mealDay?.noteText, mealDay?.noteVersion])
@@ -464,8 +460,9 @@ function NotaMealSection({
               onClick={async () => {
                 setGuardando(true)
                 try {
-                  acceptReloadedVersion.current = true
-                  await onReload()
+                  // Recargar desde el aviso es aceptar la versión actual como base del borrador.
+                  const day = await onReload()
+                  baseVersion.current = day.meals.find(m => m.mealId === meal.id)?.noteVersion ?? null
                   setConflict(false)
                   setError(null)
                 } catch {
@@ -882,6 +879,7 @@ export default function HoyPage() {
                         onReload={async () => {
                           const data = await getDayRegistro(token!, fecha)
                           setDayRegistro(data)
+                          return data
                         }}
                         meal={meal}
                         mealDay={mealDay}
