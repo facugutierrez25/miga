@@ -177,3 +177,12 @@ test('abre Reglas de tu plan con una pestaña accesible', async () => {
   expect(screen.getByRole('tab', { name: 'Reglas de tu plan' })).toHaveAttribute('aria-selected', 'true')
   await waitFor(() => expect(rulesApi.getPlanRules).toHaveBeenCalledWith('tok'))
 })
+
+test('recarga las comidas cuando cambian las reglas del plan', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 2, planVersion: 4, modoRegistro: 'PORCIONES', grupos: [], alimentos: [], habitos: [] })
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(1))
+  fireEvent.click(screen.getByRole('tab', { name: 'Reglas de tu plan' }))
+  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
+})

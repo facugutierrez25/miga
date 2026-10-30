@@ -137,10 +137,20 @@ export default function MiPlanPage() {
   const [conflicto, setConflicto] = useState(false)
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null)
 
+  // Una edición de reglas puede crear una versión nueva del plan con otros ids de
+  // grupos: se recargan las comidas para no confirmar porciones con ids viejos.
   const handleRulesChanged = useCallback((dto: PlanRules) => {
     setGrupos(dto.grupos)
     setPlanVersion(dto.planVersion)
-  }, [])
+    if (!token) return
+    getMyPlan(token)
+      .then(plan => {
+        setGrupos(plan.foodGroups ?? DEFAULT_GRUPOS)
+        setComidas(planALocal(plan))
+        setPlanVersion(plan.version)
+      })
+      .catch(() => {})
+  }, [token])
 
   const locationDraftMeals = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
 

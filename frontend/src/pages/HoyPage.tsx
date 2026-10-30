@@ -179,7 +179,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
     && new Set(reparto.map(r => r.foodGroupId)).size === reparto.length
 
   const dot = info?.token ?? 'var(--muted)'
-  const label = info?.name ?? (item.foodGroupId === null ? 'Sin grupo en tu plan' : String(item.foodGroupId))
+  const label = info?.name ?? (item.foodGroupId !== null ? String(item.foodGroupId) : item.appliedRule ? null : 'Sin grupo en tu plan')
 
   return (
     <li className={`nota-item${item.uncertain ? ' nota-item--dudoso' : ''}`}>
@@ -209,7 +209,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
             {item.quantity !== null && (
               <span className="nota-item__qty">{item.quantity} {item.unit ?? ''}</span>
             )}
-            <span className="nota-item__grupo">{label}</span>
+            {label && <span className="nota-item__grupo">{label}</span>}
             {item.portions !== null && (
               <span className="nota-item__porciones">{fmt(item.portions)} p.</span>
             )}
@@ -604,8 +604,10 @@ export default function HoyPage() {
   const handleNotaSaved = useCallback((interp: NoteInterpretationDto, mealId: number) => {
     setDayRegistro(prev => {
       if (!prev) return prev
-      const unrecognized: EntryItemDto[] = interp.items
-        .filter(it => !it.recognized)
+      // Lo que no genera ítems guardados (no reconocido, o reconocido sin grupo:
+      // libre, flexible, no cuenta) se muestra igual, sin opción de corregir.
+      const sinItem: EntryItemDto[] = interp.items
+        .filter(it => !it.recognized || it.foodGroupId === null)
         .map((it, i) => ({
           id: -(i + 1),
           food: it.foodName,
@@ -614,13 +616,14 @@ export default function HoyPage() {
           foodGroupId: null,
           portions: null,
           origin: 'NOTA',
-          uncertain: false,
+          uncertain: it.recognized && it.uncertain,
+          appliedRule: it.recognized ? it.appliedRule : null,
         }))
       const updatedMeal: MealDayDto = {
         mealId,
         noteId: interp.noteId,
         noteText: interp.text,
-        items: [...interp.entries, ...unrecognized],
+        items: [...interp.entries, ...sinItem],
         comparison: interp.comparison,
       }
       const exists = prev.meals.some(m => m.mealId === mealId)

@@ -255,3 +255,23 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
     saveAsRule: true,
   }))
 })
+
+test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockSaveNota.mockResolvedValue({
+    noteId: 1, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [],
+    items: [{
+      originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
+      standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
+      uncertain: false, recognized: true, tipo: 'LIBRE',
+    }],
+  })
+  renderHoy()
+  await abrirNota()
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: 'mate' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+  expect(await screen.findByText('mate = libre (sin porcion asignada)')).toBeInTheDocument()
+  expect(screen.queryByText('Sin grupo en tu plan')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Corregir mate' })).not.toBeInTheDocument()
+})
