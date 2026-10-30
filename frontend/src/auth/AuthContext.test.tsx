@@ -92,3 +92,18 @@ test('un 401 de una petición con el token anterior no cierra la sesión nueva',
 
   expect(screen.getByText('con sesión')).toBeInTheDocument()
 })
+
+test('un 401 que llega después de volver a ingresar no cierra la sesión nueva', async () => {
+  let resolveLate: (res: Response) => void = () => {}
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveLate = resolve })))
+  renderWithSession()
+
+  const pending = window.fetch('/api/v1/my-plan', { headers: { Authorization: `Bearer ${TOKEN}` } })
+  fireEvent.click(screen.getByRole('button', { name: 'Ingresar otra vez' }))
+  await act(async () => {
+    resolveLate(new Response(null, { status: 401 }))
+    await pending
+  })
+
+  expect(screen.getByText('con sesión')).toBeInTheDocument()
+})
