@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.security.web.FilterChainProxy;
+import uy.miga.users.EmailOutboxWorker;
 import uy.miga.users.MockEmailService;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -32,6 +33,9 @@ class PlanIntegrationTest {
 
     @Autowired
     private MockEmailService mockEmailService;
+
+    @Autowired
+    private EmailOutboxWorker outboxWorker;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
@@ -407,6 +411,7 @@ class PlanIntegrationTest {
                             """.formatted(email)));
         } catch (Exception ignored) {}
 
+        outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
         if (verifyToken != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
