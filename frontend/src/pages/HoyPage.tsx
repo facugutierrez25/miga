@@ -279,6 +279,9 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
   )
 }
 
+// Tipos de regla que se reconocen pero no generan ítems guardados.
+const TIPOS_SIN_ITEM = new Set(['LIBRE', 'FLEXIBLE', 'NO_CUENTA'])
+
 // Agrupa los ítems de una misma mención (p. ej. los grupos de un alimento compuesto).
 function agruparPorMencion(items: EntryItemDto[]): EntryItemDto[][] {
   const grupos: EntryItemDto[][] = []
@@ -607,7 +610,7 @@ export default function HoyPage() {
       // Lo que no genera ítems guardados (no reconocido, o reconocido sin grupo:
       // libre, flexible, no cuenta) se muestra igual, sin opción de corregir.
       const sinItem: EntryItemDto[] = interp.items
-        .filter(it => !it.recognized || it.foodGroupId === null)
+        .filter(it => !it.recognized || TIPOS_SIN_ITEM.has(it.tipo))
         .map((it, i) => ({
           id: -(i + 1),
           food: it.foodName,

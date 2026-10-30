@@ -275,3 +275,24 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   expect(screen.queryByText('Sin grupo en tu plan')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Corregir mate' })).not.toBeInTheDocument()
 })
+
+test('no duplica las menciones que ya generaron ítems', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: gruposBarrita })
+  mockSaveNota.mockResolvedValue({
+    noteId: 1, text: '1 barrita', date: '2025-01-01', mealId: 1, comparison: [],
+    items: [{
+      originalText: '1 barrita', foodName: 'barrita', quantity: 1, unit: 'u', foodGroupId: null,
+      standardGroupKey: null, portions: 1, appliedRule: 'barrita (compuesto)',
+      uncertain: false, recognized: true, tipo: 'COMPUESTO',
+    }],
+    entries: [entradaBarrita(11, 1), entradaBarrita(12, 2), entradaBarrita(13, 3)],
+  })
+  renderHoy()
+  await abrirNota()
+  fireEvent.change(screen.getByPlaceholderText(/Qué comiste/), { target: { value: '1 barrita' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+  await screen.findByRole('heading', { name: 'Así lo entendí' })
+  expect(screen.queryByText('barrita (compuesto)')).not.toBeInTheDocument()
+  expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
+})
