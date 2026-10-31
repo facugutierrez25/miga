@@ -160,6 +160,23 @@ class PlanRulesIntegrationTest {
         request(post(BASE+"alimentos"),body(Map.of("alimento","mal","tipo","COMPUESTO","componentes",List.of(Map.of("groupUid",custom,"porciones",1)))),400);
         request(post(BASE+"alimentos"),body(Map.of("alimento","mal","tipo","NORMAL","groupUid",UUID.randomUUID())),404);
     }
+    @Test void editingKeepsLegacyLongNamesAndSynonymsButRejectsNewOnes() throws Exception {
+        state=request(post(BASE+"alimentos"),body(Map.of("alimento","heredado","tipo","NORMAL","groupUid",group("Proteínas").path("uid").asText())),201);
+        String uid=null;
+        for (JsonNode r: state.path("alimentos")) if ("heredado".equals(r.path("alimento").asText())) uid=r.path("uid").asText();
+        String longName="h".repeat(150), longSynonym="s".repeat(150);
+        // Datos guardados antes de los topes nuevos.
+        jdbc.update("update food_rules set alimento=?, sinonimos=? where uid=?::uuid", longName, new String[]{longSynonym}, uid);
+        state=request(get(BASE+"reglas"),null,200);
+        Map<String,Object> keep=Map.of("alimento",longName,"sinonimos",List.of(longSynonym),"tipo","NORMAL",
+            "groupUid",group("Proteínas").path("uid").asText(),"porcionPorDefecto",2);
+        state=request(put(BASE+"alimentos/"+uid),body(keep),200);
+        request(put(BASE+"alimentos/"+uid),body(Map.of("alimento",longName,"sinonimos",List.of(longSynonym,"n".repeat(101)),"tipo","NORMAL",
+            "groupUid",group("Proteínas").path("uid").asText())),400);
+        request(put(BASE+"alimentos/"+uid),body(Map.of("alimento","x".repeat(101),"tipo","NORMAL",
+            "groupUid",group("Proteínas").path("uid").asText())),400);
+    }
+
     @Test void usedVersionIsCopiedOnceAndHistoricalNotesAndItemsStayIntact() throws Exception {
         long old=state.path("planId").asLong(); long meal=meals().getFirst();
         state=request(post(BASE+"alimentos"),body(Map.of("alimento","sintetico","tipo","NORMAL","groupUid",group("Proteínas").path("uid").asText())),201);
