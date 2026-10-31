@@ -484,12 +484,16 @@ function NotaMealSection({
     setGuardando(true)
     setError(null)
     setGuardado(null)
+    const revisionEnviada = draftRevision.current
     try {
       const version = await deleteNota(token, date, meal.id, baseVersion.current)
       baseVersion.current = version
-      dirty.current = false
-      draftRevision.current += 1
-      setTexto('')
+      // Lo que se escribió mientras se borraba es un borrador nuevo y se conserva.
+      if (draftRevision.current === revisionEnviada) {
+        dirty.current = false
+        draftRevision.current += 1
+        setTexto('')
+      }
       setConflict(false)
       setConfirmando(false)
       setGuardado(`Borraste lo anotado en ${meal.name}.`)

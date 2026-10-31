@@ -81,7 +81,7 @@ class WeekService {
             }
             BigDecimal totalGoal = planId == null || "LIBRE".equals(planService.getModoRegistro(planId))
                 ? BigDecimal.ZERO : computeTotalGoal(planId);
-            days.add(new WeekDayDto(day, hasData || meals.stream().anyMatch(m -> m.noteText() != null),
+            days.add(new WeekDayDto(day, hasData || meals.stream().anyMatch(m -> m.noteText() != null && !m.noteText().isBlank()),
                 totalRecorded, totalGoal, habitLogs, meals, dayHabits.stream().map(PlanHabit::getId).toList()));
         }
 

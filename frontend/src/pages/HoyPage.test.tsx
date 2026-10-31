@@ -749,3 +749,17 @@ test('si la nota cambió en otro dispositivo, no la borra y ofrece recargar', as
   expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche y pan')
 })
+
+test('lo que se escribe mientras se borra no se pierde', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue(dayConNota)
+  let resolver: (v: number) => void = () => {}
+  mockDeleteNota.mockReturnValue(new Promise<number>(r => { resolver = r }))
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Borrar' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'una manzana' } })
+  await act(async () => { resolver(4) })
+  expect(await screen.findByRole('status')).toHaveTextContent('Borraste lo anotado en Desayuno.')
+  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('una manzana')
+})
