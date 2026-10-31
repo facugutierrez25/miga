@@ -803,3 +803,10 @@
     padding: var(--s6) var(--s5) 48px;
   }
 }
+
+.nota-compuesto__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

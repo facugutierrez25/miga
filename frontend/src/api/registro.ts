@@ -172,3 +172,18 @@ export async function getSugerencias(
     throw err
   }
 }
+
+export async function removeItem(
+  token: string,
+  date: string,
+  itemId: number,
+  version: number | null,
+): Promise<MealDayDto> {
+  const query = version === null ? '' : `?version=${version}`
+  try {
+    return await apiRequest(`/api/v1/registro/${date}/items/${itemId}${query}`, { errorMessage: 'No se pudo quitar el alimento.', token, method: 'DELETE' })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    throw err
+  }
+}

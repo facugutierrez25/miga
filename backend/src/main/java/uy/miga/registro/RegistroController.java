@@ -72,6 +72,14 @@ class RegistroController {
         return service.getDayComparison(auth.getName(), date);
     }
 
+    @DeleteMapping("/{date}/items/{id}")
+    DayRegistroDto.MealDayDto removeItem(Authentication auth,
+                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                    @PathVariable Long id,
+                    @RequestParam(required = false) Long version) {
+        return service.removeItem(auth.getName(), date, id, version);
+    }
+
     // PATCH /api/v1/registro/{date}/items/{id} — corregir cantidad/grupo; saveAsRule crea regla USUARIO
     @PatchMapping("/{date}/items/{id}")
     PatchItemResultDto patchItem(Authentication auth,

@@ -13,11 +13,11 @@ import java.util.regex.Pattern;
 @Service
 class InterpreterService {
 
-    private static final Pattern HARD_SEP = Pattern.compile(",|;|\\+|(?<=\\S)\\.(?=\\s|$)");
+    static final Pattern HARD_SEP = Pattern.compile(",|;|\\+|(?<=\\S)\\.(?=\\s|$)");
 
     // Separadores blandos: "y" / "con" como delimitadores de ítems cuando el
     // segmento completo no coincide con ninguna regla.
-    private static final Pattern SOFT_SEP = Pattern.compile("\\s+(?:y|con)\\s+", Pattern.CASE_INSENSITIVE);
+    static final Pattern SOFT_SEP = Pattern.compile("\\s+(?:y|con)\\s+", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern QUANTITY_PREFIX = Pattern.compile(
         "^(\\d+(?:[.,]\\d+)?|medios?|medias?|un[ao]?)\\s+",
