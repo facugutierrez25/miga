@@ -32,5 +32,8 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
 
     List<FoodRule> findByPlanIdAndAlcanceIn(Long planId, List<String> alcances);
 
+    @Query("SELECT r FROM FoodRule r WHERE r.uid = :uid AND (r.alcance = 'GLOBAL' OR (r.alcance = 'PLAN' AND r.planId = :planId))")
+    java.util.Optional<FoodRule> findForAdjust(@Param("uid") java.util.UUID uid, @Param("planId") Long planId);
+
     void deleteByIdAndUserId(Long id, Long userId);
 }

@@ -292,4 +292,29 @@ class InterpreterServiceTest {
         }
     }
 
+
+    @Test void boundedDistanceMatchesFullDistance() {
+        var words = java.util.List.of("", "a", "ab", "abc", "arroz", "arros", "arrozs", "leche", "leches");
+        for (String a : words) for (String b : words) for (int max = 0; max <= 3; max++) {
+            int[][] full = new int[a.length() + 1][b.length() + 1];
+            for (int i = 0; i <= a.length(); i++) full[i][0] = i;
+            for (int j = 0; j <= b.length(); j++) full[0][j] = j;
+            for (int i = 1; i <= a.length(); i++) for (int j = 1; j <= b.length(); j++)
+                full[i][j] = Math.min(full[i-1][j] + 1, Math.min(full[i][j-1] + 1,
+                    full[i-1][j-1] + (a.charAt(i-1) == b.charAt(j-1) ? 0 : 1)));
+            assertThat(interpreter.levenshtein(a, b, max)).isEqualTo(Math.min(full[a.length()][b.length()], max + 1));
+        }
+    }
+
+    @Test void boundedDistanceCutsOffAndHandlesLongStringsQuickly() {
+        org.junit.jupiter.api.Assertions.assertTimeout(java.time.Duration.ofMillis(50), () -> {
+            assertThat(interpreter.levenshtein("a".repeat(2000), "b".repeat(2000), 2)).isEqualTo(3);
+            assertThat(interpreter.levenshtein("a".repeat(2000), "a".repeat(2000), 2)).isZero();
+            assertThat(interpreter.levenshtein("a".repeat(2000), "a", 2)).isEqualTo(3);
+        });
+    }
+
+    @Test void longMentionIsNotRecognizedEvenWithLegacyRule() {
+        assertThat(interpreter.findRule("a".repeat(101), List.of(normal(1L, "a".repeat(101), 1L, null, null)))).isNull();
+    }
 }

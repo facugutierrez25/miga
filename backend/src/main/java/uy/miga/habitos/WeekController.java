@@ -48,7 +48,7 @@ class WeekController {
     HabitLogDto logHabit(Authentication auth,
                          @PathVariable Long id,
                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                         @RequestBody LogValueRequest req) {
+                         @Valid @RequestBody LogValueRequest req) {
         return service.logHabit(auth.getName(), id, date, req.value());
     }
 
@@ -74,5 +74,8 @@ class WeekController {
         }
     }
 
-    record LogValueRequest(BigDecimal value) {}
+    record LogValueRequest(
+        @jakarta.validation.constraints.NotNull(message = "Ingresá un valor.")
+        @jakarta.validation.constraints.PositiveOrZero(message = "El valor no puede ser negativo.")
+        @jakarta.validation.constraints.DecimalMax(value = "100000", message = "El valor admite hasta 100000.") BigDecimal value) {}
 }

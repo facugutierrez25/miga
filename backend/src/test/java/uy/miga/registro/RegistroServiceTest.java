@@ -200,4 +200,12 @@ class RegistroServiceTest {
         verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
         verifyNoInteractions(rules);
     }
+
+    @Test void oversizedNotesAreRejectedByBothServiceOverloadsBeforeLoadingData() {
+        assertThatThrownBy(() -> service.saveNote("user", today, 10L, "a".repeat(2001)))
+            .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        assertThatThrownBy(() -> service.saveNote("user", today, 10L, "a".repeat(2001), 1L))
+            .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        verifyNoInteractions(notes, entries, rules);
+    }
 }

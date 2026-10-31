@@ -19,11 +19,11 @@ final class Requests {
         }
     }
     record Component(@NotNull UUID groupUid, @Positive double porciones) {}
-    record Rule(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=200) String alimento,
-        List<@NotBlank String> sinonimos, @NotBlank String tipo, UUID groupUid, @Positive BigDecimal cantidadPorPorcion,
+    record Rule(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=100, message="El alimento admite hasta 100 caracteres.") String alimento,
+        @Size(max=20, message="Podés indicar hasta 20 sinónimos.") List<@NotBlank @Size(max=100, message="Cada sinónimo admite hasta 100 caracteres.") String> sinonimos, @NotBlank String tipo, UUID groupUid, @Positive BigDecimal cantidadPorPorcion,
         @Size(max=20) String unidad, @Positive BigDecimal porcionPorDefecto, List<@NotNull @Valid Component> componentes, UUID overridesRuleUid) {}
     record Habit(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=100) String name, @NotBlank String habitType,
-        @Size(max=40) String unit, @Positive BigDecimal goal, @NotBlank String period, @Positive BigDecimal step, Boolean countsFlexibleMeals) {
+        @Size(max=40) String unit, @PositiveOrZero(message="La meta no puede ser negativa.") @DecimalMax(value="100000", message="La meta admite hasta 100000.") BigDecimal goal, @NotBlank String period, @Positive(message="El paso debe ser positivo.") @DecimalMax(value="100000", message="El paso admite hasta 100000.") BigDecimal step, Boolean countsFlexibleMeals) {
         HabitInput input() {
             return new HabitInput(name, habitType, unit, goal, period, step, Boolean.TRUE.equals(countsFlexibleMeals));
         }

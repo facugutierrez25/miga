@@ -164,6 +164,7 @@ class InterpreterService {
     }
 
     FoodRuleDto findRule(String name, List<FoodRuleDto> rules) {
+        if (name.length() > 100) return null;
         // 1. Exact match on food name
         for (FoodRuleDto r : rules) {
             if (normalize(r.alimento()).equals(name)) return r;
@@ -191,14 +192,14 @@ class InterpreterService {
         for (FoodRuleDto r : rules) {
             String rName = normalize(r.alimento());
             if (rName.length() < 4) continue;
-            int d = levenshtein(name, rName);
+            int d = levenshtein(name, rName, 2);
             if (d < bestDist) { bestDist = d; candidates.clear(); candidates.add(r); }
             else if (d == bestDist) candidates.add(r);
             if (r.sinonimos() != null) {
                 for (String s : r.sinonimos()) {
                     String ns = normalize(s);
                     if (ns.length() < 4) continue;
-                    d = levenshtein(name, ns);
+                    d = levenshtein(name, ns, 2);
                     if (d < bestDist) { bestDist = d; candidates.clear(); candidates.add(r); }
                     else if (d == bestDist && !candidates.contains(r)) candidates.add(r);
                 }
@@ -304,19 +305,34 @@ class InterpreterService {
     }
 
     int levenshtein(String a, String b) {
+        return levenshtein(a, b, 2);
+    }
+
+    int levenshtein(String a, String b, int max) {
+        if (max < 0) throw new IllegalArgumentException("La distancia máxima no puede ser negativa.");
         int la = a.length(), lb = b.length();
-        if (Math.abs(la - lb) > 3) return 99;
+        int exceeded = max + 1;
+        if (Math.abs(la - lb) > max) return exceeded;
+        if (la == 0) return lb;
+        if (lb == 0) return la;
         int[] prev = new int[lb + 1];
-        for (int j = 0; j <= lb; j++) prev[j] = j;
+        int[] curr = new int[lb + 1];
+        Arrays.fill(prev, exceeded);
+        for (int j = 0; j <= Math.min(lb, max); j++) prev[j] = j;
         for (int i = 1; i <= la; i++) {
-            int[] curr = new int[lb + 1];
-            curr[0] = i;
-            for (int j = 1; j <= lb; j++) {
+            int start = Math.max(1, i - max), end = Math.min(lb, i + max);
+            curr[0] = Math.min(i, exceeded);
+            if (start > 1) curr[start - 1] = exceeded;
+            int rowMin = curr[0];
+            for (int j = start; j <= end; j++) {
                 int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
                 curr[j] = Math.min(curr[j - 1] + 1, Math.min(prev[j] + 1, prev[j - 1] + cost));
+                rowMin = Math.min(rowMin, curr[j]);
             }
-            prev = curr;
+            if (rowMin > max) return exceeded;
+            if (end < lb) curr[end + 1] = exceeded;
+            int[] swap = prev; prev = curr; curr = swap;
         }
-        return prev[lb];
+        return Math.min(prev[lb], exceeded);
     }
 }

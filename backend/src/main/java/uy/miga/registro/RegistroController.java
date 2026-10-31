@@ -108,5 +108,5 @@ class RegistroController {
 
     record DeleteNoteResponse(Long version) {}
 
-    record NoteRequest(@NotBlank @Size(max = 10_000) String text, Long version) {}
+    record NoteRequest(@NotBlank @Size(max = 2_000, message = "La nota admite hasta 2000 caracteres.") String text, Long version) {}
 }

@@ -1,6 +1,7 @@
 package uy.miga.users;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
@@ -12,7 +13,7 @@ record RegisterRequest(
     @NotBlank
     @Pattern(
         regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^a-zA-Z\\d]).{10,}$",
-        message = "Password must be at least 10 characters and include uppercase, lowercase, number and special character"
+        message = "La contraseña debe tener al menos 10 caracteres e incluir mayúscula, minúscula, número y carácter especial."
     )
-    String password
+    @Size(max = 128, message = "La contraseña admite hasta 128 caracteres.") String password
   ) {}
