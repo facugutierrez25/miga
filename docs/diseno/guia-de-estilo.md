@@ -47,7 +47,6 @@ Se definen como variables CSS en `frontend/src/index.css` y cambian según el te
 | `--ink` | Texto principal | `#16201F` | `#EDEDEA` |
 | `--muted` / `--text-secondary` | Texto secundario | `#5A6462` | `#A6A6A1` |
 | `--muted-2` | Íconos e información terciaria | `#646E6C` | `#8F8F8A` |
-| `--done` | Cosas ya hechas | `#7C8583` | `#6A6A66` |
 | `--primary` | Acción principal, enlaces, selección, navegación activa | `#0E6E6B` | `#4DB8B2` |
 | `--on-primary` | Texto sobre `--primary` | `#FFFFFF` | `#0B1F1E` |
 | `--primary-soft` | Fondo de ítem seleccionado | `#E7F1F0` | `#18302F` |
