@@ -356,6 +356,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
           <p className="mi-plan-loading">Cargando tu plan…</p>
         ) : (
           <>
+            <div className="meal-list">
             {comidas.map((comida, i) =>
               comida.minimizada ? (
                 <div key={i} className="comida-card comida-card--min">
@@ -468,6 +469,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
               </svg>
               Agregar comida
             </button>
+            </div>
 
             {error && <p className="plan-error" role="alert">{error}</p>}
 
