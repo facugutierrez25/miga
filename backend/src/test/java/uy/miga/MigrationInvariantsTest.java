@@ -480,6 +480,22 @@ class MigrationInvariantsTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Una migración aplicada cuyo contenido cambió hace fallar la migración por checksum, en
+     * lugar de pasar en silencio (el arranque ya no ejecuta repair por defecto).
+     */
+    @Test
+    void changedAppliedMigrationFailsValidationInsteadOfPassingSilently() throws Exception {
+        buildFlyway(null).migrate();
+        try (Connection c = connect()) {
+            c.createStatement().execute("UPDATE flyway_schema_history SET checksum = 12345 WHERE version = '14'");
+        }
+
+        Flyway flyway = buildFlyway(null);
+        assertThatThrownBy(() -> new FlywayConfig().flywayMigrationStrategy(false).migrate(flyway))
+            .hasStackTraceContaining("checksum");
+    }
+
     private Flyway buildFlyway(String target) {
         return buildFlyway(target, false);
     }
