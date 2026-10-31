@@ -16,31 +16,34 @@
   flex: 1;
   /* empuja el contenido por debajo de la status bar (notch / Dynamic Island) */
   padding-top: env(safe-area-inset-top, 0px);
-  /* espacio para la barra flotante + zona de gestos */
-  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-  /* fusión entre el color sólido del top y el fondo ambiental glass */
-  background: linear-gradient(to bottom, var(--bg) 0%, transparent 72px);
+  /* espacio para la barra flotante: el contenido termina por encima de ella */
+  padding-bottom: calc(var(--nav-clearance, 96px) + env(safe-area-inset-bottom, 0px));
 }
 
-/* Celular: barra flotante tipo cápsula de vidrio */
+/* Celular: el foco y los anclajes nunca quedan tapados por la barra (WCAG 2.4.11) */
+@media (max-width: 639px) {
+  :root {
+    --nav-clearance: 96px;
+    scroll-padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Celular: barra compacta del ancho de sus pestañas. Es el único vidrio de la app,
+   porque el contenido pasa por debajo. */
 .app-nav {
   position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  height: 64px;
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--nav-glass);
+  -webkit-backdrop-filter: var(--nav-blur);
+  backdrop-filter: var(--nav-blur);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-float);
   display: flex;
   align-items: center;
-  justify-content: space-around;
   z-index: 100;
 }
 
@@ -54,34 +57,35 @@
 }
 
 .nav-item {
-  flex: 1;
+  width: 62px;
+  height: 54px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-width: 44px;
-  height: 54px;
-  padding: 0 8px;
+  gap: 2px;
   color: var(--text-secondary);
   text-decoration: none;
-  border-radius: var(--radius-pill);
+  border-radius: 999px;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s;
 }
 
-/* Pestaña activa: una "lente" de vidrio más clara */
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+}
+
 .nav-item--active {
   color: var(--primary);
-  background: var(--glass-bg-strong);
-  box-shadow: var(--glass-shadow);
+  background: var(--surface-2);
 }
 
 .nav-item__label {
   font-family: var(--font-body);
-  font-size: 11px;
+  font-size: var(--fs-cap);
   font-weight: 500;
-  line-height: 1;
+  line-height: 16px;
 }
 
 .nav-item--active .nav-item__label {
@@ -120,6 +124,7 @@
   .app-nav {
     position: sticky;
     top: 0;
+    transform: none;
     align-self: flex-start;
     height: 100dvh;
     width: 200px;
@@ -205,11 +210,12 @@
 
   .nav-item {
     flex: none;
+    width: auto;
     height: auto;
     flex-direction: row;
     gap: 12px;
     padding: 8px 12px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control);
     min-height: 44px;
     justify-content: flex-start;
     white-space: nowrap;
@@ -227,8 +233,13 @@
     justify-content: center;
   }
 
+  .nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
+
   .nav-item__label {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 500;
     transition: opacity 0.15s;
   }
