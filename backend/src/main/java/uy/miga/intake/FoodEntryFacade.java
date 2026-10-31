@@ -85,6 +85,12 @@ public class FoodEntryFacade {
     }
 
     @Transactional
+    public void deleteEntries(List<Long> ids) {
+        repository.deleteAllById(ids);
+        repository.flush();
+    }
+
+    @Transactional
     public void correctEntry(Long id, Double quantity, String unit, Long foodGroupId, BigDecimal portions) {
         repository.findById(id).ifPresent(e -> {
             if (quantity != null) e.setQuantity(quantity);
@@ -141,6 +147,12 @@ public class FoodEntryFacade {
     public void deleteResponseEntries(Long userId, LocalDate date, Long mealId, Long foodGroupId) {
         repository.deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
             userId, date, mealId, foodGroupId, "RESPUESTA");
+    }
+
+    // Borra todo lo registrado en una comida de un día: ítems de la nota, respuestas y cargas manuales.
+    @Transactional
+    public void deleteMealEntries(Long userId, LocalDate date, Long mealId) {
+        repository.deleteMealEntries(userId, date, mealId);
     }
 
     @Transactional

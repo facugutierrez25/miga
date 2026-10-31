@@ -81,7 +81,7 @@ class WeekService {
             }
             BigDecimal totalGoal = planId == null || "LIBRE".equals(planService.getModoRegistro(planId))
                 ? BigDecimal.ZERO : computeTotalGoal(planId);
-            days.add(new WeekDayDto(day, hasData || meals.stream().anyMatch(m -> m.noteText() != null),
+            days.add(new WeekDayDto(day, hasData || meals.stream().anyMatch(m -> m.noteText() != null && !m.noteText().isBlank()),
                 totalRecorded, totalGoal, habitLogs, meals, dayHabits.stream().map(PlanHabit::getId).toList()));
         }
 
@@ -102,6 +102,8 @@ class WeekService {
 
     @Transactional
     HabitDto createHabit(String email, HabitSaveDto dto) {
+        HabitValidation.configuration(new HabitInput(dto.name(), dto.habitType(), dto.unit(), dto.dailyGoal(),
+            dto.period() == null ? "DIA" : dto.period(), dto.step(), Boolean.TRUE.equals(dto.countsFlexibleMeals())));
         Long planId = planService.getCurrentPlanId(email);
         PlanHabit habit = new PlanHabit();
         habit.setPlanId(planId);
@@ -135,6 +137,7 @@ class WeekService {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
                 "Este hábito se calcula desde las comidas flexibles.");
         }
+        HabitValidation.log(habit.getHabitType(), value);
         HabitLog log = logRepository.findByUserIdAndHabitUidAndLogDate(userId, habit.getUid(), date)
             .orElseGet(() -> {
                 HabitLog l = new HabitLog();

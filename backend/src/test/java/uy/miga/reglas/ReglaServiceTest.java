@@ -111,4 +111,66 @@ class ReglaServiceTest {
         assertThat(service.updateUserRule(2L, 1L, first.getUid(), input).alimento()).isEqualTo("ARBOL");
     }
 
+
+    @Test void missingCatalogRuleUsesScopedLookupAndReturns404() {
+        UUID uid = UUID.randomUUID();
+        when(repository.findForAdjust(uid, 1L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.getRuleForAdjust(uid, 1L))
+            .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode().value()).isEqualTo(404));
+        verify(repository).findForAdjust(uid, 1L);
+        verifyNoMoreInteractions(repository);
+    }
+
+    @Test void serviceRejectsOversizedFoodNamesOnBothWritePaths() {
+        String name = "a".repeat(101);
+        assertThatThrownBy(() -> service.createUserRule(2L, 1L, 3L, name, List.of(), null, null, null))
+            .isInstanceOf(InvalidRuleException.class);
+        assertThatThrownBy(() -> service.createUserRule(2L, 1L,
+            new RuleInput(name, List.of(), "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test void serviceRejectsOversizedSynonymsOnBothWritePaths() {
+        for (var aliases : List.of(List.of("a".repeat(101)), Collections.nCopies(21, "alias"))) {
+            assertThatThrownBy(() -> service.createUserRule(2L, 1L, 3L, "Arroz", aliases, null, null, null))
+                .isInstanceOf(InvalidRuleException.class);
+            assertThatThrownBy(() -> service.createUserRule(2L, 1L,
+                new RuleInput("Arroz", aliases, "LIBRE", null, null, null, null, List.of(), null)))
+                .isInstanceOf(InvalidRuleException.class);
+        }
+        verify(repository, never()).save(any());
+    }
+    @Test void updatePreservesLegacyValuesWhenChangingPortion() {
+        FoodRule existing = rule("USUARIO", "a".repeat(150));
+        var aliases = new ArrayList<>(java.util.stream.IntStream.range(0, 21).mapToObj(i -> "alias" + i).toList());
+        aliases.add("b".repeat(150));
+        existing.setSinonimos(aliases);
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        var input = new RuleInput(existing.getAlimento(), aliases, "NORMAL", 7L, null, null,
+            BigDecimal.valueOf(2), List.of(), null);
+        var result = service.updateUserRule(2L, 1L, existing.getUid(), input);
+        assertThat(result.porcionPorDefecto()).isEqualByComparingTo("2");
+        assertThat(result.alimento()).hasSize(150);
+        assertThat(result.sinonimos()).containsExactlyElementsOf(aliases);
+        assertThat(service.upsertUserRule(2L, 1L, input).sinonimos()).containsExactlyElementsOf(aliases);
+        var added = new ArrayList<>(aliases);
+        added.add("nuevo");
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
+            new RuleInput(existing.getAlimento(), added, "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+    }
+
+    @Test void updateRejectsNewOversizedNamesAndSynonyms() {
+        FoodRule existing = rule("USUARIO", "a".repeat(150));
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
+            new RuleInput("b".repeat(101), List.of(), "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
+            new RuleInput(existing.getAlimento(), List.of("b".repeat(101)), "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+    }
+
 }

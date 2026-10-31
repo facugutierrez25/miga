@@ -125,6 +125,23 @@ export async function saveNota(
 
 }
 
+// Borra la nota de una comida y todo lo registrado en ella ese día.
+export async function deleteNota(
+  token: string,
+  date: string,
+  mealId: number,
+  version: number | null,
+): Promise<number | null> {
+  const query = version === null ? '' : `?version=${version}`
+  try {
+    const result = await apiRequest<{ version: number | null }>(`/api/v1/registro/${date}/comidas/${mealId}/nota${query}`, { errorMessage: 'No se pudo borrar lo anotado.', token, method: 'DELETE' })
+    return result.version
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    throw err
+  }
+}
+
 export async function patchItem(
   token: string,
   date: string,
@@ -152,6 +169,21 @@ export async function getSugerencias(
     return await apiRequest(`/api/v1/registro/sugerencias?mealId=${mealId}`, { token, signal })
   } catch (err) {
     if (err instanceof ApiError) return []
+    throw err
+  }
+}
+
+export async function removeItem(
+  token: string,
+  date: string,
+  itemId: number,
+  version: number | null,
+): Promise<MealDayDto> {
+  const query = version === null ? '' : `?version=${version}`
+  try {
+    return await apiRequest(`/api/v1/registro/${date}/items/${itemId}${query}`, { errorMessage: 'No se pudo quitar el alimento.', token, method: 'DELETE' })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
     throw err
   }
 }

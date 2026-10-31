@@ -59,4 +59,22 @@ class WeekServiceTest {
         order.verify(habits).findById(3L);
         verifyNoInteractions(logs);
     }
+
+    @Test void invalidLogsReturn400BeforeWriting() {
+        var habits = mock(PlanHabitRepository.class);
+        var logs = mock(HabitLogRepository.class);
+        var plans = mock(PlanService.class);
+        var users = mock(UserService.class);
+        var service = new WeekService(habits, logs, mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.RegistroService.class));
+        when(users.findUserIdByEmail("user")).thenReturn(1L);
+        when(plans.getPlanIdForDate(eq(1L), any())).thenReturn(10L);
+        PlanHabit habit = new PlanHabit(); habit.setPlanId(10L); habit.setHabitType(HabitType.SI_NO);
+        when(habits.findById(3L)).thenReturn(Optional.of(habit));
+        for (String value : java.util.List.of("2", "-1", "0.5", "100001")) {
+            assertThatThrownBy(() -> service.logHabit("user", 3L, LocalDate.now(), new BigDecimal(value)))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                    e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        }
+        verifyNoInteractions(logs);
+    }
 }

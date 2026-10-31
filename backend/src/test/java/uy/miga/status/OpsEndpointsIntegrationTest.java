@@ -93,7 +93,7 @@ class OpsEndpointsIntegrationTest {
                 .content(mapper.writeValueAsString(credentials)))
             .andExpect(status().isCreated());
         outbox.processJobs();
-        mockMvc.perform(get("/api/v1/auth/verify").param("token", email.getLastToken()))
+        mockMvc.perform(get("/api/v1/auth/verify").param("token", email.tokenAfterProcessing(outbox, address)))
             .andExpect(status().isOk());
         String body = mockMvc.perform(post("/api/v1/users/login").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(credentials)))

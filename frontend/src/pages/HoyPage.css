@@ -452,6 +452,62 @@
   cursor: default;
 }
 
+.nota-btn-borrar {
+  min-height: 44px;
+  padding: 0 var(--s3);
+  margin-left: auto;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--error);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nota-btn-borrar:hover {
+  background: var(--error-bg);
+}
+
+.nota-confirmar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+  border-radius: var(--radius-control);
+  background: var(--error-bg);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.nota-confirmar__acciones {
+  display: flex;
+  gap: var(--s2);
+}
+
+.nota-btn-confirmar,
+.nota-btn-cancelar {
+  min-height: 44px;
+  padding: 0 var(--s4);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nota-btn-confirmar {
+  border: none;
+  background: var(--error);
+  color: var(--surface);
+}
+
+.nota-btn-cancelar {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+
 .nota-guardado:empty {
   display: none;
 }
@@ -632,6 +688,8 @@
   list-style: none;
 }
 
+
+
 .nota-compuesto__titulo {
   margin-top: var(--s1);
   font-size: var(--fs-sm);
@@ -744,4 +802,11 @@
     max-width: 640px;
     padding: var(--s6) var(--s5) 48px;
   }
+}
+
+.nota-compuesto__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }

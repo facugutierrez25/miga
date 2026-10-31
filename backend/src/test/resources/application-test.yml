@@ -9,3 +9,7 @@ spring:
 app:
   rate-limit:
     enabled: false
+  # Los tests procesan los emails llamando a processJobs(); sin esto, los procesadores
+  # programados de otros contextos de Spring podían tomar el email de un test.
+  email-outbox:
+    scheduler-enabled: false

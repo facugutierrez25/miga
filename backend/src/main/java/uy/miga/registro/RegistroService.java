@@ -33,12 +33,12 @@ public class RegistroService {
         return day.meals().stream().map(meal -> {
             var note = notes.get(meal.mealId());
             long flexible = 0;
-            if (note != null) {
+            if (note != null && !note.getText().isBlank()) {
                 Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
                 flexible = interpreter.interpret(note.getText(), ruleService.findApplicable(notePlan, userId))
                     .stream().filter(item -> "FLEXIBLE".equals(item.tipo())).count();
             }
-            String status = note != null || !meal.items().isEmpty()
+            String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
                 ? recordedMealStatus(meal.comparison())
                 : ComparisonService.MISSING;
             return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
@@ -105,6 +105,9 @@ public class RegistroService {
 
     private NoteInterpretationDto saveNote(String userEmail, LocalDate date, Long mealId, String text,
                                             Long version, boolean checkVersion) {
+        if (text == null || text.isBlank() || text.length() > 2_000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingresá una nota de hasta 2000 caracteres.");
+        }
         Long userId = userService.findUserIdByEmail(userEmail);
         lockCurrentPlanIfPresent(userId);
 
@@ -365,6 +368,46 @@ public class RegistroService {
     }
 
     @Transactional
+    DayRegistroDto.MealDayDto removeItem(String userEmail, LocalDate date, Long entryId, Long version) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
+        var entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
+        if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (entry.mealNoteId() == null || "RESPUESTA".equals(entry.origin())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo podés quitar alimentos de una nota.");
+        }
+        MealNote note = noteRepository.findByUserIdAndDateAndMealId(userId, date, entry.mealId())
+            .filter(n -> n.getId().equals(entry.mealNoteId())).orElseThrow(NoteConflictException::new);
+        if (version == null || !version.equals(note.getVersion())) throw new NoteConflictException();
+        var entries = entryFacade.findByMealNoteId(note.getId());
+        Map<Object, List<FoodEntryFacade.EntryData>> occurrences = new LinkedHashMap<>();
+        for (var item : entries) {
+            Object key = item.occurrenceId() != null ? item.occurrenceId() : item.id();
+            occurrences.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+        }
+        var mentions = new ArrayList<>(occurrences.values());
+        int index = -1;
+        for (int i = 0; i < mentions.size(); i++) {
+            if (mentions.get(i).stream().anyMatch(e -> e.id().equals(entryId))) index = i;
+        }
+        String text;
+        try {
+            text = NoteTextEditor.removeMention(note.getText(), mentions.stream()
+                .map(m -> m.get(0).originalText()).toList(), index);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                "No se pudo ubicar el alimento en la nota con seguridad. Recargá la nota e intentá de nuevo.");
+        }
+        // Solo se borran los ítems de esa mención: las respuestas y las cargas manuales de la comida quedan.
+        entryFacade.deleteEntries(mentions.get(index).stream().map(FoodEntryFacade.EntryData::id).toList());
+        note.setText(text);
+        note.touch();
+        noteRepository.saveAndFlush(note);
+        return getDayRegistro(userEmail, date).meals().stream()
+            .filter(m -> m.mealId().equals(entry.mealId())).findFirst().orElseThrow();
+    }
+
+    @Transactional
     PatchItemResultDto patchItem(String userEmail, LocalDate date, Long entryId, PatchItemRequest req) {
         Long userId = userService.findUserIdByEmail(userEmail);
         Long currentPlanId = lockCurrentPlanIfPresent(userId);
@@ -448,6 +491,30 @@ public class RegistroService {
             if (notePlan != null) return notePlan;
         }
         return planService.getPlanIdForDate(userId, entry.date());
+    }
+
+    // Borra la nota de una comida y todo lo registrado en ella ese día. Exige la versión vigente,
+    // igual que al guardar, para no borrar cambios hechos en otro dispositivo.
+    @Transactional
+    Long deleteNote(String userEmail, LocalDate date, Long mealId, Long version) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
+        if (!planService.mealBelongsToUser(mealId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        Optional<MealNote> existing = noteRepository.findByUserIdAndDateAndMealId(userId, date, mealId);
+        if (existing.isPresent()
+            ? version == null || !version.equals(existing.get().getVersion())
+            : version != null) {
+            throw new NoteConflictException();
+        }
+        entryFacade.deleteMealEntries(userId, date, mealId);
+        if (existing.isEmpty()) return null;
+        MealNote note = existing.get();
+        note.setText("");
+        // Actualizar la fecha fuerza el versionado incluso si la nota ya estaba vacía.
+        note.touch();
+        return noteRepository.saveAndFlush(note).getVersion();
     }
 
     @Transactional

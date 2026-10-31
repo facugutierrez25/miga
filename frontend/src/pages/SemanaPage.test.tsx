@@ -14,7 +14,7 @@ vi.mock('../hooks/useWeek', () => ({ useWeek: () => ({
       { id: 1, name: 'Flexibles', habitType: 'CONTADOR', step: 1, countsFlexibleMeals: true },
       { id: 2, name: 'Agua', habitType: 'CONTADOR', step: 250, unit: 'ml' }
     ], days: [{ date: '2026-10-26', hasData: true, totalRecorded: 0, totalGoal: 0,
-      habitIds: [1, 2], habitLogs: [{ habitId: 1, date: '2026-10-26', value: 2 }],
+      habitIds: [1, 2], habitLogs: [{ habitId: 1, date: '2026-10-26', value: 2 }, { habitId: 2, date: '2026-10-26', value: 500 }],
       meals: [{ mealId: 10, name: 'Desayuno', status: 'REGISTRADA', noteText: '=pan y café' }] }]
   }
 }) }))
@@ -50,14 +50,14 @@ test('identifica el día actual y su fecha completa en ambas vistas', () => {
 test('anuncia un error al registrar un hábito y permite reintentar', async () => {
   const logHabit = vi.spyOn(api, 'logHabit')
     .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce({ habitId: 2, date: '2026-10-26', value: 250 })
+    .mockResolvedValueOnce({ habitId: 2, date: '2026-10-26', value: 750 })
   render(<SemanaPage />)
-  const button = screen.getByRole('button', { name: /Agua: pendiente, 0 ml, lunes, 26 de octubre de 2026/ })
+  const button = screen.getByRole('button', { name: /Sumar 250 ml a Agua, lunes, 26 de octubre de 2026/ })
   fireEvent.click(button)
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo registrar el hábito')
   expect(button).toBeEnabled()
   fireEvent.click(button)
-  expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 250)
+  expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 750)
   await waitFor(() => expect(button).toBeEnabled())
 })
 
@@ -67,4 +67,12 @@ test('la tira de la semana anuncia cada día con su resumen y marca el elegido',
   expect(dia).toHaveAttribute('aria-pressed', 'true')
   expect(dia).toHaveAttribute('aria-current', 'date')
   expect(screen.getByText('Esta semana: 0 de 1 comidas como el plan')).toBeInTheDocument()
+})
+
+test('un contador se puede bajar si se sumó de más', async () => {
+  const logHabit = vi.spyOn(api, 'logHabit').mockResolvedValue({ habitId: 2, date: '2026-10-26', value: 250 })
+  render(<SemanaPage />)
+  expect(screen.getByText('500 ml')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Restar 250 ml de Agua, lunes, 26 de octubre de 2026/ }))
+  await waitFor(() => expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 250))
 })

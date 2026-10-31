@@ -530,7 +530,7 @@ class PlanIntegrationTest {
             .andExpect(status().isCreated());
 
         outboxWorker.processJobs();
-        String verifyToken = mockEmailService.getLastToken();
+        String verifyToken = mockEmailService.tokenAfterProcessing(outboxWorker, email);
         assertThat(verifyToken).isNotBlank();
         mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken))
             .andExpect(status().isOk());
@@ -545,5 +545,26 @@ class PlanIntegrationTest {
 
         return objectMapper.readTree(result.getResponse().getContentAsString())
                 .get("token").asText();
+    }
+
+    @Test void historyReturnsOnlyLatest50Versions() throws Exception {
+        String address = "history-" + java.util.UUID.randomUUID() + "@miga.uy";
+        String historyToken = registerAndLogin(address);
+        Long userId = jdbc.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, address);
+        jdbc.update("""
+            INSERT INTO plans (user_id, created_at, updated_at, is_current, superseded_at)
+            SELECT ?, TIMESTAMPTZ '2025-01-01 12:00:00+00' + i * INTERVAL '1 day',
+                NOW(), false, TIMESTAMPTZ '2025-01-02 12:00:00+00' + i * INTERVAL '1 day'
+            FROM generate_series(1, 55) AS i
+            """, userId);
+        String result = mockMvc.perform(get("/api/v1/my-plan/historial").header("Authorization", "Bearer " + historyToken))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode history = objectMapper.readTree(result);
+        assertThat(history.isArray()).isTrue();
+        assertThat(history.size()).isEqualTo(50);
+        var expected = jdbc.queryForList("SELECT created_at::date::text FROM plans WHERE user_id = ? ORDER BY superseded_at DESC, id DESC LIMIT 50", String.class, userId);
+        for (int index = 0; index < 50; index++) {
+            assertThat(history.get(index).path("createdAt").asText()).isEqualTo(expected.get(index));
+        }
     }
 }

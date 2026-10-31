@@ -38,6 +38,15 @@ class RegistroController {
         return service.saveNote(auth.getName(), date, mealId, req.text(), req.version());
     }
 
+    // DELETE /api/v1/registro/{date}/comidas/{mealId}/nota?version= — borra la nota y lo registrado en la comida
+    @DeleteMapping("/{date}/comidas/{mealId}/nota")
+    DeleteNoteResponse deleteNota(Authentication auth,
+                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                    @PathVariable Long mealId,
+                    @RequestParam(required = false) Long version) {
+        return new DeleteNoteResponse(service.deleteNote(auth.getName(), date, mealId, version));
+    }
+
     // GET  /api/v1/registro/{date}/{mealId}/note — mantenido por compatibilidad temporal
     @GetMapping("/{date}/{mealId}/note")
     NoteDto getNote(Authentication auth,
@@ -61,6 +70,14 @@ class RegistroController {
     DayComparisonDto getDayComparison(Authentication auth,
                                       @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.getDayComparison(auth.getName(), date);
+    }
+
+    @DeleteMapping("/{date}/items/{id}")
+    DayRegistroDto.MealDayDto removeItem(Authentication auth,
+                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                    @PathVariable Long id,
+                    @RequestParam(required = false) Long version) {
+        return service.removeItem(auth.getName(), date, id, version);
     }
 
     // PATCH /api/v1/registro/{date}/items/{id} — corregir cantidad/grupo; saveAsRule crea regla USUARIO
@@ -89,5 +106,7 @@ class RegistroController {
         return service.getSugerencias(auth.getName(), mealId);
     }
 
-    record NoteRequest(@NotBlank @Size(max = 10_000) String text, Long version) {}
+    record DeleteNoteResponse(Long version) {}
+
+    record NoteRequest(@NotBlank @Size(max = 2_000, message = "La nota admite hasta 2000 caracteres.") String text, Long version) {}
 }

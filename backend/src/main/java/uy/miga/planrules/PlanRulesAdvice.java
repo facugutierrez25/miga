@@ -34,5 +34,5 @@ class PlanRulesAdvice {
     @ExceptionHandler(PlanNotFoundException.class)
     ResponseEntity<?> missing(Exception e) { return error(404, "NOT_FOUND", e.getMessage()); }
     @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<?> status(ResponseStatusException e) { return error(e.getStatusCode().value(), e.getStatusCode().value() == 409 ? "DUPLICATE" : "NOT_FOUND", e.getReason() == null ? "Recurso no encontrado." : e.getReason()); }
+    ResponseEntity<?> status(ResponseStatusException e) { return error(e.getStatusCode().value(), e.getStatusCode().value() == 400 ? "VALIDATION" : e.getStatusCode().value() == 409 ? "DUPLICATE" : "NOT_FOUND", e.getReason() == null ? "Recurso no encontrado." : e.getReason()); }
 }
