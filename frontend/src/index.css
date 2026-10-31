@@ -125,6 +125,12 @@ h2, h3 {
   outline-offset: 2px;
 }
 
+/* Los títulos y el contenido principal reciben el foco al cambiar de pantalla para que el lector
+   de pantalla los anuncie; no son controles, así que no muestran el recuadro de foco. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* Logo: "miga" con el punto de la i en amarillo */
 .brand {
   font-family: var(--font-display);
