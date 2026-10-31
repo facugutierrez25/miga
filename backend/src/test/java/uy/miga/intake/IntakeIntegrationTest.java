@@ -54,7 +54,7 @@ class IntakeIntegrationTest {
                 """.formatted(email)));
 
         outboxWorker.processJobs();
-        String verifyToken = mockEmailService.getLastToken();
+        String verifyToken = mockEmailService.getTokenFor(email);
         if (verifyToken != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
         }

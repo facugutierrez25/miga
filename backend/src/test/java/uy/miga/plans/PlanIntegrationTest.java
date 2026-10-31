@@ -530,7 +530,7 @@ class PlanIntegrationTest {
             .andExpect(status().isCreated());
 
         outboxWorker.processJobs();
-        String verifyToken = mockEmailService.getLastToken();
+        String verifyToken = mockEmailService.getTokenFor(email);
         assertThat(verifyToken).isNotBlank();
         mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken))
             .andExpect(status().isOk());

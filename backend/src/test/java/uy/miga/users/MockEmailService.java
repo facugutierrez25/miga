@@ -6,6 +6,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 @Service
@@ -13,6 +15,7 @@ import java.util.function.Consumer;
 public class MockEmailService implements EmailService {
 
     private String lastToken;
+    private final Map<String, String> tokensByRecipient = new ConcurrentHashMap<>();
     private final List<Boolean> transactionStates = new ArrayList<>();
     private final List<String> recipients = new ArrayList<>();
     private Consumer<String> onSend = recipient -> {};
@@ -23,6 +26,7 @@ public class MockEmailService implements EmailService {
         recipients.add(to);
         onSend.accept(to);
         this.lastToken = token;
+        tokensByRecipient.put(to, token);
     }
 
     List<Boolean> getTransactionStates() { return List.copyOf(transactionStates); }
@@ -33,8 +37,14 @@ public class MockEmailService implements EmailService {
         return lastToken;
     }
 
+    // Token del último email enviado a esa dirección: no depende de qué otros emails se procesaron en el lote.
+    public String getTokenFor(String recipient) {
+        return tokensByRecipient.get(recipient);
+    }
+
     public void reset() {
         this.lastToken = null;
+        tokensByRecipient.clear();
         transactionStates.clear();
         recipients.clear();
         onSend = recipient -> {};
