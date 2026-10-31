@@ -29,6 +29,7 @@ final class NoteTextEditor {
         String wanted = mentions.get(index);
         // Con un alimento repetido, cuál de los fragmentos es la mención solo se sabe si las menciones
         // siguen el orden del texto; si no (p. ej. tras repartir una de ellas), es ambiguo y se rechaza.
+        // Menciones con el mismo texto son intercambiables: quitar cualquiera deja las mismas menciones.
         if (mentions.stream().filter(wanted::equals).count() > 1) {
             for (int i = 0; i < fragments.size(); i++) {
                 if (!normalized(text, fragments.get(i)).equals(mentions.get(i))) throw new IllegalArgumentException();

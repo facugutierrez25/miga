@@ -45,6 +45,15 @@ class NoteTextEditorTest {
     }
 
     @Test
+    void identicalMentionsAreInterchangeable() {
+        // Las tres menciones son "leche": quitar cualquiera deja dos "leche", aunque cambie el conector.
+        assertThat(NoteTextEditor.removeMention("Leche con leche, leche", List.of("leche", "leche", "leche"), 2))
+            .isEqualTo("Leche con leche");
+        assertThat(NoteTextEditor.removeMention("Leche con leche, leche", List.of("leche", "leche", "leche"), 0))
+            .isEqualTo("leche, leche");
+    }
+
+    @Test
     void rejectsMismatchedOrMissingMentions() {
         assertThatIllegalArgumentException().isThrownBy(() ->
             NoteTextEditor.removeMention("leche, pan", List.of("leche", "manzana"), 1));
