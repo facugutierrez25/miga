@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
@@ -302,11 +302,12 @@ function describirGrupos(grupos: GroupStatusDto[], diff: (s: GroupStatusDto) => 
 
 function mealState(mealDay: MealDayDto | undefined): { kind: MealStateKind; text: string } {
   if (!mealDay?.noteText) return { kind: 'none', text: 'Sin anotar' }
-  const comparison = mealDay.comparison.filter(s => s.status !== 'LIBRE')
-  if (comparison.some(s => s.status === 'PREGUNTA')) return { kind: 'ask', text: 'Por confirmar' }
+  const comparison = mealDay.comparison
+  if (comparison.some(s => s.status === 'PREGUNTAR')) return { kind: 'ask', text: 'Por confirmar' }
   if (comparison.length === 0) return { kind: 'noted', text: 'Anotada' }
-  const faltan = comparison.filter(s => s.recorded < s.expected)
-  const sobran = comparison.filter(s => s.recorded > s.expected)
+  // El backend ya aplica el margen del plan: solo CASI y SIN_ANOTAR faltan, solo DE_MAS sobra.
+  const faltan = comparison.filter(s => s.status === 'CASI' || s.status === 'SIN_ANOTAR')
+  const sobran = comparison.filter(s => s.status === 'DE_MAS')
   const partes = [
     faltan.length > 0 ? `Faltó: ${describirGrupos(faltan, s => s.expected - s.recorded)}` : '',
     sobran.length > 0 ? `De más: ${describirGrupos(sobran, s => s.recorded - s.expected)}` : '',
@@ -359,8 +360,7 @@ function MealState({ mealDay }: { mealDay: MealDayDto | undefined }) {
 
 // Migas de una comida: lo comido según la comparación, o el plan vacío si todavía no se anotó.
 function mealMigas(meal: MealDto, mealDay: MealDayDto | undefined, gruposMap: Record<number, GrupoInfo>): MigaRow[] {
-  const comparison = (mealDay?.noteText ? mealDay.comparison : [])
-    .filter(s => s.status !== 'LIBRE' && s.expected > 0)
+  const comparison = (mealDay?.noteText ? mealDay.comparison : []).filter(s => s.expected > 0)
   if (comparison.length > 0) {
     return comparison.map(s => ({
       id: s.foodGroupId,
@@ -383,8 +383,20 @@ function mealMigas(meal: MealDto, mealDay: MealDayDto | undefined, gruposMap: Re
 
 // ── NotaMealSection ───────────────────────────────────────────────────────
 
+// Borrador de una nota: vive fuera del editor para no perderse al cerrar una fila ni cuando
+// la comida de ahora cambia de lugar.
+interface Draft {
+  texto: string
+  baseVersion: number | null
+  dirty: boolean
+  conflict: boolean
+}
+
+type DraftStore = Map<string, Draft>
+
 interface NotaMealSectionProps {
   meal: MealDto
+  drafts: DraftStore
   mealDay: MealDayDto | undefined
   date: string
   token: string
@@ -396,16 +408,22 @@ interface NotaMealSectionProps {
 }
 
 function NotaMealSection({
-  meal, mealDay, date, token, gruposMap,
+  meal, drafts, mealDay, date, token, gruposMap,
   onNotaSaved, onItemPatched, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
-  const [texto, setTexto] = useState(mealDay?.noteText ?? '')
-  const dirty = useRef(false)
+  const draftKey = `${date}-${meal.id}`
+  const [saved] = useState(() => drafts.get(draftKey))
+  const [texto, setTexto] = useState(saved?.dirty ? saved.texto : mealDay?.noteText ?? '')
+  const dirty = useRef(saved?.dirty ?? false)
   const draftRevision = useRef(0)
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
-  const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
-  const [conflict, setConflict] = useState(false)
+  const baseVersion = useRef<number | null>(saved ? saved.baseVersion : mealDay?.noteVersion ?? null)
+  const [conflict, setConflict] = useState(saved?.conflict ?? false)
+
+  useEffect(() => {
+    drafts.set(draftKey, { texto, baseVersion: baseVersion.current, dirty: dirty.current, conflict })
+  })
   const [sugerencias, setSugerencias] = useState<string[]>([])
   const [cargandoSug, setCargandoSug] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -416,7 +434,7 @@ function NotaMealSection({
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
   const comparison = mealDay?.comparison ?? []
-  const preguntas = comparison.filter(s => s.status === 'PREGUNTA')
+  const preguntas = comparison.filter(s => s.status === 'PREGUNTAR')
 
   useEffect(() => {
     if (!dirty.current) {
@@ -634,21 +652,32 @@ function calcResumenDeDay(
   return { total, done, porGrupo }
 }
 
-// Al guardar una nota, el resumen del día suma la diferencia de lo registrado en esa comida.
-function ajustarResumen(summary: DailySummaryDto[], antes: GroupStatusDto[], despues: GroupStatusDto[]): DailySummaryDto[] {
-  const delta = new Map<number, { name: string; value: number }>()
-  for (const s of despues) delta.set(s.foodGroupId, { name: s.name, value: Number(s.recorded) })
-  for (const s of antes) {
-    const d = delta.get(s.foodGroupId) ?? { name: s.name, value: 0 }
-    delta.set(s.foodGroupId, { ...d, value: d.value - Number(s.recorded) })
+// Al guardar una nota, el resumen del día suma la diferencia de porciones entre los ítems
+// anteriores y los nuevos de esa comida, también de grupos que esa comida no tenía previstos.
+function porcionesPorGrupo(items: EntryItemDto[]): Map<number, number> {
+  const total = new Map<number, number>()
+  for (const item of items) {
+    if (item.foodGroupId === null || item.portions === null) continue
+    total.set(item.foodGroupId, (total.get(item.foodGroupId) ?? 0) + Number(item.portions))
   }
+  return total
+}
+
+function ajustarResumen(
+  summary: DailySummaryDto[],
+  antes: EntryItemDto[],
+  despues: EntryItemDto[],
+  gruposMap: Record<number, GrupoInfo>,
+): DailySummaryDto[] {
+  const delta = porcionesPorGrupo(despues)
+  for (const [id, value] of porcionesPorGrupo(antes)) delta.set(id, (delta.get(id) ?? 0) - value)
   const ajustado = summary.map(s => {
     const d = delta.get(s.foodGroupId)
-    return d ? { ...s, totalRecorded: Number(s.totalRecorded) + d.value } : s
+    return d ? { ...s, totalRecorded: Number(s.totalRecorded) + d } : s
   })
-  for (const [foodGroupId, d] of delta) {
-    if (!summary.some(s => s.foodGroupId === foodGroupId) && d.value !== 0) {
-      ajustado.push({ foodGroupId, name: d.name, clave: '', totalRecorded: d.value, dailyGoal: null })
+  for (const [foodGroupId, value] of delta) {
+    if (value !== 0 && !summary.some(s => s.foodGroupId === foodGroupId)) {
+      ajustado.push({ foodGroupId, name: gruposMap[foodGroupId]?.name ?? '', clave: '', totalRecorded: value, dailyGoal: null })
     }
   }
   return ajustado
@@ -658,6 +687,7 @@ function ajustarResumen(summary: DailySummaryDto[], antes: GroupStatusDto[], des
 
 interface MealProps {
   meal: MealDto
+  drafts: DraftStore
   mealDay: MealDayDto | undefined
   fecha: string
   token: string
@@ -677,6 +707,7 @@ function MealDetail(props: MealProps) {
         <NotaMealSection
           key={fecha}
           meal={meal}
+          drafts={props.drafts}
           mealDay={mealDay}
           date={fecha}
           token={token}
@@ -757,6 +788,8 @@ function HoyContent() {
   const cargando = planLoad.status === 'loading' || (!!plan && dayStatus === 'loading' && !dayRegistro)
   const diaError = dayStatus === 'error'
   const [diaAbierto, setDiaAbierto] = useState<boolean | null>(null)
+  const [drafts] = useState<DraftStore>(() => new Map())
+  const gruposMap = useMemo(() => plan ? buildGruposMap(plan.foodGroups ?? []) : {}, [plan])
 
   const [previousToday, setPreviousToday] = useState(HOY)
   if (previousToday !== HOY) {
@@ -783,9 +816,9 @@ function HoyContent() {
       const meals = anterior
         ? prev.meals.map(m => m.mealId === mealId ? updatedMeal : m)
         : [...prev.meals, updatedMeal]
-      return { ...prev, meals, summary: ajustarResumen(prev.summary, anterior?.comparison ?? [], interp.comparison) }
+      return { ...prev, meals, summary: ajustarResumen(prev.summary, anterior?.items ?? [], interp.entries, gruposMap) }
     })
-  }, [setDayRegistro])
+  }, [setDayRegistro, gruposMap])
 
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRegistro(prev => {
@@ -814,8 +847,16 @@ function HoyContent() {
   const esHoy = fecha === HOY
   const nombre = firstName ?? formatNombre(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
-  const gruposMap = plan ? buildGruposMap(plan.foodGroups ?? []) : {}
-  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, ahora) : -1
+  const ahoraCalculada = esHoy && plan ? meals[findIndexAhora(meals, ahora)]?.id ?? null : null
+  const [ahoraFija, setAhoraFija] = useState<{ fecha: string; id: number | null }>({ fecha, id: ahoraCalculada })
+  const ahoraId = ahoraFija.fecha === fecha ? ahoraFija.id : ahoraCalculada
+  // Al cambiar de día se actualiza siempre; dentro del día, la comida de ahora solo cambia
+  // si no hay un borrador sin guardar, para no mover el editor mientras se escribe.
+  if (ahoraFija.fecha !== fecha || (ahoraFija.id !== ahoraCalculada && (ahoraFija.id === null
+    || ![...drafts.entries()].some(([key, d]) => key.startsWith(`${fecha}-`) && d.dirty)))) {
+    setAhoraFija({ fecha, id: ahoraCalculada })
+  }
+  const ahoraIdx = ahoraId === null ? -1 : meals.findIndex(m => m.id === ahoraId)
   const { total, done, porGrupo } = calcResumenDeDay(dayRegistro, meals, gruposMap)
   const sinAnotar = !dayRegistro?.meals.some(m => m.noteText)
   const ahoraMeal = ahoraIdx >= 0 ? meals[ahoraIdx] : null
@@ -851,6 +892,7 @@ function HoyContent() {
   )
 
   const mealProps = {
+    drafts,
     fecha,
     token: token!,
     gruposMap,
