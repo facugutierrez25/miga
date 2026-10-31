@@ -38,6 +38,16 @@ class RegistroController {
         return service.saveNote(auth.getName(), date, mealId, req.text(), req.version());
     }
 
+    // DELETE /api/v1/registro/{date}/comidas/{mealId}/nota?version= — borra la nota y lo registrado en la comida
+    @DeleteMapping("/{date}/comidas/{mealId}/nota")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteNota(Authentication auth,
+                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                    @PathVariable Long mealId,
+                    @RequestParam(required = false) Long version) {
+        service.deleteNote(auth.getName(), date, mealId, version);
+    }
+
     // GET  /api/v1/registro/{date}/{mealId}/note — mantenido por compatibilidad temporal
     @GetMapping("/{date}/{mealId}/note")
     NoteDto getNote(Authentication auth,
@@ -70,6 +80,15 @@ class RegistroController {
                                  @PathVariable Long id,
                                  @RequestBody @Valid PatchItemRequest req) {
         return service.patchItem(auth.getName(), date, id, req);
+    }
+
+    // DELETE /api/v1/registro/{date}/items/{id} — quita un alimento (toda su mención) de la nota
+    @DeleteMapping("/{date}/items/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteItem(Authentication auth,
+                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                    @PathVariable Long id) {
+        service.deleteItem(auth.getName(), date, id);
     }
 
     // POST /api/v1/registro/{date}/comidas/{mealId}/respuestas — responder preguntar_si_falta

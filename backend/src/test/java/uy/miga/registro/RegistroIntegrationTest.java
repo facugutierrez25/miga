@@ -298,6 +298,77 @@ class RegistroIntegrationTest {
             .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTE_CONFLICT"));
     }
 
+    @Test
+    void deletingNoteClearsTheMealAndRespectsTheVersion() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode before = getDay(date);
+        long groupId = before.path("summary").get(0).path("foodGroupId").asLong();
+        JsonNode saved = putNote(date, "leche, manzana");
+        mockMvc.perform(post("/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":true}"))
+            .andExpect(status().isCreated());
+        String url = "/api/v1/registro/" + date + "/comidas/" + mealId + "/nota";
+
+        mockMvc.perform(delete(url).header("Authorization", "Bearer " + token))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTE_CONFLICT"));
+        mockMvc.perform(delete(url + "?version=" + (saved.path("version").asLong() + 1))
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isConflict());
+
+        mockMvc.perform(delete(url + "?version=" + saved.path("version").asLong())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNoContent());
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").isNull()).isTrue();
+        assertThat(meal.path("items")).isEmpty();
+        assertThat(getDay(date).path("summary")).isEqualTo(before.path("summary"));
+
+        // Sin nota, se puede volver a anotar desde cero (así funciona deshacer).
+        assertThat(putNote(date, "leche").path("entries")).isNotEmpty();
+    }
+
+    @Test
+    void deletingNoteOfAnotherUsersMealIsForbidden() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        putNote(date, "leche");
+        Long ownerMeal = mealId;
+        createUniqueUserPlan();
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/comidas/" + ownerMeal + "/nota?version=0")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deletingAnItemRemovesOnlyThatMention() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche, manzana");
+        JsonNode entries = saved.path("entries");
+        assertThat(entries.size()).isGreaterThanOrEqualTo(2);
+        long removed = entries.get(0).path("id").asLong();
+        String keptFood = entries.get(entries.size() - 1).path("food").asText();
+
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + removed)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNoContent());
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").asText()).isEqualTo("leche, manzana");
+        assertThat(meal.path("items")).noneMatch(i -> i.path("id").asLong() == removed);
+        assertThat(meal.path("items")).anyMatch(i -> i.path("food").asText().equals(keptFood));
+
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + removed)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNotFound());
+        Long ownerItem = meal.path("items").get(0).path("id").asLong();
+        createUniqueUserPlan();
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + ownerItem)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNotFound());
+    }
+
     private String registerAndLogin(String email) throws Exception {
         mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)

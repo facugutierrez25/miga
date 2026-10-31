@@ -450,6 +450,34 @@ public class RegistroService {
         return planService.getPlanIdForDate(userId, entry.date());
     }
 
+    // Borra la nota de una comida y todo lo registrado en ella ese día. Exige la versión vigente,
+    // igual que al guardar, para no borrar cambios hechos en otro dispositivo.
+    @Transactional
+    void deleteNote(String userEmail, LocalDate date, Long mealId, Long version) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
+        if (!planService.mealBelongsToUser(mealId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        Optional<MealNote> existing = noteRepository.findByUserIdAndDateAndMealId(userId, date, mealId);
+        if (existing.isPresent()
+            ? version == null || !version.equals(existing.get().getVersion())
+            : version != null) {
+            throw new NoteConflictException();
+        }
+        entryFacade.deleteMealEntries(userId, date, mealId);
+        existing.ifPresent(noteRepository::delete);
+    }
+
+    @Transactional
+    void deleteItem(String userEmail, LocalDate date, Long entryId) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
+        FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
+        if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        entryFacade.deleteMention(entryId, userId);
+    }
+
     @Transactional
     void saveRespuesta(String userEmail, LocalDate date, Long mealId, RespuestaRequest req) {
         Long userId = userService.findUserIdByEmail(userEmail);
