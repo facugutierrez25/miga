@@ -10,7 +10,7 @@ vi.mock('../api/plans')
 vi.mock('../api/registro', async importOriginal => {
   const actual = await importOriginal<typeof import('../api/registro')>()
   return { ...actual, getDayRegistro: vi.fn(), saveNota: vi.fn(), patchItem: vi.fn(),
-    saveRespuesta: vi.fn(), getSugerencias: vi.fn() }
+    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn() }
 })
 vi.mock('../auth/authTypes')
 
@@ -18,6 +18,7 @@ const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockGetDayRegistro = vi.mocked(registroApi.getDayRegistro)
 const mockSaveNota = vi.mocked(registroApi.saveNota)
 const mockGetSugerencias = vi.mocked(registroApi.getSugerencias)
+const mockDeleteNota = vi.mocked(registroApi.deleteNota)
 
 const gruposPRO = [{ id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null }]
 
@@ -686,4 +687,79 @@ test('al guardar suma al día también los grupos que esa comida no tenía previ
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   expect(await screen.findByText('3 de 4 porciones')).toBeInTheDocument()
   expect(screen.getAllByRole('img', { name: 'Frutas: 1 de 1 porciones' }).length).toBeGreaterThan(0)
+})
+
+const dayConNota = {
+  ...dayVacio,
+  meals: [{
+    mealId: 1, noteId: 5, noteVersion: 3, noteText: 'leche y pan',
+    items: [
+      { id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1, origin: 'REGLA',
+        uncertain: false, originalText: 'leche', appliedRule: null, occurrenceId: 'occ-a' },
+      { id: 22, food: 'pan', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: 'REGLA',
+        uncertain: false, originalText: 'pan', appliedRule: null, occurrenceId: 'occ-b' },
+    ],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN', dailyGoal: null }],
+  }],
+  summary: [{ foodGroupId: 1, name: 'Proteínas', clave: 'PRO', totalRecorded: 2, dailyGoal: null }],
+}
+
+test('borrar lo anotado pide confirmación, vacía la comida y conserva la versión', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue(dayConNota)
+  mockDeleteNota.mockResolvedValue(4)
+  mockSaveNota.mockResolvedValue({
+    noteId: 5, version: 5, text: 'leche y pan', date: '2025-01-01', mealId: 1, items: [],
+    entries: dayConNota.meals[0].items, comparison: dayConNota.meals[0].comparison,
+  })
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  const confirmar = screen.getByRole('button', { name: 'Borrar' })
+  expect(confirmar).toHaveFocus()
+  fireEvent.click(confirmar)
+  await waitFor(() => expect(mockDeleteNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 3))
+  expect(await screen.findByRole('status')).toHaveTextContent('Borraste lo anotado en Desayuno.')
+  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('')
+  expect(screen.getByText('0 de 2 porciones')).toBeInTheDocument()
+  const textarea = screen.getByRole('textbox', { name: '¿Qué comiste?' })
+  expect(textarea).toHaveFocus()
+  fireEvent.change(textarea, { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche y pan', 4))
+})
+
+test('cancelar el borrado devuelve el foco al botón', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue(dayConNota)
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.getByRole('button', { name: 'Borrar lo anotado' })).toHaveFocus()
+  expect(mockDeleteNota).not.toHaveBeenCalled()
+})
+
+test('si la nota cambió en otro dispositivo, no la borra y ofrece recargar', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue(dayConNota)
+  mockDeleteNota.mockRejectedValue(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo. Recargá para ver la versión actual.'))
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Borrar' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Esta nota cambió en otro dispositivo')
+  expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche y pan')
+})
+
+test('lo que se escribe mientras se borra no se pierde', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue(dayConNota)
+  let resolver: (v: number) => void = () => {}
+  mockDeleteNota.mockReturnValue(new Promise<number>(r => { resolver = r }))
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Borrar' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'una manzana' } })
+  await act(async () => { resolver(4) })
+  expect(await screen.findByRole('status')).toHaveTextContent('Borraste lo anotado en Desayuno.')
+  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('una manzana')
 })

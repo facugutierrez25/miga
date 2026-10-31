@@ -143,6 +143,12 @@ public class FoodEntryFacade {
             userId, date, mealId, foodGroupId, "RESPUESTA");
     }
 
+    // Borra todo lo registrado en una comida de un día: ítems de la nota, respuestas y cargas manuales.
+    @Transactional
+    public void deleteMealEntries(Long userId, LocalDate date, Long mealId) {
+        repository.deleteMealEntries(userId, date, mealId);
+    }
+
     @Transactional
     public void detachGroup(Long groupId) {
         repository.findByFoodGroupId(groupId).forEach(entry -> entry.setFoodGroupId(null));

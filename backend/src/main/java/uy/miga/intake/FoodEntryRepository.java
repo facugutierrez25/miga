@@ -34,6 +34,12 @@ interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
     @Query("DELETE FROM FoodEntry e WHERE e.mealNoteId = :mealNoteId")
     void deleteByMealNoteId(@Param("mealNoteId") Long mealNoteId);
 
+    @Modifying
+    @Query("DELETE FROM FoodEntry e WHERE e.userId = :userId AND e.date = :date AND e.mealId = :mealId")
+    void deleteMealEntries(@Param("userId") Long userId,
+                           @Param("date") LocalDate date,
+                           @Param("mealId") Long mealId);
+
     List<FoodEntry> findByFoodGroupId(Long foodGroupId);
 
     List<FoodEntry> findByMealNoteIdOrderByIdAsc(Long mealNoteId);

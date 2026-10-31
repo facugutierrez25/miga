@@ -33,12 +33,12 @@ public class RegistroService {
         return day.meals().stream().map(meal -> {
             var note = notes.get(meal.mealId());
             long flexible = 0;
-            if (note != null) {
+            if (note != null && !note.getText().isBlank()) {
                 Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
                 flexible = interpreter.interpret(note.getText(), ruleService.findApplicable(notePlan, userId))
                     .stream().filter(item -> "FLEXIBLE".equals(item.tipo())).count();
             }
-            String status = note != null || !meal.items().isEmpty()
+            String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
                 ? recordedMealStatus(meal.comparison())
                 : ComparisonService.MISSING;
             return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
@@ -448,6 +448,30 @@ public class RegistroService {
             if (notePlan != null) return notePlan;
         }
         return planService.getPlanIdForDate(userId, entry.date());
+    }
+
+    // Borra la nota de una comida y todo lo registrado en ella ese día. Exige la versión vigente,
+    // igual que al guardar, para no borrar cambios hechos en otro dispositivo.
+    @Transactional
+    Long deleteNote(String userEmail, LocalDate date, Long mealId, Long version) {
+        Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
+        if (!planService.mealBelongsToUser(mealId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        Optional<MealNote> existing = noteRepository.findByUserIdAndDateAndMealId(userId, date, mealId);
+        if (existing.isPresent()
+            ? version == null || !version.equals(existing.get().getVersion())
+            : version != null) {
+            throw new NoteConflictException();
+        }
+        entryFacade.deleteMealEntries(userId, date, mealId);
+        if (existing.isEmpty()) return null;
+        MealNote note = existing.get();
+        note.setText("");
+        // Actualizar la fecha fuerza el versionado incluso si la nota ya estaba vacía.
+        note.touch();
+        return noteRepository.saveAndFlush(note).getVersion();
     }
 
     @Transactional

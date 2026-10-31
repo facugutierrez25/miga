@@ -32,6 +32,8 @@ class RegistroIntegrationTest {
     @Autowired private FilterChainProxy springSecurityFilterChain;
     @Autowired private MockEmailService mockEmailService;
     @Autowired private EmailOutboxWorker outboxWorker;
+    @Autowired private MealNoteRepository notes;
+    @Autowired private RegistroService registro;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
         .findAndRegisterModules();
@@ -296,6 +298,90 @@ class RegistroIntegrationTest {
             .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
             .content("{\"text\":\"leche\",\"version\":0}"))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTE_CONFLICT"));
+    }
+
+    @Test
+    void deletingNoteClearsTheMealAndRespectsTheVersion() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode before = getDay(date);
+        long groupId = before.path("summary").get(0).path("foodGroupId").asLong();
+        JsonNode saved = putNote(date, "leche, manzana");
+        mockMvc.perform(post("/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":true}"))
+            .andExpect(status().isCreated());
+        String url = "/api/v1/registro/" + date + "/comidas/" + mealId + "/nota";
+
+        mockMvc.perform(delete(url).header("Authorization", "Bearer " + token))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTE_CONFLICT"));
+        mockMvc.perform(delete(url + "?version=" + (saved.path("version").asLong() + 1))
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isConflict());
+
+        long previousVersion = saved.path("version").asLong();
+        long clearedVersion = deleteNoteVersion(url, previousVersion);
+        assertThat(clearedVersion).isGreaterThan(previousVersion);
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").asText("")).isEmpty();
+        assertThat(meal.path("items")).isEmpty();
+        assertThat(getDay(date).path("summary")).isEqualTo(before.path("summary"));
+        long secondVersion = deleteNoteVersion(url, clearedVersion);
+        assertThat(secondVersion).isGreaterThan(clearedVersion);
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(delete(url + "?version=" + previousVersion)
+                    .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+            mockMvc.perform(put(url).header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"text\":\"leche\",\"version\":" + previousVersion + "}"))
+                .andExpect(status().isConflict());
+            if (attempt == 0) {
+                mockMvc.perform(put(url).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"leche\",\"version\":" + secondVersion + "}"))
+                    .andExpect(status().isCreated()).andExpect(jsonPath("$.entries").isNotEmpty());
+            }
+        }
+    }
+
+    @Test
+    void deletingNoteOfAnotherUsersMealIsForbidden() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        putNote(date, "leche");
+        Long ownerMeal = mealId;
+        createUniqueUserPlan();
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/comidas/" + ownerMeal + "/nota?version=0")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isForbidden());
+    }
+
+    private long deleteNoteVersion(String url, long version) throws Exception {
+        var result = mockMvc.perform(delete(url + "?version=" + version)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("version").asLong();
+    }
+
+    @Test
+    void emptyNotesAreNotSuggestedOrCountedAsPlanUsage() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche");
+        MealNote note = notes.findById(saved.path("noteId").asLong()).orElseThrow();
+        Long planId = note.getPlanId();
+        assertThat(registro.planHasNotes(planId)).isTrue();
+        deleteNoteVersion("/api/v1/registro/" + date + "/comidas/" + mealId + "/nota", saved.path("version").asLong());
+        for (String text : new String[]{"", " \t\n "}) {
+            note = notes.findById(note.getId()).orElseThrow();
+            note.setText(text);
+            notes.saveAndFlush(note);
+            assertThat(registro.planHasNotes(planId)).isFalse();
+            mockMvc.perform(get("/api/v1/registro/sugerencias?mealId=" + mealId)
+                    .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+        }
     }
 
     private String registerAndLogin(String email) throws Exception {

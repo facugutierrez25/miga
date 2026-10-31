@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
@@ -9,7 +9,7 @@ import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
 import { type PlanFoodGroupDto, type MealDto } from '../api/plans'
 import {
-  NoteConflictError, saveNota, patchItem, saveRespuesta, getSugerencias,
+  NoteConflictError, saveNota, deleteNota, patchItem, saveRespuesta, getSugerencias,
   type DayRegistroDto, type DailySummaryDto, type MealDayDto, type EntryItemDto,
   type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
@@ -403,13 +403,14 @@ interface NotaMealSectionProps {
   gruposMap: Record<number, GrupoInfo>
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
+  onNotaBorrada: (mealId: number, version: number | null) => void
   onReload: () => Promise<DayRegistroDto>
   onRespuestaGuardada: (mealId: number) => void
 }
 
 function NotaMealSection({
   meal, drafts, mealDay, date, token, gruposMap,
-  onNotaSaved, onItemPatched, onRespuestaGuardada, onReload,
+  onNotaSaved, onItemPatched, onNotaBorrada, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
@@ -430,6 +431,10 @@ function NotaMealSection({
   const [guardado, setGuardado] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [confirmando, setConfirmando] = useState(false)
+  const borrarRef = useRef<HTMLButtonElement>(null)
+  const confirmarRef = useRef<HTMLButtonElement>(null)
+  const foco = useRef<'confirmar' | 'borrar' | 'textarea' | null>(null)
 
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
@@ -461,6 +466,47 @@ function NotaMealSection({
     draftRevision.current += 1
     setGuardado(null)
     setTexto(update)
+  }
+
+  // El foco se consume después de actualizar el DOM, sin efectos pendientes del render anterior.
+  useLayoutEffect(() => {
+    const destino = foco.current
+    if (!destino) return
+    foco.current = null
+    if (destino === 'confirmar') confirmarRef.current?.focus()
+    else if (destino === 'borrar') borrarRef.current?.focus()
+    else textareaRef.current?.focus()
+  })
+
+  async function handleBorrar() {
+    if (!meal.id || saveInFlight.current) return
+    saveInFlight.current = true
+    setGuardando(true)
+    setError(null)
+    setGuardado(null)
+    const revisionEnviada = draftRevision.current
+    try {
+      const version = await deleteNota(token, date, meal.id, baseVersion.current)
+      baseVersion.current = version
+      // Lo que se escribió mientras se borraba es un borrador nuevo y se conserva.
+      if (draftRevision.current === revisionEnviada) {
+        dirty.current = false
+        draftRevision.current += 1
+        setTexto('')
+      }
+      setConflict(false)
+      setConfirmando(false)
+      setGuardado(`Borraste lo anotado en ${meal.name}.`)
+      foco.current = 'textarea'
+      onNotaBorrada(meal.id, version)
+    } catch (err) {
+      setConfirmando(false)
+      setConflict(err instanceof NoteConflictError)
+      setError(err instanceof NoteConflictError ? err.message : 'No se pudo borrar. Intentá de nuevo.')
+    } finally {
+      saveInFlight.current = false
+      setGuardando(false)
+    }
   }
 
   async function handleGuardar(value = texto) {
@@ -545,7 +591,31 @@ function NotaMealSection({
         <DictationButton disabled={guardando} onTranscript={transcript => {
           editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
         }} />
+        {hasNote && !confirmando && (
+          <button type="button" ref={borrarRef} className="nota-btn-borrar" disabled={guardando}
+            onClick={() => { setConfirmando(true); foco.current = 'confirmar' }}>
+            Borrar lo anotado
+          </button>
+        )}
       </div>
+
+      {confirmando && (
+        <div className="nota-confirmar" role="group" aria-labelledby={`confirmar-${meal.id}`}>
+          <p id={`confirmar-${meal.id}`}>
+            ¿Borrar todo lo anotado en {meal.name}? Se quita la nota y lo que sumó al día.
+          </p>
+          <div className="nota-confirmar__acciones">
+            <button type="button" ref={confirmarRef} className="nota-btn-confirmar" disabled={guardando}
+              onClick={() => void handleBorrar()}>
+              Borrar
+            </button>
+            <button type="button" className="nota-btn-cancelar"
+              onClick={() => { setConfirmando(false); foco.current = 'borrar' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <p className="nota-guardado" role="status">{guardado}</p>
       {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
@@ -694,6 +764,7 @@ interface MealProps {
   gruposMap: Record<number, GrupoInfo>
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
+  onNotaBorrada: (mealId: number, version: number | null) => void
   onReload: () => Promise<DayRegistroDto>
   onRespuestaGuardada: (mealId: number) => void
 }
@@ -714,6 +785,7 @@ function MealDetail(props: MealProps) {
           gruposMap={gruposMap}
           onNotaSaved={props.onNotaSaved}
           onItemPatched={props.onItemPatched}
+          onNotaBorrada={props.onNotaBorrada}
           onReload={props.onReload}
           onRespuestaGuardada={props.onRespuestaGuardada}
         />
@@ -820,6 +892,18 @@ function HoyContent() {
     })
   }, [setDayRegistro, gruposMap])
 
+  const handleNotaBorrada = useCallback((mealId: number, version: number | null) => {
+    setDayRegistro(prev => {
+      if (!prev) return prev
+      const anterior = prev.meals.find(m => m.mealId === mealId)
+      return {
+        ...prev,
+        meals: prev.meals.map(m => m.mealId === mealId ? { ...m, noteText: '', noteVersion: version, items: [], comparison: [] } : m),
+        summary: ajustarResumen(prev.summary, anterior?.items ?? [], [], gruposMap),
+      }
+    })
+  }, [setDayRegistro, gruposMap])
+
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRegistro(prev => {
       if (!prev) return prev
@@ -898,6 +982,7 @@ function HoyContent() {
     gruposMap,
     onNotaSaved: handleNotaSaved,
     onItemPatched: handleItemPatched,
+    onNotaBorrada: handleNotaBorrada,
     onReload: reloadDay,
     onRespuestaGuardada: handleRespuestaGuardada,
   }

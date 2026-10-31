@@ -125,6 +125,23 @@ export async function saveNota(
 
 }
 
+// Borra la nota de una comida y todo lo registrado en ella ese día.
+export async function deleteNota(
+  token: string,
+  date: string,
+  mealId: number,
+  version: number | null,
+): Promise<number | null> {
+  const query = version === null ? '' : `?version=${version}`
+  try {
+    const result = await apiRequest<{ version: number | null }>(`/api/v1/registro/${date}/comidas/${mealId}/nota${query}`, { errorMessage: 'No se pudo borrar lo anotado.', token, method: 'DELETE' })
+    return result.version
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    throw err
+  }
+}
+
 export async function patchItem(
   token: string,
   date: string,

@@ -92,14 +92,10 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
   const logMap = new Map(day.habitLogs.map(l => [l.habitId, l]))
   const meals = day.meals ?? []
 
-  async function toggleHabit(habit: HabitDto) {
+  async function setHabit(habit: HabitDto, newVal: number) {
     if (savingHabit !== null) return
     setHabitError('')
     setSavingHabit(habit.id)
-    const current = logMap.get(habit.id)
-    const newVal = habit.habitType === 'SI_NO'
-      ? (current && current.value > 0 ? 0 : 1)
-      : (current ? current.value + habit.step : habit.step)
     try {
       const updated = await logHabit(token, habit.id, day.date, newVal)
       onLogUpdated(updated)
@@ -143,32 +139,51 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
           <ul className="semana-habitos__lista">
             {habits.map(h => {
               const log = logMap.get(h.id)
-              const done = Boolean(log && log.value > 0)
-              const muestraValor = (h.habitType !== 'SI_NO' || h.countsFlexibleMeals) && log
+              const valor = log?.value ?? 0
+              const done = valor > 0
+              const unidad = h.unit ? ` ${h.unit}` : ''
+              // Contadores y cantidades se corrigen con − y +; los de sí/no y los flexibles, con la casilla.
+              const esContador = h.habitType !== 'SI_NO' && !h.countsFlexibleMeals
+              const check = done && (
+                <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              )
               return (
                 <li key={h.id}>
-                  <button
-                    disabled={h.countsFlexibleMeals || savingHabit !== null}
-                    className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
-                    onClick={() => void toggleHabit(h)}
-                    aria-label={`${h.name}: ${done ? 'completado' : 'pendiente'}, ${fmtN(log?.value ?? 0)}${h.unit ? ` ${h.unit}` : ''}, ${fullDate(day.date)}`}
-                    aria-pressed={done}
-                  >
-                    <span className="semana-habito__check" aria-hidden="true">
-                      {done && (
-                        <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      )}
-                    </span>
-                    <span className="semana-habito__name">{h.name}</span>
-                    {muestraValor && (
-                      <span className="semana-habito__val">
-                        {fmtN(log.value)}{h.unit ? ` ${h.unit}` : ''}
+                  {esContador ? (
+                    <div className={`semana-habito${done ? ' semana-habito--ok' : ''}`}>
+                      <span className="semana-habito__check" aria-hidden="true">{check}</span>
+                      <span className="semana-habito__name">{h.name}</span>
+                      <span className="semana-habito__val">{fmtN(valor)}{unidad}</span>
+                      <span className="semana-habito__ajuste">
+                        <button type="button" className="semana-habito__paso"
+                          disabled={valor <= 0 || savingHabit !== null}
+                          aria-label={`Restar ${fmtN(h.step)}${unidad} de ${h.name}, ${fullDate(day.date)}`}
+                          onClick={() => void setHabit(h, Math.max(0, valor - h.step))}>
+                          −
+                        </button>
+                        <button type="button" className="semana-habito__paso"
+                          disabled={savingHabit !== null}
+                          aria-label={`Sumar ${fmtN(h.step)}${unidad} a ${h.name}, ${fullDate(day.date)}`}
+                          onClick={() => void setHabit(h, valor + h.step)}>
+                          +
+                        </button>
                       </span>
-                    )}
-                    {!h.countsFlexibleMeals && h.habitType !== 'SI_NO' && (
-                      <span className="semana-habito__paso" aria-hidden="true">+{fmtN(h.step)}{h.unit ? ` ${h.unit}` : ''}</span>
-                    )}
-                  </button>
+                    </div>
+                  ) : (
+                    <button
+                      disabled={h.countsFlexibleMeals || savingHabit !== null}
+                      className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
+                      onClick={() => void setHabit(h, done ? 0 : 1)}
+                      aria-label={`${h.name}: ${done ? 'completado' : 'pendiente'}, ${fmtN(valor)}${unidad}, ${fullDate(day.date)}`}
+                      aria-pressed={done}
+                    >
+                      <span className="semana-habito__check" aria-hidden="true">{check}</span>
+                      <span className="semana-habito__name">{h.name}</span>
+                      {h.countsFlexibleMeals && log && (
+                        <span className="semana-habito__val">{fmtN(log.value)}{unidad}</span>
+                      )}
+                    </button>
+                  )}
                 </li>
               )
             })}
