@@ -53,7 +53,7 @@ class PlanRulesIntegrationTest {
         mvc.perform(post("/api/v1/users").contentType(MediaType.APPLICATION_JSON)
             .content(mapper.writeValueAsString(Map.of("email", address, "password", "Segura1234!")))).andExpect(status().isCreated());
         outbox.processJobs();
-        mvc.perform(get("/api/v1/auth/verify").param("token", email.getTokenFor(address))).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/auth/verify").param("token", email.tokenAfterProcessing(outbox, address))).andExpect(status().isOk());
         return mapper.readTree(mvc.perform(post("/api/v1/users/login").contentType(MediaType.APPLICATION_JSON)
             .content(mapper.writeValueAsString(Map.of("email", address, "password", "Segura1234!"))))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("token").asText();

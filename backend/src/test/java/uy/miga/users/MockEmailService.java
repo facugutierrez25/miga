@@ -37,8 +37,12 @@ public class MockEmailService implements EmailService {
         return lastToken;
     }
 
-    // Token del último email enviado a esa dirección: no depende de qué otros emails se procesaron en el lote.
-    public String getTokenFor(String recipient) {
+    // Token del último email enviado a esa dirección. Procesa lotes hasta encontrarlo, porque los emails
+    // que otros tests registran sin procesar se acumulan y pueden ocupar el primer lote.
+    public String tokenAfterProcessing(EmailOutboxWorker worker, String recipient) {
+        for (int i = 0; i < 20 && tokensByRecipient.get(recipient) == null; i++) {
+            worker.processJobs();
+        }
         return tokensByRecipient.get(recipient);
     }
 

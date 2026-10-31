@@ -399,7 +399,7 @@ class WeekIntegrationTest {
                     """.formatted(email)));
         } catch (Exception ignored) {}
         outboxWorker.processJobs();
-        String verifyToken = mockEmailService.getTokenFor(email);
+        String verifyToken = mockEmailService.tokenAfterProcessing(outboxWorker, email);
         if (verifyToken != null) {
             mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
         }
