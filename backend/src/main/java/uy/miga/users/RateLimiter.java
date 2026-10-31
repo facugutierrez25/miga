@@ -94,12 +94,26 @@ public class RateLimiter {
             }
             Entry entry = entries.get(key);
             if (entry == null) {
-                if (entries.size() >= maximum) entries.remove(entries.keySet().iterator().next());
+                // Solo se libera un contador sin intentos consumidos: expulsar uno activo le
+                // devolvería los intentos a quien está bloqueado. Si todos están activos, la
+                // clave nueva se rechaza hasta que alguno venza.
+                if (entries.size() >= maximum && !evictIdleEntry()) return false;
                 entry = new Entry(Bucket.builder().addLimit(Bandwidth.builder()
                         .capacity(limit).refillGreedy(limit, window).build()).build(), now);
             }
             entries.put(key, new Entry(entry.bucket(), now));
             return entry.bucket().tryConsume(1);
+        }
+
+        private boolean evictIdleEntry() {
+            var iterator = entries.values().iterator();
+            while (iterator.hasNext()) {
+                if (iterator.next().bucket().getAvailableTokens() >= limit) {
+                    iterator.remove();
+                    return true;
+                }
+            }
+            return false;
         }
 
         synchronized int size() { return entries.size(); }

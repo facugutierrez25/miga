@@ -16,12 +16,27 @@ class RateLimiterTest {
         assertThat(store.consume("a")).isTrue();
         assertThat(store.consume("a")).isFalse();
         store.consume("b");
-        store.consume("c");
+        assertThat(store.consume("c")).isFalse();
         assertThat(store.size()).isEqualTo(2);
 
         clock.set(Duration.ofMinutes(1).toNanos());
         assertThat(store.consume("a")).isTrue();
         assertThat(store.size()).isEqualTo(1);
+    }
+
+    @Test
+    void aFullStoreNeverReleasesAnExhaustedKey() {
+        AtomicLong clock = new AtomicLong();
+        var store = new RateLimiter.BucketStore(1, Duration.ofMinutes(15), 2, clock::get);
+        assertThat(store.consume("bloqueado")).isTrue();
+        assertThat(store.consume("bloqueado")).isFalse();
+        // Llenar el almacén con claves nuevas no debe devolverle intentos a la bloqueada.
+        for (int i = 0; i < 50; i++) store.consume("otra-" + i);
+        assertThat(store.consume("bloqueado")).isFalse();
+        assertThat(store.size()).isLessThanOrEqualTo(2);
+
+        clock.set(Duration.ofMinutes(15).toNanos());
+        assertThat(store.consume("bloqueado")).isTrue();
     }
 
     @Test
