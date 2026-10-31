@@ -394,11 +394,11 @@
 
 .semana-habito {
   width: 100%;
-  min-height: 48px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 var(--s3);
+  padding: var(--s1) var(--s2) var(--s1) var(--s3);
   border: none;
   border-radius: var(--radius-card);
   background: transparent;
@@ -438,16 +438,28 @@
 }
 
 .semana-habito__val,
-.semana-habito__paso {
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
+.semana-habito__ajuste {
+  display: flex;
+  gap: var(--s1);
 }
 
 .semana-habito__paso {
-  font-size: var(--fs-cap);
-  padding: 2px var(--s2);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.semana-habito__paso:disabled {
+  color: var(--muted-2);
+  cursor: default;
 }
 
 .semana-dia__vacio {
