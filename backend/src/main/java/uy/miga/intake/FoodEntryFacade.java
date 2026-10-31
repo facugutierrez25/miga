@@ -149,18 +149,6 @@ public class FoodEntryFacade {
         repository.deleteMealEntries(userId, date, mealId);
     }
 
-    // Quita una mención completa: los ítems de un compuesto comparten la misma mención.
-    @Transactional
-    public void deleteMention(Long entryId, Long userId) {
-        repository.findByIdAndUserId(entryId, userId).ifPresent(entry -> {
-            if (entry.getOccurrenceId() != null) {
-                repository.deleteByUserIdAndOccurrenceId(userId, entry.getOccurrenceId());
-            } else {
-                repository.delete(entry);
-            }
-        });
-    }
-
     @Transactional
     public void detachGroup(Long groupId) {
         repository.findByFoodGroupId(groupId).forEach(entry -> entry.setFoodGroupId(null));

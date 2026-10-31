@@ -10,7 +10,7 @@ vi.mock('../api/plans')
 vi.mock('../api/registro', async importOriginal => {
   const actual = await importOriginal<typeof import('../api/registro')>()
   return { ...actual, getDayRegistro: vi.fn(), saveNota: vi.fn(), patchItem: vi.fn(),
-    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn(), deleteItem: vi.fn() }
+    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn() }
 })
 vi.mock('../auth/authTypes')
 
@@ -19,7 +19,6 @@ const mockGetDayRegistro = vi.mocked(registroApi.getDayRegistro)
 const mockSaveNota = vi.mocked(registroApi.saveNota)
 const mockGetSugerencias = vi.mocked(registroApi.getSugerencias)
 const mockDeleteNota = vi.mocked(registroApi.deleteNota)
-const mockDeleteItem = vi.mocked(registroApi.deleteItem)
 
 const gruposPRO = [{ id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null }]
 
@@ -705,12 +704,12 @@ const dayConNota = {
   summary: [{ foodGroupId: 1, name: 'Proteínas', clave: 'PRO', totalRecorded: 2, dailyGoal: null }],
 }
 
-test('borrar lo anotado pide confirmación, vacía la comida y permite deshacer', async () => {
+test('borrar lo anotado pide confirmación, vacía la comida y conserva la versión', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockGetDayRegistro.mockResolvedValue(dayConNota)
-  mockDeleteNota.mockResolvedValue(undefined)
+  mockDeleteNota.mockResolvedValue(4)
   mockSaveNota.mockResolvedValue({
-    noteId: 6, version: 0, text: 'leche y pan', date: '2025-01-01', mealId: 1, items: [],
+    noteId: 5, version: 5, text: 'leche y pan', date: '2025-01-01', mealId: 1, items: [],
     entries: dayConNota.meals[0].items, comparison: dayConNota.meals[0].comparison,
   })
   renderHoy()
@@ -722,10 +721,11 @@ test('borrar lo anotado pide confirmación, vacía la comida y permite deshacer'
   expect(await screen.findByRole('status')).toHaveTextContent('Borraste lo anotado en Desayuno.')
   expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('')
   expect(screen.getByText('0 de 2 porciones')).toBeInTheDocument()
-  const deshacer = screen.getByRole('button', { name: 'Deshacer' })
-  expect(deshacer).toHaveFocus()
-  fireEvent.click(deshacer)
-  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche y pan', null))
+  const textarea = screen.getByRole('textbox', { name: '¿Qué comiste?' })
+  expect(textarea).toHaveFocus()
+  fireEvent.change(textarea, { target: { value: 'leche y pan' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  await waitFor(() => expect(mockSaveNota).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche y pan', 4))
 })
 
 test('cancelar el borrado devuelve el foco al botón', async () => {
@@ -748,20 +748,4 @@ test('si la nota cambió en otro dispositivo, no la borra y ofrece recargar', as
   expect(await screen.findByRole('alert')).toHaveTextContent('Esta nota cambió en otro dispositivo')
   expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche y pan')
-})
-
-test('quitar un alimento lo saca de la nota y resta sus porciones', async () => {
-  mockGetMyPlan.mockResolvedValue(planConComida)
-  mockGetDayRegistro.mockResolvedValueOnce(dayConNota)
-    .mockResolvedValue({ ...dayConNota, meals: [{ ...dayConNota.meals[0], items: [dayConNota.meals[0].items[1]] }],
-      summary: [{ ...dayConNota.summary[0], totalRecorded: 1 }] })
-  mockDeleteItem.mockResolvedValue(undefined)
-  renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Quitar leche' }))
-  await waitFor(() => expect(mockDeleteItem).toHaveBeenCalledWith('tok', expect.any(String), 21))
-  expect(await screen.findByRole('status')).toHaveTextContent('Quitaste leche.')
-  expect(screen.queryByRole('button', { name: 'Quitar leche' })).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Quitar pan' })).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: 'Así lo entendí' })).toHaveFocus()
-  expect(screen.getByText('1 de 2 porciones')).toBeInTheDocument()
 })

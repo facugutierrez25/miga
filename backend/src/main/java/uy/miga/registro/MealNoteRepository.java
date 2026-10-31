@@ -9,13 +9,14 @@ import java.util.List;
 import java.util.Optional;
 
 interface MealNoteRepository extends JpaRepository<MealNote, Long> {
-    boolean existsByPlanId(Long planId);
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM meal_notes WHERE plan_id = :planId AND texto ~ '[^[:space:]]')", nativeQuery = true)
+    boolean existsByPlanId(@Param("planId") Long planId);
 
     Optional<MealNote> findByUserIdAndDateAndMealId(Long userId, LocalDate date, Long mealId);
     List<MealNote> findByUserIdAndDate(Long userId, LocalDate date);
     Optional<MealNote> findByIdAndUserId(Long id, Long userId);
 
-    @Query(value = "SELECT texto FROM meal_notes WHERE user_id = :userId AND meal_id = :mealId " +
+    @Query(value = "SELECT texto FROM meal_notes WHERE user_id = :userId AND meal_id = :mealId AND texto ~ '[^[:space:]]' " +
                    "GROUP BY texto ORDER BY COUNT(*) DESC, MIN(id) ASC LIMIT 5",
            nativeQuery = true)
     List<String> findTopTextsByUserIdAndMealId(@Param("userId") Long userId,

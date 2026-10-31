@@ -33,12 +33,12 @@ public class RegistroService {
         return day.meals().stream().map(meal -> {
             var note = notes.get(meal.mealId());
             long flexible = 0;
-            if (note != null) {
+            if (note != null && !note.getText().isBlank()) {
                 Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
                 flexible = interpreter.interpret(note.getText(), ruleService.findApplicable(notePlan, userId))
                     .stream().filter(item -> "FLEXIBLE".equals(item.tipo())).count();
             }
-            String status = note != null || !meal.items().isEmpty()
+            String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
                 ? recordedMealStatus(meal.comparison())
                 : ComparisonService.MISSING;
             return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
@@ -453,7 +453,7 @@ public class RegistroService {
     // Borra la nota de una comida y todo lo registrado en ella ese día. Exige la versión vigente,
     // igual que al guardar, para no borrar cambios hechos en otro dispositivo.
     @Transactional
-    void deleteNote(String userEmail, LocalDate date, Long mealId, Long version) {
+    Long deleteNote(String userEmail, LocalDate date, Long mealId, Long version) {
         Long userId = userService.findUserIdByEmail(userEmail);
         lockCurrentPlanIfPresent(userId);
         if (!planService.mealBelongsToUser(mealId, userId)) {
@@ -466,16 +466,12 @@ public class RegistroService {
             throw new NoteConflictException();
         }
         entryFacade.deleteMealEntries(userId, date, mealId);
-        existing.ifPresent(noteRepository::delete);
-    }
-
-    @Transactional
-    void deleteItem(String userEmail, LocalDate date, Long entryId) {
-        Long userId = userService.findUserIdByEmail(userEmail);
-        lockCurrentPlanIfPresent(userId);
-        FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
-        if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        entryFacade.deleteMention(entryId, userId);
+        if (existing.isEmpty()) return null;
+        MealNote note = existing.get();
+        note.setText("");
+        // Actualizar la fecha fuerza el versionado incluso si la nota ya estaba vacía.
+        note.touch();
+        return noteRepository.saveAndFlush(note).getVersion();
     }
 
     @Transactional
