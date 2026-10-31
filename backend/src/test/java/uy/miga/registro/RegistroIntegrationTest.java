@@ -507,6 +507,23 @@ class RegistroIntegrationTest {
         assertThat(getDay(date).path("meals").get(0)).isEqualTo(before);
     }
 
+    @Test
+    void removingTheLastMentionKeepsResponsesOfTheMeal() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche");
+        long groupId = saved.path("entries").get(0).path("foodGroupId").asLong();
+        mockMvc.perform(post("/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":true}"))
+            .andExpect(status().isCreated());
+        JsonNode meal = removeItem(date, saved.path("entries").get(0).path("id").asLong(),
+            getDay(date).path("meals").get(0).path("noteVersion").asLong());
+        assertThat(meal.path("noteText").asText()).isEmpty();
+        assertThat(meal.path("items")).hasSize(1);
+        assertThat(meal.path("items").get(0).path("origin").asText()).isEqualTo("RESPUESTA");
+    }
+
     private JsonNode removeItem(String date, long id, long version) throws Exception {
         var result = mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + id)
             .param("version", Long.toString(version)).header("Authorization", "Bearer " + token))

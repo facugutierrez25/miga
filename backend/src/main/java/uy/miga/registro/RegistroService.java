@@ -395,11 +395,8 @@ public class RegistroService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                 "No se pudo ubicar el alimento en la nota con seguridad. Recargá la nota e intentá de nuevo.");
         }
-        if (text.isEmpty()) {
-            entryFacade.deleteMealEntries(userId, date, entry.mealId());
-        } else {
-            entryFacade.deleteEntries(mentions.get(index).stream().map(FoodEntryFacade.EntryData::id).toList());
-        }
+        // Solo se borran los ítems de esa mención: las respuestas y las cargas manuales de la comida quedan.
+        entryFacade.deleteEntries(mentions.get(index).stream().map(FoodEntryFacade.EntryData::id).toList());
         note.setText(text);
         note.touch();
         noteRepository.saveAndFlush(note);

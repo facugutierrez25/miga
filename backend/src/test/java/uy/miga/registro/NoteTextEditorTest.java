@@ -38,6 +38,13 @@ class NoteTextEditorTest {
     }
 
     @Test
+    void rejectsRepeatedMentionsWhenTheOrderIsUnknown() {
+        // "leche" repetida y la primera repartida en grupos: sus ítems quedan al final.
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            NoteTextEditor.removeMention("Leche con pan, leche", List.of("pan", "leche", "leche"), 1));
+    }
+
+    @Test
     void rejectsMismatchedOrMissingMentions() {
         assertThatIllegalArgumentException().isThrownBy(() ->
             NoteTextEditor.removeMention("leche, pan", List.of("leche", "manzana"), 1));
