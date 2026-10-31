@@ -33,9 +33,9 @@ export default function PrivacidadPage() {
             <div className="priv-section__body">
               <p>Solo recopilamos lo estrictamente necesario para que la app funcione:</p>
               <ul className="priv-list">
-                <li><strong>Email</strong> — para identificarte y que puedas iniciar sesión.</li>
-                <li><strong>Contraseña</strong> — almacenada con hash bcrypt. Nunca se guarda ni se transmite en texto plano.</li>
-                <li><strong>Tu plan nutricional</strong> — las comidas, porciones e intercambios que vos cargás voluntariamente.</li>
+                <li><strong>Email</strong>: para identificarte y que puedas iniciar sesión.</li>
+                <li><strong>Contraseña</strong>: almacenada con hash bcrypt. Nunca se guarda ni se transmite en texto plano.</li>
+                <li><strong>Tu plan nutricional</strong>: las comidas, porciones e intercambios que vos cargás voluntariamente.</li>
               </ul>
               <p>No recopilamos datos biométricos, historial médico, información de pago ni datos de geolocalización.</p>
             </div>
@@ -76,10 +76,10 @@ export default function PrivacidadPage() {
                 De acuerdo con la Ley 18.331 de Protección de Datos Personales de Uruguay, tenés derecho a:
               </p>
               <ul className="priv-list">
-                <li><strong>Acceso</strong> — saber qué datos tuyos tenemos guardados.</li>
-                <li><strong>Rectificación</strong> — corregir datos incorrectos o desactualizados.</li>
-                <li><strong>Cancelación</strong> — solicitar el borrado de tu cuenta y todos tus datos.</li>
-                <li><strong>Oposición</strong> — oponerte al tratamiento de tus datos en cualquier momento.</li>
+                <li><strong>Acceso</strong>: saber qué datos tuyos tenemos guardados.</li>
+                <li><strong>Rectificación</strong>: corregir datos incorrectos o desactualizados.</li>
+                <li><strong>Cancelación</strong>: solicitar el borrado de tu cuenta y todos tus datos.</li>
+                <li><strong>Oposición</strong>: oponerte al tratamiento de tus datos en cualquier momento.</li>
               </ul>
               <p>
                 Para ejercer cualquiera de estos derechos, escribinos a{' '}

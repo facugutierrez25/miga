@@ -1,15 +1,11 @@
 .vmail-spinner {
   width: 32px;
   height: 32px;
-  border: 2.5px solid var(--glass-border);
+  border: 2.5px solid var(--line);
   border-top-color: var(--primary);
   border-radius: 50%;
-  animation: vmail-spin 0.8s linear infinite;
-  margin-bottom: 4px;
-}
 
-@keyframes vmail-spin {
-  to { transform: rotate(360deg); }
+  margin-bottom: 4px;
 }
 
 .vmail-icon {
