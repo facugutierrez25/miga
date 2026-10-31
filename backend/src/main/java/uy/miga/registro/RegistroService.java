@@ -105,6 +105,9 @@ public class RegistroService {
 
     private NoteInterpretationDto saveNote(String userEmail, LocalDate date, Long mealId, String text,
                                             Long version, boolean checkVersion) {
+        if (text == null || text.isBlank() || text.length() > 2_000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingresá una nota de hasta 2000 caracteres.");
+        }
         Long userId = userService.findUserIdByEmail(userEmail);
         lockCurrentPlanIfPresent(userId);
 

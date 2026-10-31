@@ -47,6 +47,7 @@ public class ReglaService {
                                      String alimento, List<String> sinonimos,
                                      BigDecimal cantidadPorPorcion, String unidad,
                                      BigDecimal porcionPorDefecto) {
+        validateNames(alimento, sinonimos);
         FoodRule rule = new FoodRule();
         rule.setAlcance("USUARIO");
         rule.setUserId(userId);
@@ -96,9 +97,7 @@ public class ReglaService {
 
     @Transactional(readOnly = true)
     public FoodRuleDto getRuleForAdjust(java.util.UUID uid, Long planId) {
-        return repository.findAll().stream().filter(r -> r.getUid().equals(uid))
-            .filter(r -> "GLOBAL".equals(r.getAlcance()) || ("PLAN".equals(r.getAlcance()) && planId.equals(r.getPlanId())))
-            .findFirst().map(this::toDto).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
+        return repository.findForAdjust(uid, planId).map(this::toDto).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
     private FoodRule userRule(Long userId, Long planId, java.util.UUID uid) {
@@ -158,9 +157,24 @@ public class ReglaService {
         }
     }
 
+    private static void validateNames(String name, List<String> synonyms) {
+        validateNames(name, synonyms, null);
+    }
+
+    private static void validateNames(String name, List<String> synonyms, FoodRule existing) {
+        List<String> previous = existing == null || existing.getSinonimos() == null ? List.of() : existing.getSinonimos();
+        if (name == null || name.isBlank() || (name.length() > 100 &&
+            (existing == null || !name.equals(existing.getAlimento()))))
+            throw new InvalidRuleException("Ingresá un nombre de alimento de hasta 100 caracteres.");
+        if (synonyms != null && (synonyms.size() > Math.max(20, previous.size()) ||
+            (previous.size() > 20 && synonyms.stream().anyMatch(s -> !previous.contains(s))) || synonyms.stream()
+            .anyMatch(s -> s == null || s.isBlank() || (s.length() > 100 && !previous.contains(s)))))
+            throw new InvalidRuleException("Podés indicar hasta 20 sinónimos de hasta 100 caracteres cada uno.");
+    }
+
     private void apply(FoodRule rule, RuleInput in) {
-        if (in.alimento() == null || in.alimento().isBlank() || in.alimento().length() > 200 ||
-            in.tipo() == null || !List.of("NORMAL", "COMPUESTO", "LIBRE", "FLEXIBLE", "NO_CUENTA").contains(in.tipo()) ||
+        validateNames(in.alimento(), in.sinonimos(), rule);
+        if (in.tipo() == null || !List.of("NORMAL", "COMPUESTO", "LIBRE", "FLEXIBLE", "NO_CUENTA").contains(in.tipo()) ||
             (in.porcionPorDefecto() != null && in.porcionPorDefecto().signum() <= 0))
             throw new InvalidRuleException("Nombre, tipo o porción por defecto inválidos.");
         boolean components = in.componentes() != null && !in.componentes().isEmpty();

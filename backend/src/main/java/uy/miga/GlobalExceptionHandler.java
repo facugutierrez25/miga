@@ -86,4 +86,9 @@ class GlobalExceptionHandler {
     Map<String, Object> handleDataIntegrity(DataIntegrityViolationException ex) {
         return Map.of("code", "PLAN_CONFLICT", "error", "Operación rechazada por restricción de integridad. Intentá de nuevo.");
     }
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    org.springframework.http.ResponseEntity<?> handleStatus(org.springframework.web.server.ResponseStatusException ex) {
+        return org.springframework.http.ResponseEntity.status(ex.getStatusCode())
+            .body(Map.of("error", ex.getReason() == null ? "No se pudo completar la solicitud." : ex.getReason()));
+    }
 }

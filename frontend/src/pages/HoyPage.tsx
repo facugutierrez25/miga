@@ -611,6 +611,7 @@ function NotaMealSection({
         id={textareaId}
         ref={textareaRef}
         className="nota-textarea"
+        maxLength={2000}
         placeholder="Por ejemplo: tarta de zapallitos y ensalada"
         value={texto}
         onChange={e => { const value = e.target.value; editarBorrador(() => value) }}

@@ -50,6 +50,14 @@ export default function FoodRuleForm({
 
   const [synonyms, setSynonyms] = useState(rule?.sinonimos.join(', ') ?? '')
 
+  const parsedSynonyms = synonyms.split(',').map((s) => s.trim()).filter(Boolean)
+  const previousSynonyms = rule?.sinonimos ?? []
+  const nameInvalid = input.alimento.length > 100 && input.alimento !== rule?.alimento
+  const synonymsInvalid =
+    parsedSynonyms.length > Math.max(20, previousSynonyms.length) ||
+    (previousSynonyms.length > 20 && parsedSynonyms.some((s) => !previousSynonyms.includes(s))) ||
+    parsedSynonyms.some((s) => s.length > 100 && !previousSynonyms.includes(s))
+
   const compoundValid =
     input.componentes.length >= 2 &&
     new Set(input.componentes.map((c) => c.groupUid)).size === input.componentes.length &&
@@ -58,7 +66,7 @@ export default function FoodRuleForm({
   // Cantidad y unidad van juntas: las dos o ninguna (en ese caso se usa la porción por defecto).
   const quantityUnitMismatch = input.tipo === 'NORMAL' && !!input.cantidadPorPorcion !== !!input.unidad
   const valid =
-    input.alimento.trim() &&
+    input.alimento.trim() && !nameInvalid && !synonymsInvalid &&
     (input.tipo !== 'COMPUESTO' || compoundValid) &&
     (input.tipo !== 'NORMAL' || (input.groupUid && !!input.cantidadPorPorcion === !!input.unidad))
 
@@ -97,7 +105,8 @@ export default function FoodRuleForm({
         <input
           autoFocus
           required
-          maxLength={200}
+          maxLength={Math.max(100, rule?.alimento.length ?? 0)}
+          aria-invalid={nameInvalid || undefined}
           value={input.alimento}
           onChange={(e) => setInput({ ...input, alimento: e.target.value })}
         />
@@ -107,6 +116,13 @@ export default function FoodRuleForm({
         Sinónimos separados por comas
         <input value={synonyms} onChange={(e) => setSynonyms(e.target.value)} />
       </label>
+
+      {(nameInvalid || synonymsInvalid) && (
+        <p className="rules-error" role="alert">
+          Usá hasta 100 caracteres para nombres y sinónimos nuevos o modificados, y hasta 20 sinónimos.
+          Podés conservar valores heredados sin cambios; si ya tenés más de 20 sinónimos, no podés agregar otros.
+        </p>
+      )}
 
       <fieldset>
         <legend>Tipo de alimento</legend>

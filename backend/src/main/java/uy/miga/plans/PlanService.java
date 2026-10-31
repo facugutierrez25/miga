@@ -123,7 +123,7 @@ public class PlanService {
     @Transactional(readOnly = true)
     List<PlanSummaryDto> getPlanHistory(String email) {
         Long userId = userService.findUserIdByEmail(email);
-        return plansRepository.findAllByUserIdAndCurrentFalseOrderBySupersededAtDesc(userId)
+        return plansRepository.findTop50ByUserIdAndCurrentFalseOrderBySupersededAtDescIdDesc(userId)
             .stream()
             .map(p -> {
                 List<PlanFoodGroupDto> groups = toGroupDtos(p.getFoodGroups());

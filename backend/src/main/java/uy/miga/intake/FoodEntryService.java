@@ -41,6 +41,9 @@ class FoodEntryService {
     @Transactional
     FoodEntryDto addEntry(String userEmail, Long mealId, LocalDate date,
                           String food, Double quantity, String unit, Long foodGroupId) {
+        if (food == null || food.isBlank() || food.length() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingresá un nombre de alimento de hasta 100 caracteres.");
+        }
         Long userId = userService.findUserIdByEmail(userEmail);
         lockCurrentPlanIfPresent(userId);
         if (!planService.mealBelongsToUser(mealId, userId)) {

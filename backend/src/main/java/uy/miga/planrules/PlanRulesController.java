@@ -25,7 +25,7 @@ class PlanRulesController {
     @DeleteMapping("/grupos/{uid}")
     PlanRulesDto deleteGroup(Authentication auth, @PathVariable UUID uid, @RequestParam Long planVersion) { return service.deleteGroup(auth.getName(), uid, planVersion); }
     @PostMapping("/alimentos") @ResponseStatus(HttpStatus.CREATED)
-    PlanRulesDto createRule(Authentication auth, @Valid @RequestBody Requests.Rule req) { return service.rule(auth.getName(), null, req); }
+    PlanRulesDto createRule(Authentication auth, @org.springframework.validation.annotation.Validated({jakarta.validation.groups.Default.class, Requests.CreateRule.class}) @RequestBody Requests.Rule req) { return service.rule(auth.getName(), null, req); }
     @PutMapping("/alimentos/{uid}")
     PlanRulesDto updateRule(Authentication auth, @PathVariable UUID uid, @Valid @RequestBody Requests.Rule req) { return service.rule(auth.getName(), uid, req); }
     @DeleteMapping("/alimentos/{uid}")
