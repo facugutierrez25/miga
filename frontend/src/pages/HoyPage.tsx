@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
@@ -485,8 +485,8 @@ function NotaMealSection({
     setTexto(update)
   }
 
-  // Después de confirmar, borrar, cancelar o quitar, el foco va a un lugar que todavía existe.
-  useEffect(() => {
+  // El foco se consume después de actualizar el DOM, sin efectos pendientes del render anterior.
+  useLayoutEffect(() => {
     const destino = foco.current
     if (!destino) return
     foco.current = null
