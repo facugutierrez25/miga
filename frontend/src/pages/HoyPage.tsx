@@ -9,7 +9,7 @@ import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
 import { type PlanFoodGroupDto, type MealDto } from '../api/plans'
 import {
-  NoteConflictError, saveNota, patchItem, saveRespuesta, getSugerencias,
+  NoteConflictError, saveNota, deleteNota, deleteItem, patchItem, saveRespuesta, getSugerencias,
   type DayRegistroDto, type DailySummaryDto, type MealDayDto, type EntryItemDto,
   type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
@@ -114,9 +114,20 @@ interface ItemRowProps {
   token: string
   gruposMap: Record<number, GrupoInfo>
   onPatched: (result: PatchItemResultDto) => void
+  onQuitar?: () => void
 }
 
-function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
+function BotonQuitar({ food, onClick }: { food: string; onClick: () => void }) {
+  return (
+    <button type="button" className="nota-item__quitar" onClick={onClick} aria-label={`Quitar ${food}`}>
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
+  )
+}
+
+function ItemRow({ item, date, token, gruposMap, onPatched, onQuitar }: ItemRowProps) {
   const [editando, setEditando] = useState(false)
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(false)
@@ -211,6 +222,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched }: ItemRowProps) {
                 </svg>
               </button>
             )}
+            {onQuitar && <BotonQuitar food={item.food} onClick={onQuitar} />}
           </>
         )}
       </div>
@@ -403,13 +415,15 @@ interface NotaMealSectionProps {
   gruposMap: Record<number, GrupoInfo>
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
+  onNotaBorrada: (mealId: number) => void
+  onItemQuitado: (mealId: number, item: EntryItemDto) => void
   onReload: () => Promise<DayRegistroDto>
   onRespuestaGuardada: (mealId: number) => void
 }
 
 function NotaMealSection({
   meal, drafts, mealDay, date, token, gruposMap,
-  onNotaSaved, onItemPatched, onRespuestaGuardada, onReload,
+  onNotaSaved, onItemPatched, onNotaBorrada, onItemQuitado, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
@@ -430,6 +444,13 @@ function NotaMealSection({
   const [guardado, setGuardado] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [confirmando, setConfirmando] = useState(false)
+  const [borrado, setBorrado] = useState<string | null>(null)
+  const borrarRef = useRef<HTMLButtonElement>(null)
+  const confirmarRef = useRef<HTMLButtonElement>(null)
+  const deshacerRef = useRef<HTMLButtonElement>(null)
+  const entendidoRef = useRef<HTMLHeadingElement>(null)
+  const foco = useRef<'confirmar' | 'borrar' | 'deshacer' | 'items' | null>(null)
 
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
@@ -460,7 +481,61 @@ function NotaMealSection({
     dirty.current = true
     draftRevision.current += 1
     setGuardado(null)
+    setBorrado(null)
     setTexto(update)
+  }
+
+  // Después de confirmar, borrar, cancelar o quitar, el foco va a un lugar que todavía existe.
+  useEffect(() => {
+    const destino = foco.current
+    if (!destino) return
+    foco.current = null
+    if (destino === 'confirmar') confirmarRef.current?.focus()
+    else if (destino === 'borrar') borrarRef.current?.focus()
+    else if (destino === 'deshacer') deshacerRef.current?.focus()
+    else (entendidoRef.current ?? textareaRef.current)?.focus()
+  })
+
+  async function handleBorrar() {
+    if (!meal.id || saveInFlight.current) return
+    const anterior = mealDay?.noteText ?? texto
+    saveInFlight.current = true
+    setGuardando(true)
+    setError(null)
+    setGuardado(null)
+    try {
+      await deleteNota(token, date, meal.id, baseVersion.current)
+      baseVersion.current = null
+      dirty.current = false
+      draftRevision.current += 1
+      setTexto('')
+      setConflict(false)
+      setConfirmando(false)
+      setBorrado(anterior)
+      setGuardado(`Borraste lo anotado en ${meal.name}.`)
+      foco.current = 'deshacer'
+      onNotaBorrada(meal.id)
+    } catch (err) {
+      setConfirmando(false)
+      setConflict(err instanceof NoteConflictError)
+      setError(err instanceof NoteConflictError ? err.message : 'No se pudo borrar. Intentá de nuevo.')
+    } finally {
+      saveInFlight.current = false
+      setGuardando(false)
+    }
+  }
+
+  async function handleQuitar(item: EntryItemDto) {
+    if (!meal.id) return
+    setError(null)
+    try {
+      await deleteItem(token, date, item.id)
+      setGuardado(`Quitaste ${item.food}.`)
+      foco.current = 'items'
+      onItemQuitado(meal.id, item)
+    } catch {
+      setError('No se pudo quitar. Intentá de nuevo.')
+    }
   }
 
   async function handleGuardar(value = texto) {
@@ -545,9 +620,39 @@ function NotaMealSection({
         <DictationButton disabled={guardando} onTranscript={transcript => {
           editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
         }} />
+        {hasNote && !confirmando && (
+          <button type="button" ref={borrarRef} className="nota-btn-borrar" disabled={guardando}
+            onClick={() => { setConfirmando(true); foco.current = 'confirmar' }}>
+            Borrar lo anotado
+          </button>
+        )}
       </div>
 
+      {confirmando && (
+        <div className="nota-confirmar" role="group" aria-labelledby={`confirmar-${meal.id}`}>
+          <p id={`confirmar-${meal.id}`}>
+            ¿Borrar todo lo anotado en {meal.name}? Se quita la nota y lo que sumó al día.
+          </p>
+          <div className="nota-confirmar__acciones">
+            <button type="button" ref={confirmarRef} className="nota-btn-confirmar" disabled={guardando}
+              onClick={() => void handleBorrar()}>
+              Borrar
+            </button>
+            <button type="button" className="nota-btn-cancelar"
+              onClick={() => { setConfirmando(false); foco.current = 'borrar' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <p className="nota-guardado" role="status">{guardado}</p>
+      {borrado !== null && (
+        <button type="button" ref={deshacerRef} className="nota-btn-deshacer" disabled={guardando}
+          onClick={() => { const anterior = borrado; setBorrado(null); void handleGuardar(anterior) }}>
+          Deshacer
+        </button>
+      )}
       {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
       {conflict && (
         <button type="button" className="nota-btn-recargar" disabled={guardando}
@@ -583,7 +688,7 @@ function NotaMealSection({
 
       {items.length > 0 && (
         <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
-          <h3 id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
+          <h3 id={`entendido-${meal.id}`} ref={entendidoRef} tabIndex={-1} className="nota-entendido__titulo">Así lo entendí</h3>
           <ul className="nota-items">
             {agruparPorMencion(items).map(mencion => {
               const fila = (item: EntryItemDto) => (
@@ -594,16 +699,20 @@ function NotaMealSection({
                   token={token}
                   gruposMap={gruposMap}
                   onPatched={result => onItemPatched(meal.id!, result)}
+                  onQuitar={mencion.length === 1 && item.id > 0 ? () => void handleQuitar(item) : undefined}
                 />
               )
               if (mencion.length === 1) return fila(mencion[0])
               const [primero] = mencion
               return (
                 <li key={primero.occurrenceId} className="nota-compuesto">
-                  <p className="nota-compuesto__titulo">
-                    {primero.food}
-                    {primero.quantity !== null && <> · {primero.quantity} {primero.unit ?? ''}</>}
-                  </p>
+                  <div className="nota-compuesto__cabecera">
+                    <p className="nota-compuesto__titulo">
+                      {primero.food}
+                      {primero.quantity !== null && <> · {primero.quantity} {primero.unit ?? ''}</>}
+                    </p>
+                    {primero.id > 0 && <BotonQuitar food={primero.food} onClick={() => void handleQuitar(primero)} />}
+                  </div>
                   {primero.appliedRule && <p className="nota-item__regla">{primero.appliedRule}</p>}
                   <ul className="nota-items" aria-label={`Grupos de ${primero.food}`}>
                     {mencion.map(item => fila({ ...item, appliedRule: null }))}
@@ -694,6 +803,8 @@ interface MealProps {
   gruposMap: Record<number, GrupoInfo>
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
+  onNotaBorrada: (mealId: number) => void
+  onItemQuitado: (mealId: number, item: EntryItemDto) => void
   onReload: () => Promise<DayRegistroDto>
   onRespuestaGuardada: (mealId: number) => void
 }
@@ -714,6 +825,8 @@ function MealDetail(props: MealProps) {
           gruposMap={gruposMap}
           onNotaSaved={props.onNotaSaved}
           onItemPatched={props.onItemPatched}
+          onNotaBorrada={props.onNotaBorrada}
+          onItemQuitado={props.onItemQuitado}
           onReload={props.onReload}
           onRespuestaGuardada={props.onRespuestaGuardada}
         />
@@ -820,6 +933,35 @@ function HoyContent() {
     })
   }, [setDayRegistro, gruposMap])
 
+  const handleNotaBorrada = useCallback((mealId: number) => {
+    setDayRegistro(prev => {
+      if (!prev) return prev
+      const anterior = prev.meals.find(m => m.mealId === mealId)
+      return {
+        ...prev,
+        meals: prev.meals.filter(m => m.mealId !== mealId),
+        summary: ajustarResumen(prev.summary, anterior?.items ?? [], [], gruposMap),
+      }
+    })
+  }, [setDayRegistro, gruposMap])
+
+  const handleItemQuitado = useCallback((mealId: number, quitado: EntryItemDto) => {
+    const mismaMencion = (it: EntryItemDto) => it.id === quitado.id
+      || (quitado.occurrenceId !== null && it.occurrenceId === quitado.occurrenceId)
+    setDayRegistro(prev => {
+      if (!prev) return prev
+      const meal = prev.meals.find(m => m.mealId === mealId)
+      if (!meal) return prev
+      return {
+        ...prev,
+        meals: prev.meals.map(m => m.mealId === mealId ? { ...m, items: m.items.filter(it => !mismaMencion(it)) } : m),
+        summary: ajustarResumen(prev.summary, meal.items.filter(mismaMencion), [], gruposMap),
+      }
+    })
+    // La comparación de la comida la recalcula el servidor.
+    reloadDay().catch(() => {})
+  }, [setDayRegistro, gruposMap, reloadDay])
+
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRegistro(prev => {
       if (!prev) return prev
@@ -898,6 +1040,8 @@ function HoyContent() {
     gruposMap,
     onNotaSaved: handleNotaSaved,
     onItemPatched: handleItemPatched,
+    onNotaBorrada: handleNotaBorrada,
+    onItemQuitado: handleItemQuitado,
     onReload: reloadDay,
     onRespuestaGuardada: handleRespuestaGuardada,
   }
