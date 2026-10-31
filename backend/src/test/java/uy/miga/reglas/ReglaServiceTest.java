@@ -142,4 +142,35 @@ class ReglaServiceTest {
         }
         verify(repository, never()).save(any());
     }
+    @Test void updatePreservesLegacyValuesWhenChangingPortion() {
+        FoodRule existing = rule("USUARIO", "a".repeat(150));
+        var aliases = new ArrayList<>(java.util.stream.IntStream.range(0, 21).mapToObj(i -> "alias" + i).toList());
+        aliases.add("b".repeat(150));
+        existing.setSinonimos(aliases);
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        var input = new RuleInput(existing.getAlimento(), aliases, "NORMAL", 7L, null, null,
+            BigDecimal.valueOf(2), List.of(), null);
+        var result = service.updateUserRule(2L, 1L, existing.getUid(), input);
+        assertThat(result.porcionPorDefecto()).isEqualByComparingTo("2");
+        assertThat(result.alimento()).hasSize(150);
+        assertThat(result.sinonimos()).containsExactlyElementsOf(aliases);
+        assertThat(service.upsertUserRule(2L, 1L, input).sinonimos()).containsExactlyElementsOf(aliases);
+        var added = new ArrayList<>(aliases);
+        added.add("nuevo");
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
+            new RuleInput(existing.getAlimento(), added, "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+    }
+
+    @Test void updateRejectsNewOversizedNamesAndSynonyms() {
+        FoodRule existing = rule("USUARIO", "a".repeat(150));
+        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
+            new RuleInput("b".repeat(101), List.of(), "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+        assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
+            new RuleInput(existing.getAlimento(), List.of("b".repeat(101)), "LIBRE", null, null, null, null, List.of(), null)))
+            .isInstanceOf(InvalidRuleException.class);
+    }
+
 }

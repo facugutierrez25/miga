@@ -164,7 +164,6 @@ class InterpreterService {
     }
 
     FoodRuleDto findRule(String name, List<FoodRuleDto> rules) {
-        if (name.length() > 100) return null;
         // 1. Exact match on food name
         for (FoodRuleDto r : rules) {
             if (normalize(r.alimento()).equals(name)) return r;
@@ -186,7 +185,7 @@ class InterpreterService {
                         if (normalize(s).equals(stem)) return r;
             }
         }
-        if (name.length() < 4) return null;
+        if (name.length() < 4 || name.length() > 100) return null;
         List<FoodRuleDto> candidates = new ArrayList<>();
         int bestDist = 3;
         for (FoodRuleDto r : rules) {

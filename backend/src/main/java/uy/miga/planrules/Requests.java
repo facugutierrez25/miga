@@ -19,7 +19,8 @@ final class Requests {
         }
     }
     record Component(@NotNull UUID groupUid, @Positive double porciones) {}
-    record Rule(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=100, message="El alimento admite hasta 100 caracteres.") String alimento,
+    interface CreateRule {}
+    record Rule(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=100, groups=CreateRule.class, message="El alimento admite hasta 100 caracteres.") String alimento,
         @Size(max=20, message="Podés indicar hasta 20 sinónimos.") List<@NotBlank @Size(max=100, message="Cada sinónimo admite hasta 100 caracteres.") String> sinonimos, @NotBlank String tipo, UUID groupUid, @Positive BigDecimal cantidadPorPorcion,
         @Size(max=20) String unidad, @Positive BigDecimal porcionPorDefecto, List<@NotNull @Valid Component> componentes, UUID overridesRuleUid) {}
     record Habit(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=100) String name, @NotBlank String habitType,

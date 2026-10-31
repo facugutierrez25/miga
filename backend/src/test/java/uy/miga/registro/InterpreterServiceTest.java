@@ -314,7 +314,17 @@ class InterpreterServiceTest {
         });
     }
 
-    @Test void longMentionIsNotRecognizedEvenWithLegacyRule() {
-        assertThat(interpreter.findRule("a".repeat(101), List.of(normal(1L, "a".repeat(101), 1L, null, null)))).isNull();
+    @Test void longMentionSkipsApproximateMatching() {
+        assertThat(interpreter.findRule("a".repeat(101), List.of(normal(1L, "a".repeat(100) + "b", 1L, null, null)))).isNull();
     }
+    @Test void legacyLongNamesStillMatchExactlyBySynonymAndPlural() {
+        String name = "a".repeat(150);
+        var rule = normal(1L, name, 1L, null, null);
+        assertThat(interpreter.findRule(name, List.of(rule))).isEqualTo(rule);
+        assertThat(interpreter.findRule(name + "s", List.of(rule))).isEqualTo(rule);
+        var aliased = withSynonyms(2L, "otro", List.of(name), 1L);
+        assertThat(interpreter.findRule(name, List.of(aliased))).isEqualTo(aliased);
+        assertThat(interpreter.findRule(name + "s", List.of(aliased))).isEqualTo(aliased);
+    }
+
 }

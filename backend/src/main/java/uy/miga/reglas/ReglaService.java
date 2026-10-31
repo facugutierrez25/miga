@@ -118,7 +118,6 @@ public class ReglaService {
 
     @Transactional
     public FoodRuleDto upsertUserRule(Long userId, Long planId, RuleInput in) {
-        validateNames(in.alimento(), in.sinonimos());
         var existing = repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
             .filter(r -> normalize(r.getAlimento()).equals(normalize(in.alimento())))
             .findFirst();
@@ -159,17 +158,23 @@ public class ReglaService {
     }
 
     private static void validateNames(String name, List<String> synonyms) {
-        if (name == null || name.isBlank() || name.length() > 100)
+        validateNames(name, synonyms, null);
+    }
+
+    private static void validateNames(String name, List<String> synonyms, FoodRule existing) {
+        List<String> previous = existing == null || existing.getSinonimos() == null ? List.of() : existing.getSinonimos();
+        if (name == null || name.isBlank() || (name.length() > 100 &&
+            (existing == null || !name.equals(existing.getAlimento()))))
             throw new InvalidRuleException("Ingresá un nombre de alimento de hasta 100 caracteres.");
-        if (synonyms != null && (synonyms.size() > 20 || synonyms.stream()
-            .anyMatch(s -> s == null || s.isBlank() || s.length() > 100)))
+        if (synonyms != null && (synonyms.size() > Math.max(20, previous.size()) ||
+            (previous.size() > 20 && synonyms.stream().anyMatch(s -> !previous.contains(s))) || synonyms.stream()
+            .anyMatch(s -> s == null || s.isBlank() || (s.length() > 100 && !previous.contains(s)))))
             throw new InvalidRuleException("Podés indicar hasta 20 sinónimos de hasta 100 caracteres cada uno.");
     }
 
     private void apply(FoodRule rule, RuleInput in) {
-        validateNames(in.alimento(), in.sinonimos());
-        if (in.alimento() == null || in.alimento().isBlank() || in.alimento().length() > 100 ||
-            in.tipo() == null || !List.of("NORMAL", "COMPUESTO", "LIBRE", "FLEXIBLE", "NO_CUENTA").contains(in.tipo()) ||
+        validateNames(in.alimento(), in.sinonimos(), rule);
+        if (in.tipo() == null || !List.of("NORMAL", "COMPUESTO", "LIBRE", "FLEXIBLE", "NO_CUENTA").contains(in.tipo()) ||
             (in.porcionPorDefecto() != null && in.porcionPorDefecto().signum() <= 0))
             throw new InvalidRuleException("Nombre, tipo o porción por defecto inválidos.");
         boolean components = in.componentes() != null && !in.componentes().isEmpty();
