@@ -1,6 +1,7 @@
 package uy.miga.users;
 
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -11,7 +12,10 @@ class UserController {
 
     private final UserService userService;
 
-    UserController(UserService userService) {
+    private final RateLimiter rateLimiter;
+
+    UserController(UserService userService, RateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
         this.userService = userService;
     }
 
@@ -22,9 +26,13 @@ class UserController {
     }
 
     @PostMapping("/login")
-    LoginResponse login(@Valid @RequestBody LoginRequest request) {
+    ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        if (!rateLimiter.allowLoginEmail(request.email())) {
+            return ResponseEntity.status(429).header("Retry-After", "900")
+                    .header("Content-Type", "application/json;charset=UTF-8").body(RateLimiter.ERROR_JSON);
+        }
         String token = userService.login(request.email(), request.password());
-        return new LoginResponse(token);
+        return ResponseEntity.ok(new LoginResponse(token));
     }
 
     @GetMapping("/me")
