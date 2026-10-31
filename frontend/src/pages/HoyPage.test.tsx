@@ -10,7 +10,7 @@ vi.mock('../api/plans')
 vi.mock('../api/registro', async importOriginal => {
   const actual = await importOriginal<typeof import('../api/registro')>()
   return { ...actual, getDayRegistro: vi.fn(), saveNota: vi.fn(), patchItem: vi.fn(),
-    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn() }
+    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn(), removeItem: vi.fn() }
 })
 vi.mock('../auth/authTypes')
 
@@ -762,4 +762,58 @@ test('lo que se escribe mientras se borra no se pierde', async () => {
   await act(async () => { resolver(4) })
   expect(await screen.findByRole('status')).toHaveTextContent('Borraste lo anotado en Desayuno.')
   expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('una manzana')
+})
+
+const removableItems = [
+  { id: 101, food: 'leche', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: 'REGLA', uncertain: false, occurrenceId: 'milk' },
+  { id: 102, food: 'manzana', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: 'MENTION', uncertain: false, occurrenceId: 'apple' },
+]
+
+function setupRemoval(items = removableItems) {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const meal = { mealId: 1, noteId: 3, noteVersion: 7, noteText: 'leche, manzana', items, comparison: [] }
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [meal] })
+  return meal
+}
+
+test('quitar usa la versión, actualiza texto y lista, anuncia y enfoca el título', async () => {
+  const meal = setupRemoval()
+  vi.mocked(registroApi.removeItem).mockResolvedValue({ ...meal, noteVersion: 8, noteText: 'leche', items: [removableItems[0]] })
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Quitar manzana' }))
+  await waitFor(() => expect(registroApi.removeItem).toHaveBeenCalledWith('tok', expect.any(String), 102, 7))
+  expect(await screen.findByText('Quitaste manzana.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Quitar manzana' })).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche')
+  expect(screen.getByRole('heading', { name: 'Así lo entendí' })).toHaveFocus()
+})
+
+test('quitar con conflicto ofrece Recargar', async () => {
+  setupRemoval()
+  vi.mocked(registroApi.removeItem).mockRejectedValue(new registroApi.NoteConflictError('La nota cambió.'))
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Quitar manzana' }))
+  expect(await screen.findByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+  expect(screen.getByText('La nota cambió.')).toBeInTheDocument()
+})
+
+test('un compuesto tiene un único botón de quitar en la cabecera', async () => {
+  setupRemoval(removableItems.map(item => ({ ...item, food: 'barrita', occurrenceId: 'compound' })))
+  renderHoy()
+  const button = await screen.findByRole('button', { name: 'Quitar barrita' })
+  expect(button.parentElement).toHaveClass('nota-compuesto__header')
+  expect(screen.getAllByRole('button', { name: 'Quitar barrita' })).toHaveLength(1)
+})
+
+test('quitar la última mención enfoca el editor y conserva un borrador sucio', async () => {
+  const meal = setupRemoval([removableItems[0]])
+  vi.mocked(registroApi.removeItem).mockResolvedValue({ ...meal, noteVersion: 8, noteText: '', items: [] })
+  renderHoy()
+  const button = await screen.findByRole('button', { name: 'Quitar leche' })
+  const editor = screen.getByRole('textbox', { name: '¿Qué comiste?' })
+  fireEvent.change(editor, { target: { value: 'Mi borrador' } })
+  fireEvent.click(button)
+  expect(await screen.findByText('Quitaste leche.')).toBeInTheDocument()
+  expect(editor).toHaveValue('Mi borrador')
+  expect(editor).toHaveFocus()
 })

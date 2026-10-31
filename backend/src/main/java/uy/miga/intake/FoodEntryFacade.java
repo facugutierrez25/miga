@@ -85,6 +85,12 @@ public class FoodEntryFacade {
     }
 
     @Transactional
+    public void deleteEntries(List<Long> ids) {
+        repository.deleteAllById(ids);
+        repository.flush();
+    }
+
+    @Transactional
     public void correctEntry(Long id, Double quantity, String unit, Long foodGroupId, BigDecimal portions) {
         repository.findById(id).ifPresent(e -> {
             if (quantity != null) e.setQuantity(quantity);

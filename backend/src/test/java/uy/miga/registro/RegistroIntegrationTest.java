@@ -422,6 +422,115 @@ class RegistroIntegrationTest {
             .path("meals").get(0).path("id").asLong();
     }
 
+    @Test
+    void removeMentionPreservesCorrectionAndUpdatesNoteAndExport() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche, manzana");
+        long milkId = saved.path("entries").get(0).path("id").asLong();
+        long appleId = saved.path("entries").get(1).path("id").asLong();
+        mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + milkId)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"quantity\":3}" )).andExpect(status().isOk());
+        long version = getDay(date).path("meals").get(0).path("noteVersion").asLong();
+        JsonNode result = removeItem(date, appleId, version);
+        assertThat(result.path("noteText").asText()).isEqualTo("leche");
+        assertThat(result.path("noteVersion").asLong()).isGreaterThan(version);
+        assertThat(result.path("items").size()).isEqualTo(1);
+        assertThat(result.path("items").get(0).path("quantity").asDouble()).isEqualTo(3);
+        assertThat(putNote(date, "leche").path("entries")).isEqualTo(result.path("items"));
+        String csv = mockMvc.perform(get("/api/v1/semana/export").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        assertThat(csv).contains("leche").doesNotContain("manzana");
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + milkId).param("version", "-1")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isConflict());
+        JsonNode empty = removeItem(date, milkId, result.path("noteVersion").asLong());
+        assertThat(empty.path("noteText").asText()).isEmpty();
+        assertThat(empty.path("items").isEmpty()).isTrue();
+    }
+
+    @Test
+    void removeCompoundDeletesAllItsGroupsAndRejectsOtherUsers() throws Exception {
+        createUniqueUserPlan();
+        createCompound("barrita sintetica", "Proteínas", "Cereales", "Grasas");
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "1 barrita sintetica, leche");
+        JsonNode result = removeItem(date, saved.path("entries").get(1).path("id").asLong(), saved.path("version").asLong());
+        assertThat(result.path("noteText").asText()).isEqualTo("leche");
+        assertThat(result.path("items").size()).isEqualTo(1);
+        long id = result.path("items").get(0).path("id").asLong();
+        createUniqueUserPlan();
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + id).param("version", "0")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void removeConnectorMentionAndRepeatedOccurrence() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche con pan y una manzana");
+        assertThat(saved.path("entries").size()).isEqualTo(3);
+        JsonNode result = removeItem(date, saved.path("entries").get(2).path("id").asLong(), saved.path("version").asLong());
+        assertThat(result.path("noteText").asText()).isEqualTo("leche con pan");
+        saved = putNote(date, "leche, manzana, leche");
+        result = removeItem(date, saved.path("entries").get(2).path("id").asLong(), saved.path("version").asLong());
+        assertThat(result.path("noteText").asText()).isEqualTo("leche, manzana");
+        assertThat(result.path("items").get(0).path("id")).isEqualTo(saved.path("entries").get(0).path("id"));
+        mockMvc.perform(delete("/api/v1/registro/" + LocalDate.now().minusDays(1) + "/items/" + result.path("items").get(0).path("id").asLong())
+            .param("version", result.path("noteVersion").asText()).header("Authorization", "Bearer " + token))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void removeRejectsResponsesAndUnmatchedTextWithoutChanges() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche, manzana");
+        long groupId = saved.path("entries").get(0).path("foodGroupId").asLong();
+        mockMvc.perform(post("/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":true}"))
+            .andExpect(status().isCreated());
+        JsonNode before = getDay(date).path("meals").get(0);
+        long responseId = before.path("items").get(2).path("id").asLong();
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + responseId)
+            .param("version", before.path("noteVersion").asText()).header("Authorization", "Bearer " + token))
+            .andExpect(status().isBadRequest());
+        MealNote note = notes.findById(saved.path("noteId").asLong()).orElseThrow();
+        note.setText("leche, pan");
+        notes.saveAndFlush(note);
+        before = getDay(date).path("meals").get(0);
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + saved.path("entries").get(1).path("id").asLong())
+            .param("version", before.path("noteVersion").asText()).header("Authorization", "Bearer " + token))
+            .andExpect(status().isUnprocessableEntity());
+        assertThat(getDay(date).path("meals").get(0)).isEqualTo(before);
+    }
+
+    @Test
+    void removingTheLastMentionKeepsResponsesOfTheMeal() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche");
+        long groupId = saved.path("entries").get(0).path("foodGroupId").asLong();
+        mockMvc.perform(post("/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":true}"))
+            .andExpect(status().isCreated());
+        JsonNode meal = removeItem(date, saved.path("entries").get(0).path("id").asLong(),
+            getDay(date).path("meals").get(0).path("noteVersion").asLong());
+        assertThat(meal.path("noteText").asText()).isEmpty();
+        assertThat(meal.path("items")).hasSize(1);
+        assertThat(meal.path("items").get(0).path("origin").asText()).isEqualTo("RESPUESTA");
+    }
+
+    private JsonNode removeItem(String date, long id, long version) throws Exception {
+        var result = mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + id)
+            .param("version", Long.toString(version)).header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
     private JsonNode putNote(String date, String text) throws Exception {
         JsonNode meals = getDay(date).path("meals");
         JsonNode currentVersion = meals.get(0).path("noteVersion");

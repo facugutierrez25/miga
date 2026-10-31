@@ -71,6 +71,37 @@ class WeekIntegrationTest {
     }
 
     @Test
+    void removedMentionDisappearsFromWeekAndExports() throws Exception {
+        String date = LocalDate.now().toString();
+        JsonNode plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        long mealId = plan.path("meals").get(0).path("id").asLong();
+        JsonNode note = objectMapper.readTree(mockMvc.perform(put("/api/v1/registro/" + date + "/comidas/" + mealId + "/nota")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"leche, manzana\",\"version\":null}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+        mockMvc.perform(delete("/api/v1/registro/" + date + "/items/" + note.path("entries").get(1).path("id").asLong())
+            .param("version", note.path("version").asText()).header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+        String week = mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        assertThat(week).contains("leche").doesNotContain("manzana");
+        String csv = mockMvc.perform(get("/api/v1/semana/export").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        assertThat(csv).contains("leche").doesNotContain("manzana");
+        byte[] xlsx = mockMvc.perform(get("/api/v1/semana/export").param("date", date).param("format", "xlsx")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsByteArray();
+        try (var workbook = new org.dhatim.fastexcel.reader.ReadableWorkbook(new java.io.ByteArrayInputStream(xlsx))) {
+            String cells = workbook.getFirstSheet().read().stream()
+                .map(row -> row.getCellText(1)).collect(java.util.stream.Collectors.joining(" "));
+            assertThat(cells).contains("leche").doesNotContain("manzana");
+        }
+    }
+
+    @Test
     void getWeek_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/semana")).andExpect(status().isUnauthorized());
     }
