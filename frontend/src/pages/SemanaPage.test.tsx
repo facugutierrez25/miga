@@ -60,3 +60,11 @@ test('anuncia un error al registrar un hábito y permite reintentar', async () =
   expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 250)
   await waitFor(() => expect(button).toBeEnabled())
 })
+
+test('la tira de la semana anuncia cada día con su resumen y marca el elegido', () => {
+  render(<SemanaPage />)
+  const dia = screen.getByRole('button', { name: /lunes, 26 de octubre de 2026, hoy: 0 de 1 comidas como el plan, 1 anotadas/ })
+  expect(dia).toHaveAttribute('aria-pressed', 'true')
+  expect(dia).toHaveAttribute('aria-current', 'date')
+  expect(screen.getByText('Esta semana: 0 de 1 comidas como el plan')).toBeInTheDocument()
+})
