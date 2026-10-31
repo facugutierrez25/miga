@@ -32,7 +32,7 @@ curl -s https://<host>/actuator/health/liveness | jq .
 curl -s https://<host>/actuator/health/readiness | jq .
 ```
 
-Los endpoints `/actuator/metrics` e `/actuator/info` requieren autenticación (JWT válido).
+Los endpoints `/actuator/metrics` e `/actuator/info` son operativos: solo responden con el encabezado `X-Ops-Key` igual a la variable `OPS_API_KEY`. Un JWT de paciente no da acceso. Si `OPS_API_KEY` está vacía, nadie accede.
 
 ### Cabecera de correlación
 
@@ -69,6 +69,7 @@ export CORS_ALLOWED_ORIGINS=https://<dominio-frontend>
 export APP_BASE_URL=https://<dominio-frontend>
 export MAIL_FROM=noreply@<dominio>
 export RESEND_API_KEY=<clave>
+export OPS_API_KEY=<clave-operativa-larga-y-aleatoria>
 
 # Iniciar
 java -jar miga-backend.jar
@@ -96,12 +97,15 @@ en producción se configura en el servidor estático o CDN).
 
 ## 3. RPO y RTO
 
-> Estado actual: sin backup automatizado configurado.
-
-| Métrica | Valor actual | Notas |
+| Métrica | Objetivo | Estado actual |
 |---|---|---|
-| **RPO** (Recovery Point Objective) | Último backup manual | No hay backup automático. El RPO real es la antigüedad del último `pg_dump` ejecutado manualmente. |
-| **RTO** (Recovery Time Objective) | ~30 minutos | Incluye: restaurar el dump (~5 min), reiniciar el backend (~2 min) y verificar con health check (~1 min). Estimación en condiciones normales; puede variar. |
+| **RPO** (pérdida máxima aceptable) | 24 horas | **Bloqueado:** no hay backup automático. Hasta configurarlo, el RPO real es la antigüedad del último `pg_dump` manual. |
+| **RTO** (tiempo máximo de recuperación) | 30 minutos | Medido en el ensayo con datos sintéticos (sección 5): restaurar tomó menos de 1 s y el backend arrancó en 9 s. El tiempo real lo dominan descargar el dump y desplegar. |
+| **Retención** | 7 diarios + 4 semanales | Pendiente de la automatización. |
+
+**Bloqueo externo (responsable: Facu):** elegir el proveedor de hosting de PostgreSQL y
+configurar ahí un `pg_dump` diario automático con la retención indicada y copia fuera del
+servidor. Hasta entonces, hacer un backup manual antes de cada despliegue (obligatorio, ver 3.1).
 
 ### Backup manual con pg_dump
 
@@ -113,8 +117,45 @@ pg_dump -h <host> -U nutriplan -Fc nutriplan > nutriplan_$(date +%Y%m%d_%H%M%S).
 ls -lh nutriplan_*.dump
 ```
 
-**Recomendación a futuro:** configurar un cron job o tarea programada que ejecute
-`pg_dump` al menos una vez al día y suba el dump a almacenamiento externo (S3 o similar).
+### 3.1 Despliegue con migraciones y migración fallida
+
+1. **Antes de desplegar:** backup manual con `pg_dump -Fc` y anotar su nombre.
+2. Desplegar el backend: Flyway aplica las migraciones pendientes al arrancar.
+3. Verificar `GET /actuator/health/readiness` = 200 y la versión en `flyway_schema_history`.
+
+Si una migración falla, el backend **no arranca** y readiness no responde. Flyway confirma
+cada migración por separado: las anteriores a la que falló **quedan aplicadas**, y solo la que
+falló se revierte (PostgreSQL ejecuta cada migración en su propia transacción).
+
+1. Ver hasta dónde llegó: `SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;`
+2. **Si falló por datos** (por ejemplo, una verificación previa como V23 o V26 que aborta con
+   un mensaje): corregir esos datos y volver a desplegar la misma versión; la migración se
+   reintenta.
+3. **Si falló por un error en su SQL:** como se revirtió y nunca quedó aplicada, se corrige
+   **ese mismo archivo** y se despliega una versión nueva. (Un archivo nuevo no alcanza: Flyway
+   volvería a ejecutar primero el fallido.) Las migraciones que sí quedaron aplicadas nunca se
+   editan; si hay que cambiarlas, se agrega una migración nueva.
+4. **Para volver al backend anterior** mientras se corrige: solo si las migraciones que quedaron
+   aplicadas son compatibles con esa versión (por ejemplo, agregan columnas opcionales o tablas
+   que el backend anterior ignora). Si no lo son, restaurar el backup del paso 1 de despliegue en
+   una base nueva, apuntar el backend anterior a ella y verificar con las consultas de integridad
+   (sección 5).
+5. No usar `flyway repair` en producción sin entender la causa: solo limpia el historial, no
+   deshace cambios.
+
+**El backend no repara el historial al arrancar.** Si una migración aplicada cambió o una
+falló, el arranque se detiene con el error de Flyway. Para una reparación puntual, ya
+entendida la causa: arrancar una vez con `FLYWAY_REPAIR_ON_START=true` y volver a `false`.
+
+**Antes del primer despliegue sin reparación automática:** verificar que el historial de
+producción coincide con las migraciones del repo, contra una copia restaurada (sección 5):
+
+```bash
+docker run --rm --network host -v "$PWD/backend/src/main/resources/db/migration:/flyway/sql"   flyway/flyway:11 -url=jdbc:postgresql://localhost:5433/nutriplan_drill -user=drill -password=drill validate
+```
+
+Si `validate` informa diferencias de checksum, revisar qué migración cambió antes de desplegar
+y, si corresponde, hacer una reparación puntual con la variable anterior.
 
 ---
 
@@ -122,13 +163,22 @@ ls -lh nutriplan_*.dump
 
 ### 4.1 Detectar problemas con el health endpoint
 
-Configurar una alerta externa (UptimeRobot, Betterstack u otro servicio) sobre:
+Alerta mínima: un monitor externo (UptimeRobot, Betterstack u otro) sobre readiness, que
+incluye la base de datos:
 
 ```
-GET https://<host>/actuator/health
-Esperar: HTTP 200 y body contiene "UP"
-Frecuencia: cada 1 minuto
+GET https://<host>/actuator/health/readiness
+Esperar: HTTP 200 y body {"status":"UP"}
+Frecuencia: cada 1 minuto; avisar tras 3 fallos seguidos
+Destinatario: email de Facu
 ```
+
+La respuesta no contiene datos personales (`show-details: never`).
+
+**Verificación de la alerta (al configurarla y una vez por trimestre):** en un entorno de
+prueba, detener PostgreSQL y comprobar que readiness pasa a 503 y que llega el aviso; luego
+levantar la base y comprobar que se normaliza. Que readiness depende de la base está cubierto
+por `OpsEndpointsIntegrationTest#readinessIncludesDatabase`.
 
 Si el health endpoint devuelve algo distinto de 200, investigar según la siguiente tabla.
 
@@ -147,14 +197,14 @@ Con un JWT válido en `Authorization: Bearer <token>`:
 
 ```bash
 # Estado del pool de conexiones
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/metrics/hikaricp.connections.active
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/metrics/hikaricp.connections.pending
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/hikaricp.connections.active
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/hikaricp.connections.pending
 
 # Memoria JVM
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/metrics/jvm.memory.used
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/jvm.memory.used
 
 # Versión desplegada
-curl -H "Authorization: Bearer $TOKEN" https://<host>/actuator/info
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/info
 ```
 
 ### 4.4 Buscar logs por correlación
@@ -169,6 +219,15 @@ Para correlacionar un error reportado por el usuario:
 (Ley 18.331, Uruguay). No agregar esos campos al logging aunque parezca útil para debug.
 
 ---
+
+El outbox de correo entrega al menos una vez: si el proceso cae durante el envío, el trabajo se reintenta al vencer el lease (`EMAIL_OUTBOX_LEASE_MS`, por defecto 5 minutos) y puede duplicarse un correo. Un trabajo queda asociado al token con el que se creó: si el usuario pidió un reenvío, el trabajo anterior se descarta sin enviar.
+
+Métricas del outbox (con `X-Ops-Key`): `email.outbox.pending` (pendientes y en proceso) y `email.outbox.jobs` con `result=sent|retried|failed`. No incluyen emails ni tokens.
+
+```bash
+curl -H "X-Ops-Key: $OPS_API_KEY" https://<host>/actuator/metrics/email.outbox.pending
+curl -H "X-Ops-Key: $OPS_API_KEY" "https://<host>/actuator/metrics/email.outbox.jobs?tag=result:failed"
+```
 
 ## 5. Simulacro de restauración (restore drill)
 
@@ -218,9 +277,24 @@ rm drill_$(date +%Y%m%d).dump
 
 ### Criterio de éxito
 
-- El dump se restaura sin errores fatales.
-- Las tablas principales existen: `users`, `plans`, `meals`, `food_entries`, etc.
-- Al menos una consulta de negocio devuelve datos coherentes.
+- El dump se restaura sin errores con `--exit-on-error`.
+- Las consultas de [`consultas-integridad.sql`](consultas-integridad.sql) dan **el mismo
+  resultado** en origen y destino (versión de migración, planes vigentes únicos, reglas e ítems
+  sin referencias rotas, porciones totales, registros de hábitos con uid válido).
+- El backend arranca contra la base restaurada (Flyway sin migraciones pendientes,
+  Hibernate `validate` sin errores) y readiness responde 200.
+
+```bash
+psql -h <origen> -U nutriplan -d nutriplan -tA -F'|' -f docs/operacion/consultas-integridad.sql > origen.txt
+psql -h localhost -p 5433 -U drill -d nutriplan_drill -tA -F'|' -f docs/operacion/consultas-integridad.sql > destino.txt
+diff origen.txt destino.txt && echo "integridad OK"
+```
+
+### Último ensayo
+
+| Fecha | Datos | Dump | Restauración | Integridad | Arranque del backend |
+|---|---|---|---|---|---|
+| 2026-10-30 | Sintéticos ([`datos-sinteticos-ensayo.sql`](datos-sinteticos-ensayo.sql)): 50 usuarios, 150 grupos, 50 reglas, 700 notas, 700 ítems, 700 registros de hábitos; esquema V32 | 319 ms, 94 KB | 643 ms | 14/14 consultas idénticas | 8,4 s, readiness 200 |
 
 ### Registro del simulacro
 

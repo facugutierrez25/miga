@@ -2,6 +2,8 @@ package uy.miga.plans;
 
 import jakarta.persistence.*;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "plan_food_groups")
 class PlanFoodGroup {
@@ -19,6 +21,9 @@ class PlanFoodGroup {
 
     @Column(nullable = false, length = 10)
     private String abbreviation;
+
+    @Column(nullable = false, updatable = false)
+    private UUID uid = UUID.randomUUID();
 
     @Column(name = "display_order", nullable = false)
     private short displayOrder;
@@ -48,6 +53,7 @@ class PlanFoodGroup {
     }
 
     Long getId()             { return id; }
+    UUID getUid()            { return uid; }
     Plan getPlan()           { return plan; }
     String getName()         { return name; }
     String getAbbreviation() { return abbreviation; }
@@ -58,6 +64,13 @@ class PlanFoodGroup {
     boolean isPreguntarSiFalta()          { return preguntarSiFalta; }
     boolean isOpcional()                  { return opcional; }
 
+    void setName(String name) { this.name = name; }
+    void setAbbreviation(String abbreviation) { this.abbreviation = abbreviation; }
+    void setDisplayOrder(short order) { this.displayOrder = order; }
+    void setUid(UUID uid) { this.uid = uid; }
+    void setMetaDiaria(java.math.BigDecimal metaDiaria) { this.metaDiaria = metaDiaria; }
+    void setPreguntarSiFalta(boolean preguntarSiFalta) { this.preguntarSiFalta = preguntarSiFalta; }
+    void setOpcional(boolean opcional) { this.opcional = opcional; }
     void setPlan(Plan plan)        { this.plan = plan; }
     void setColor(String color)    { this.color = color; }
     void setClave(String clave)    { this.clave = clave; }

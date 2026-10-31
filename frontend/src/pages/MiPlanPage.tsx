@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDialogFocus } from './useDialogFocus'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
@@ -7,8 +8,10 @@ import {
   getMyPlan, getPlanHistory, saveMyPlan, PlanConflictError,
   type PlanFoodGroupDto, type PlanDto, type PlanSummaryDto,
 } from '../api/plans'
-import { getEquivalences, addEquivalence, deleteEquivalence, type EquivalenceDto, type Unit } from '../api/equivalences'
+import type { PlanRules } from '../api/planRules'
+import PlanRulesSection from './plan/PlanRulesSection'
 import './MiPlanPage.css'
+import { usePlan } from '../hooks/usePlan'
 
 const DEFAULT_GRUPOS: PlanFoodGroupDto[] = [
   { id: -1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
@@ -65,15 +68,40 @@ function localAPlan(comidas: ComidaLocal[], grupos: PlanFoodGroupDto[]) {
   }
 }
 
+// Porciones con coma decimal (es-UY).
+function formatPorcion(value: number) {
+  return String(value).replace('.', ',')
+}
+
 function formatFecha(iso: string) {
   return new Date(iso).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+function ConfirmDeleteModal({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onCancel)
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="confirm-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Confirmar eliminación"
+        onClick={e => e.stopPropagation()}>
+        <p className="confirm-modal__msg">
+          ¿Eliminar <strong>{name}</strong>?
+        </p>
+        <div className="confirm-modal__actions">
+          <button type="button" className="confirm-modal__cancel" onClick={onCancel}>Cancelar</button>
+          <button type="button" className="confirm-modal__confirm" onClick={onConfirm}>Eliminar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: () => void }) {
   const gruposMap = Object.fromEntries((plan.foodGroups ?? []).map(g => [g.id, g]))
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalle del plan" onClick={onClose}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Detalle del plan"
+        onClick={e => e.stopPropagation()}>
         <div className="modal-card__header">
           <div>
             <p className="modal-card__eyebrow">Plan anterior</p>
@@ -101,7 +129,7 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
                   const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
                   return (
                     <span key={p.foodGroupId} className={`porcion-chip porcion-chip--${cssKey}`}>
-                      <span className="porcion-chip__num">{p.portions}</span>
+                      <span className="porcion-chip__num">{formatPorcion(Number(p.portions))}</span>
                       {g.name}
                     </span>
                   )
@@ -115,72 +143,95 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
   )
 }
 
-type Tab = 'comidas' | 'equivalencias'
+type Tab = 'comidas' | 'rules'
 
 export default function MiPlanPage() {
+  const { token, email } = useAuth()
+  return <PlanLoader key={JSON.stringify([email, token])} />
+}
+
+function PlanLoader() {
+  useTitle('Mi plan | Miga')
+  const { token, email } = useAuth()
+  const { data, status, retry } = usePlan(token, email)
+  const [tab, setTab] = useState<Tab>('comidas')
+  return <PlanEditor initialPlan={data} loading={status === 'loading'} loadError={status === 'error'} retry={retry} tab={tab} setTab={setTab} />
+}
+
+function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
+  initialPlan: PlanDto | null; loading: boolean; loadError: boolean; retry: () => void
+  tab: Tab; setTab: (tab: Tab) => void
+}) {
   useTitle('Mi plan | Miga')
   const { token } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const desdeWizard = !!(location.state as { meals?: unknown } | null)?.meals
-  const [tab, setTab] = useState<Tab>('comidas')
-  const [grupos, setGrupos] = useState<PlanFoodGroupDto[]>(DEFAULT_GRUPOS)
-  const [comidas, setComidas] = useState<ComidaLocal[]>([])
-  const [cargando, setCargando] = useState(true)
+
+  const [grupos, setGrupos] = useState<PlanFoodGroupDto[]>(initialPlan?.foodGroups ?? DEFAULT_GRUPOS)
+  const [comidas, setComidas] = useState<ComidaLocal[]>(() => initialPlan ? planALocal(initialPlan) :
+    ((location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals ?? []).map(meal => ({
+      nombre: meal.name, hora: meal.suggestedTime?.slice(0, 5) ?? '',
+      porciones: porcionesVacias(DEFAULT_GRUPOS), minimizada: false,
+    })))
+  // El foco solo se mueve por una acción de la persona: al guardar una comida vuelve a
+  // su «Editar», al editar o agregar va al nombre y al eliminar va a «Agregar comida».
+  const focoEditar = useRef<number | null>(null)
+  const focoNombre = useRef<number | null>(null)
+  const focoAgregar = useRef(false)
+  useEffect(() => {
+    if (focoEditar.current !== null) {
+      document.querySelector<HTMLElement>(`[data-edit-index="${focoEditar.current}"]`)?.focus()
+    } else if (focoNombre.current !== null) {
+      document.querySelector<HTMLElement>(`[data-name-index="${focoNombre.current}"]`)?.focus()
+    } else if (focoAgregar.current) {
+      document.querySelector<HTMLElement>('.btn-agregar')?.focus()
+    }
+    focoEditar.current = null
+    focoNombre.current = null
+    focoAgregar.current = false
+  }, [comidas])
+  const [cargando, setCargando] = useState(false)
   const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
   const [planDetalle, setPlanDetalle] = useState<PlanSummaryDto | null>(null)
-  const [planVersion, setPlanVersion] = useState<number | undefined>(undefined)
+  const [planVersion, setPlanVersion] = useState<number | undefined>(initialPlan?.version)
   const [confirmando, setConfirmando] = useState(false)
   const [confirmado, setConfirmado] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conflicto, setConflicto] = useState(false)
-  const [equivalences, setEquivalences] = useState<EquivalenceDto[] | null>(null)
-  const [equivError, setEquivError] = useState<string | null>(null)
-  const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
-  const [newFood, setNewFood] = useState('')
-  const [newQuantity, setNewQuantity] = useState('')
-  const [newUnit, setNewUnit] = useState<Unit>('G')
-  const [equivAdding, setEquivAdding] = useState(false)
-  const [equivAdded, setEquivAdded] = useState(false)
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null)
-  const [snackbar, setSnackbar] = useState<{ eq: EquivalenceDto } | null>(null)
-  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [loadedPlan, setLoadedPlan] = useState(initialPlan)
+  if (loadedPlan !== initialPlan) {
+    setLoadedPlan(initialPlan)
+    setGrupos(initialPlan?.foodGroups ?? DEFAULT_GRUPOS)
+    setComidas(initialPlan ? planALocal(initialPlan) : [])
+    setPlanVersion(initialPlan?.version)
+  }
 
-  const locationDraftMeals = (location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals
+
+  // Una edición de reglas puede crear una versión nueva del plan con otros ids de
+  // grupos: se recargan las comidas para no confirmar porciones con ids viejos.
+  const handleRulesChanged = useCallback((dto: PlanRules) => {
+    setGrupos(dto.grupos)
+    setPlanVersion(dto.planVersion)
+    if (!token) return
+    getMyPlan(token)
+      .then(plan => {
+        setGrupos(plan.foodGroups ?? DEFAULT_GRUPOS)
+        setComidas(planALocal(plan))
+        setPlanVersion(plan.version)
+      })
+      .catch(() => {})
+  }, [token])
 
   useEffect(() => {
     if (!token) return
-    getMyPlan(token)
-      .then(dto => {
-        setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
-        setComidas(planALocal(dto))
-        setPlanVersion(dto.version)
-      })
-      .catch(err => {
-        if (err.message === 'sin-plan') {
-          if (locationDraftMeals) {
-            setComidas(locationDraftMeals.map(m => ({
-              nombre: m.name,
-              hora: m.suggestedTime ? m.suggestedTime.slice(0, 5) : '',
-              porciones: porcionesVacias(DEFAULT_GRUPOS),
-              minimizada: false,
-            })))
-          }
-        } else {
-          console.error(err)
-        }
-      })
-      .finally(() => setCargando(false))
-
-    getPlanHistory(token).then(setHistorial).catch(() => {})
-  }, [token, locationDraftMeals])
-
-  useEffect(() => {
-    if (!token || tab !== 'equivalencias' || equivalences !== null) return
-    getEquivalences(token)
-      .then(dtos => setEquivalences(dtos))
-      .catch(() => setEquivError('No se pudieron cargar las equivalencias.'))
-  }, [token, tab, equivalences])
+    const controller = new AbortController()
+    getPlanHistory(token, controller.signal).then(data => {
+      if (!controller.signal.aborted) setHistorial(data)
+    }).catch(() => {})
+    return () => controller.abort()
+  }, [token])
 
   function actualizarNombre(i: number, nombre: string) {
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, nombre } : c))
@@ -200,76 +251,24 @@ export default function MiPlanPage() {
   }
 
   function guardarComida(i: number) {
+    focoEditar.current = i
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, minimizada: true } : c))
   }
 
   function editarComida(i: number) {
+    focoNombre.current = i
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, minimizada: false } : c))
   }
 
   function agregarComida() {
+    focoNombre.current = comidas.length
     setComidas(prev => [...prev, { nombre: '', hora: '', porciones: porcionesVacias(grupos), minimizada: false }])
   }
 
   function eliminarComida(i: number) {
+    focoAgregar.current = true
     setComidas(prev => prev.filter((_, j) => j !== i))
     setConfirmDeleteIdx(null)
-  }
-
-  function toggleGroup(groupId: number) {
-    setExpandedGroup(prev => prev === groupId ? null : groupId)
-    setNewFood('')
-    setNewQuantity('')
-    setNewUnit('G')
-    setEquivError(null)
-  }
-
-  async function handleAddEquivalence(groupId: number) {
-    const qty = parseFloat(newQuantity)
-    if (!token || !newFood.trim() || !qty || qty <= 0) return
-    setEquivAdding(true)
-    setEquivError(null)
-    try {
-      const created = await addEquivalence(token, groupId, newFood.trim(), qty, newUnit)
-      setEquivalences(prev => [...(prev ?? []), created])
-      setNewFood('')
-      setNewQuantity('')
-      setNewUnit('G')
-      setEquivAdded(true)
-      setTimeout(() => setEquivAdded(false), 2000)
-    } catch {
-      setEquivError('No se pudo agregar. Intentá de nuevo.')
-    } finally {
-      setEquivAdding(false)
-    }
-  }
-
-  function handleDeleteEquivalence(id: number) {
-    if (!token) return
-    const eq = equivalences?.find(e => e.id === id)
-    if (!eq) return
-
-    setEquivalences(prev => prev?.filter(e => e.id !== id) ?? null)
-
-    if (snackbarTimer.current) clearTimeout(snackbarTimer.current)
-    setSnackbar({ eq })
-
-    snackbarTimer.current = setTimeout(async () => {
-      setSnackbar(null)
-      try {
-        await deleteEquivalence(token, id)
-      } catch {
-        setEquivalences(prev => prev ? [...prev, eq] : [eq])
-        setEquivError('No se pudo eliminar. Intentá de nuevo.')
-      }
-    }, 5000)
-  }
-
-  function handleUndoDelete() {
-    if (!snackbar) return
-    if (snackbarTimer.current) clearTimeout(snackbarTimer.current)
-    setEquivalences(prev => prev ? [...prev, snackbar.eq] : [snackbar.eq])
-    setSnackbar(null)
   }
 
   async function confirmarPlan() {
@@ -315,13 +314,6 @@ export default function MiPlanPage() {
 
   return (
     <div className="mi-plan-page">
-      {snackbar && (
-        <div className="snackbar" role="status">
-          <span>"{snackbar.eq.food}" eliminada</span>
-          <button className="snackbar__undo" onClick={handleUndoDelete}>Deshacer</button>
-        </div>
-      )}
-
       <header className="mi-plan-header">
         <div className="mi-plan-header__meta">
           <Brand size={20} />
@@ -332,7 +324,10 @@ export default function MiPlanPage() {
       <div className="mi-plan-body">
         <div className="plan-tabs" role="tablist">
           <button
+            type="button"
             role="tab"
+            id="plan-tab-meals"
+            aria-controls="plan-panel"
             aria-selected={tab === 'comidas'}
             className={`plan-tab${tab === 'comidas' ? ' plan-tab--active' : ''}`}
             onClick={() => setTab('comidas')}
@@ -340,126 +335,28 @@ export default function MiPlanPage() {
             Comidas
           </button>
           <button
+            type="button"
             role="tab"
-            aria-selected={tab === 'equivalencias'}
-            className={`plan-tab${tab === 'equivalencias' ? ' plan-tab--active' : ''}`}
-            onClick={() => setTab('equivalencias')}
+            id="plan-tab-rules"
+            aria-controls="plan-panel"
+            aria-selected={tab === 'rules'}
+            className={`plan-tab${tab === 'rules' ? ' plan-tab--active' : ''}`}
+            onClick={() => setTab('rules')}
           >
-            Equivalencias
+            Reglas de tu plan
           </button>
         </div>
 
-        {tab === 'equivalencias' ? (
-          equivalences === null ? (
-            <p className="mi-plan-loading">Cargando equivalencias…</p>
-          ) : (
-            <>
-              <p className="equiv-intro">
-                Las equivalencias son los alimentos que podés elegir para cada porción de tu plan.
-                Por ejemplo, si tu plan indica "1 porción de proteínas", podés elegir entre los alimentos de esa lista.
-              </p>
-              {equivAdded && (
-                <p className="equiv-success" role="status">¡Equivalencia agregada!</p>
-              )}
-              {grupos.map(g => {
-                const items = equivalences.filter(e => e.foodGroupId === g.id)
-                const open = expandedGroup === g.id
-                const dot = ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)'
-                return (
-                  <div key={g.id} className={`equiv-group${open ? ' equiv-group--open' : ''}`}>
-                    <button
-                      className="equiv-group__header"
-                      onClick={() => toggleGroup(g.id)}
-                      aria-expanded={open}
-                    >
-                      <span className="equiv-group__dot" style={{ background: dot }} />
-                      <span className="equiv-group__label">{g.name}</span>
-                      <span className="equiv-group__count">
-                        {items.length > 0 ? `${items.length} equiv.` : ''}
-                      </span>
-                      <svg className={`equiv-group__chevron${open ? ' equiv-group__chevron--open' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-
-                    {open && (
-                      <div className="equiv-group__body">
-                        {items.length === 0 && (
-                          <p className="equiv-empty">Todavía no cargaste equivalencias para este grupo.</p>
-                        )}
-                        {items.map(eq => (
-                          <div key={eq.id} className="equiv-item">
-                            <span className="equiv-item__food">{eq.food}</span>
-                            <span className="equiv-item__amount">{eq.quantity} {eq.unit.toLowerCase()}</span>
-                            <button
-                              className="equiv-item__delete"
-                              onClick={() => handleDeleteEquivalence(eq.id)}
-                              aria-label={`Eliminar ${eq.food}`}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
-                        <div className="equiv-add">
-                          <input
-                            className="equiv-add__input"
-                            type="text"
-                            placeholder="Alimento"
-                            value={newFood}
-                            onChange={e => setNewFood(e.target.value)}
-                            aria-label="Nombre del alimento"
-                          />
-                          <input
-                            className="equiv-add__input equiv-add__input--qty"
-                            type="number"
-                            min="0.01"
-                            step="0.5"
-                            placeholder="Cant."
-                            value={newQuantity}
-                            onChange={e => setNewQuantity(e.target.value)}
-                            aria-label="Cantidad numérica"
-                          />
-                          <div className="equiv-add__unit-wrap">
-                            <select
-                              value={newUnit}
-                              onChange={e => setNewUnit(e.target.value as Unit)}
-                              aria-label="Unidad"
-                            >
-                              <option value="G">g</option>
-                              <option value="ML">ml</option>
-                              <option value="UNIDAD">unidad</option>
-                              <option value="TAZA">taza</option>
-                            </select>
-                            <svg className="equiv-add__unit-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                              <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </div>
-                          <button
-                            className="equiv-add__btn"
-                            onClick={() => handleAddEquivalence(g.id)}
-                            disabled={equivAdding || !newFood.trim() || !newQuantity || parseFloat(newQuantity) <= 0}
-                            aria-label="Agregar equivalencia"
-                          >
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                              <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {equivError && <p className="plan-error" role="alert">{equivError}</p>}
-            </>
-          )
-        ) : cargando ? (
+        <div id="plan-panel" role="tabpanel" aria-labelledby={tab === 'rules' ? 'plan-tab-rules' : 'plan-tab-meals'}>
+        {tab === 'rules' ? (
+          <PlanRulesSection token={token} onChanged={handleRulesChanged} />
+        ) : loadError ? (
+          <p role="alert">No se pudo cargar el plan. <button onClick={retry}>Reintentar</button></p>
+        ) : cargando || loading ? (
           <p className="mi-plan-loading">Cargando tu plan…</p>
         ) : (
           <>
+            <div className="meal-list">
             {comidas.map((comida, i) =>
               comida.minimizada ? (
                 <div key={i} className="comida-card comida-card--min">
@@ -470,7 +367,7 @@ export default function MiPlanPage() {
                       const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
                       return (
                         <span key={g.id} className={`porcion-chip porcion-chip--${cssKey}`}>
-                          <span className="porcion-chip__num">{comida.porciones[g.id]}</span>
+                          <span className="porcion-chip__num">{formatPorcion(comida.porciones[g.id])}</span>
                           {g.name}
                         </span>
                       )
@@ -478,8 +375,9 @@ export default function MiPlanPage() {
                   </div>
                   <button
                     className="btn-editar"
+                    data-edit-index={i}
                     onClick={() => editarComida(i)}
-                    aria-label="Editar comida"
+                    aria-label={`Editar ${comida.nombre || 'comida'}`}
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                       <path d="M12.5 2.5a1.414 1.414 0 0 1 2 2L5 14H3v-2L12.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -504,6 +402,7 @@ export default function MiPlanPage() {
                       value={comida.nombre}
                       onChange={e => actualizarNombre(i, e.target.value)}
                       aria-label="Nombre de la comida"
+                      data-name-index={i}
                     />
                     <button
                       className="btn-eliminar-exp"
@@ -542,7 +441,7 @@ export default function MiPlanPage() {
                             disabled={(comida.porciones[g.id] ?? 0) <= 0}
                             aria-label={`Reducir ${g.name}`}
                           >−</button>
-                          <span className="stepper-value" aria-live="polite">{comida.porciones[g.id] ?? 0}</span>
+                          <span className="stepper-value" aria-live="polite">{formatPorcion(comida.porciones[g.id] ?? 0)}</span>
                           <button
                             className="stepper-btn"
                             onClick={() => actualizarPorcion(i, g.id, 0.5)}
@@ -570,6 +469,7 @@ export default function MiPlanPage() {
               </svg>
               Agregar comida
             </button>
+            </div>
 
             {error && <p className="plan-error" role="alert">{error}</p>}
 
@@ -584,7 +484,7 @@ export default function MiPlanPage() {
               {confirmando ? 'Confirmando…' : 'Confirmar plan'}
             </button>
 
-            {confirmado && <p className="confirmado-msg">¡Plan guardado!</p>}
+            <p className="confirmado-msg" role="status">{confirmado ? '¡Plan guardado!' : ''}</p>
 
             {historial.length > 0 && (
               <div className="plan-historial">
@@ -608,20 +508,15 @@ export default function MiPlanPage() {
             )}
 
             {confirmDeleteIdx !== null && comidas[confirmDeleteIdx] && (
-              <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar eliminación" onClick={() => setConfirmDeleteIdx(null)}>
-                <div className="confirm-modal" onClick={e => e.stopPropagation()}>
-                  <p className="confirm-modal__msg">
-                    ¿Eliminar <strong>{comidas[confirmDeleteIdx].nombre || 'esta comida'}</strong>?
-                  </p>
-                  <div className="confirm-modal__actions">
-                    <button className="confirm-modal__cancel" onClick={() => setConfirmDeleteIdx(null)}>Cancelar</button>
-                    <button className="confirm-modal__confirm" onClick={() => eliminarComida(confirmDeleteIdx)}>Eliminar</button>
-                  </div>
-                </div>
-              </div>
+              <ConfirmDeleteModal
+                name={comidas[confirmDeleteIdx].nombre || 'esta comida'}
+                onCancel={() => setConfirmDeleteIdx(null)}
+                onConfirm={() => eliminarComida(confirmDeleteIdx)}
+              />
             )}
           </>
         )}
+        </div>
       </div>
     </div>
   )

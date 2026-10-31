@@ -1,32 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
-
-// ── Legacy endpoints (mantenidos por compatibilidad) ──────────────────────
-
-export async function getLog(token: string, date: string): Promise<number[]> {
-  const res = await fetch(`${API_URL}/api/v1/meal-log/${date}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al cargar el registro.')
-  return res.json()
-}
-
-export async function markMealEaten(token: string, mealId: number, date: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/meal-log/${date}/${mealId}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al marcar la comida.')
-}
-
-export async function unmarkMealEaten(token: string, mealId: number, date: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/meal-log/${date}/${mealId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al desmarcar la comida.')
-}
-
-// ── Tipos del registro nuevo ──────────────────────────────────────────────
+import { apiRequest, ApiError } from './client'
 
 export interface InterpretedItemDto {
   originalText: string
@@ -53,10 +25,12 @@ export interface GroupStatusDto {
 
 export interface NoteInterpretationDto {
   noteId: number
+  version: number
   text: string
   date: string
   mealId: number
   items: InterpretedItemDto[]
+  entries: EntryItemDto[]
   comparison: GroupStatusDto[]
 }
 
@@ -69,6 +43,9 @@ export interface EntryItemDto {
   portions: number | null
   origin: string
   uncertain: boolean
+  originalText?: string | null
+  appliedRule?: string | null
+  occurrenceId?: string | null
 }
 
 export interface DailySummaryDto {
@@ -82,6 +59,7 @@ export interface DailySummaryDto {
 export interface MealDayDto {
   mealId: number
   noteId: number | null
+  noteVersion: number | null
   noteText: string | null
   items: EntryItemDto[]
   comparison: GroupStatusDto[]
@@ -93,12 +71,23 @@ export interface DayRegistroDto {
   summary: DailySummaryDto[]
 }
 
+export interface GroupPortion {
+  foodGroupId: number
+  porciones: number
+}
+
 export interface PatchItemRequest {
-  quantity: number | null
-  unit: string | null
-  foodGroupId: number | null
-  portions: number | null
-  saveAsRule: boolean
+  quantity?: number | null
+  unit?: string | null
+  foodGroupId?: number | null
+  portions?: number | null
+  grupos?: GroupPortion[]
+  saveAsRule?: boolean
+}
+
+export interface PatchItemResultDto {
+  replacedItemIds: number[]
+  items: EntryItemDto[]
 }
 
 export interface RespuestaRequest {
@@ -113,12 +102,11 @@ export async function getDayRegistro(
   date: string,
   signal?: AbortSignal,
 ): Promise<DayRegistroDto> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal,
-  })
-  if (!res.ok) throw new Error('Error al cargar el registro del día.')
-  return res.json()
+  return apiRequest(`/api/v1/registro/${date}`, { errorMessage: 'Error al cargar el registro del día.', token, signal })
+}
+
+export class NoteConflictError extends ApiError {
+  constructor(message: string, details: Record<string, unknown> = {}) { super(409, message, details) }
 }
 
 export async function saveNota(
@@ -126,14 +114,15 @@ export async function saveNota(
   date: string,
   mealId: number,
   text: string,
+  version: number | null,
 ): Promise<NoteInterpretationDto> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}/comidas/${mealId}/nota`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ text }),
-  })
-  if (!res.ok) throw new Error('Error al guardar la nota.')
-  return res.json()
+  try {
+    return await apiRequest(`/api/v1/registro/${date}/comidas/${mealId}/nota`, { errorMessage: 'Error al guardar la nota.', token, method: 'PUT', body: { text, version } })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    throw err
+  }
+
 }
 
 export async function patchItem(
@@ -141,14 +130,8 @@ export async function patchItem(
   date: string,
   itemId: number,
   req: PatchItemRequest,
-): Promise<EntryItemDto> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}/items/${itemId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Error al actualizar el ítem.')
-  return res.json()
+): Promise<PatchItemResultDto> {
+  return apiRequest(`/api/v1/registro/${date}/items/${itemId}`, { errorMessage: 'Error al actualizar el ítem.', token, method: 'PATCH', body: req })
 }
 
 export async function saveRespuesta(
@@ -157,12 +140,7 @@ export async function saveRespuesta(
   mealId: number,
   req: RespuestaRequest,
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/registro/${date}/comidas/${mealId}/respuestas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) throw new Error('Error al guardar la respuesta.')
+  return apiRequest(`/api/v1/registro/${date}/comidas/${mealId}/respuestas`, { errorMessage: 'Error al guardar la respuesta.', token, method: 'POST', body: req })
 }
 
 export async function getSugerencias(
@@ -170,10 +148,10 @@ export async function getSugerencias(
   mealId: number,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  const res = await fetch(`${API_URL}/api/v1/registro/sugerencias?mealId=${mealId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal,
-  })
-  if (!res.ok) return []
-  return res.json()
+  try {
+    return await apiRequest(`/api/v1/registro/sugerencias?mealId=${mealId}`, { token, signal })
+  } catch (err) {
+    if (err instanceof ApiError) return []
+    throw err
+  }
 }

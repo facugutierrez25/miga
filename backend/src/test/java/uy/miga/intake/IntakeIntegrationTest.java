@@ -70,14 +70,14 @@ class IntakeIntegrationTest {
         MvcResult plan = mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content("""
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, """
                 { "meals": [{ "name": "Desayuno", "displayOrder": 1,
                   "portions": [
                     { "foodGroupAbbr": "PRO", "portions": 1.0 },
                     { "foodGroupAbbr": "CER", "portions": 1.0 },
                     { "foodGroupAbbr": "FRU", "portions": 1.0 }
                   ] }] }
-                """))
+                """)))
             .andReturn();
 
         JsonNode planJson = objectMapper.readTree(plan.getResponse().getContentAsString());

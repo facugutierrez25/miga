@@ -3,6 +3,7 @@ package uy.miga.users;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -22,10 +23,19 @@ class ResendEmailService implements EmailService {
     ResendEmailService(
             @Value("${resend.api-key}") String apiKey,
             @Value("${app.mail.from}") String from,
-            @Value("${app.base-url}") String baseUrl) {
+            @Value("${app.base-url}") String baseUrl,
+            @Value("${app.mail.connect-timeout-ms:5000}") int connectTimeoutMs,
+            @Value("${app.mail.read-timeout-ms:10000}") int readTimeoutMs) {
         this.from = from;
         this.baseUrl = baseUrl;
+        if (connectTimeoutMs <= 0 || readTimeoutMs <= 0) {
+            throw new IllegalArgumentException("Mail timeouts must be positive");
+        }
+        var requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
         this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
                 .baseUrl("https://api.resend.com")
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")

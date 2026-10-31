@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
@@ -41,7 +41,7 @@ function Step0({
   return (
     <form className="ob-step" onSubmit={onNext} noValidate>
       <div className="ob-step__content">
-        <h1 className="ob-step__title">¿Cómo te llamás?</h1>
+        <h1 className="ob-step__title" tabIndex={-1}>¿Cómo te llamás?</h1>
         <p className="ob-step__example">
           Usamos tu nombre para personalizar la app. No lo compartimos con nadie.
         </p>
@@ -54,7 +54,6 @@ function Step0({
             onChange={e => setFirstName(e.target.value)}
             autoComplete="given-name"
             required
-            autoFocus
           />
         </div>
         <div className="register-field">
@@ -92,7 +91,7 @@ function Step1({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
   return (
     <div className="ob-step">
       <div className="ob-step__content">
-        <h1 className="ob-step__title">Vamos a cargar tu plan juntos</h1>
+        <h1 className="ob-step__title" tabIndex={-1}>Vamos a cargar tu plan juntos</h1>
         <p className="ob-step__example">
           Te vamos a hacer 3 preguntas cortas para ayudarte a pasar el plan de tu nutricionista a la app. Tené el papel o la foto a mano.
         </p>
@@ -112,7 +111,7 @@ function Step2({
     <div className="ob-step">
       <ProgressBar step={1} />
       <div className="ob-step__content">
-        <h1 className="ob-step__title">¿Cuántas comidas tiene tu plan?</h1>
+        <h1 className="ob-step__title" tabIndex={-1}>¿Cuántas comidas tiene tu plan?</h1>
         <p className="ob-step__example">
           La mayoría tienen 4 o 5: desayuno, almuerzo, merienda y cena, más alguna colación.
         </p>
@@ -153,7 +152,7 @@ function Step3({
     <div className="ob-step">
       <ProgressBar step={2} />
       <div className="ob-step__content">
-        <h1 className="ob-step__title">¿Cómo se llaman tus comidas?</h1>
+        <h1 className="ob-step__title" tabIndex={-1}>¿Cómo se llaman tus comidas?</h1>
         <p className="ob-step__example">
           Usá los nombres que usa tu nutricionista. La hora es opcional.
         </p>
@@ -192,7 +191,7 @@ function Step4({ meals, onNext, onBack }: { meals: MealDraft[]; onNext: () => vo
     <div className="ob-step">
       <ProgressBar step={3} />
       <div className="ob-step__content">
-        <h1 className="ob-step__title">¿Cuántas porciones tiene cada comida?</h1>
+        <h1 className="ob-step__title" tabIndex={-1}>¿Cuántas porciones tiene cada comida?</h1>
         <p className="ob-step__example">
           En el plan vas a cargar las porciones de cada grupo: proteínas, cereales, frutas, lácteos, grasas y verduras.
           <br /><br />
@@ -221,6 +220,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate()
   const auth = useAuth()
   const [step, setStep] = useState(auth.firstName ? 1 : 0)
+  const pageRef = useRef<HTMLDivElement>(null)
   const [mealCount, setMealCount] = useState(4)
   const [meals, setMeals] = useState<MealDraft[]>(() =>
     Array.from({ length: 4 }, (_, i) => ({ name: NOMBRES_SUGERIDOS[i] ?? '', time: '' }))
@@ -230,6 +230,10 @@ export default function OnboardingPage() {
   const [birthDate, setBirthDate] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
+
+  useEffect(() => {
+    pageRef.current?.querySelector<HTMLElement>('h1')?.focus()
+  }, [step])
 
   function handleCountChange(n: number) {
     setMealCount(n)
@@ -278,7 +282,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="ob-page">
+    <div className="ob-page" ref={pageRef}>
       <div className="ob-header">
         <Brand size={22} />
       </div>

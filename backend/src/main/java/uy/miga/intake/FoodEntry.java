@@ -25,7 +25,7 @@ class FoodEntry {
     @Column(nullable = false)
     private LocalDate date;
 
-    @Column(nullable = false, length = 120)
+    @Column(nullable = false, length = 10000)
     private String food;
 
     @Column(nullable = false)
@@ -34,7 +34,7 @@ class FoodEntry {
     @Column(nullable = false, length = 20)
     private String unit;
 
-    @Column(name = "food_group_id", nullable = false)
+    @Column(name = "food_group_id")
     private Long foodGroupId;
 
     @Column(nullable = false)
@@ -47,7 +47,7 @@ class FoodEntry {
     @Column(name = "meal_note_id")
     private Long mealNoteId;
 
-    @Column(name = "texto_original", length = 500)
+    @Column(name = "texto_original", length = 10000)
     private String textoOriginal;
 
     @Column(length = 10)
@@ -57,6 +57,12 @@ class FoodEntry {
 
     @Column(precision = 8, scale = 3)
     private BigDecimal porciones;
+
+    @Column(name = "applied_rule", columnDefinition = "text")
+    private String appliedRule;
+
+    @Column(name = "occurrence_id")
+    private java.util.UUID occurrenceId;
 
     FoodEntry() {}
 
@@ -88,7 +94,10 @@ class FoodEntry {
     String getOrigen()       { return origen; }
     Boolean getSupuesto()    { return supuesto; }
     BigDecimal getPorciones(){ return porciones; }
+    String getAppliedRule()  { return appliedRule; }
+    java.util.UUID getOccurrenceId() { return occurrenceId; }
 
+    void setMealId(Long mealId)                    { this.mealId = mealId; }
     void setQuantity(Double quantity)              { this.quantity = quantity; }
     void setUnit(String unit)                      { this.unit = unit; }
     void setFoodGroupId(Long foodGroupId)          { this.foodGroupId = foodGroupId; }
@@ -98,4 +107,6 @@ class FoodEntry {
     void setOrigen(String origen)             { this.origen = origen; }
     void setSupuesto(Boolean supuesto)        { this.supuesto = supuesto; }
     void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
+    void setAppliedRule(String appliedRule)   { this.appliedRule = appliedRule; }
+    void setOccurrenceId(java.util.UUID id)   { this.occurrenceId = id; }
 }

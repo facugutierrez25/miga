@@ -10,6 +10,12 @@ import java.util.List;
 import java.util.Optional;
 
 interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
+    boolean existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+        Long userId, LocalDate date, Long mealId, Long foodGroupId, String origen);
+    void deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+        Long userId, LocalDate date, Long mealId, Long foodGroupId, String origen);
+
+    boolean existsByMealIdIn(List<Long> mealIds);
     List<FoodEntry> findByUserIdAndDateOrderByIdAsc(Long userId, LocalDate date);
     Optional<FoodEntry> findByIdAndUserId(Long id, Long userId);
 
@@ -25,7 +31,10 @@ interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
                            @Param("consumed") boolean consumed);
 
     @Modifying
-    @Query("DELETE FROM FoodEntry e WHERE e.mealNoteId = :mealNoteId AND e.origen = :origen")
-    void deleteByMealNoteIdAndOrigen(@Param("mealNoteId") Long mealNoteId,
-                                     @Param("origen") String origen);
+    @Query("DELETE FROM FoodEntry e WHERE e.mealNoteId = :mealNoteId")
+    void deleteByMealNoteId(@Param("mealNoteId") Long mealNoteId);
+
+    List<FoodEntry> findByFoodGroupId(Long foodGroupId);
+
+    List<FoodEntry> findByMealNoteIdOrderByIdAsc(Long mealNoteId);
 }

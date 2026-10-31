@@ -4,20 +4,16 @@ import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MiPlanPage from './MiPlanPage'
 import * as plansApi from '../api/plans'
 import * as AuthContext from '../auth/authTypes'
-import * as equivalencesApi from '../api/equivalences'
+import * as rulesApi from '../api/planRules'
 
 vi.mock('../api/plans')
 vi.mock('../auth/authTypes')
-vi.mock('../api/equivalences')
+vi.mock('../api/planRules')
 
 const mockUseAuth = vi.mocked(AuthContext.useAuth)
 const mockGetMyPlan = vi.mocked(plansApi.getMyPlan)
 const mockSaveMyPlan = vi.mocked(plansApi.saveMyPlan)
 const mockGetPlanHistory = vi.mocked(plansApi.getPlanHistory)
-const mockGetEquivalences = vi.mocked(equivalencesApi.getEquivalences)
-const mockAddEquivalence = vi.mocked(equivalencesApi.addEquivalence)
-const mockDeleteEquivalence = vi.mocked(equivalencesApi.deleteEquivalence)
-
 const gruposDefault = [
   { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
   { id: 2, name: 'Cereales',  abbreviation: 'CER', displayOrder: 2, color: null },
@@ -33,11 +29,10 @@ const planConGrupos = {
 }
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(), logout: vi.fn() })
+  mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(),
+    sessionExpired: false, logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
-  mockGetEquivalences.mockResolvedValue([])
-  mockAddEquivalence.mockResolvedValue({ id: 1, foodGroupId: 1, food: '', quantity: 0, unit: 'G' })
-  mockDeleteEquivalence.mockResolvedValue(undefined)
+
 })
 
 afterEach(() => {
@@ -77,8 +72,8 @@ test('expande una comida al hacer clic en editar', async () => {
     meals: [{ name: 'Almuerzo', displayOrder: 1, portions: [] }],
   })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByLabelText('Editar comida'))
-  fireEvent.click(screen.getByLabelText('Editar comida'))
+  await waitFor(() => screen.getByLabelText('Editar Almuerzo'))
+  fireEvent.click(screen.getByLabelText('Editar Almuerzo'))
   expect(screen.getByDisplayValue('Almuerzo')).toBeInTheDocument()
 })
 
@@ -171,86 +166,58 @@ test('cierra el modal al hacer click en el overlay', async () => {
   await waitFor(() => screen.getByText('1 comidas'))
   fireEvent.click(screen.getByText('1 comidas'))
   expect(screen.getByRole('dialog')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('dialog'))
+  fireEvent.click(screen.getByRole('dialog').parentElement!)
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
-// ── Pestaña equivalencias ──────────────────────────────────────────────────
-
-test('muestra cargando equivalencias al cambiar a la pestaña', async () => {
-  mockGetMyPlan.mockResolvedValue(planConGrupos)
-  mockGetEquivalences.mockReturnValue(new Promise(() => {}))
+test('el detalle del plan enfoca su primer control, cierra con Escape y devuelve el foco', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  mockGetPlanHistory.mockResolvedValue([{
+    createdAt: '2026-09-01',
+    supersededAt: '2026-10-01',
+    mealCount: 1,
+    foodGroups: gruposDefault,
+    meals: [{ name: 'Cena', portions: [] }],
+  }])
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Desayuno'))
-  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
-  expect(screen.getByText('Cargando equivalencias…')).toBeInTheDocument()
+  await waitFor(() => screen.getByText('1 comidas'))
+  const trigger = screen.getByText('1 comidas').closest('button') ?? screen.getByText('1 comidas')
+  ;(trigger as HTMLElement).focus()
+  fireEvent.click(trigger)
+
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.contains(document.activeElement)).toBe(true)
+  fireEvent.keyDown(document, { key: 'Escape' })
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
 })
 
-test('muestra los grupos del plan en la pestaña de equivalencias', async () => {
+test('abre Reglas de tu plan con una pestaña accesible', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
+  vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 1, planVersion: 0, modoRegistro: 'LIBRE', grupos: [], alimentos: [], habitos: [] })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Desayuno'))
-  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
-  await waitFor(() => screen.getByText('Proteínas'))
-  expect(screen.getByText('Cereales')).toBeInTheDocument()
-  expect(screen.getByText('Frutas')).toBeInTheDocument()
-  expect(screen.getByText('Lácteos')).toBeInTheDocument()
-  expect(screen.getByText('Grasas')).toBeInTheDocument()
-  expect(screen.getByText('Verduras')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Reglas de tu plan' }))
+  expect(screen.getByRole('tab', { name: 'Reglas de tu plan' })).toHaveAttribute('aria-selected', 'true')
+  await waitFor(() => expect(rulesApi.getPlanRules).toHaveBeenCalledWith('tok'))
 })
 
-test('expandir un grupo muestra el formulario de agregar', async () => {
+test('recarga las comidas cuando cambian las reglas del plan', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
+  vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 2, planVersion: 4, modoRegistro: 'PORCIONES', grupos: [], alimentos: [], habitos: [] })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Desayuno'))
-  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
-  await waitFor(() => screen.getByText('Proteínas'))
-  fireEvent.click(screen.getByText('Proteínas'))
-  expect(screen.getByPlaceholderText('Alimento')).toBeInTheDocument()
+  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(1))
+  fireEvent.click(screen.getByRole('tab', { name: 'Reglas de tu plan' }))
+  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
 })
 
-test('agregar una equivalencia llama a la API y la muestra en la lista', async () => {
+test('cargar Mi plan no mueve el foco y editar lo lleva al nombre de la comida', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
-  mockAddEquivalence.mockResolvedValue({ id: 99, foodGroupId: 1, food: 'Pollo', quantity: 200, unit: 'G' })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Desayuno'))
-  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
-  await waitFor(() => screen.getByText('Proteínas'))
-  fireEvent.click(screen.getByText('Proteínas'))
-  fireEvent.change(screen.getByPlaceholderText('Alimento'), { target: { value: 'Pollo' } })
-  fireEvent.change(screen.getByPlaceholderText('Cant.'), { target: { value: '200' } })
-  fireEvent.click(screen.getByLabelText('Agregar equivalencia'))
-  await waitFor(() => expect(mockAddEquivalence).toHaveBeenCalledWith('tok', 1, 'Pollo', 200, 'G'))
-  await waitFor(() => expect(screen.getAllByText('Pollo').length).toBeGreaterThan(0))
-})
+  await waitFor(() => screen.getAllByRole('button', { name: /^Editar / }))
+  expect(document.activeElement).toBe(document.body)
 
-test('eliminar equivalencia muestra snackbar y no llama a la API de inmediato', async () => {
-  mockGetMyPlan.mockResolvedValue(planConGrupos)
-  mockGetEquivalences.mockResolvedValue([{ id: 5, foodGroupId: 1, food: 'Leche', quantity: 1, unit: 'TAZA' }])
-  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Desayuno'))
-  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
-  await waitFor(() => screen.getByText('Proteínas'))
-  fireEvent.click(screen.getByText('Proteínas'))
-  await waitFor(() => screen.getByLabelText('Eliminar Leche'))
-  fireEvent.click(screen.getByLabelText('Eliminar Leche'))
-  await waitFor(() => screen.getByRole('status'))
-  expect(screen.getByText('Deshacer')).toBeInTheDocument()
-  expect(mockDeleteEquivalence).not.toHaveBeenCalled()
-})
+  fireEvent.click(screen.getAllByRole('button', { name: /^Editar / })[0])
 
-test('deshacer eliminar restaura el ítem y no llama a la API', async () => {
-  mockGetMyPlan.mockResolvedValue(planConGrupos)
-  mockGetEquivalences.mockResolvedValue([{ id: 5, foodGroupId: 1, food: 'Leche', quantity: 1, unit: 'TAZA' }])
-  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Desayuno'))
-  fireEvent.click(screen.getByRole('tab', { name: 'Equivalencias' }))
-  await waitFor(() => screen.getByText('Proteínas'))
-  fireEvent.click(screen.getByText('Proteínas'))
-  await waitFor(() => screen.getByLabelText('Eliminar Leche'))
-  fireEvent.click(screen.getByLabelText('Eliminar Leche'))
-  await waitFor(() => screen.getByText('Deshacer'))
-  fireEvent.click(screen.getByText('Deshacer'))
-  await waitFor(() => expect(screen.getByText('Leche')).toBeInTheDocument())
-  expect(mockDeleteEquivalence).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Nombre de la comida' })).toHaveFocus())
 })

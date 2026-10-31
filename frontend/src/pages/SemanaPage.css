@@ -1,261 +1,512 @@
 .semana-page {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-  padding: 0 0 80px;
-  max-width: 540px;
+  min-height: 100%;
+}
+
+/* ── Encabezado ── */
+
+.semana-header {
+  padding: var(--s3) var(--s4) 0;
+  max-width: 640px;
   margin: 0 auto;
 }
 
-/* ── Header ── */
-.semana-header {
+.semana-header__top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 20px 16px 12px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line-soft);
+  justify-content: space-between;
+  gap: var(--s2);
+  min-height: 44px;
+}
+
+.semana-title {
+  font-size: var(--fs-h1);
+  line-height: 28px;
+  margin-top: var(--s2);
 }
 
 .semana-nav {
-  flex: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  margin: 0 calc(-1 * var(--s3));
 }
 
 .semana-nav__btn {
-  background: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
   border: none;
-  color: var(--primary);
-  font-size: 22px;
-  line-height: 1;
-  padding: 4px 8px;
+  background: transparent;
+  color: var(--ink);
+  border-radius: var(--radius-control);
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s;
 }
-.semana-nav__btn:hover { background: var(--primary-soft); }
+
+.semana-nav__btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.semana-nav__btn[aria-disabled="true"] {
+  color: var(--muted-2);
+  cursor: default;
+}
+
+.semana-nav__btn:not([aria-disabled="true"]):hover {
+  background: var(--surface-2);
+}
 
 .semana-nav__title {
-  flex: 1;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-  letter-spacing: -0.01em;
-}
-
-.semana-export-btn {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  background: none;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-.semana-export-btn:hover {
-  color: var(--primary);
-  border-color: var(--primary);
-}
-
-/* ── Grid ── */
-.semana-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  padding: 16px 10px;
-  overflow-x: auto;
-  min-width: 0;
-}
-
-/* ── Day card ── */
-.semana-day {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 6px;
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
-  min-width: 0;
-  transition: border-color 0.15s;
-}
-
-.semana-day--hoy {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-}
-
-.semana-day--datos {
-  border-color: var(--line);
-}
-
-.semana-day__head {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.semana-day__dow {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.semana-day__num {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1;
-}
-
-.semana-day--hoy .semana-day__num {
-  color: var(--primary);
-}
-
-/* ── Portions bar ── */
-.semana-day__porciones {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: center;
-}
-
-.semana-bar {
-  width: 100%;
-  height: 4px;
-  background: var(--rail);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.semana-bar__fill {
-  height: 100%;
-  background: var(--primary);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.semana-bar__fill--ok {
-  background: var(--g-verd);
-}
-
-.semana-day__frac {
-  font-size: 9px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.semana-day__frac-sep {
-  margin: 0 1px;
-}
-
-/* ── Habits ── */
-.semana-day__habitos {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.semana-habito {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 3px 5px;
-  cursor: pointer;
-  font-size: 9px;
-  color: var(--muted);
-  text-align: left;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.semana-habito--ok {
-  background: var(--primary-soft);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.semana-habito__check {
-  font-size: 8px;
-  min-width: 8px;
-  text-align: center;
-}
-
-.semana-habito__name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
-.semana-habito__val {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  font-size: 8px;
+/* Descarga: un solo botón que abre CSV o Excel */
+.semana-descargar {
+  position: relative;
 }
 
-/* ── Empty / status ── */
-.semana-day__vacio {
-  font-size: 11px;
-  color: var(--done);
-  text-align: center;
-  margin: auto;
+.semana-descargar__btn {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.semana-estado {
-  text-align: center;
-  color: var(--muted);
-  padding: 32px 16px;
-  font-size: 14px;
+.semana-descargar__btn::-webkit-details-marker {
+  display: none;
+}
+
+.semana-descargar__btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.semana-descargar__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--s1));
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: var(--s1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+}
+
+.semana-descargar__menu button {
+  min-height: 44px;
+  padding: 0 var(--s3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.semana-descargar__menu button:hover {
+  background: var(--surface-2);
+}
+
+/* ── Cuerpo ── */
+
+.semana-body {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--s3) var(--s4) var(--s6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+.semana-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px;
+  background: var(--surface-2);
+  border-radius: var(--radius-control);
+}
+
+.semana-views button {
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.semana-views button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
+}
+
+.semana-estado,
+.semana-vacia {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.semana-estado--error,
+.semana-error,
+.semana-habit-error {
+  color: var(--error);
+  font-size: var(--fs-sm);
 }
 
 .semana-estado--error {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  color: var(--error);
+  gap: var(--s2);
 }
 
 .semana-retry {
+  min-height: 44px;
+  border: none;
   background: none;
-  border: 1px solid var(--error);
-  color: var(--error);
-  padding: 6px 16px;
-  border-radius: var(--radius-pill);
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
   cursor: pointer;
-  font-size: 13px;
 }
 
-.semana-vacia {
+/* ── Tira de la semana: un día por columna y una miga por comida ── */
+
+.semana-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.semana-tira {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.semana-tira__dia {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--s1);
+  min-height: 72px;
+  padding: 6px 0 var(--s2);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.semana-tira__dia[aria-pressed="true"] {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.semana-tira__letra {
+  font-size: var(--fs-cap);
+  line-height: 16px;
+}
+
+/* La miga amarilla del logo marca el día de hoy */
+.semana-tira__dia--hoy::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.semana-tira__num {
+  font-size: var(--fs-body);
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.semana-tira__dia--futuro .semana-tira__num {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.semana-tira__migas {
+  display: grid;
+  grid-template-columns: repeat(2, 8px);
+  gap: 3px;
+  justify-content: center;
+}
+
+.semana-miga {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--miga-empty);
+}
+
+.semana-miga--full {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.semana-miga--half {
+  background: linear-gradient(90deg, var(--primary) 50%, transparent 50%);
+  border-color: var(--primary);
+}
+
+.semana-miga--noted {
+  background: var(--miga-empty);
+}
+
+.semana-miga--futuro {
+  border-style: dotted;
+}
+
+.semana-resumen__texto {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
   text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  padding: 16px 24px 0;
 }
 
-/* ── Responsive: stack to 2-col on very narrow ── */
-@media (max-width: 340px) {
-  .semana-grid {
-    grid-template-columns: repeat(4, 1fr);
+/* ── Detalle del día elegido ── */
+
+.semana-dia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.semana-dia__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s2);
+}
+
+.semana-dia__titulo {
+  font-size: var(--fs-body);
+  line-height: 20px;
+}
+
+.semana-dia__titulo time::first-letter {
+  text-transform: uppercase;
+}
+
+.semana-dia__hoy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-cap);
+  font-weight: 600;
+  color: var(--on-accent-soft);
+}
+
+.semana-dia__hoy::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.semana-dia__porciones {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.semana-comidas,
+.semana-habitos__lista {
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.semana-comida {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 var(--s2);
+  padding: 10px var(--s3);
+}
+
+.semana-comida + .semana-comida,
+.semana-habitos__lista li + li {
+  border-top: 1px solid var(--line);
+}
+
+.semana-comida__nombre {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.semana-comida__estado {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.semana-comida__estado--full { color: var(--ok); }
+.semana-comida__estado--half { color: var(--warn); }
+.semana-comida__estado--noted,
+.semana-comida__estado--empty { color: var(--text-secondary); }
+
+.semana-comida__nota {
+  grid-column: 1 / -1;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  white-space: pre-line;
+}
+
+.semana-habitos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.semana-habitos__titulo {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.semana-habito {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--s3);
+  border: none;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.semana-habito:disabled {
+  cursor: default;
+}
+
+.semana-habito__check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--control-border);
+  border-radius: 6px;
+  color: var(--on-primary);
+}
+
+.semana-habito--ok .semana-habito__check {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.semana-habito__check svg {
+  width: 14px;
+  height: 14px;
+}
+
+.semana-habito__name {
+  flex: 1;
+}
+
+.semana-habito__val,
+.semana-habito__paso {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.semana-habito__paso {
+  font-size: var(--fs-cap);
+  padding: 2px var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.semana-dia__vacio {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Planilla ── */
+
+.semana-sheet {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.semana-sheet table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fs-sm);
+}
+
+.semana-sheet caption {
+  text-align: left;
+  padding: var(--s3);
+  font-weight: 600;
+}
+
+.semana-sheet th,
+.semana-sheet td {
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.semana-sheet th[scope="row"] {
+  font-weight: 500;
+  min-width: 140px;
+}
+
+.semana-note {
+  white-space: pre-line;
+  min-width: 160px;
+  color: var(--text-secondary);
+}
+
+@media (min-width: 640px) {
+  .semana-header,
+  .semana-body {
+    max-width: 720px;
+  }
+
+  .semana-header {
+    padding-top: var(--s6);
+  }
+
+  .semana-title {
+    font-size: 28px;
+    line-height: 32px;
   }
 }

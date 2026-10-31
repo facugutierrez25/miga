@@ -78,6 +78,8 @@
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
 
+        <dependency><groupId>org.dhatim</groupId><artifactId>fastexcel</artifactId><version>0.18.4</version></dependency>
+        <dependency><groupId>org.dhatim</groupId><artifactId>fastexcel-reader</artifactId><version>0.18.4</version><scope>test</scope></dependency>
         <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

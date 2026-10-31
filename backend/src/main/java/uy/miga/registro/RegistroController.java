@@ -35,7 +35,7 @@ class RegistroController {
                                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                    @PathVariable Long mealId,
                                    @RequestBody @Valid NoteRequest req) {
-        return service.saveNote(auth.getName(), date, mealId, req.text());
+        return service.saveNote(auth.getName(), date, mealId, req.text(), req.version());
     }
 
     // GET  /api/v1/registro/{date}/{mealId}/note — mantenido por compatibilidad temporal
@@ -65,10 +65,10 @@ class RegistroController {
 
     // PATCH /api/v1/registro/{date}/items/{id} — corregir cantidad/grupo; saveAsRule crea regla USUARIO
     @PatchMapping("/{date}/items/{id}")
-    DayRegistroDto.EntryItemDto patchItem(Authentication auth,
-                                          @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                                          @PathVariable Long id,
-                                          @RequestBody PatchItemRequest req) {
+    PatchItemResultDto patchItem(Authentication auth,
+                                 @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                 @PathVariable Long id,
+                                 @RequestBody @Valid PatchItemRequest req) {
         return service.patchItem(auth.getName(), date, id, req);
     }
 
@@ -89,5 +89,5 @@ class RegistroController {
         return service.getSugerencias(auth.getName(), mealId);
     }
 
-    record NoteRequest(@NotBlank @Size(max = 10_000) String text) {}
+    record NoteRequest(@NotBlank @Size(max = 10_000) String text, Long version) {}
 }

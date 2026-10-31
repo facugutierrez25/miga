@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+import { apiRequest } from './client'
 
 export interface FoodEntryDto {
   id: number
@@ -12,12 +12,7 @@ export interface FoodEntryDto {
 }
 
 export async function getIntake(token: string, date: string, signal?: AbortSignal): Promise<FoodEntryDto[]> {
-  const res = await fetch(`${API_URL}/api/v1/intake/${date}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal,
-  })
-  if (!res.ok) throw new Error('Error al cargar el registro de ingesta.')
-  return res.json()
+  return apiRequest(`/api/v1/intake/${date}`, { errorMessage: 'Error al cargar el registro de ingesta.', token, signal })
 }
 
 export async function addFoodEntry(
@@ -29,38 +24,17 @@ export async function addFoodEntry(
   unit: string,
   foodGroupId: number,
 ): Promise<FoodEntryDto> {
-  const res = await fetch(`${API_URL}/api/v1/intake/${date}/${mealId}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ food, quantity, unit, foodGroupId }),
-  })
-  if (!res.ok) throw new Error('Error al registrar.')
-  return res.json()
+  return apiRequest(`/api/v1/intake/${date}/${mealId}`, { errorMessage: 'Error al registrar.', token, method: 'POST', body: { food, quantity, unit, foodGroupId } })
 }
 
 export async function deleteFoodEntry(token: string, id: number): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/intake/entries/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al eliminar.')
+  return apiRequest(`/api/v1/intake/entries/${id}`, { errorMessage: 'Error al eliminar.', token, method: 'DELETE' })
 }
 
 export async function markMealConsumed(token: string, date: string, mealId: number): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/intake/${date}/${mealId}/consumed`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al marcar como comido.')
+  return apiRequest(`/api/v1/intake/${date}/${mealId}/consumed`, { errorMessage: 'Error al marcar como comido.', token, method: 'PUT' })
 }
 
 export async function unmarkMealConsumed(token: string, date: string, mealId: number): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/intake/${date}/${mealId}/consumed`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al desmarcar.')
+  return apiRequest(`/api/v1/intake/${date}/${mealId}/consumed`, { errorMessage: 'Error al desmarcar.', token, method: 'DELETE' })
 }

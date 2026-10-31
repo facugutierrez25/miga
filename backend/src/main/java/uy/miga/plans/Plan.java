@@ -24,6 +24,7 @@ class Plan {
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")
+    @org.hibernate.annotations.OptimisticLock(excluded = true)
     private List<PlanFoodGroup> foodGroups = new ArrayList<>();
 
     @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -66,6 +67,8 @@ class Plan {
     java.math.BigDecimal getMargenPorciones() { return margenPorciones; }
     Long getVersion() { return version; }
 
+    void setModoRegistro(String modoRegistro) { this.modoRegistro = modoRegistro; }
+    void setMargenPorciones(java.math.BigDecimal margenPorciones) { this.margenPorciones = margenPorciones; }
     void setUserId(Long userId) { this.userId = userId; }
     void setCurrent(boolean current) { this.current = current; }
     void setSupersededAt(OffsetDateTime supersededAt) { this.supersededAt = supersededAt; }

@@ -11,5 +11,6 @@ record HabitSaveDto(
     BigDecimal dailyGoal,
     BigDecimal step,
     String period,
+    Boolean countsFlexibleMeals,
     short displayOrder
 ) {}

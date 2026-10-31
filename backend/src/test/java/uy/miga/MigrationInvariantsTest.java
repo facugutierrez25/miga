@@ -10,6 +10,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import java.sql.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Verifica invariantes de las migraciones Flyway:
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - Backfill V21: food_entries.user_id desde user_email.
  * - Backfill V22: meal_notes.plan_id.
  * - V23: índice único de plan vigente.
+ * - V26: uid estable entre versiones, habit_uid en registros y verificación de duplicados.
  * - Aislamiento de datos entre dos usuarios tras migración completa.
  */
 class MigrationInvariantsTest {
@@ -245,6 +247,83 @@ class MigrationInvariantsTest {
     }
 
     /**
+     * V26 asigna el mismo uid a los grupos de igual abreviatura en distintas versiones
+     * del plan de un usuario y copia el uid del hábito a sus registros.
+     */
+    @Test
+    void v26Backfill_sharesGroupUidAcrossVersionsAndCopiesHabitUid() throws Exception {
+        buildFlyway("25").migrate();
+
+        long oldPlanId;
+        long newPlanId;
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "v26user@test.com");
+            oldPlanId = insertPlan(c, userId);
+            c.createStatement().execute(
+                "UPDATE plans SET is_current = false, superseded_at = now() WHERE id = " + oldPlanId);
+            newPlanId = insertPlan(c, userId);
+            for (long planId : new long[]{oldPlanId, newPlanId}) {
+                c.createStatement().execute("""
+                    INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order)
+                    VALUES (%d, 'Huevo', 'HUE', 1)
+                    """.formatted(planId));
+            }
+            c.createStatement().execute("""
+                INSERT INTO plan_habits (plan_id, name, habit_type, daily_goal)
+                VALUES (%d, 'Agua', 'CANTIDAD', 2)
+                """.formatted(oldPlanId));
+            long habitId = queryLong(c, "SELECT MAX(id) FROM plan_habits");
+            c.createStatement().execute("""
+                INSERT INTO habit_logs (user_id, plan_habit_id, log_date, value)
+                VALUES (%d, %d, CURRENT_DATE, 1.5)
+                """.formatted(userId, habitId));
+        }
+
+        buildFlyway(null).migrate();
+
+        try (Connection c = connect()) {
+            long distinctUids = queryLong(c, """
+                SELECT COUNT(DISTINCT uid) FROM plan_food_groups
+                WHERE abbreviation = 'HUE' AND plan_id IN (%d, %d)
+                """.formatted(oldPlanId, newPlanId));
+            assertThat(distinctUids).as("versiones del mismo grupo comparten uid").isEqualTo(1);
+
+            long mismatched = queryLong(c, """
+                SELECT COUNT(*) FROM habit_logs l
+                JOIN plan_habits h ON h.id = l.plan_habit_id
+                WHERE l.habit_uid IS DISTINCT FROM h.uid
+                """);
+            assertThat(mismatched).as("cada registro lleva el uid de su hábito").isZero();
+        }
+    }
+
+    /**
+     * V26 aborta si un plan tiene dos grupos con la misma abreviatura, sin borrar datos.
+     */
+    @Test
+    void v26_abortsOnDuplicateAbbreviationWithinPlan() throws Exception {
+        buildFlyway("25").migrate();
+
+        try (Connection c = connect()) {
+            long planId = insertPlan(c, insertUser(c, "v26dup@test.com"));
+            for (int i = 1; i <= 2; i++) {
+                c.createStatement().execute("""
+                    INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order)
+                    VALUES (%d, 'Grupo %d', 'DUP', %d)
+                    """.formatted(planId, i, i));
+            }
+        }
+
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V26 abortada");
+
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM plan_food_groups WHERE abbreviation = 'DUP'"))
+                .isEqualTo(2);
+        }
+    }
+
+    /**
      * Los food_entries de dos usuarios permanecen aislados tras el backfill de V21.
      */
     @Test
@@ -300,13 +379,133 @@ class MigrationInvariantsTest {
         }
     }
 
+    @Test
+    void v8RejectsMealLogLossUnlessExplicitlyAllowed() throws Exception {
+        buildFlyway("7").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "legacy-log@example.test");
+            long mealId = insertMeal(c, insertPlan(c, userId), "Desayuno");
+            c.createStatement().execute("INSERT INTO meal_logs (user_id, meal_id, logged_date) VALUES (%d, %d, CURRENT_DATE)"
+                .formatted(userId, mealId));
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V8 abortada: se perderían 1 filas de meal_logs")
+            .hasStackTraceContaining("app.migrations.allow-legacy-data-loss=true");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM meal_logs")).isEqualTo(1);
+        }
+        buildFlyway(null, true).migrate();
+        try (Connection c = connect()) {
+            assertTableNotExists(c, "meal_logs");
+        }
+    }
+
+    @Test
+    void v12RejectsUnresolvedEntriesFromV7UnlessExplicitlyAllowed() throws Exception {
+        buildFlyway("7").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "legacy-entry@example.test");
+            insertPlan(c, userId);
+            // V7 permite entradas sin una comida existente; V8 les asigna PROTEINS.
+            c.createStatement().execute("""
+                INSERT INTO food_entries (user_email, meal_id, date, food, quantity, unit)
+                VALUES ('legacy-entry@example.test', -1, CURRENT_DATE, 'Sintético', 1, 'G')
+                """);
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V12 abortada: se perderían 1 filas de food_entries");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isEqualTo(1);
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries WHERE food_group = 'PROTEINS'"))
+                .isEqualTo(1);
+        }
+        buildFlyway(null, true).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isZero();
+        }
+    }
+
+    @Test
+    void v12RejectsUnknownGroupEvenWhenMealExists() throws Exception {
+        buildFlyway("9").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "unknown-group@example.test");
+            long mealId = insertMeal(c, insertPlan(c, userId), "Desayuno");
+            c.createStatement().execute("""
+                INSERT INTO food_entries (user_email, meal_id, date, food, quantity, unit, food_group)
+                VALUES ('unknown-group@example.test', %d, CURRENT_DATE, 'Sintético', 1, 'G', 'UNKNOWN')
+                """.formatted(mealId));
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V12 abortada: se perderían 1 filas de food_entries");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries WHERE food_group = 'UNKNOWN'"))
+                .isEqualTo(1);
+        }
+        buildFlyway(null, true).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isZero();
+        }
+    }
+
+    @Test
+    void springStartsWithHibernateValidationAfterUpgradeFromV9() throws Exception {
+        buildFlyway("9").migrate();
+        try (Connection c = connect()) {
+            long userId = insertUser(c, "upgrade@example.test");
+            long mealId = insertMeal(c, insertPlan(c, userId), "Desayuno");
+            insertMealPortionWithVarcharGroup(c, mealId, "PROTEINS", 1);
+            insertEquivalenceWithVarcharGroup(c, "upgrade@example.test", "PROTEINS", "Pollo sintético", 100, "G");
+            c.createStatement().execute("""
+                INSERT INTO food_entries (user_email, meal_id, date, food, quantity, unit, food_group)
+                VALUES ('upgrade@example.test', %d, CURRENT_DATE, 'Pollo sintético', 100, 'G', 'PROTEINS')
+                """.formatted(mealId));
+        }
+        try (var context = new org.springframework.boot.builder.SpringApplicationBuilder(MigaApplication.class)
+                .profiles("test")
+                .run("--spring.datasource.url=" + postgres.getJdbcUrl(),
+                    "--spring.datasource.driver-class-name=org.postgresql.Driver",
+                    "--spring.datasource.username=" + postgres.getUsername(),
+                    "--spring.datasource.password=" + postgres.getPassword(),
+                    "--spring.jpa.hibernate.ddl-auto=validate", "--server.port=0")) {
+            assertThat(context.isActive()).isTrue();
+            assertThat(context.getBean(jakarta.persistence.EntityManagerFactory.class).isOpen()).isTrue();
+            try (Connection c = connect()) {
+                assertThat(queryLong(c, "SELECT COUNT(*) FROM food_entries")).isEqualTo(1);
+                assertThat(queryLong(c, "SELECT COUNT(*) FROM food_rules WHERE alimento = 'Pollo sintético'"))
+                    .isEqualTo(1);
+            }
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Una migración aplicada cuyo contenido cambió hace fallar la migración por checksum, en
+     * lugar de pasar en silencio (el arranque ya no ejecuta repair por defecto).
+     */
+    @Test
+    void changedAppliedMigrationFailsValidationInsteadOfPassingSilently() throws Exception {
+        buildFlyway(null).migrate();
+        try (Connection c = connect()) {
+            c.createStatement().execute("UPDATE flyway_schema_history SET checksum = 12345 WHERE version = '14'");
+        }
+
+        Flyway flyway = buildFlyway(null);
+        assertThatThrownBy(() -> new FlywayConfig().flywayMigrationStrategy(false).migrate(flyway))
+            .hasStackTraceContaining("checksum");
+    }
+
     private Flyway buildFlyway(String target) {
+        return buildFlyway(target, false);
+    }
+
+    private Flyway buildFlyway(String target, boolean allowDataLoss) {
         var cfg = Flyway.configure()
             .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
             .locations("classpath:db/migration")
-            .cleanDisabled(false);
+            .cleanDisabled(false)
+            .callbacks(new FlywayConfig().legacyDataLossCallback(allowDataLoss));
         if (target != null) {
             cfg = cfg.target(target);
         }
@@ -320,8 +519,8 @@ class MigrationInvariantsTest {
 
     private long insertUser(Connection c, String email) throws SQLException {
         c.createStatement().execute("""
-            INSERT INTO users (email, password_hash, role, email_verified)
-            VALUES ('%s', 'hash', 'PATIENT', true)
+            INSERT INTO users (email, password_hash, role)
+            VALUES ('%s', 'hash', 'PATIENT')
             """.formatted(email));
         return queryLong(c, "SELECT MAX(id) FROM users");
     }

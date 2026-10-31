@@ -279,4 +279,17 @@ class InterpreterServiceTest {
         var result = interpreter.findRule("leche", List.of(userRule, globalRule));
         assertThat(result.id()).isEqualTo(10L);
     }
+    @Test
+    void trailingUnitUsesCorrectedEquivalenceForFoodAndSynonym() {
+        FoodRuleDto corrected = rule(1L, "yogur prueba", List.of("yogurt"), "NORMAL", 7L, null,
+            new BigDecimal("0.667"), "u", BigDecimal.ONE, List.of());
+        for (String food : List.of("yogur prueba", "yogurt")) {
+            var items = interpreter.interpret("2 " + food + " u", List.of(corrected));
+            assertThat(items).hasSize(1);
+            assertThat(items.getFirst().unit()).isEqualTo("u");
+            assertThat(items.getFirst().portions()).isEqualByComparingTo("2.999");
+            assertThat(items.getFirst().uncertain()).isFalse();
+        }
+    }
+
 }

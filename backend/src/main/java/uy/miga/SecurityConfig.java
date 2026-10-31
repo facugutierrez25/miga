@@ -23,7 +23,8 @@ import uy.miga.users.JwtService;
 class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService,
+                                            @Value("${app.ops.api-key:}") String opsApiKey) throws Exception {
         http
             .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
@@ -33,8 +34,8 @@ class SecurityConfig {
                         "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness",
                         "/api/v1/users", "/api/v1/users/login",
                         "/api/v1/auth/verify", "/api/v1/auth/resend-verification").permitAll()
-                // /actuator/metrics e /actuator/info solo accesibles con autenticación
-                .requestMatchers("/actuator/**").authenticated()
+                // Métricas e info son operativas: solo con la clave X-Ops-Key, nunca con un JWT de paciente.
+                .requestMatchers("/actuator/**").access(new OpsKeyAuthorizationManager(opsApiKey))
                 .anyRequest().authenticated())
             .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
             .httpBasic(http2 -> http2.disable())

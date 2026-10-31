@@ -1,0 +1,37 @@
+{
+  "date" : "2026-01-05",
+  "meals" : [ {
+    "mealId" : 1,
+    "noteId" : 1,
+    "noteText" : "Sintético",
+    "noteVersion" : 1,
+    "items" : [ {
+      "id" : 1,
+      "food" : "Sintético",
+      "quantity" : 1.5,
+      "unit" : "Sintético",
+      "foodGroupId" : 1,
+      "portions" : 1.5,
+      "origin" : "Sintético",
+      "uncertain" : true,
+      "originalText" : "Sintético",
+      "appliedRule" : "Sintético",
+      "occurrenceId" : "00000000-0000-0000-0000-000000000001"
+    } ],
+    "comparison" : [ {
+      "foodGroupId" : 1,
+      "name" : "Sintético",
+      "expected" : 1.5,
+      "recorded" : 1.5,
+      "status" : "OK",
+      "dailyGoal" : 1.5
+    } ]
+  } ],
+  "summary" : [ {
+    "foodGroupId" : 1,
+    "name" : "Sintético",
+    "clave" : "Sintético",
+    "totalRecorded" : 1.5,
+    "dailyGoal" : 1.5
+  } ]
+}

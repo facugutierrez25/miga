@@ -65,17 +65,78 @@ class RegistroIntegrationTest {
             .addFilters(springSecurityFilterChain)
             .build();
         mockEmailService.reset();
-        token = registerAndLogin("registro@miga.uy");
+        token = registerAndLogin("registro-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         MvcResult planResult = mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk())
             .andReturn();
 
         JsonNode plan = objectMapper.readTree(planResult.getResponse().getContentAsString());
         mealId = plan.path("meals").get(0).path("id").asLong();
+    }
+
+    @Test
+    void longUnrecognizedMentionSurvivesReload() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        String text = "z".repeat(700);
+        putNote(date, text);
+        JsonNode item = getDay(date).path("meals").get(0).path("items").get(0);
+        assertThat(item.path("food").asText()).isEqualTo(text);
+        assertThat(item.path("originalText").asText()).isEqualTo(text);
+        assertThat(item.path("portions").isNull()).isTrue();
+    }
+
+    @Test
+    void mentionsSurviveReloadWithoutAddingPortions() throws Exception {
+        createUniqueUserPlan();
+        for (String type : java.util.List.of("FLEXIBLE", "NO_CUENTA")) {
+            JsonNode rules = planRules();
+            mockMvc.perform(post("/api/v1/my-plan/alimentos")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of(
+                    "planVersion", rules.path("planVersion").asLong(), "alimento", type.toLowerCase(),
+                    "sinonimos", java.util.List.of(), "tipo", type))))
+                .andExpect(status().isCreated());
+        }
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "mate, flexible, no_cuenta, xyzdesconocido");
+        assertThat(saved.path("entries").size()).isEqualTo(4);
+        JsonNode day = getDay(date);
+        JsonNode meal = day.path("meals").get(0);
+        assertThat(meal.path("items")).isEqualTo(saved.path("entries"));
+        for (JsonNode item : meal.path("items")) {
+            assertThat(item.path("foodGroupId").isNull()).isTrue();
+            assertThat(item.path("portions").isNull()).isTrue();
+            assertThat(item.path("occurrenceId").asText()).isNotBlank();
+            assertThat(item.path("origin").asText()).isIn("MENTION", "UNKNOWN");
+            if ("MENTION".equals(item.path("origin").asText())) {
+                assertThat(item.path("appliedRule").asText()).isNotBlank();
+            }
+            patchItem(date, item.path("id").asLong(), "{\"quantity\":2}")
+                .andExpect(status().isBadRequest());
+        }
+        for (JsonNode group : meal.path("comparison")) {
+            assertThat(group.path("recorded").asDouble()).isZero();
+        }
+        for (JsonNode group : day.path("summary")) {
+            assertThat(group.path("totalRecorded").asDouble()).isZero();
+        }
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        boolean found = false;
+        for (JsonNode weekDay : week.path("days")) {
+            if (!date.equals(weekDay.path("date").asText())) continue;
+            found = true;
+            assertThat(weekDay.path("totalRecorded").decimalValue()).isZero();
+            assertThat(weekDay.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
+        }
+        assertThat(found).isTrue();
     }
 
     @Test
@@ -173,26 +234,90 @@ class RegistroIntegrationTest {
             .andExpect(jsonPath("$.meals").isArray());
     }
 
+    @Test
+    void responsesAreIdempotentAndCanBeRemoved() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode before = getDay(date);
+        long groupId = before.path("summary").get(0).path("foodGroupId").asLong();
+        String url = "/api/v1/registro/" + date + "/comidas/" + mealId + "/respuestas";
+        String yes = "{\"foodGroupId\":" + groupId + ",\"consumed\":true}";
+        mockMvc.perform(post(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content(yes)).andExpect(status().isCreated());
+        JsonNode first = getDay(date);
+        mockMvc.perform(post(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content(yes)).andExpect(status().isCreated());
+        JsonNode repeated = getDay(date);
+        assertThat(repeated.path("summary")).isEqualTo(first.path("summary"));
+        assertThat(repeated.path("meals").get(0).path("items")).hasSize(1);
+        assertThat(repeated.path("meals").get(0).path("items").get(0).path("origin").asText())
+            .isEqualTo("RESPUESTA");
+        assertThat(repeated.path("summary").get(0).path("totalRecorded").decimalValue())
+            .isEqualByComparingTo("1");
+        mockMvc.perform(post(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"consumed\":false}"))
+            .andExpect(status().isCreated());
+        JsonNode removed = getDay(date);
+        assertThat(removed.path("meals").get(0).path("items")).isEmpty();
+        assertThat(removed.path("summary")).isEqualTo(before.path("summary"));
+    }
+
+    @Test
+    void noteVersionsRejectStaleClientsAndKeepItemsOnIdenticalText() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode first = putNote(date, "leche");
+        JsonNode identical = putNote(date, "leche");
+        assertThat(identical.path("version")).isEqualTo(first.path("version"));
+        assertThat(identical.path("entries")).isEqualTo(first.path("entries"));
+        JsonNode updated = putNote(date, "pan");
+        assertThat(updated.path("version").asLong()).isGreaterThan(first.path("version").asLong());
+        String url = "/api/v1/registro/" + date + "/comidas/" + mealId + "/nota";
+        mockMvc.perform(put(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"manzana\",\"version\":" + first.path("version").asLong() + "}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("NOTE_CONFLICT"))
+            .andExpect(jsonPath("$.error").value(
+                "Esta nota cambió en otro dispositivo. Recargá para ver la versión actual."));
+        mockMvc.perform(put(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"manzana\"}"))
+            .andExpect(status().isConflict());
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").asText()).isEqualTo("pan");
+        assertThat(meal.path("noteVersion")).isEqualTo(updated.path("version"));
+    }
+
+    @Test
+    void missingNoteRejectsNonNullVersion() throws Exception {
+        createUniqueUserPlan();
+        mockMvc.perform(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + mealId + "/nota")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"leche\",\"version\":0}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTE_CONFLICT"));
+    }
+
     private String registerAndLogin(String email) throws Exception {
-        try {
-            mockMvc.perform(post("/api/v1/users")
+        mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     { "email": "%s", "password": "Segura1234!" }
-                    """.formatted(email)));
-        } catch (Exception ignored) {}
+                    """.formatted(email)))
+            .andExpect(status().isCreated());
 
         outboxWorker.processJobs();
         String verifyToken = mockEmailService.getLastToken();
-        if (verifyToken != null) {
-            mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken));
-        }
+        assertThat(verifyToken).isNotBlank();
+        mockMvc.perform(get("/api/v1/auth/verify?token=" + verifyToken))
+            .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(post("/api/v1/users/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 { "email": "%s", "password": "Segura1234!" }
                 """.formatted(email)))
+            .andExpect(status().isOk())
             .andReturn();
 
         return objectMapper.readTree(result.getResponse().getContentAsString())
@@ -204,7 +329,7 @@ class RegistroIntegrationTest {
         MvcResult result = mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk())
             .andReturn();
         mealId = objectMapper.readTree(result.getResponse().getContentAsString())
@@ -212,10 +337,15 @@ class RegistroIntegrationTest {
     }
 
     private JsonNode putNote(String date, String text) throws Exception {
+        JsonNode meals = getDay(date).path("meals");
+        JsonNode currentVersion = meals.get(0).path("noteVersion");
+        java.util.Map<String, Object> request = new java.util.HashMap<>();
+        request.put("text", text);
+        request.put("version", currentVersion.isNumber() ? currentVersion.asLong() : null);
         MvcResult result = mockMvc.perform(put("/api/v1/registro/" + date + "/comidas/" + mealId + "/nota")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(java.util.Map.of("text", text))))
+            .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.noteId").isNumber())
             .andReturn();
@@ -296,7 +426,9 @@ class RegistroIntegrationTest {
                 {"quantity": 3, "unit": "u", "foodGroupId": null, "portions": null, "saveAsRule": false}
                 """))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.quantity").value(3));
+            .andExpect(jsonPath("$.replacedItemIds[0]").value(itemId))
+            .andExpect(jsonPath("$.items[0].quantity").value(3))
+            .andExpect(jsonPath("$.items[0].origin").value("USUARIO"));
     }
 
     @Test
@@ -316,6 +448,193 @@ class RegistroIntegrationTest {
                 {"quantity": 1, "unit": "u", "foodGroupId": %d, "portions": 1, "saveAsRule": true}
                 """.formatted(item.path("foodGroupId").asLong())))
             .andExpect(status().isOk());
+    }
+
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void repeatedCorrectionsAsRuleUseLatestValuesAndBumpRevision(boolean compound) throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode entry = putNote(date, "leche").path("entries").get(0);
+        long id = entry.path("id").asLong();
+        long revision = planRules().path("planVersion").asLong();
+        for (int portions : java.util.List.of(2, 3)) {
+            String body = compound
+                ? """
+                    {"quantity":1,"saveAsRule":true,"grupos":[{"foodGroupId":%d,"porciones":%d},{"foodGroupId":%d,"porciones":1}]}
+                    """.formatted(groupId("Proteínas"), portions, groupId("Grasas"))
+                : """
+                    {"quantity":1,"unit":"u","foodGroupId":%d,"portions":%d,"saveAsRule":true}
+                    """.formatted(entry.path("foodGroupId").asLong(), portions);
+            JsonNode patched = objectMapper.readTree(patchItem(date, id, body).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+            id = patched.path("items").get(0).path("id").asLong();
+            JsonNode rules = planRules();
+            assertThat(rules.path("planVersion").asLong()).isGreaterThan(revision);
+            revision = rules.path("planVersion").asLong();
+            assertThat(rules.path("alimentos").size()).isEqualTo(1);
+        }
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "1 leche u").path("entries");
+        assertThat(next.size()).isEqualTo(compound ? 2 : 1);
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
+            .anySatisfy(portions -> assertThat(portions).isCloseTo(3.0, org.assertj.core.data.Offset.offset(0.01)));
+    }
+
+    @Test
+    void savingHistoricalCorrectionAsRuleReturnsVersionConflict() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().minusDays(1).toString();
+        JsonNode entry = putNote(date, "leche").path("entries").get(0);
+        JsonNode rules = planRules();
+        mockMvc.perform(post("/api/v1/my-plan/grupos").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of("name", "Nuevo", "planVersion", rules.path("planVersion").asLong()))))
+            .andExpect(status().isCreated());
+        patchItem(date, entry.path("id").asLong(), "{\"saveAsRule\":true}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("VERSION_CONFLICT"))
+            .andExpect(jsonPath("$.error").value("El plan cambió en otra sesión. Recargá para ver la versión actual."));
+    }
+
+    @Test
+    void putNota_returnsPersistedEntriesWithRealIds() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche");
+
+        JsonNode entries = saved.path("entries");
+        JsonNode dayItems = getDay(date).path("meals").get(0).path("items");
+        assertThat(entries.size()).isEqualTo(dayItems.size()).isGreaterThan(0);
+        assertThat(entries.get(0).path("id").asLong()).isEqualTo(dayItems.get(0).path("id").asLong());
+        assertThat(entries.get(0).path("occurrenceId").asText()).isNotBlank();
+    }
+
+    @Test
+    void compoundRule_sharesOccurrenceAndStoresReadableRule() throws Exception {
+        createUniqueUserPlan();
+        createCompound("barrita sintetica", "Proteínas", "Cereales", "Grasas");
+        String date = LocalDate.now().toString();
+
+        JsonNode entries = putNote(date, "1 barrita sintetica").path("entries");
+
+        assertThat(entries.size()).isEqualTo(3);
+        assertThat(entries.findValuesAsText("occurrenceId")).containsOnly(entries.get(0).path("occurrenceId").asText());
+        assertThat(entries.get(0).path("appliedRule").asText())
+            .isEqualTo("1 barrita sintetica = 1 Proteínas + 1 Cereales + 1 Grasas");
+        assertThat(getDay(date).path("meals").get(0).path("items").get(0).path("appliedRule").asText())
+            .startsWith("1 barrita sintetica =");
+    }
+
+    @Test
+    void patchItem_quantityOnly_rescalesPortions() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode entry = putNote(date, "leche").path("entries").get(0);
+        double portions = entry.path("portions").asDouble();
+
+        patchItem(date, entry.path("id").asLong(),
+            "{\"quantity\": %s}".formatted(entry.path("quantity").asDouble() * 2))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].portions").value(portions * 2));
+    }
+
+    @Test
+    void patchItem_withGroups_splitsAndSavesCompoundRule() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode entry = putNote(date, "leche").path("entries").get(0);
+        long proteins = groupId("Proteínas");
+        long fats = groupId("Grasas");
+
+        patchItem(date, entry.path("id").asLong(), """
+            {"quantity": 1, "grupos": [{"foodGroupId": %d, "porciones": 1}, {"foodGroupId": %d, "porciones": 0.5}],
+             "saveAsRule": true}
+            """.formatted(proteins, fats))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.replacedItemIds[0]").value(entry.path("id").asLong()))
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].origin").value("USUARIO"));
+
+        String nextDay = LocalDate.now().minusDays(1).toString();
+        JsonNode next = putNote(nextDay, "2 leche").path("entries");
+        assertThat(next.size()).isEqualTo(2);
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
+            .containsExactlyInAnyOrder(2.0, 1.0);
+    }
+
+    @Test
+    void patchItem_rejectsWrongDateForeignGroupAndAmbiguousBody() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        long id = putNote(date, "leche").path("entries").get(0).path("id").asLong();
+
+        patchItem(LocalDate.now().minusDays(1).toString(), id, "{\"quantity\": 1}")
+            .andExpect(status().isNotFound());
+        patchItem(date, id, "{\"foodGroupId\": 999999}")
+            .andExpect(status().isBadRequest());
+        patchItem(date, id, "{\"quantity\": 0}")
+            .andExpect(status().isBadRequest());
+        patchItem(date, id, """
+            {"foodGroupId": %d, "grupos": [{"foodGroupId": %d, "porciones": 1}, {"foodGroupId": %d, "porciones": 1}]}
+            """.formatted(groupId("Grasas"), groupId("Proteínas"), groupId("Grasas")))
+            .andExpect(status().isBadRequest());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchItem(String date, long id, String body) throws Exception {
+        return mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + id)
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
+    }
+
+    private JsonNode planRules() throws Exception {
+        return objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan/reglas")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    private long groupId(String name) throws Exception {
+        for (JsonNode g : planRules().path("grupos")) {
+            if (name.equals(g.path("name").asText())) return g.path("id").asLong();
+        }
+        throw new AssertionError(name);
+    }
+
+    private void createCompound(String food, String... groupNames) throws Exception {
+        JsonNode rules = planRules();
+        var components = new java.util.ArrayList<java.util.Map<String, Object>>();
+        for (String name : groupNames) {
+            for (JsonNode g : rules.path("grupos")) {
+                if (name.equals(g.path("name").asText())) {
+                    components.add(java.util.Map.of("groupUid", g.path("uid").asText(), "porciones", 1));
+                }
+            }
+        }
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of(
+                    "planVersion", rules.path("planVersion").asLong(), "alimento", food,
+                    "tipo", "COMPUESTO", "componentes", components))))
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void renamingMealKeepsTodaysRecordsVisible() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        putNote(date, "leche");
+
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON.replace("\"Desayuno\"", "\"Primera comida\""))))
+            .andExpect(status().isOk());
+
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("noteText").asText()).isEqualTo("leche");
+        assertThat(meal.path("items").size()).isGreaterThan(0);
     }
 
     @Test
@@ -338,7 +657,7 @@ class RegistroIntegrationTest {
         assertThat(after.size()).isEqualTo(before.size() + 1);
         assertThat(after).anySatisfy(item -> {
             assertThat(item.path("foodGroupId").asLong()).isEqualTo(foodGroupId);
-            assertThat(item.path("origin").asText()).isEqualTo("USUARIO");
+            assertThat(item.path("origin").asText()).isEqualTo("RESPUESTA");
         });
     }
 
@@ -441,7 +760,7 @@ class RegistroIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -450,7 +769,7 @@ class RegistroIntegrationTest {
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                {"text": "leche"}
+                {"text": "leche", "version": 0}
                 """))
             .andExpect(status().isCreated())
             .andReturn();
@@ -470,7 +789,7 @@ class RegistroIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk());
 
         // GET día de ayer debe devolver datos sin error aunque el plan cambió

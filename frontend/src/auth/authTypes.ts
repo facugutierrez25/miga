@@ -4,6 +4,7 @@ export interface AuthContextValue {
   token: string | null
   email: string | null
   firstName: string | null
+  sessionExpired: boolean
   login: (token: string, firstName: string | null) => void
   setFirstName: (name: string) => void
   logout: () => void

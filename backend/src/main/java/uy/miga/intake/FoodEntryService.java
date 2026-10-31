@@ -42,10 +42,18 @@ class FoodEntryService {
     FoodEntryDto addEntry(String userEmail, Long mealId, LocalDate date,
                           String food, Double quantity, String unit, Long foodGroupId) {
         Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
         if (!planService.mealBelongsToUser(mealId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         Long planId = planService.getPlanIdForDate(userId, date);
+        if (!planService.getMealIds(planId).contains(mealId)) {
+            throw new uy.miga.plans.PlanVersionConflictException();
+        }
+        if (foodGroupId != null && planService.getPlanFoodGroups(planId).stream()
+            .noneMatch(g -> g.id().equals(foodGroupId))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");
+        }
         BigDecimal porciones = calculatePortions(food, foodGroupId, quantity, planId, userId);
 
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
@@ -77,6 +85,7 @@ class FoodEntryService {
     @Transactional
     void deleteEntry(String userEmail, Long id) {
         Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
         FoodEntry entry = repository.findByIdAndUserId(id, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         repository.delete(entry);
@@ -85,10 +94,23 @@ class FoodEntryService {
     @Transactional
     void markConsumed(String userEmail, Long mealId, LocalDate date, boolean consumed) {
         Long userId = userService.findUserIdByEmail(userEmail);
+        lockCurrentPlanIfPresent(userId);
         if (!planService.mealBelongsToUser(mealId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        Long planId = planService.getPlanIdForDate(userId, date);
+        if (!planService.getMealIds(planId).contains(mealId)) {
+            throw new uy.miga.plans.PlanVersionConflictException();
+        }
         repository.setConsumedByMeal(userId, mealId, date, consumed);
+    }
+
+    private void lockCurrentPlanIfPresent(Long userId) {
+        try {
+            planService.lockCurrentPlan(userId);
+        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+            // Un registro histórico puede existir sin plan vigente.
+        }
     }
 
     private FoodEntryDto toDto(FoodEntry e) {

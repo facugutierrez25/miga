@@ -34,6 +34,7 @@ class WeekIntegrationTest {
     @Autowired private EmailOutboxWorker outboxWorker;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
     private MockMvc mockMvc;
     private String token;
 
@@ -65,7 +66,7 @@ class WeekIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + token)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk());
     }
 
@@ -173,7 +174,7 @@ class WeekIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
             .header("Authorization", "Bearer " + tokenB)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(PLAN_JSON))
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, tokenB, PLAN_JSON)))
             .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(get("/api/v1/semana")
@@ -198,8 +199,140 @@ class WeekIntegrationTest {
             .andReturn();
 
         String csv = result.getResponse().getContentAsString();
-        assertThat(csv).contains("Fecha,Datos");
+        assertThat(csv).contains("Fecha", "Desayuno");
         assertThat(csv.lines().count()).isGreaterThanOrEqualTo(8);
+    }
+
+    @Test
+    void historicalPlansNotesAndExportsStayIsolated() throws Exception {
+        LocalDate monday = LocalDate.of(2026, 1, 5);
+        JsonNode plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        long oldMeal = plan.path("meals").get(0).path("id").asLong();
+        long oldPlan = jdbc.queryForObject("SELECT plan_id FROM meals WHERE id = ?", Long.class, oldMeal);
+        long user = jdbc.queryForObject("SELECT user_id FROM plans WHERE id = ?", Long.class, oldPlan);
+        jdbc.update("UPDATE plans SET created_at = ?::date WHERE id = ?", monday.toString(), oldPlan);
+        mockMvc.perform(put("/api/v1/my-plan").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token,
+                PLAN_JSON.replace("Desayuno", "Almuerzo")))).andExpect(status().isOk());
+        long newPlan = jdbc.queryForObject("SELECT id FROM plans WHERE user_id = ? AND is_current", Long.class, user);
+        jdbc.update("UPDATE plans SET superseded_at = ?::date WHERE id = ?", monday.plusDays(3).toString(), oldPlan);
+        jdbc.update("UPDATE plans SET created_at = ?::date, modo_registro = 'LIBRE' WHERE id = ?", monday.plusDays(3).toString(), newPlan);
+        long newMeal = jdbc.queryForObject("SELECT id FROM meals WHERE plan_id = ?", Long.class, newPlan);
+        String note = "=texto privado; con \"comillas\"\nsegunda l\u00ednea";
+        jdbc.update("INSERT INTO meal_notes(user_id, fecha, meal_id, texto, plan_id) VALUES (?, ?, ?, ?, ?)",
+            user, monday.plusDays(3), newMeal, note, newPlan);
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", monday.toString())
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(week.path("days").get(0).path("totalGoal").asDouble()).isEqualTo(5.5);
+        assertThat(week.path("days").get(0).path("meals").get(0).path("name").asText()).isEqualTo("Desayuno");
+        assertThat(week.path("days").get(3).path("totalGoal").asDouble()).isZero();
+        assertThat(week.path("days").get(3).path("meals").get(0).path("status").asText()).isEqualTo("REGISTRADA");
+        String csv = mockMvc.perform(get("/api/v1/semana/export").param("date", monday.toString())
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).contains("Desayuno", "Almuerzo", "'=texto privado", "segunda l\u00ednea");
+        byte[] xlsx = mockMvc.perform(get("/api/v1/semana/export").param("date", monday.toString()).param("format", "xlsx")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (var workbook = new org.dhatim.fastexcel.reader.ReadableWorkbook(new java.io.ByteArrayInputStream(xlsx))) {
+            assertThat(workbook.getFirstSheet().read().get(4).getCellText(2)).isEqualTo("'" + note);
+        }
+        String other = registerAndLogin("isolation-" + UUID.randomUUID() + "@miga.uy");
+        String otherWeek = mockMvc.perform(get("/api/v1/semana").param("date", monday.toString())
+            .header("Authorization", "Bearer " + other)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(otherWeek).doesNotContain("texto privado", "Almuerzo");
+        for (String format : java.util.List.of("csv", "xlsx")) {
+            byte[] bytes = mockMvc.perform(get("/api/v1/semana/export").param("date", monday.toString()).param("format", format)
+                .header("Authorization", "Bearer " + other)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            if (format.equals("csv")) assertThat(new String(bytes, java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("texto privado", "Almuerzo");
+            else try (var workbook = new org.dhatim.fastexcel.reader.ReadableWorkbook(new java.io.ByteArrayInputStream(bytes))) {
+                assertThat(workbook.getFirstSheet().read().getFirst().getCellCount()).isEqualTo(1);
+            }
+        }
+    }
+
+    @Test
+    void flexibleHabitCountsMentionsAndRewritingReplacesTheCount() throws Exception {
+        JsonNode rules = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan/reglas")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        mockMvc.perform(post("/api/v1/my-plan/alimentos").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("""
+                {"planVersion":%d,"alimento":"galleta especial","sinonimos":[],"tipo":"FLEXIBLE"}
+                """.formatted(rules.path("planVersion").asLong()))).andExpect(status().isCreated());
+        long habit = objectMapper.readTree(mockMvc.perform(post("/api/v1/habitos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"name":"Flexibles","habitType":"CONTADOR","countsFlexibleMeals":true,"step":1,"displayOrder":1}
+                """)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).path("id").asLong();
+        JsonNode plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        long meal = plan.path("meals").get(0).path("id").asLong();
+        String today = LocalDate.now().toString();
+        for (String text : java.util.List.of("galleta especial, galleta especial", "galleta especial, galleta especial", "galleta especial")) {
+            mockMvc.perform(post("/api/v1/registro/" + today + "/" + meal + "/note")
+                .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of("text", text)))).andExpect(status().isCreated());
+            JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", today)
+                .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+            for (JsonNode day : week.path("days")) if (day.path("date").asText().equals(today)) {
+                assertThat(day.path("habitLogs").get(0).path("habitId").asLong()).isEqualTo(habit);
+                assertThat(day.path("habitLogs").get(0).path("value").asInt()).isEqualTo(text.contains(",") ? 2 : 1);
+            }
+        }
+        mockMvc.perform(put("/api/v1/habitos/" + habit + "/log").param("date", today)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content("{\"value\":99}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void habitOfAnEarlierPlanCanBeLoggedOnItsDayButNotToday() throws Exception {
+        long oldHabit = createHabit("Agua", "CANTIDAD", "lt");
+        mockMvc.perform(put("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token,
+                    PLAN_JSON.replace("Desayuno", "Desayuno nuevo"))))
+            .andExpect(status().isOk());
+        String yesterday = java.time.LocalDate.now().minusDays(1).toString();
+
+        logHabit(oldHabit, yesterday, 1.5);
+
+        int todayStatus = mockMvc.perform(put("/api/v1/habitos/" + oldHabit + "/log")
+                .param("date", java.time.LocalDate.now().toString())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":1}"))
+            .andReturn().getResponse().getStatus();
+        org.assertj.core.api.Assertions.assertThat(todayStatus).isEqualTo(400);
+    }
+
+    @Test
+    void mealWithNoteIsNeverShownAsNotRecorded() throws Exception {
+        JsonNode plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token))
+            .andReturn().getResponse().getContentAsString());
+        long mealId = plan.path("meals").get(0).path("id").asLong();
+        String today = java.time.LocalDate.now().toString();
+        mockMvc.perform(put("/api/v1/registro/" + today + "/comidas/" + mealId + "/nota")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"text\":\"leche\",\"version\":null}"))
+            .andExpect(status().isCreated());
+
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", today)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        for (JsonNode day : week.path("days")) {
+            if (!today.equals(day.path("date").asText())) continue;
+            for (JsonNode meal : day.path("meals")) {
+                if (meal.path("mealId").asLong() == mealId) {
+                    org.assertj.core.api.Assertions.assertThat(meal.path("status").asText())
+                        .isIn("CASI", "EN_PLAN", "DE_MAS", "REGISTRADA", "PREGUNTAR");
+                    return;
+                }
+            }
+        }
+        throw new AssertionError("no se encontró la comida de hoy en la semana");
     }
 
     private long createHabit(String name, String type, String unit) throws Exception {

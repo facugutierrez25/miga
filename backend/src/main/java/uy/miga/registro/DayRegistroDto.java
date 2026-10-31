@@ -13,6 +13,7 @@ record DayRegistroDto(
         Long mealId,
         Long noteId,
         String noteText,
+        Long noteVersion,
         List<EntryItemDto> items,
         List<GroupStatusDto> comparison
     ) {}
@@ -25,7 +26,10 @@ record DayRegistroDto(
         Long foodGroupId,
         BigDecimal portions,
         String origin,
-        Boolean uncertain
+        Boolean uncertain,
+        String originalText,
+        String appliedRule,
+        java.util.UUID occurrenceId
     ) {}
 
     record DailySummaryDto(

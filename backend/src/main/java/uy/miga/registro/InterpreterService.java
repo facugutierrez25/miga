@@ -138,6 +138,18 @@ class InterpreterService {
             }
         }
 
+        // Admite también la unidad al final: "2 yogur u".
+        if (detectedUnit == null) {
+            for (Map.Entry<String, String> entry : UNIT_CANONICAL.entrySet()) {
+                String suffix = " " + entry.getKey();
+                if (foodName.endsWith(suffix)) {
+                    detectedUnit = entry.getValue();
+                    foodName = foodName.substring(0, foodName.length() - suffix.length()).strip();
+                    break;
+                }
+            }
+        }
+
         // Strip preposition "de" after a unit: "un vaso de leche" → foodName = "leche"
         if (foodName.startsWith("de ")) {
             foodName = foodName.substring(3).strip();

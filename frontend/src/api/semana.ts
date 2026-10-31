@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+import { apiRequest } from './client'
 
 export interface HabitDto {
   id: number
@@ -8,6 +8,7 @@ export interface HabitDto {
   dailyGoal: number | null
   step: number
   period: string
+  countsFlexibleMeals?: boolean
   displayOrder: number
 }
 
@@ -23,6 +24,8 @@ export interface WeekDayDto {
   totalRecorded: number
   totalGoal: number
   habitLogs: HabitLogDto[]
+  habitIds?: number[]
+  meals?: { mealId: number; name: string; noteText: string | null; status: string; flexibleCount?: number }[]
 }
 
 export interface WeekSummaryDto {
@@ -34,22 +37,13 @@ export interface WeekSummaryDto {
 
 export async function getWeek(token: string, date?: string, signal?: AbortSignal): Promise<WeekSummaryDto> {
   const url = date
-    ? `${API_URL}/api/v1/semana?date=${date}`
-    : `${API_URL}/api/v1/semana`
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal,
-  })
-  if (!res.ok) throw new Error('Error al cargar la semana.')
-  return res.json()
+    ? `/api/v1/semana?date=${date}`
+    : `/api/v1/semana`
+  return apiRequest(url, { errorMessage: 'Error al cargar la semana.', token, signal })
 }
 
 export async function getHabits(token: string): Promise<HabitDto[]> {
-  const res = await fetch(`${API_URL}/api/v1/habitos`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al cargar los hábitos.')
-  return res.json()
+  return apiRequest(`/api/v1/habitos`, { errorMessage: 'Error al cargar los hábitos.', token })
 }
 
 export async function logHabit(
@@ -58,25 +52,20 @@ export async function logHabit(
   date: string,
   value: number,
 ): Promise<HabitLogDto> {
-  const res = await fetch(`${API_URL}/api/v1/habitos/${habitId}/log?date=${date}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value }),
-  })
-  if (!res.ok) throw new Error('Error al registrar el hábito.')
-  return res.json()
+  return apiRequest(`/api/v1/habitos/${habitId}/log?date=${date}`, { errorMessage: 'Error al registrar el hábito.', token, method: 'PUT', body: { value } })
 }
 
-export async function exportWeekCsv(token: string, weekStart: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/semana/export?date=${weekStart}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al exportar.')
-  const blob = await res.blob()
+export async function exportWeek(token: string, weekStart: string, format: 'csv' | 'xlsx' = 'csv'): Promise<void> {
+  const blob = await apiRequest<Blob>(`/api/v1/semana/export?date=${weekStart}&format=${format}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
+  if (!blob) return
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `semana-${weekStart}.csv`
+  a.download = `semana-${weekStart}.${format}`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export function exportWeekCsv(token: string, weekStart: string): Promise<void> {
+  return exportWeek(token, weekStart, 'csv')
 }

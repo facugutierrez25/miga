@@ -30,5 +30,7 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
 
     List<FoodRule> findByUserIdAndPlanIdAndAlcance(Long userId, Long planId, String alcance);
 
+    List<FoodRule> findByPlanIdAndAlcanceIn(Long planId, List<String> alcances);
+
     void deleteByIdAndUserId(Long id, Long userId);
 }

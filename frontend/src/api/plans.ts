@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+import { apiRequest, ApiError } from './client'
 
 export interface PlanFoodGroupDto {
   id: number
@@ -6,6 +6,11 @@ export interface PlanFoodGroupDto {
   abbreviation: string
   displayOrder: number
   color: string | null
+  clave?: string | null
+  preguntarSiFalta?: boolean
+  opcional?: boolean
+  metaDiaria?: number | null
+  uid?: string
 }
 
 export interface MealPortionDto {
@@ -34,6 +39,7 @@ export interface MealSaveDto {
 }
 
 export interface PlanDto {
+  createdAt?: string
   foodGroups: PlanFoodGroupDto[]
   meals: MealDto[]
   version?: number
@@ -44,20 +50,15 @@ export interface PlanSaveDto {
   clientVersion?: number
 }
 
-export class PlanConflictError extends Error {
-  constructor() {
-    super('PLAN_CONFLICT')
+export class PlanConflictError extends ApiError {
+  constructor(details: Record<string, unknown> = {}) {
+    super(409, 'PLAN_CONFLICT', details)
     this.name = 'PlanConflictError'
   }
 }
 
-export async function getMyPlan(token: string): Promise<PlanDto> {
-  const res = await fetch(`${API_URL}/api/v1/my-plan`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (res.status === 404) throw new Error('sin-plan')
-  if (!res.ok) throw new Error('Error al cargar el plan.')
-  return res.json()
+export async function getMyPlan(token: string, signal?: AbortSignal): Promise<PlanDto> {
+  return apiRequest(`/api/v1/my-plan`, { errorMessage: 'Error al cargar el plan.', token, signal, errorMessages: { 404: 'sin-plan' } })
 }
 
 export interface MealSummaryDto {
@@ -73,27 +74,16 @@ export interface PlanSummaryDto {
   meals: MealSummaryDto[]
 }
 
-export async function getPlanHistory(token: string): Promise<PlanSummaryDto[]> {
-  const res = await fetch(`${API_URL}/api/v1/my-plan/historial`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Error al cargar el historial.')
-  return res.json()
+export async function getPlanHistory(token: string, signal?: AbortSignal): Promise<PlanSummaryDto[]> {
+  return apiRequest(`/api/v1/my-plan/historial`, { errorMessage: 'Error al cargar el historial.', token, signal })
 }
 
 export async function saveMyPlan(token: string, plan: PlanSaveDto): Promise<PlanDto> {
-  const res = await fetch(`${API_URL}/api/v1/my-plan`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(plan),
-  })
-  if (res.status === 409) throw new PlanConflictError()
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`${res.status}: ${body}`)
+  try {
+    return await apiRequest(`/api/v1/my-plan`, { token, method: 'PUT', body: plan })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) throw new PlanConflictError(err.details)
+    throw err
   }
-  return res.json()
+
 }
