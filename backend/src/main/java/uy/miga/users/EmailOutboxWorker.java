@@ -34,6 +34,8 @@ public class EmailOutboxWorker {
     private final Counter sentCounter;
     private final Counter retriedCounter;
     private final Counter failedCounter;
+    @Value("${app.email-outbox.scheduler-enabled:true}")
+    private boolean schedulerEnabled = true;
 
     EmailOutboxWorker(EmailOutboxJobRepository outboxRepository,
                       VerificationTokenRepository tokenRepository,
@@ -59,7 +61,13 @@ public class EmailOutboxWorker {
             .register(meterRegistry);
     }
 
+    // En los tests se desactiva: cada contexto de Spring tendría su propio procesador programado
+    // leyendo la misma base, y podría tomar el email que espera otro test.
     @Scheduled(fixedDelayString = "${app.email-outbox.poll-interval-ms:30000}")
+    void scheduledRun() {
+        if (schedulerEnabled) processJobs();
+    }
+
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void processJobs() {
         List<EmailOutboxJob> jobs = transactions.execute(status -> {
