@@ -303,3 +303,5 @@ Documentar en la issue o comentario de GitHub:
 - Antigüedad del dump usado
 - Resultado (éxito / error y descripción)
 - Tiempo total del proceso
+
+`RATE_LIMIT_TRUSTED_PROXIES` (1 por defecto) selecciona la IP desde el final de X-Forwarded-For; 0 ignora la cabecera; `RATE_LIMIT_MAX_BUCKETS` (10000) acota claves por tipo con vencimiento por inactividad igual a su ventana (email: 10 intentos/15 minutos).
