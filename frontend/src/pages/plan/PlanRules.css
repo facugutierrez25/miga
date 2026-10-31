@@ -26,8 +26,28 @@
 }
 
 .plan-rules h2,
-.plan-rules h3 {
+.plan-rules h3,
+.plan-rules h4 {
+  margin: 0;
   font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Escala de la guía: título de sección 18 px, título de ítem 16 px. */
+.plan-rules h2 {
+  font-size: 18px;
+}
+
+.plan-rules h3,
+.plan-rules h4 {
+  font-size: 16px;
+}
+
+.rules-error {
+  margin: 0;
+  color: var(--error);
+  font-size: 14px;
 }
 
 .rules-row {
@@ -54,7 +74,7 @@
   padding: 8px;
   color: var(--ink);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border, var(--border));
   border-radius: 12px;
 }
 

@@ -305,6 +305,36 @@ class WeekIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(todayStatus).isEqualTo(400);
     }
 
+    @Test
+    void mealWithNoteIsNeverShownAsNotRecorded() throws Exception {
+        JsonNode plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+                .header("Authorization", "Bearer " + token))
+            .andReturn().getResponse().getContentAsString());
+        long mealId = plan.path("meals").get(0).path("id").asLong();
+        String today = java.time.LocalDate.now().toString();
+        mockMvc.perform(put("/api/v1/registro/" + today + "/comidas/" + mealId + "/nota")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"text\":\"leche\",\"version\":null}"))
+            .andExpect(status().isCreated());
+
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", today)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        for (JsonNode day : week.path("days")) {
+            if (!today.equals(day.path("date").asText())) continue;
+            for (JsonNode meal : day.path("meals")) {
+                if (meal.path("mealId").asLong() == mealId) {
+                    org.assertj.core.api.Assertions.assertThat(meal.path("status").asText())
+                        .isIn("CASI", "EN_PLAN", "DE_MAS", "REGISTRADA", "PREGUNTAR");
+                    return;
+                }
+            }
+        }
+        throw new AssertionError("no se encontró la comida de hoy en la semana");
+    }
+
     private long createHabit(String name, String type, String unit) throws Exception {
         String unitJson = unit != null ? "\"" + unit + "\"" : "null";
         MvcResult result = mockMvc.perform(post("/api/v1/habitos")

@@ -37,7 +37,7 @@
 .priv-hero__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(32px, 7vw, 52px);
+  font-size: 34px;
   letter-spacing: -0.04em;
   line-height: 1.05;
   color: var(--ink);
@@ -65,7 +65,7 @@
 .priv-section__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 20px;
+  font-size: 18px;
   letter-spacing: -0.02em;
   color: var(--ink);
   margin-bottom: 16px;
@@ -93,7 +93,7 @@
 .priv-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding-left: 0;
   list-style: none;
 }
@@ -150,7 +150,7 @@
   }
 
   .priv-section__title {
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .priv-section__body p,

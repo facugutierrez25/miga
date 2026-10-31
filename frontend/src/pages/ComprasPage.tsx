@@ -8,7 +8,7 @@ export default function ComprasPage() {
       <div style={{ marginBottom: 24 }}>
         <Brand size={26} />
       </div>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>Compras</h1>
+      <h1 style={{ fontSize: 34, marginBottom: 8 }}>Compras</h1>
       <p style={{ color: 'var(--muted)' }}>Muy pronto.</p>
     </div>
   )

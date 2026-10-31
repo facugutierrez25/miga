@@ -3,7 +3,8 @@
   flex-direction: column;
   min-height: 100dvh;
   padding: 0 0 80px;
-  max-width: 540px;
+  max-width: 1600px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -11,6 +12,8 @@
 .semana-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 12px;
   padding: 20px 16px 12px;
   position: sticky;
@@ -22,6 +25,7 @@
 
 .semana-nav {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -33,9 +37,11 @@
   color: var(--primary);
   font-size: 22px;
   line-height: 1;
-  padding: 4px 8px;
+  padding: 8px;
+  min-width: 44px;
+  min-height: 44px;
   cursor: pointer;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   transition: background 0.15s;
 }
 .semana-nav__btn:hover { background: var(--primary-soft); }
@@ -50,12 +56,14 @@
 }
 
 .semana-export-btn {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--muted);
   background: none;
-  padding: 4px 8px;
+  padding: 8px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   cursor: pointer;
@@ -69,9 +77,9 @@
 /* ── Grid ── */
 .semana-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  padding: 16px 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  padding: 16px;
   overflow-x: auto;
   min-width: 0;
 }
@@ -80,8 +88,8 @@
 .semana-day {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 6px;
+  gap: 8px;
+  padding: 16px;
   border-radius: var(--radius-card);
   background: var(--surface);
   border: 1px solid var(--line-soft);
@@ -102,11 +110,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .semana-day__dow {
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -128,7 +136,7 @@
 .semana-day__porciones {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   align-items: center;
 }
 
@@ -152,7 +160,7 @@
 }
 
 .semana-day__frac {
-  font-size: 9px;
+  font-size: 13px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -166,19 +174,20 @@
 .semana-day__habitos {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .semana-habito {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   background: none;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 3px 5px;
+  border-radius: var(--radius-pill);
+  padding: 8px;
+  min-height: 44px;
   cursor: pointer;
-  font-size: 9px;
+  font-size: 13px;
   color: var(--muted);
   text-align: left;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
@@ -194,7 +203,7 @@
 }
 
 .semana-habito__check {
-  font-size: 8px;
+  font-size: 13px;
   min-width: 8px;
   text-align: center;
 }
@@ -210,13 +219,13 @@
 .semana-habito__val {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  font-size: 8px;
+  font-size: 13px;
 }
 
 /* ── Empty / status ── */
 .semana-day__vacio {
-  font-size: 11px;
-  color: var(--done);
+  font-size: 13px;
+  color: var(--text-secondary);
   text-align: center;
   margin: auto;
 }
@@ -240,7 +249,8 @@
   background: none;
   border: 1px solid var(--error);
   color: var(--error);
-  padding: 6px 16px;
+  padding: 8px 16px;
+  min-height: 44px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   font-size: 13px;
@@ -253,18 +263,84 @@
   padding: 16px 24px 0;
 }
 
-/* ── Responsive: stack to 2-col on very narrow ── */
-@media (max-width: 340px) {
-  .semana-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+.semana-views,
+.semana-exports {
+  display: flex;
+  gap: 8px;
 }
-
-.semana-views, .semana-exports { display: flex; gap: .5rem; }
-.semana-views { margin: 1rem 0; }
-.semana-views [aria-pressed="true"] { font-weight: bold; text-decoration: underline; }
+.semana-views {
+  margin: 16px;
+  padding: 4px;
+  align-self: flex-start;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+}
+.semana-views button {
+  min-height: 44px;
+  padding: 8px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+.semana-views [aria-pressed="true"] {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  background: var(--surface);
+  border-color: var(--control-border);
+}
 .semana-sheet { overflow-x: auto; }
 .semana-sheet table { border-collapse: collapse; width: 100%; }
 .semana-sheet th, .semana-sheet td { padding: .75rem; border: 1px solid var(--border, #ddd); text-align: left; }
-.semana-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.semana-note {
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  hyphens: auto;
+}
 .semana-meals { list-style: none; padding: 0; font-size: .85rem; }
+
+.semana-title {
+  font-size: 34px;
+}
+
+.semana-day__head {
+  font-size: 18px;
+  text-align: center;
+}
+
+.semana-day__today {
+  color: var(--primary);
+  font: 700 13px var(--font-body);
+}
+
+.semana-habit-error {
+  color: var(--error);
+  font-size: 13px;
+}
+
+.semana-habito__name {
+  white-space: normal;
+}
+
+@media (max-width: 639px) {
+  .semana-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .semana-nav {
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .semana-exports {
+    margin-left: auto;
+  }
+}
+
+@media (min-width: 640px) {
+  .semana-header > .brand {
+    display: none;
+  }
+}

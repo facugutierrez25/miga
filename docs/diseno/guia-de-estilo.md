@@ -23,8 +23,8 @@ Se definen como variables CSS y se cambian según el tema. Nunca usar hex suelto
 | `--surface` | Tarjetas, barras | `#FFFFFF` | `#132322` |
 | `--surface-2` | Paneles laterales (escritorio) | `#F8FBFA` | `#0F1D1C` |
 | `--ink` | Texto principal | `#102624` | `#E6F0EF` |
-| `--muted` | Texto secundario | `#5A706E` | `#93A9A7` |
-| `--muted-2` | Íconos y etiquetas inactivas | `#6E8482` | `#7F9795` |
+| `--muted` | Texto secundario | `#5A706E` | `#9BB1AF` |
+| `--muted-2` | Íconos decorativos | `#6E8482` | `#7F9795` |
 | `--done` | Texto de cosas ya hechas | `#7C918F` | `#6E8684` |
 | `--primary` | Encabezado, acción principal, navegación activa | `#0E6E6B` | `#3FB3AE` |
 | `--on-primary` | Texto e íconos sobre `--primary` | `#FFFFFF` | `#062120` |
@@ -38,10 +38,14 @@ Se definen como variables CSS y se cambian según el tema. Nunca usar hex suelto
 | `--rail` | Línea de tiempo del día | `#CFE0DE` | `#24403E` |
 | `--border` | Borde de inputs y botones secundarios | `#C6DCDA` | `#2C4644` |
 | `--control` | Borde de checkbox y puntos pendientes | `#7A9290` | `#6F8B88` |
+| `--text-secondary` | Texto pequeño y navegación inactiva | `#526865` | `#9BB1AF` |
+| `--control-border` | Bordes de campos (contraste mínimo 3:1) | `#708784` | `#789592` |
 
 El amarillo (`--accent`) es solo para detalles: nunca para texto ni para fondos grandes.
 
 ### Grupos de alimentos
+
+Los chips usan `--group-text: var(--ink)` para el texto sobre tinte y el color del grupo en un punto o borde.
 
 El color de cada grupo es el mismo en los dos temas; solo cambia el fondo suave (tinte).
 
@@ -148,7 +152,7 @@ No usar IBM Plex, Inter, Roboto, Arial ni tipografías con serifa. Inputs siempr
 
 **Barra de progreso de porciones.** Barra de 12 px dividida por grupo, cada tramo proporcional a sus porciones del día, con el tinte de fondo y el color del grupo como relleno. Debajo, leyenda con punto + `Grupo 2/3`.
 
-**Navegación inferior (paciente).** 4 ítems: Hoy, Semana, Compras, Perfil. Alto 82 px, fondo `--surface`, borde superior `--line`. Ícono de línea de 24 px (trazo 2,2, puntas redondeadas) + etiqueta de 11 px. Activo: color `--primary` y `aria-current="page"`; inactivo: `--muted-2`.
+**Navegación inferior (paciente).** 4 ítems: Hoy, Semana, Compras, Perfil. Alto 82 px, fondo `--surface`, borde superior `--line`. Ícono de línea de 24 px (trazo 2,2, puntas redondeadas) + etiqueta de 11 px. Activo: color `--primary` y `aria-current="page"`; inactivo: `--text-secondary`.
 
 **Navegación lateral (nutricionista).** Ancho ~232 px, fondo `--surface`. Ítem activo con fondo `--primary-soft` y texto `--primary`.
 

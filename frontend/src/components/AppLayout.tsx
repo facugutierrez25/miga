@@ -116,7 +116,7 @@ export default function AppLayout() {
           </div>
         </nav>
 
-        <main className="app-layout__main">
+        <main className="app-layout__main" tabIndex={-1}>
           <Outlet />
         </main>
 

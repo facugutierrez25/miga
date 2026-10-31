@@ -75,7 +75,7 @@
 .ob-step__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 28px;
+  font-size: 34px;
   color: var(--ink);
   letter-spacing: -0.03em;
   line-height: 1.15;
@@ -94,7 +94,7 @@
 .ob-step__actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin-top: 32px;
 }
 
@@ -211,13 +211,14 @@
   flex: 1;
   min-height: 48px;
   border-radius: var(--radius-control);
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--control-border);
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 15px;
   padding: 0 14px;
-  outline: none;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .ob-meal-row__name:focus {
@@ -232,13 +233,14 @@
   width: 110px;
   min-height: 48px;
   border-radius: var(--radius-control);
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--control-border);
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 15px;
   padding: 0 10px;
-  outline: none;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
   flex-shrink: 0;
 }
 
@@ -252,7 +254,7 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   border-radius: var(--radius-card);
   padding: 16px;
   background: var(--glass-bg);
@@ -265,7 +267,7 @@
 .ob-meal-preview__item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 32px;
 }
 
@@ -303,6 +305,40 @@
   }
 
   .ob-step__title {
-    font-size: 32px;
+    font-size: 34px;
   }
+}
+
+.ob-body,
+.ob-step,
+.ob-step__content,
+.ob-meal-row,
+.ob-meal-row__name,
+.ob-meal-row__time,
+.ob-meal-preview__name {
+  min-width: 0;
+}
+
+.ob-btn,
+.btn-skip,
+.ob-stepper__btn {
+  border-radius: var(--radius-pill);
+}
+
+.ob-meal-preview__name {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 389px) {
+  .ob-meal-row {
+    flex-wrap: wrap;
+  }
+
+  .ob-meal-row__name {
+    flex-basis: 100%;
+  }
+}
+
+.ob-btn.btn-secondary {
+  border: 1px solid var(--control-border);
 }

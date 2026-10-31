@@ -55,6 +55,8 @@ export default function FoodRuleForm({
     new Set(input.componentes.map((c) => c.groupUid)).size === input.componentes.length &&
     input.componentes.every((c) => c.groupUid && c.porciones > 0)
 
+  // Cantidad y unidad van juntas: las dos o ninguna (en ese caso se usa la porción por defecto).
+  const quantityUnitMismatch = input.tipo === 'NORMAL' && !!input.cantidadPorPorcion !== !!input.unidad
   const valid =
     input.alimento.trim() &&
     (input.tipo !== 'COMPUESTO' || compoundValid) &&
@@ -150,6 +152,8 @@ export default function FoodRuleForm({
               min="0.01"
               step="any"
               value={input.cantidadPorPorcion ?? ''}
+              aria-describedby="rule-quantity-hint"
+              aria-invalid={quantityUnitMismatch || undefined}
               onChange={(e) =>
                 setInput({
                   ...input,
@@ -163,6 +167,8 @@ export default function FoodRuleForm({
             Unidad
             <select
               value={input.unidad ?? ''}
+              aria-describedby="rule-quantity-hint"
+              aria-invalid={quantityUnitMismatch || undefined}
               onChange={(e) => setInput({ ...input, unidad: e.target.value || null })}
             >
               <option value="">Sin unidad</option>
@@ -171,6 +177,13 @@ export default function FoodRuleForm({
               ))}
             </select>
           </label>
+
+          <p id="rule-quantity-hint" className={quantityUnitMismatch ? 'rules-error' : 'rules-secondary'}
+            role={quantityUnitMismatch ? 'alert' : undefined}>
+            {quantityUnitMismatch
+              ? 'Completá la cantidad y la unidad juntas, o dejá las dos vacías.'
+              : 'Cantidad y unidad van juntas; si las dejás vacías se usa la porción por defecto.'}
+          </p>
 
           <label>
             Porción por defecto
@@ -195,7 +208,9 @@ export default function FoodRuleForm({
             foodName={input.alimento}
           />
           {!compoundValid && (
-            <p>Elegí al menos dos grupos distintos con porciones mayores a cero.</p>
+            <p className="rules-error" role="alert">
+              Elegí al menos dos grupos distintos con porciones mayores a cero.
+            </p>
           )}
         </>
       )}

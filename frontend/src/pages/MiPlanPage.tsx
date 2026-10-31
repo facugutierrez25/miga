@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDialogFocus } from './useDialogFocus'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
@@ -67,15 +68,40 @@ function localAPlan(comidas: ComidaLocal[], grupos: PlanFoodGroupDto[]) {
   }
 }
 
+// Porciones con coma decimal (es-UY).
+function formatPorcion(value: number) {
+  return String(value).replace('.', ',')
+}
+
 function formatFecha(iso: string) {
   return new Date(iso).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+function ConfirmDeleteModal({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onCancel)
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="confirm-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Confirmar eliminación"
+        onClick={e => e.stopPropagation()}>
+        <p className="confirm-modal__msg">
+          ¿Eliminar <strong>{name}</strong>?
+        </p>
+        <div className="confirm-modal__actions">
+          <button type="button" className="confirm-modal__cancel" onClick={onCancel}>Cancelar</button>
+          <button type="button" className="confirm-modal__confirm" onClick={onConfirm}>Eliminar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: () => void }) {
   const gruposMap = Object.fromEntries((plan.foodGroups ?? []).map(g => [g.id, g]))
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Detalle del plan" onClick={onClose}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Detalle del plan"
+        onClick={e => e.stopPropagation()}>
         <div className="modal-card__header">
           <div>
             <p className="modal-card__eyebrow">Plan anterior</p>
@@ -103,7 +129,7 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
                   const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
                   return (
                     <span key={p.foodGroupId} className={`porcion-chip porcion-chip--${cssKey}`}>
-                      <span className="porcion-chip__num">{p.portions}</span>
+                      <span className="porcion-chip__num">{formatPorcion(Number(p.portions))}</span>
                       {g.name}
                     </span>
                   )
@@ -148,6 +174,23 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       nombre: meal.name, hora: meal.suggestedTime?.slice(0, 5) ?? '',
       porciones: porcionesVacias(DEFAULT_GRUPOS), minimizada: false,
     })))
+  // El foco solo se mueve por una acción de la persona: al guardar una comida vuelve a
+  // su «Editar», al editar o agregar va al nombre y al eliminar va a «Agregar comida».
+  const focoEditar = useRef<number | null>(null)
+  const focoNombre = useRef<number | null>(null)
+  const focoAgregar = useRef(false)
+  useEffect(() => {
+    if (focoEditar.current !== null) {
+      document.querySelector<HTMLElement>(`[data-edit-index="${focoEditar.current}"]`)?.focus()
+    } else if (focoNombre.current !== null) {
+      document.querySelector<HTMLElement>(`[data-name-index="${focoNombre.current}"]`)?.focus()
+    } else if (focoAgregar.current) {
+      document.querySelector<HTMLElement>('.btn-agregar')?.focus()
+    }
+    focoEditar.current = null
+    focoNombre.current = null
+    focoAgregar.current = false
+  }, [comidas])
   const [cargando, setCargando] = useState(false)
   const [historial, setHistorial] = useState<PlanSummaryDto[]>([])
   const [planDetalle, setPlanDetalle] = useState<PlanSummaryDto | null>(null)
@@ -208,18 +251,22 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   }
 
   function guardarComida(i: number) {
+    focoEditar.current = i
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, minimizada: true } : c))
   }
 
   function editarComida(i: number) {
+    focoNombre.current = i
     setComidas(prev => prev.map((c, j) => j === i ? { ...c, minimizada: false } : c))
   }
 
   function agregarComida() {
+    focoNombre.current = comidas.length
     setComidas(prev => [...prev, { nombre: '', hora: '', porciones: porcionesVacias(grupos), minimizada: false }])
   }
 
   function eliminarComida(i: number) {
+    focoAgregar.current = true
     setComidas(prev => prev.filter((_, j) => j !== i))
     setConfirmDeleteIdx(null)
   }
@@ -319,7 +366,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                       const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
                       return (
                         <span key={g.id} className={`porcion-chip porcion-chip--${cssKey}`}>
-                          <span className="porcion-chip__num">{comida.porciones[g.id]}</span>
+                          <span className="porcion-chip__num">{formatPorcion(comida.porciones[g.id])}</span>
                           {g.name}
                         </span>
                       )
@@ -327,8 +374,9 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                   </div>
                   <button
                     className="btn-editar"
+                    data-edit-index={i}
                     onClick={() => editarComida(i)}
-                    aria-label="Editar comida"
+                    aria-label={`Editar ${comida.nombre || 'comida'}`}
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                       <path d="M12.5 2.5a1.414 1.414 0 0 1 2 2L5 14H3v-2L12.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -353,6 +401,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                       value={comida.nombre}
                       onChange={e => actualizarNombre(i, e.target.value)}
                       aria-label="Nombre de la comida"
+                      data-name-index={i}
                     />
                     <button
                       className="btn-eliminar-exp"
@@ -391,7 +440,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                             disabled={(comida.porciones[g.id] ?? 0) <= 0}
                             aria-label={`Reducir ${g.name}`}
                           >−</button>
-                          <span className="stepper-value" aria-live="polite">{comida.porciones[g.id] ?? 0}</span>
+                          <span className="stepper-value" aria-live="polite">{formatPorcion(comida.porciones[g.id] ?? 0)}</span>
                           <button
                             className="stepper-btn"
                             onClick={() => actualizarPorcion(i, g.id, 0.5)}
@@ -433,7 +482,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
               {confirmando ? 'Confirmando…' : 'Confirmar plan'}
             </button>
 
-            {confirmado && <p className="confirmado-msg">¡Plan guardado!</p>}
+            <p className="confirmado-msg" role="status">{confirmado ? '¡Plan guardado!' : ''}</p>
 
             {historial.length > 0 && (
               <div className="plan-historial">
@@ -457,17 +506,11 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
             )}
 
             {confirmDeleteIdx !== null && comidas[confirmDeleteIdx] && (
-              <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Confirmar eliminación" onClick={() => setConfirmDeleteIdx(null)}>
-                <div className="confirm-modal" onClick={e => e.stopPropagation()}>
-                  <p className="confirm-modal__msg">
-                    ¿Eliminar <strong>{comidas[confirmDeleteIdx].nombre || 'esta comida'}</strong>?
-                  </p>
-                  <div className="confirm-modal__actions">
-                    <button className="confirm-modal__cancel" onClick={() => setConfirmDeleteIdx(null)}>Cancelar</button>
-                    <button className="confirm-modal__confirm" onClick={() => eliminarComida(confirmDeleteIdx)}>Eliminar</button>
-                  </div>
-                </div>
-              </div>
+              <ConfirmDeleteModal
+                name={comidas[confirmDeleteIdx].nombre || 'esta comida'}
+                onCancel={() => setConfirmDeleteIdx(null)}
+                onConfirm={() => eliminarComida(confirmDeleteIdx)}
+              />
             )}
           </>
         )}

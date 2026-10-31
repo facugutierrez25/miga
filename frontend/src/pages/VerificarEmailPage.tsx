@@ -19,6 +19,7 @@ export default function VerificarEmailPage() {
   const [email, setEmail] = useState(emailInicial)
   const [reenviando, setReenviando] = useState(false)
   const [reenviado, setReenviado] = useState(false)
+  const [resendError, setResendError] = useState('')
   const verificado = useRef(false)
 
   useEffect(() => {
@@ -33,9 +34,12 @@ export default function VerificarEmailPage() {
     e.preventDefault()
     if (!email) return
     setReenviando(true)
+    setResendError('')
     try {
       await resendVerification(email)
       setReenviado(true)
+    } catch {
+      setResendError('No se pudo reenviar el link. Probá de nuevo.')
     } finally {
       setReenviando(false)
     }
@@ -46,10 +50,12 @@ export default function VerificarEmailPage() {
       <div className="register-card">
         <div className="register-brand"><Brand size={30} /></div>
 
+        {resendError && <p role="alert" className="register-error">{resendError}</p>}
         {estado === 'verificando' && (
           <>
             <div className="vmail-spinner" aria-label="Verificando…" />
-            <p className="vmail-subtitle">Verificando tu email…</p>
+            <h1 className="register-title">Verificá tu email</h1>
+            <p role="status" className="vmail-subtitle">Verificando tu email…</p>
           </>
         )}
 
@@ -62,7 +68,7 @@ export default function VerificarEmailPage() {
               </svg>
             </div>
             <h1 className="register-title">Email verificado</h1>
-            <p className="vmail-subtitle">Tu cuenta está lista. Ya podés iniciar sesión.</p>
+            <p role="status" className="vmail-subtitle">Tu cuenta está lista. Ya podés iniciar sesión.</p>
             <Link to="/login" className="register-submit vmail-link-btn">Iniciar sesión</Link>
           </>
         )}
@@ -76,7 +82,7 @@ export default function VerificarEmailPage() {
               </svg>
             </div>
             <h1 className="register-title">El link expiró</h1>
-            <p className="vmail-subtitle">Este link ya no es válido. Pedí uno nuevo:</p>
+            <p role="status" className="vmail-subtitle">Este link ya no es válido. Pedí uno nuevo:</p>
             <ResendForm email={email} onChange={setEmail} onSubmit={handleResend}
               reenviando={reenviando} reenviado={reenviado} />
             <p className="register-footer"><Link to="/login">Volver al inicio de sesión</Link></p>
@@ -92,7 +98,7 @@ export default function VerificarEmailPage() {
               </svg>
             </div>
             <h1 className="register-title">Revisá tu email</h1>
-            <p className="vmail-subtitle">
+            <p role="status" className="vmail-subtitle">
               {emailInicial
                 ? <>Te mandamos un link a <strong>{emailInicial}</strong>. Hacé clic para confirmar tu cuenta.</>
                 : 'Te mandamos un link de verificación. Hacé clic para confirmar tu cuenta.'}
@@ -116,7 +122,7 @@ function ResendForm({ email, onChange, onSubmit, reenviando, reenviado }: {
   reenviado: boolean
 }) {
   if (reenviado) {
-    return <p className="vmail-reenviado">Listo, revisá tu bandeja de entrada.</p>
+    return <p role="status" className="vmail-reenviado">Listo, revisá tu bandeja de entrada.</p>
   }
   return (
     <form className="vmail-resend" onSubmit={onSubmit}>

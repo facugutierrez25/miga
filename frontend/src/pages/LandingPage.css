@@ -64,7 +64,7 @@
   color: var(--muted);
   text-decoration: none;
   padding: 6px 12px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   transition: color 0.15s;
 }
 
@@ -84,7 +84,7 @@
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   transition: background 0.15s;
 }
 
@@ -115,7 +115,7 @@
 .land-hero__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(40px, 11vw, 76px);
+  font-size: 34px;
   letter-spacing: -0.04em;
   line-height: 1.02;
   color: var(--ink);
@@ -123,8 +123,7 @@
 
 .land-hero__sub {
   font-size: clamp(15px, 2.5vw, 18px);
-  color: var(--ink);
-  opacity: 0.65;
+  color: var(--text-secondary);
   line-height: 1.6;
   max-width: 480px;
   margin: 0 auto;
@@ -133,7 +132,7 @@
 .land-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
   animation: land-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
@@ -357,7 +356,7 @@
 .pscreen__cards {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .pscreen__card {
@@ -397,12 +396,36 @@
   font-family: var(--font-body);
 }
 
-.pbadge--prot { background: color-mix(in srgb, var(--g-prot) 16%, transparent); color: var(--g-prot); }
-.pbadge--cer  { background: color-mix(in srgb, var(--g-cer)  16%, transparent); color: var(--g-cer);  }
-.pbadge--frut { background: color-mix(in srgb, var(--g-frut) 16%, transparent); color: var(--g-frut); }
-.pbadge--verd { background: color-mix(in srgb, var(--g-verd) 16%, transparent); color: var(--g-verd); }
-.pbadge--lac  { background: color-mix(in srgb, var(--g-lac)  16%, transparent); color: var(--g-lac);  }
-.pbadge--gras { background: color-mix(in srgb, var(--g-gras) 16%, transparent); color: var(--g-gras); }
+.pbadge--prot {
+  --badge-color: var(--g-prot);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  color: var(--group-text);
+}
+.pbadge--cer {
+  --badge-color: var(--g-cer);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  color: var(--group-text);
+}
+.pbadge--frut {
+  --badge-color: var(--g-frut);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  color: var(--group-text);
+}
+.pbadge--verd {
+  --badge-color: var(--g-verd);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  color: var(--group-text);
+}
+.pbadge--lac {
+  --badge-color: var(--g-lac);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  color: var(--group-text);
+}
+.pbadge--gras {
+  --badge-color: var(--g-gras);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  color: var(--group-text);
+}
 
 .phone__home {
   position: relative;
@@ -441,7 +464,7 @@
 .land-section-title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(26px, 5vw, 44px);
+  font-size: 18px;
   letter-spacing: -0.03em;
   line-height: 1.1;
   color: var(--ink);
@@ -492,15 +515,14 @@
 .land-feature__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 19px;
+  font-size: 18px;
   color: var(--ink);
   letter-spacing: -0.02em;
 }
 
 .land-feature__desc {
   font-size: 15px;
-  color: var(--ink);
-  opacity: 0.65;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -537,7 +559,7 @@
   line-height: 1;
   flex-shrink: 0;
   width: 44px;
-  opacity: 0.35;
+  opacity: 1;
 }
 
 .land-step__title {
@@ -551,8 +573,7 @@
 
 .land-step__desc {
   font-size: 15px;
-  color: var(--ink);
-  opacity: 0.65;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -573,7 +594,7 @@
 
 .land-cta__badges {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -606,7 +627,7 @@
 .land-cta__title {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(36px, 7vw, 64px);
+  font-size: 18px;
   letter-spacing: -0.04em;
   line-height: 1.05;
   color: var(--ink);
@@ -744,5 +765,20 @@
 
   .land-steps {
     background: var(--surface);
+  }
+}
+
+.pbadge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--badge-color);
+}
+
+@media (min-width: 640px) {
+  .phone {
+    box-shadow: none;
   }
 }

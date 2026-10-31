@@ -38,14 +38,24 @@ public class RegistroService {
                 flexible = interpreter.interpret(note.getText(), ruleService.findApplicable(notePlan, userId))
                     .stream().filter(item -> "FLEXIBLE".equals(item.tipo())).count();
             }
-            String status = "SIN_ANOTAR";
-            if (note != null || !meal.items().isEmpty()) {
-                status = meal.comparison().isEmpty() ? "REGISTRADA" :
-                    meal.comparison().stream().map(GroupStatusDto::status)
-                        .filter(s -> !"EN_PLAN".equals(s)).findFirst().orElse("EN_PLAN");
-            }
+            String status = note != null || !meal.items().isEmpty()
+                ? recordedMealStatus(meal.comparison())
+                : ComparisonService.MISSING;
             return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
         }).toList();
+    }
+
+    // Estado de una comida con registro: un grupo sin porciones no la vuelve «sin anotar»,
+    // cuenta como «casi»; si algún grupo se pasa, el estado es «de más».
+    private static String recordedMealStatus(List<GroupStatusDto> groups) {
+        if (groups.isEmpty()) return "REGISTRADA";
+        List<String> statuses = groups.stream().map(GroupStatusDto::status).toList();
+        if (statuses.contains(ComparisonService.OVER)) return ComparisonService.OVER;
+        if (statuses.contains(ComparisonService.CLOSE) || statuses.contains(ComparisonService.MISSING)) {
+            return ComparisonService.CLOSE;
+        }
+        if (statuses.contains(ComparisonService.ASK)) return ComparisonService.ASK;
+        return ComparisonService.ON_PLAN;
     }
 
     @Transactional(readOnly = true)

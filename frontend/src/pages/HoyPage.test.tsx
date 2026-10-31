@@ -543,3 +543,41 @@ test('lo dictado mientras se guarda no se pierde al terminar el guardado', async
 
   await waitFor(() => expect(draft).toHaveValue('mate con pan'))
 })
+
+test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, comparison: [],
+      items: [{ id: 31, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
+        origin: 'REGLA', uncertain: false, appliedRule: null, occurrenceId: 'occ-31' }],
+    }],
+  })
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Corregir leche' })).toHaveFocus())
+})
+
+test('si falla una respuesta a la pregunta, se muestra el error', async () => {
+  vi.mocked(registroApi.saveRespuesta).mockRejectedValue(new Error('sin red'))
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTA', dailyGoal: null }],
+    }],
+  })
+  renderHoy()
+  await abrirNota()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Sí' }))
+
+  expect(await screen.findByText('No se pudo guardar la respuesta. Intentá de nuevo.')).toBeInTheDocument()
+})
