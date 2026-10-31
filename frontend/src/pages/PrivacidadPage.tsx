@@ -12,7 +12,7 @@ export default function PrivacidadPage() {
         <Brand size={22} />
         <nav className="land-nav__links">
           <Link to="/login" className="land-nav__login">Iniciar sesión</Link>
-          <Link to="/register" className="land-nav__cta">Crear cuenta</Link>
+          <Link to="/register" className="land-btn land-btn--primary land-btn--sm">Crear cuenta</Link>
         </nav>
       </header>
 
@@ -128,7 +128,7 @@ export default function PrivacidadPage() {
         <Brand size={18} />
         <div className="land-footer__right">
           <Link to="/" className="land-footer__priv">Inicio</Link>
-          <p className="land-footer__copy">Hecho con cuidado en Uruguay.</p>
+          <p className="land-footer__copy">Hecho en Uruguay.</p>
         </div>
       </footer>
 
