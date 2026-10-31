@@ -26,20 +26,20 @@
 }
 
 .priv-hero__updated {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--primary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+
+
   margin-bottom: 12px;
 }
 
 .priv-hero__title {
   font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 34px;
-  letter-spacing: -0.04em;
-  line-height: 1.05;
+  font-weight: 700;
+  font-size: var(--fs-h1);
+
+  line-height: 28px;
   color: var(--ink);
   margin-bottom: 16px;
 }
@@ -63,12 +63,13 @@
 }
 
 .priv-section__title {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: -0.02em;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--fs-h3);
+
   color: var(--ink);
   margin-bottom: 16px;
+  line-height: 24px;
 }
 
 .priv-section__body {
@@ -137,7 +138,6 @@
   border-color: var(--primary);
 }
 
-
 /* ── Desktop ── */
 
 @media (min-width: 640px) {
@@ -150,8 +150,9 @@
   }
 
   .priv-section__title {
-    font-size: 18px;
-  }
+    font-size: var(--fs-h3);
+    line-height: 24px;
+}
 
   .priv-section__body p,
   .priv-list li {

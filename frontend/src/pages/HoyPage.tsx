@@ -1,14 +1,16 @@
-import { Fragment, useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
 import Brand from '../components/Brand'
+import Migas from '../components/Migas'
+import { type MigaRow } from '../components/migaSlots'
 import { useTitle } from '../hooks/useTitle'
 import { useAhora } from '../hooks/useAhora'
 import { type PlanFoodGroupDto, type MealDto } from '../api/plans'
 import {
   NoteConflictError, saveNota, patchItem, saveRespuesta, getSugerencias,
-  type DayRegistroDto, type MealDayDto, type EntryItemDto,
+  type DayRegistroDto, type DailySummaryDto, type MealDayDto, type EntryItemDto,
   type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
 import './HoyPage.css'
@@ -20,16 +22,9 @@ const ABBR_DOT: Record<string, string> = {
   LAC: 'var(--g-lac)',  GRA: 'var(--g-gras)', VER: 'var(--g-verd)',
 }
 
-const ABBR_CSS: Record<string, string> = {
-  PRO: 'PROTEINS', CER: 'GRAINS', FRU: 'FRUITS',
-  LAC: 'DAIRY',    GRA: 'FATS',   VER: 'VEGETABLES',
-}
-
-
 interface GrupoInfo {
   name: string
   token: string
-  cssKey: string
 }
 
 function buildGruposMap(foodGroups: PlanFoodGroupDto[]): Record<number, GrupoInfo> {
@@ -37,7 +32,6 @@ function buildGruposMap(foodGroups: PlanFoodGroupDto[]): Record<number, GrupoInf
     foodGroups.map(g => [g.id, {
       name: g.name,
       token: ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)',
-      cssKey: ABBR_CSS[g.abbreviation] ?? g.abbreviation,
     }])
   )
 }
@@ -87,13 +81,6 @@ function formatNombre(email: string | undefined): string {
     .trim()
 }
 
-function esPasada(suggestedTime: string | undefined, ahora: Date): boolean {
-  if (!suggestedTime) return false
-  const [h, m] = suggestedTime.split(':').map(Number)
-  const nowMin = ahora.getHours() * 60 + ahora.getMinutes()
-  return h * 60 + m < nowMin - 90
-}
-
 function findIndexAhora(meals: MealDto[], ahora: Date): number {
   if (meals.length === 0) return -1
   const nowMin = ahora.getHours() * 60 + ahora.getMinutes()
@@ -117,13 +104,6 @@ function findIndexAhora(meals: MealDto[], ahora: Date): number {
 
 function fmt(n: number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(1).replace('.', ',')
-}
-
-function statusColor(status: string): string {
-  if (status === 'OK' || status === 'CUMPLIDO') return 'var(--g-verd)'
-  if (status === 'EXCEDIDO') return 'var(--error)'
-  if (status === 'INCOMPLETO' || status === 'SIN_ANOTAR') return 'var(--muted)'
-  return 'var(--muted)'
 }
 
 // ── ItemRow ───────────────────────────────────────────────────────────────
@@ -312,34 +292,115 @@ function agruparPorMencion(items: EntryItemDto[]): EntryItemDto[][] {
   return grupos
 }
 
-// ── ComparisonRow ─────────────────────────────────────────────────────────
+// ── Estado de una comida en texto concreto ────────────────────────────────
 
-function ComparisonRow({ status }: { status: GroupStatusDto }) {
-  const pct = status.expected > 0
-    ? Math.min(100, Math.round((status.recorded / status.expected) * 100))
-    : 0
-  const color = statusColor(status.status)
+type MealStateKind = 'ok' | 'warn' | 'ask' | 'noted' | 'none'
 
+function describirGrupos(grupos: GroupStatusDto[], diff: (s: GroupStatusDto) => number): string {
+  return grupos.map(s => `${s.name} ${fmt(diff(s))}`).join(', ')
+}
+
+function mealState(mealDay: MealDayDto | undefined): { kind: MealStateKind; text: string } {
+  if (!mealDay?.noteText) return { kind: 'none', text: 'Sin anotar' }
+  const comparison = mealDay.comparison
+  if (comparison.some(s => s.status === 'PREGUNTAR')) return { kind: 'ask', text: 'Por confirmar' }
+  if (comparison.length === 0) return { kind: 'noted', text: 'Anotada' }
+  // El backend ya aplica el margen del plan: solo CASI y SIN_ANOTAR faltan, solo DE_MAS sobra.
+  const faltan = comparison.filter(s => s.status === 'CASI' || s.status === 'SIN_ANOTAR')
+  const sobran = comparison.filter(s => s.status === 'DE_MAS')
+  const partes = [
+    faltan.length > 0 ? `Faltó: ${describirGrupos(faltan, s => s.expected - s.recorded)}` : '',
+    sobran.length > 0 ? `De más: ${describirGrupos(sobran, s => s.recorded - s.expected)}` : '',
+  ].filter(Boolean)
+  return partes.length > 0
+    ? { kind: 'warn', text: partes.join(' · ') }
+    : { kind: 'ok', text: 'Como el plan' }
+}
+
+function MealStateIcon({ kind }: { kind: MealStateKind }) {
+  if (kind === 'ok') {
+    return (
+      <svg viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="7" r="6" fill="currentColor" />
+        <path d="M4.2 7.2l1.9 1.9 3.7-4.1" fill="none" stroke="var(--surface)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (kind === 'warn' || kind === 'ask') {
+    return (
+      <svg viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="7" r="5.4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M7 1.6a5.4 5.4 0 0 1 0 10.8z" fill="currentColor" />
+      </svg>
+    )
+  }
+  if (kind === 'noted') {
+    return (
+      <svg viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="7" r="6" fill="currentColor" />
+      </svg>
+    )
+  }
   return (
-    <div className="comp-row">
-      <span className="comp-row__name">{status.name}</span>
-      <div className="comp-row__bar">
-        <div className="comp-row__fill" style={{ width: `${pct}%`, background: color }} />
-      </div>
-      <span className="comp-row__frac">{fmt(status.recorded)}/{fmt(status.expected)}</span>
-    </div>
+    <svg viewBox="0 0 14 14" aria-hidden="true">
+      <circle cx="7" cy="7" r="5.4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
   )
+}
+
+function MealState({ mealDay }: { mealDay: MealDayDto | undefined }) {
+  const { kind, text } = mealState(mealDay)
+  return (
+    <span className={`hoy-estado hoy-estado--${kind}`}>
+      <MealStateIcon kind={kind} />
+      {text}
+    </span>
+  )
+}
+
+// Migas de una comida: lo comido según la comparación, o el plan vacío si todavía no se anotó.
+function mealMigas(meal: MealDto, mealDay: MealDayDto | undefined, gruposMap: Record<number, GrupoInfo>): MigaRow[] {
+  const comparison = (mealDay?.noteText ? mealDay.comparison : []).filter(s => s.expected > 0)
+  if (comparison.length > 0) {
+    return comparison.map(s => ({
+      id: s.foodGroupId,
+      name: s.name,
+      color: gruposMap[s.foodGroupId]?.token ?? 'var(--muted)',
+      done: Number(s.recorded),
+      total: Number(s.expected),
+    }))
+  }
+  return meal.portions
+    .filter(p => p.portions > 0 && gruposMap[p.foodGroupId])
+    .map(p => ({
+      id: p.foodGroupId,
+      name: gruposMap[p.foodGroupId].name,
+      color: gruposMap[p.foodGroupId].token,
+      done: 0,
+      total: Number(p.portions),
+    }))
 }
 
 // ── NotaMealSection ───────────────────────────────────────────────────────
 
+// Borrador de una nota: vive fuera del editor para no perderse al cerrar una fila ni cuando
+// la comida de ahora cambia de lugar.
+interface Draft {
+  texto: string
+  baseVersion: number | null
+  dirty: boolean
+  conflict: boolean
+}
+
+type DraftStore = Map<string, Draft>
+
 interface NotaMealSectionProps {
   meal: MealDto
+  drafts: DraftStore
   mealDay: MealDayDto | undefined
   date: string
   token: string
   gruposMap: Record<number, GrupoInfo>
-  isAhora: boolean
   onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onReload: () => Promise<DayRegistroDto>
@@ -347,27 +408,33 @@ interface NotaMealSectionProps {
 }
 
 function NotaMealSection({
-  meal, mealDay, date, token, gruposMap, isAhora,
+  meal, drafts, mealDay, date, token, gruposMap,
   onNotaSaved, onItemPatched, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
-  const [isOpen, setIsOpen] = useState(isAhora)
-  const [texto, setTexto] = useState(mealDay?.noteText ?? '')
-  const dirty = useRef(false)
+  const draftKey = `${date}-${meal.id}`
+  const [saved] = useState(() => drafts.get(draftKey))
+  const [texto, setTexto] = useState(saved?.dirty ? saved.texto : mealDay?.noteText ?? '')
+  const dirty = useRef(saved?.dirty ?? false)
   const draftRevision = useRef(0)
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
-  const baseVersion = useRef<number | null>(mealDay?.noteVersion ?? null)
-  const [conflict, setConflict] = useState(false)
+  const baseVersion = useRef<number | null>(saved ? saved.baseVersion : mealDay?.noteVersion ?? null)
+  const [conflict, setConflict] = useState(saved?.conflict ?? false)
+
+  useEffect(() => {
+    drafts.set(draftKey, { texto, baseVersion: baseVersion.current, dirty: dirty.current, conflict })
+  })
   const [sugerencias, setSugerencias] = useState<string[]>([])
   const [cargandoSug, setCargandoSug] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const [guardado, setGuardado] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
   const comparison = mealDay?.comparison ?? []
-  const preguntas = comparison.filter(s => s.status === 'PREGUNTA')
+  const preguntas = comparison.filter(s => s.status === 'PREGUNTAR')
 
   useEffect(() => {
     if (!dirty.current) {
@@ -377,14 +444,14 @@ function NotaMealSection({
   }, [mealDay?.noteText, mealDay?.noteVersion])
 
   useEffect(() => {
-    if (!isOpen || !meal.id) return
+    if (!meal.id) return
     const controller = new AbortController()
     getSugerencias(token, meal.id!, controller.signal)
       .then(s => { if (!controller.signal.aborted) setSugerencias(s) })
       .catch(() => {})
       .finally(() => { if (!controller.signal.aborted) setCargandoSug(false) })
     return () => controller.abort()
-  }, [isOpen, meal.id, token])
+  }, [meal.id, token])
 
   const saveInFlight = useRef(false)
   // Cada edición del borrador (teclado o dictado) sube la revisión: si cambia mientras se
@@ -392,6 +459,7 @@ function NotaMealSection({
   function editarBorrador(update: (current: string) => string) {
     dirty.current = true
     draftRevision.current += 1
+    setGuardado(null)
     setTexto(update)
   }
 
@@ -402,6 +470,7 @@ function NotaMealSection({
     const revisionEnviada = draftRevision.current
     setTexto(value)
     setGuardando(true)
+    setGuardado(null)
     setError(null)
     try {
       const interp = await saveNota(token, date, meal.id, value.trim(), baseVersion.current)
@@ -409,6 +478,11 @@ function NotaMealSection({
       baseVersion.current = interp.version
       setConflict(false)
       onNotaSaved(interp, meal.id)
+      const estado = mealState({
+        mealId: meal.id, noteId: interp.noteId, noteVersion: interp.version,
+        noteText: interp.text, items: interp.entries, comparison: interp.comparison,
+      })
+      setGuardado(`Guardado. ${estado.text}.`)
     } catch (err) {
       setConflict(err instanceof NoteConflictError)
       setError(err instanceof NoteConflictError ? err.message : 'No se pudo guardar. Intentá de nuevo.')
@@ -428,143 +502,117 @@ function NotaMealSection({
     }
   }
 
-  const summaryLabel = !hasNote
-    ? 'Anotar'
-    : `${items.length} ${items.length === 1 ? 'ítem' : 'ítems'}`
+  const textareaId = `nota-${meal.id}`
 
   return (
-    <div className="comida-hoy__nota">
-      <button
-        className="nota-toggle"
-        onClick={() => setIsOpen(o => !o)}
-        aria-expanded={isOpen}
-      >
-        <span className={`nota-toggle__label${hasNote ? ' nota-toggle__label--anotado' : ''}`}>
-          {summaryLabel}
-        </span>
-        <svg
-          className={`nota-toggle__chevron${isOpen ? ' nota-toggle__chevron--open' : ''}`}
-          viewBox="0 0 10 6" fill="none" aria-hidden="true" width="10" height="6"
-        >
-          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="nota-body">
-          {!cargandoSug && sugerencias.length > 0 && !hasNote && (
-            <div className="nota-sugerencias" aria-label="Lo de siempre">
-              {sugerencias.map((s, i) => (
-                <button
-                  key={i}
-                  className="nota-sugerencia"
-                  disabled={guardando || conflict}
-                  onClick={() => void handleGuardar(s)}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <textarea
-            ref={textareaRef}
-            className="nota-textarea"
-            placeholder="¿Qué comiste? Escribí en texto libre…"
-            value={texto}
-            onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
-            rows={3}
-            aria-label="Nota de la comida"
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? `nota-error-${meal.id}` : undefined}
-          />
-
-          <DictationButton disabled={guardando} onTranscript={transcript => {
-            editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
-          }} />
-          {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
-          {conflict && (
-            <button type="button" className="nota-btn-recargar" disabled={guardando}
-              onClick={async () => {
-                setGuardando(true)
-                try {
-                  // Recargar desde el aviso es aceptar la versión actual como base del borrador.
-                  const day = await onReload()
-                  baseVersion.current = day.meals.find(m => m.mealId === meal.id)?.noteVersion ?? null
-                  setConflict(false)
-                  setError(null)
-                } catch {
-                  setError('No se pudo recargar. Intentá de nuevo.')
-                } finally {
-                  setGuardando(false)
-                }
-              }}>
-              Recargar
+    <div className="nota-body">
+      {!cargandoSug && sugerencias.length > 0 && !hasNote && (
+        <div className="nota-sugerencias" aria-label="Lo de siempre">
+          {sugerencias.map((s, i) => (
+            <button
+              key={i}
+              className="nota-sugerencia"
+              disabled={guardando || conflict}
+              onClick={() => void handleGuardar(s)}
+            >
+              {s}
             </button>
-          )}
-
-          <button
-            className="nota-btn-guardar"
-            onClick={() => void handleGuardar()}
-            disabled={guardando || conflict || !texto.trim()}
-          >
-            {guardando ? 'Guardando…' : hasNote ? 'Guardar cambios' : 'Guardar'}
-          </button>
-
-          {items.length > 0 && (
-            <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
-              <h3 id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
-              <ul className="nota-items">
-                {agruparPorMencion(items).map(mencion => {
-                  const fila = (item: EntryItemDto) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      date={date}
-                      token={token}
-                      gruposMap={gruposMap}
-                      onPatched={result => onItemPatched(meal.id!, result)}
-                    />
-                  )
-                  if (mencion.length === 1) return fila(mencion[0])
-                  const [primero] = mencion
-                  return (
-                    <li key={primero.occurrenceId} className="nota-compuesto">
-                      <p className="nota-compuesto__titulo">
-                        {primero.food}
-                        {primero.quantity !== null && <> · {primero.quantity} {primero.unit ?? ''}</>}
-                      </p>
-                      {primero.appliedRule && <p className="nota-item__regla">{primero.appliedRule}</p>}
-                      <ul className="nota-items" aria-label={`Grupos de ${primero.food}`}>
-                        {mencion.map(item => fila({ ...item, appliedRule: null }))}
-                      </ul>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
-
-          {comparison.length > 0 && (
-            <div className="nota-comparacion">
-              {comparison
-                .filter(s => s.status !== 'PREGUNTA' && s.status !== 'LIBRE')
-                .map(s => <ComparisonRow key={s.foodGroupId} status={s} />)}
-            </div>
-          )}
-
-          {preguntas.map(p => (
-            <div key={p.foodGroupId} className="nota-pregunta">
-              <span className="nota-pregunta__texto">
-                ¿Consumiste <strong>{p.name}</strong>?
-              </span>
-              <div className="nota-pregunta__acciones">
-                <button className="nota-pregunta__si" onClick={() => handleRespuesta(p.foodGroupId, true)}>Sí</button>
-                <button className="nota-pregunta__no" onClick={() => handleRespuesta(p.foodGroupId, false)}>No</button>
-              </div>
-            </div>
           ))}
         </div>
+      )}
+
+      <label className="nota-label" htmlFor={textareaId}>¿Qué comiste?</label>
+      <textarea
+        id={textareaId}
+        ref={textareaRef}
+        className="nota-textarea"
+        placeholder="Por ejemplo: tarta de zapallitos y ensalada"
+        value={texto}
+        onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
+        rows={2}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `nota-error-${meal.id}` : undefined}
+      />
+
+      <div className="nota-acciones">
+        <button
+          className="nota-btn-guardar"
+          onClick={() => void handleGuardar()}
+          disabled={guardando || conflict || !texto.trim()}
+        >
+          {guardando ? 'Guardando…' : hasNote ? 'Guardar cambios' : 'Guardar'}
+        </button>
+        <DictationButton disabled={guardando} onTranscript={transcript => {
+          editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
+        }} />
+      </div>
+
+      <p className="nota-guardado" role="status">{guardado}</p>
+      {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
+      {conflict && (
+        <button type="button" className="nota-btn-recargar" disabled={guardando}
+          onClick={async () => {
+            setGuardando(true)
+            try {
+              // Recargar desde el aviso es aceptar la versión actual como base del borrador.
+              const day = await onReload()
+              baseVersion.current = day.meals.find(m => m.mealId === meal.id)?.noteVersion ?? null
+              setConflict(false)
+              setError(null)
+            } catch {
+              setError('No se pudo recargar. Intentá de nuevo.')
+            } finally {
+              setGuardando(false)
+            }
+          }}>
+          Recargar
+        </button>
+      )}
+
+      {preguntas.map(p => (
+        <div key={p.foodGroupId} className="nota-pregunta">
+          <span className="nota-pregunta__texto">
+            ¿Consumiste <strong>{p.name}</strong>?
+          </span>
+          <div className="nota-pregunta__acciones">
+            <button className="nota-pregunta__si" onClick={() => handleRespuesta(p.foodGroupId, true)}>Sí</button>
+            <button className="nota-pregunta__no" onClick={() => handleRespuesta(p.foodGroupId, false)}>No</button>
+          </div>
+        </div>
+      ))}
+
+      {items.length > 0 && (
+        <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
+          <h3 id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
+          <ul className="nota-items">
+            {agruparPorMencion(items).map(mencion => {
+              const fila = (item: EntryItemDto) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  date={date}
+                  token={token}
+                  gruposMap={gruposMap}
+                  onPatched={result => onItemPatched(meal.id!, result)}
+                />
+              )
+              if (mencion.length === 1) return fila(mencion[0])
+              const [primero] = mencion
+              return (
+                <li key={primero.occurrenceId} className="nota-compuesto">
+                  <p className="nota-compuesto__titulo">
+                    {primero.food}
+                    {primero.quantity !== null && <> · {primero.quantity} {primero.unit ?? ''}</>}
+                  </p>
+                  {primero.appliedRule && <p className="nota-item__regla">{primero.appliedRule}</p>}
+                  <ul className="nota-items" aria-label={`Grupos de ${primero.food}`}>
+                    {mencion.map(item => fila({ ...item, appliedRule: null }))}
+                  </ul>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
     </div>
   )
@@ -577,18 +625,6 @@ function calcResumenDeDay(
   meals: MealDto[],
   gruposMap: Record<number, GrupoInfo>,
 ) {
-  if (!dayRegistro) {
-    const totalById: Record<number, number> = {}
-    for (const meal of meals) {
-      for (const p of meal.portions) {
-        if (p.portions <= 0) continue
-        totalById[p.foodGroupId] = (totalById[p.foodGroupId] ?? 0) + Number(p.portions)
-      }
-    }
-    const total = Object.values(totalById).reduce((s, v) => s + v, 0)
-    return { total, done: 0, porGrupo: {} as Record<number, { total: number; done: number; info: GrupoInfo }> }
-  }
-
   const totalById: Record<number, number> = {}
   const doneById: Record<number, number> = {}
 
@@ -599,21 +635,137 @@ function calcResumenDeDay(
     }
   }
 
-  for (const s of dayRegistro.summary) {
+  for (const s of dayRegistro?.summary ?? []) {
     doneById[s.foodGroupId] = Number(s.totalRecorded)
   }
 
   const total = Object.values(totalById).reduce((s, v) => s + v, 0)
   const done = Object.values(doneById).reduce((s, v) => s + v, 0)
 
-  const porGrupo: Record<number, { total: number; done: number; info: GrupoInfo }> = {}
+  const porGrupo: MigaRow[] = []
   for (const [idStr, t] of Object.entries(totalById)) {
     const id = Number(idStr)
     const info = gruposMap[id]
-    if (info) porGrupo[id] = { total: t, done: doneById[id] ?? 0, info }
+    if (info) porGrupo.push({ id, name: info.name, color: info.token, done: doneById[id] ?? 0, total: t })
   }
 
   return { total, done, porGrupo }
+}
+
+// Al guardar una nota, el resumen del día suma la diferencia de porciones entre los ítems
+// anteriores y los nuevos de esa comida, también de grupos que esa comida no tenía previstos.
+function porcionesPorGrupo(items: EntryItemDto[]): Map<number, number> {
+  const total = new Map<number, number>()
+  for (const item of items) {
+    if (item.foodGroupId === null || item.portions === null) continue
+    total.set(item.foodGroupId, (total.get(item.foodGroupId) ?? 0) + Number(item.portions))
+  }
+  return total
+}
+
+function ajustarResumen(
+  summary: DailySummaryDto[],
+  antes: EntryItemDto[],
+  despues: EntryItemDto[],
+  gruposMap: Record<number, GrupoInfo>,
+): DailySummaryDto[] {
+  const delta = porcionesPorGrupo(despues)
+  for (const [id, value] of porcionesPorGrupo(antes)) delta.set(id, (delta.get(id) ?? 0) - value)
+  const ajustado = summary.map(s => {
+    const d = delta.get(s.foodGroupId)
+    return d ? { ...s, totalRecorded: Number(s.totalRecorded) + d } : s
+  })
+  for (const [foodGroupId, value] of delta) {
+    if (value !== 0 && !summary.some(s => s.foodGroupId === foodGroupId)) {
+      ajustado.push({ foodGroupId, name: gruposMap[foodGroupId]?.name ?? '', clave: '', totalRecorded: value, dailyGoal: null })
+    }
+  }
+  return ajustado
+}
+
+// ── Comidas ───────────────────────────────────────────────────────────────
+
+interface MealProps {
+  meal: MealDto
+  drafts: DraftStore
+  mealDay: MealDayDto | undefined
+  fecha: string
+  token: string
+  gruposMap: Record<number, GrupoInfo>
+  onNotaSaved: (interp: NoteInterpretationDto, mealId: number) => void
+  onItemPatched: (mealId: number, result: PatchItemResultDto) => void
+  onReload: () => Promise<DayRegistroDto>
+  onRespuestaGuardada: (mealId: number) => void
+}
+
+function MealDetail(props: MealProps) {
+  const { meal, mealDay, fecha, token, gruposMap } = props
+  return (
+    <>
+      <Migas rows={mealMigas(meal, mealDay, gruposMap)} />
+      {meal.id !== undefined && (
+        <NotaMealSection
+          key={fecha}
+          meal={meal}
+          drafts={props.drafts}
+          mealDay={mealDay}
+          date={fecha}
+          token={token}
+          gruposMap={gruposMap}
+          onNotaSaved={props.onNotaSaved}
+          onItemPatched={props.onItemPatched}
+          onReload={props.onReload}
+          onRespuestaGuardada={props.onRespuestaGuardada}
+        />
+      )}
+    </>
+  )
+}
+
+function MealAhora(props: MealProps) {
+  const { meal } = props
+  const headingId = `comida-${meal.id ?? meal.name}`
+  return (
+    <article className="hoy-ahora" aria-labelledby={headingId}>
+      <div className="hoy-ahora__head">
+        <h2 id={headingId} className="hoy-ahora__nombre">{meal.name}</h2>
+        <span className="hoy-ahora__etiqueta">Ahora</span>
+        {meal.suggestedTime && <span className="hoy-ahora__hora">{meal.suggestedTime.slice(0, 5)}</span>}
+      </div>
+      <MealDetail {...props} />
+    </article>
+  )
+}
+
+function MealRow(props: MealProps) {
+  const { meal, mealDay } = props
+  const [abierta, setAbierta] = useState(false)
+  const detalleId = `comida-detalle-${meal.id ?? meal.name}`
+  return (
+    <li className="hoy-fila">
+      <h3 className="hoy-fila__titulo">
+        <button
+          type="button"
+          className="hoy-fila__btn"
+          aria-expanded={abierta}
+          aria-controls={detalleId}
+          onClick={() => setAbierta(a => !a)}
+        >
+          <span className="hoy-fila__nombre">{meal.name}</span>
+          {meal.suggestedTime && <span className="hoy-fila__hora">{meal.suggestedTime.slice(0, 5)}</span>}
+          <MealState mealDay={mealDay} />
+          <svg className="hoy-fila__chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </h3>
+      {abierta && (
+        <div id={detalleId} className="hoy-fila__detalle">
+          <MealDetail {...props} />
+        </div>
+      )}
+    </li>
+  )
 }
 
 // ── HoyPage ────────────────────────────────────────────────────────────────
@@ -635,6 +787,9 @@ function HoyContent() {
   const { data: dayRegistro, setData: setDayRegistro, status: dayStatus, retry: retryDay, reload: reloadDay } = useDayRegistro(token, email, fecha)
   const cargando = planLoad.status === 'loading' || (!!plan && dayStatus === 'loading' && !dayRegistro)
   const diaError = dayStatus === 'error'
+  const [diaAbierto, setDiaAbierto] = useState<boolean | null>(null)
+  const [drafts] = useState<DraftStore>(() => new Map())
+  const gruposMap = useMemo(() => plan ? buildGruposMap(plan.foodGroups ?? []) : {}, [plan])
 
   const [previousToday, setPreviousToday] = useState(HOY)
   if (previousToday !== HOY) {
@@ -657,13 +812,13 @@ function HoyContent() {
         items: interp.entries,
         comparison: interp.comparison,
       }
-      const exists = prev.meals.some(m => m.mealId === mealId)
-      const meals = exists
+      const anterior = prev.meals.find(m => m.mealId === mealId)
+      const meals = anterior
         ? prev.meals.map(m => m.mealId === mealId ? updatedMeal : m)
         : [...prev.meals, updatedMeal]
-      return { ...prev, meals }
+      return { ...prev, meals, summary: ajustarResumen(prev.summary, anterior?.items ?? [], interp.entries, gruposMap) }
     })
-  }, [setDayRegistro])
+  }, [setDayRegistro, gruposMap])
 
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRegistro(prev => {
@@ -692,9 +847,24 @@ function HoyContent() {
   const esHoy = fecha === HOY
   const nombre = firstName ?? formatNombre(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
-  const gruposMap = plan ? buildGruposMap(plan.foodGroups ?? []) : {}
-  const ahoraIdx = esHoy && plan ? findIndexAhora(meals, ahora) : -1
+  const ahoraCalculada = esHoy && plan ? meals[findIndexAhora(meals, ahora)]?.id ?? null : null
+  const [ahoraFija, setAhoraFija] = useState<{ fecha: string; id: number | null }>({ fecha, id: ahoraCalculada })
+  const ahoraId = ahoraFija.fecha === fecha ? ahoraFija.id : ahoraCalculada
+  // Al cambiar de día se actualiza siempre; dentro del día, la comida de ahora solo cambia
+  // si no hay un borrador sin guardar, para no mover el editor mientras se escribe.
+  if (ahoraFija.fecha !== fecha || (ahoraFija.id !== ahoraCalculada && (ahoraFija.id === null
+    || ![...drafts.entries()].some(([key, d]) => key.startsWith(`${fecha}-`) && d.dirty)))) {
+    setAhoraFija({ fecha, id: ahoraCalculada })
+  }
+  const ahoraIdx = ahoraId === null ? -1 : meals.findIndex(m => m.id === ahoraId)
   const { total, done, porGrupo } = calcResumenDeDay(dayRegistro, meals, gruposMap)
+  const sinAnotar = !dayRegistro?.meals.some(m => m.noteText)
+  const ahoraMeal = ahoraIdx >= 0 ? meals[ahoraIdx] : null
+  const restoMeals = meals.filter((_, i) => i !== ahoraIdx)
+
+  const titulo = esHoy ? (
+    <>{nombre ? `${saludo(ahora)}, ${nombre}` : saludo(ahora)}<span className="punto-miga">.</span></>
+  ) : formatFechaLarga(fecha)
 
   const navFecha = (
     <nav className="hoy-fecha-nav" aria-label="Navegación por fecha">
@@ -703,8 +873,8 @@ function HoyContent() {
         onClick={() => irDia(-1)}
         aria-label="Día anterior"
       >
-        <svg width="10" height="16" viewBox="0 0 10 16" fill="none" aria-hidden="true">
-          <path d="M8 2L2 8l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M12 5l-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
       <span className="hoy-fecha-nav__label">{labelFecha(fecha, HOY)}</span>
@@ -714,32 +884,44 @@ function HoyContent() {
         disabled={esHoy}
         aria-label="Día siguiente"
       >
-        <svg width="10" height="16" viewBox="0 0 10 16" fill="none" aria-hidden="true">
-          <path d="M2 2l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
     </nav>
   )
 
+  const mealProps = {
+    drafts,
+    fecha,
+    token: token!,
+    gruposMap,
+    onNotaSaved: handleNotaSaved,
+    onItemPatched: handleItemPatched,
+    onReload: reloadDay,
+    onRespuestaGuardada: handleRespuestaGuardada,
+  }
+
   return (
     <div className="hoy-page">
       <header className="hoy-header">
-        <div className="hoy-header__meta">
+        <div className="hoy-header__top">
           <Brand size={20} />
+          {navFecha}
         </div>
-        {navFecha}
-        <h1 className="hoy-header__titulo">
-          {esHoy ? `${saludo(ahora)}, ${nombre}.` : formatFechaLarga(fecha)}
-        </h1>
+        <h1 className="hoy-header__titulo">{titulo}</h1>
       </header>
 
       <div className="hoy-body">
         <div className="hoy-desktop-saludo">
           {navFecha}
-          <h1 className="hoy-desktop-saludo__titulo">
-            {esHoy ? `${saludo(ahora)}, ${nombre}.` : formatFechaLarga(fecha)}
-          </h1>
+          <h1 className="hoy-desktop-saludo__titulo">{titulo}</h1>
         </div>
+        {plan?.createdAt && !sinPlan && !cargando && (
+          <p className="hoy-plan-fecha">
+            Según tu plan · cargado el {plan.createdAt.slice(8, 10)}/{plan.createdAt.slice(5, 7)}
+          </p>
+        )}
 
         {cargando ? (
           <p className="hoy-loading">Cargando tu día…</p>
@@ -769,126 +951,55 @@ function HoyContent() {
               </p>
             )}
 
-            <p>Según tu plan{plan?.createdAt && ` · cargado el ${plan.createdAt.slice(8, 10)}/${plan.createdAt.slice(5, 7)}`}</p>
-            {total > 0 && (
-              <div className="hoy-resumen">
-                <div className="hoy-resumen__porciones">
-                  <span className="hoy-resumen__num">{fmt(done)}</span>
-                  <span className="hoy-resumen__sep"> de </span>
-                  <span className="hoy-resumen__total">{fmt(total)}</span>
-                  <span className="hoy-resumen__label">porciones</span>
-                </div>
-                <div className="hoy-resumen__grupos">
-                  {Object.entries(porGrupo).map(([idStr, { total: t, done: d, info }]) => {
-                    const id = Number(idStr)
-                    const pct = Math.min(100, Math.round((d / t) * 100))
-                    const circ = 2 * Math.PI * 15
-                    return (
-                      <Fragment key={id}>
-                        <div className="hoy-grupo-prog" title={info.name}>
-                          <span className="hoy-grupo-prog__nombre">{info.name}</span>
-                          <div className="hoy-grupo-prog__bar">
-                            <div
-                              className="hoy-grupo-prog__fill"
-                              style={{ width: `${pct}%`, background: info.token }}
-                            />
-                          </div>
-                          <span className="hoy-grupo-prog__frac">{fmt(d)}/{fmt(t)}</span>
-                        </div>
-                        <div
-                          className="hoy-anillo"
-                          role="img"
-                          aria-label={`${info.name}: ${fmt(d)} de ${fmt(t)}`}
-                        >
-                          <svg className="hoy-anillo__svg" viewBox="0 0 40 40" aria-hidden="true">
-                            <circle className="hoy-anillo__pista" cx="20" cy="20" r="15" />
-                            <circle
-                              className="hoy-anillo__valor"
-                              cx="20" cy="20" r="15"
-                              style={{ stroke: info.token, opacity: pct > 0 ? 1 : 0 }}
-                              strokeDasharray={`${(pct / 100) * circ} ${circ}`}
-                            />
-                          </svg>
-                          <span className="hoy-anillo__frac" aria-hidden="true">{fmt(d)}/{fmt(t)}</span>
-                          <span className="hoy-anillo__nombre" aria-hidden="true">{info.name}</span>
-                        </div>
-                      </Fragment>
-                    )
-                  })}
-                </div>
-              </div>
+            {ahoraMeal && (
+              <MealAhora
+                key={`${fecha}-${ahoraMeal.id}`}
+                meal={ahoraMeal}
+                mealDay={dayRegistro?.meals.find(m => m.mealId === ahoraMeal.id)}
+                {...mealProps}
+              />
             )}
 
-            <div className="hoy-cards">
-              {meals.map((meal, i) => {
-                const noVacias = meal.portions.filter(p => p.portions > 0)
-                const esAhora = i === ahoraIdx
-                const mealDay = dayRegistro?.meals.find(m => m.mealId === meal.id)
-                const pasada = esHoy && !mealDay?.noteText && !esAhora && esPasada(meal.suggestedTime, ahora)
+            {total > 0 && (
+              <details
+                className="hoy-dia"
+                open={diaAbierto ?? (sinAnotar || !ahoraMeal)}
+                onToggle={e => setDiaAbierto(e.currentTarget.open)}
+              >
+                <summary className="hoy-dia__summary">
+                  <span className="hoy-dia__titulo">Tu día por grupo</span>
+                  <span className="hoy-dia__total">{fmt(done)} de {fmt(total)} porciones</span>
+                  <svg className="hoy-dia__chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </summary>
+                {sinAnotar && esHoy && (
+                  <p className="hoy-dia__explicacion">
+                    Todavía no anotaste nada hoy. Cada porción de tu plan es una miga: se rellena
+                    cuando la comés, y la media miga es media porción.
+                  </p>
+                )}
+                <Migas rows={porGrupo} />
+              </details>
+            )}
 
-                return (
-                  <div
-                    key={i}
-                    className={[
-                      'comida-hoy',
-                      esAhora && !mealDay?.noteText ? 'comida-hoy--ahora' : '',
-                      mealDay?.noteText ? 'comida-hoy--anotada' : '',
-                      pasada ? 'comida-hoy--pasada' : '',
-                    ].filter(Boolean).join(' ')}
-                  >
-                    <div className="comida-hoy__encabezado">
-                      <div className="comida-hoy__nombre-wrap">
-                        <h2 className="comida-hoy__nombre">{meal.name}</h2>
-                        {mealDay?.noteText && (
-                          <svg className="comida-hoy__done-icon" viewBox="0 0 16 16" fill="none" aria-label="Anotada" width="14" height="14">
-                            <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.15"/>
-                            <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </div>
-                      {meal.suggestedTime && (
-                        <div className={`comida-hoy__hora-wrap${esAhora && !mealDay?.noteText ? ' comida-hoy__hora-wrap--ahora' : ''}`}>
-                          <span className="comida-hoy__hora">
-                            {meal.suggestedTime.slice(0, 5)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {noVacias.length > 0 && (
-                      <div className="comida-hoy__grupos">
-                        {noVacias.map(p => {
-                          const info = gruposMap[p.foodGroupId]
-                          if (!info) return null
-                          return (
-                            <span key={p.foodGroupId} className={`grupo-badge grupo-badge--${info.cssKey}`}>
-                              <span className="grupo-badge__numero">{fmt(Number(p.portions))}</span>
-                              <span className="grupo-badge__label">{info.name}</span>
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {meal.id !== undefined && (
-                      <NotaMealSection
-                        key={fecha}
-                        onReload={reloadDay}
-                        meal={meal}
-                        mealDay={mealDay}
-                        date={fecha}
-                        token={token!}
-                        gruposMap={gruposMap}
-                        isAhora={esAhora}
-                        onNotaSaved={handleNotaSaved}
-                        onItemPatched={handleItemPatched}
-                        onRespuestaGuardada={handleRespuestaGuardada}
-                      />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            {restoMeals.length > 0 && (
+              <section className="hoy-resto" aria-labelledby="hoy-resto-titulo">
+                <h2 id="hoy-resto-titulo" className="hoy-resto__titulo">
+                  {ahoraMeal ? 'Resto del día' : 'Comidas'}
+                </h2>
+                <ul className="hoy-filas">
+                  {restoMeals.map(meal => (
+                    <MealRow
+                      key={`${fecha}-${meal.id ?? meal.name}`}
+                      meal={meal}
+                      mealDay={dayRegistro?.meals.find(m => m.mealId === meal.id)}
+                      {...mealProps}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )}
           </>
         )}
       </div>

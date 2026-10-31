@@ -1,244 +1,113 @@
-import { useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
+import Migas from '../components/Migas'
 import { useTitle } from '../hooks/useTitle'
 import './LandingPage.css'
 
-function useScrollReveal() {
-  useEffect(() => {
-    const io = new IntersectionObserver(
-      entries =>
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            e.target.classList.add('is-visible')
-            io.unobserve(e.target)
-          }
-        }),
-      { threshold: 0.1 }
-    )
-    document.querySelectorAll('[data-reveal]').forEach(el => io.observe(el))
-    return () => io.disconnect()
-  }, [])
-}
-
-function PhoneMockup() {
-  return (
-    <div className="phone-wrap">
-      <div className="phone">
-        <div className="phone__pill" />
-        <div className="phone__screen">
-          <div className="pscreen__header">
-            <span className="pscreen__brand">miga</span>
-            <span className="pscreen__date">Viernes, 17 de oct.</span>
-          </div>
-          <div className="pscreen__greeting">Buenos días, María.</div>
-          <div className="pscreen__cards">
-            <div className="pscreen__card">
-              <span className="pscreen__meal">Desayuno</span>
-              <div className="pscreen__badges">
-                <span className="pbadge pbadge--prot">2 Proteínas</span>
-                <span className="pbadge pbadge--cer">2 Cereales</span>
-                <span className="pbadge pbadge--frut">1 Frutas</span>
-              </div>
-            </div>
-            <div className="pscreen__card">
-              <span className="pscreen__meal">Almuerzo</span>
-              <div className="pscreen__badges">
-                <span className="pbadge pbadge--prot">1 Proteínas</span>
-                <span className="pbadge pbadge--verd">3 Verduras</span>
-                <span className="pbadge pbadge--cer">0.5 Cereales</span>
-              </div>
-            </div>
-            <div className="pscreen__card">
-              <span className="pscreen__meal">Merienda</span>
-              <div className="pscreen__badges">
-                <span className="pbadge pbadge--cer">2 Cereales</span>
-                <span className="pbadge pbadge--lac">1 Lácteos</span>
-              </div>
-            </div>
-            <div className="pscreen__card">
-              <span className="pscreen__meal">Cena</span>
-              <div className="pscreen__badges">
-                <span className="pbadge pbadge--prot">1 Proteínas</span>
-                <span className="pbadge pbadge--verd">3 Verduras</span>
-                <span className="pbadge pbadge--gras">1 Grasas</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="phone__home" />
-      </div>
-    </div>
-  )
-}
+// Un almuerzo de ejemplo: el plan en papel y cómo se ve en miga después de anotarlo.
+const ALMUERZO = [
+  { id: 'prot', name: 'Proteínas', color: 'var(--g-prot)', done: 2, total: 2 },
+  { id: 'cer', name: 'Cereales', color: 'var(--g-cer)', done: 1, total: 2 },
+  { id: 'gras', name: 'Grasas', color: 'var(--g-gras)', done: 1, total: 1 },
+]
 
 export default function LandingPage() {
-  useTitle('Miga - Cumplí el plan de tu nutricionista')
+  useTitle('Miga - Tu plan, miga a miga')
   const { token } = useAuth()
-  useScrollReveal()
 
   if (token) return <Navigate to="/hoy" replace />
 
   return (
     <div className="land-page">
-
-      {/* ── Nav ── */}
       <header className="land-nav">
-        <Brand size={22} />
-        <nav className="land-nav__links">
+        <Brand size={24} />
+        <nav className="land-nav__links" aria-label="Cuenta">
           <Link to="/login" className="land-nav__login">Iniciar sesión</Link>
-          <Link to="/register" className="land-nav__cta">Crear cuenta</Link>
+          <Link to="/register" className="land-btn land-btn--primary land-btn--sm">Crear cuenta</Link>
         </nav>
       </header>
 
-      {/* ── Main content ── */}
-      <main>
-
-      {/* ── Hero ── */}
-      <div className="land-hero-wrap">
-        <div className="land-hero__bg" aria-hidden="true">
-          <span className="land-orb land-orb--prot" />
-          <span className="land-orb land-orb--cer" />
-          <span className="land-orb land-orb--frut" />
-          <span className="land-orb land-orb--verd" />
-          <span className="land-orb land-orb--lac" />
-        </div>
-        <section className="land-hero">
+      <main className="land-main">
+        <section className="land-hero" aria-labelledby="land-titulo">
           <div className="land-hero__text">
-            <h1 className="land-hero__title">
-              Cumplí el plan<br />
-              de tu<br />
-              nutricionista.
+            <h1 id="land-titulo" className="land-hero__title">
+              Tu plan, miga a miga<span className="punto-miga">.</span>
             </h1>
             <p className="land-hero__sub">
-              Cargá el plan que te dio tu nutricionista y organizá cada comida sin esfuerzo.
-              Sin apps extras. Sin papel.
+              Cargás el plan que te dio tu nutricionista, con sus porciones e intercambios,
+              y en cada comida ves qué te toca y cuánto llevás.
             </p>
             <div className="land-hero__actions">
-              <Link to="/register" className="land-btn-primary">Crear cuenta gratis</Link>
-              <Link to="/login" className="land-btn-ghost">Ya tengo cuenta</Link>
+              <Link to="/register" className="land-btn land-btn--primary">Crear cuenta gratis</Link>
+              <Link to="/login" className="land-btn land-btn--secondary">Ya tengo cuenta</Link>
             </div>
           </div>
-          <div className="land-hero__mockup">
-            <PhoneMockup />
-          </div>
+
+          <figure className="land-ejemplo">
+            <div className="land-ejemplo__papel">
+              <p className="land-ejemplo__rotulo">Tu plan en papel</p>
+              <ul className="land-ejemplo__plan">
+                <li>2 porciones de proteínas</li>
+                <li>2 porciones de cereales</li>
+                <li>1 porción de grasas</li>
+                <li>Verduras libres</li>
+              </ul>
+            </div>
+            <div className="land-ejemplo__miga">
+              <p className="land-ejemplo__rotulo">El almuerzo en miga</p>
+              <Migas rows={ALMUERZO} />
+              <p className="land-ejemplo__nota">
+                Anotaste milanesa con ensalada y una rodaja de pan: faltó 1 cereal.
+              </p>
+            </div>
+            <figcaption className="land-ejemplo__caption">
+              Cada porción de tu plan es una miga: se rellena cuando la comés.
+            </figcaption>
+          </figure>
         </section>
-      </div>
 
-      {/* ── Features ── */}
-      <section className="land-features">
-        <div className="land-section-inner">
-          <p className="land-section-label" data-reveal>Qué hace miga</p>
-          <h2 className="land-section-title" data-reveal>Diseñado para el día a día del paciente</h2>
-          <div className="land-features__grid">
-            <div className="land-feature" data-reveal data-delay="0">
-              <div className="land-feature__icon land-feature__icon--hoy">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M7 2v4M13 2v4M3 8h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M7 12h2M11 12h2M7 15h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <h3 className="land-feature__title">Tu plan, cada día</h3>
-              <p className="land-feature__desc">
-                Cada mañana sabés exactamente qué comer en cada comida: cuántas porciones de cada grupo alimenticio.
-              </p>
-            </div>
-            <div className="land-feature" data-reveal data-delay="1">
-              <div className="land-feature__icon land-feature__icon--plan">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="M10 3v14M4 6l6-3 6 3M4 14l6 3 6-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M4 6v8M16 6v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <h3 className="land-feature__title">Porciones e intercambios</h3>
-              <p className="land-feature__desc">
-                Trabajamos con el sistema de porciones que usán los nutricionistas en Uruguay. Tu plan, tal cual te lo dieron.
-              </p>
-            </div>
-            <div className="land-feature" data-reveal data-delay="2">
-              <div className="land-feature__icon land-feature__icon--semana">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M15 4l1.5 1.5L19 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h3 className="land-feature__title">Sin apps del profesional</h3>
-              <p className="land-feature__desc">
-                Tu nutricionista no necesita usar ninguna app. Vos cargás el plan y listo. Funciona desde el día uno.
-              </p>
-            </div>
+        <section className="land-detalle" aria-labelledby="land-anotar">
+          <div className="land-detalle__texto">
+            <h2 id="land-anotar" className="land-detalle__titulo">
+              Anotás lo que comiste como se lo contarías a alguien.
+            </h2>
+            <p>
+              Escribís "tarta de zapallitos y ensalada" o lo dictás. miga lo compara con tu plan
+              y te dice si esa comida fue como el plan o qué grupo te faltó. El plan no cambia:
+              eso lo decide tu nutricionista.
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* ── Cómo funciona ── */}
-      <section className="land-steps">
-        <div className="land-section-inner">
-          <p className="land-section-label" data-reveal>Cómo funciona</p>
-          <h2 className="land-section-title" data-reveal>Tres pasos para empezar</h2>
-          <div className="land-steps__list">
-            <div className="land-step" data-reveal data-delay="0">
-              <span className="land-step__num" aria-hidden="true">1</span>
-              <div className="land-step__body">
-                <h3 className="land-step__title">Cargá tu plan</h3>
-                <p className="land-step__desc">
-                  Tenés el papel o la foto del plan de tu nutricionista. En minutos lo pasás a la app con nuestra guía.
-                </p>
-              </div>
+          <dl className="land-hechos">
+            <div>
+              <dt>Funciona aunque tu nutricionista no use apps</dt>
+              <dd>Pasás el plan del papel a miga una vez, con una guía paso a paso.</dd>
             </div>
-            <div className="land-step" data-reveal data-delay="1">
-              <span className="land-step__num" aria-hidden="true">2</span>
-              <div className="land-step__body">
-                <h3 className="land-step__title">Revisá tu día</h3>
-                <p className="land-step__desc">
-                  Cada día ves de un vistazo qué comer en cada comida: desayuno, almuerzo, merienda y cena.
-                </p>
-              </div>
+            <div>
+              <dt>Porciones e intercambios, como en Uruguay</dt>
+              <dd>Los mismos grupos y equivalencias que figuran en tu plan.</dd>
             </div>
-            <div className="land-step" data-reveal data-delay="2">
-              <span className="land-step__num" aria-hidden="true">3</span>
-              <div className="land-step__body">
-                <h3 className="land-step__title">Seguí tu semana</h3>
-                <p className="land-step__desc">
-                  Próximamente: vista semanal, menú de recetas y lista de compras con precios de supermercados uruguayos.
-                </p>
-              </div>
+            <div>
+              <dt>Tus datos de salud son tuyos</dt>
+              <dd>Guardamos lo mínimo, según la Ley 18.331, y podés borrar tu cuenta cuando quieras.</dd>
             </div>
-          </div>
-        </div>
-      </section>
+          </dl>
+        </section>
 
-      {/* ── CTA final ── */}
-      <section className="land-cta">
-        <div className="land-section-inner land-cta__inner" data-reveal>
-          <div className="land-cta__badges">
-            <span className="land-cta__badge land-cta__badge--prot" />
-            <span className="land-cta__badge land-cta__badge--cer" />
-            <span className="land-cta__badge land-cta__badge--frut" />
-            <span className="land-cta__badge land-cta__badge--verd" />
-            <span className="land-cta__badge land-cta__badge--lac" />
-            <span className="land-cta__badge land-cta__badge--gras" />
-          </div>
-          <h2 className="land-cta__title">Empezá hoy.</h2>
-          <p className="land-cta__sub">Gratis. Sin tarjeta de crédito.</p>
-          <Link to="/register" className="land-btn-primary land-btn-primary--lg">Crear cuenta gratis</Link>
-        </div>
-      </section>
-
+        <section className="land-cierre" aria-labelledby="land-empezar">
+          <h2 id="land-empezar" className="land-cierre__titulo">Empezá con el plan que ya tenés.</h2>
+          <p className="land-cierre__sub">Es gratis y no pide tarjeta.</p>
+          <Link to="/register" className="land-btn land-btn--primary">Crear cuenta gratis</Link>
+        </section>
       </main>
 
-      {/* ── Footer ── */}
       <footer className="land-footer">
         <Brand size={18} />
         <div className="land-footer__right">
           <Link to="/privacidad" className="land-footer__priv">Privacidad y términos</Link>
-          <p className="land-footer__copy">Hecho con cuidado en Uruguay.</p>
+          <p className="land-footer__copy">Hecho en Uruguay.</p>
         </div>
       </footer>
-
     </div>
   )
 }

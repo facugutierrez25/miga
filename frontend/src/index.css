@@ -1,131 +1,75 @@
 /* Tokens de la guía de estilo (docs/diseno/guia-de-estilo.md) */
 :root {
   color-scheme: light;
-  --bg: #F2F7F6; --surface: #FFFFFF; --surface-2: #F8FBFA;
-  --ink: #102624; --muted: #5A706E; --muted-2: #6E8482; --done: #7C918F;
-  --text-secondary: #526865; --control-border: #708784; --group-text: var(--ink);
-  --primary: #0E6E6B; --on-primary: #FFFFFF; --on-primary-muted: #CFE6E4; --primary-soft: #EAF4F3;
-  --accent: #F6C344; --accent-soft: #FDF1D2; --on-accent-soft: #7A5A0B;
-  --line: #DCE9E7; --line-soft: #E8F1EF; --rail: #CFE0DE; --border: #C6DCDA; --control: #7A9290;
-  --g-prot: #C0704A; --g-cer: #B8913A; --g-frut: #B5627A;
+  /* Papel, tinta y una sola familia de neutros */
+  --bg: #F6F6F3; --surface: #FFFFFF; --surface-2: #EEEEEA;
+  --ink: #16201F; --muted: #5A6462; --muted-2: #646E6C;
+  --text-secondary: #5A6462; --control-border: #858D8B;
+  --primary: #0E6E6B; --on-primary: #FFFFFF; --primary-soft: #E7F1F0;
+  --accent: #F6C344; --accent-soft: #FCEFC7; --on-accent-soft: #5C4300;
+  --line: #E3E4DF; --line-soft: #ECECE8; --border: #D6D8D3; --control: #858D8B;
+  --ok: #2F7A4F; --warn: #8A5A00; --miga-empty: #858D8B;
+  --g-prot: #C0704A; --g-cer: #A8822E; --g-frut: #B5627A;
   --g-lac: #4F86B8; --g-gras: #8070B0; --g-verd: #4E8F6A;
   --t-prot: #F4E7E0; --t-cer: #F4EEDD; --t-frut: #F4E4EA;
   --t-lac: #E3ECF5; --t-gras: #ECE9F4; --t-verd: #E2EEE6;
   --error: #B42318; --error-bg: #FEF3F2;
-  --shadow-featured: 0 6px 20px rgba(16, 38, 36, 0.08);
-  --radius-header: 24px; --radius-card: 22px; --radius-control: 14px; --radius-sm: 8px; --radius-pill: 999px; --radius-chip: 999px;
-  /* Vidrio (Liquid Glass): superficies translúcidas sobre un fondo ambiental */
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-strong: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.80);
-  --glass-blur: blur(24px) saturate(180%);
-  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 12px 32px rgba(16, 38, 36, 0.08);
-  --glass-shadow-ahora: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 16px 40px rgba(14, 110, 107, 0.18);
-  --btn-primary-bg: linear-gradient(180deg, #158581, #0E6E6B);
-  --btn-primary-border: rgba(255, 255, 255, 0.35);
-  --btn-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.40), 0 8px 20px rgba(14, 110, 107, 0.28);
-  --ambient-1: rgba(14, 110, 107, 0.30);
-  --ambient-2: rgba(246, 195, 68, 0.42);
-  --ambient-3: rgba(78, 143, 106, 0.26);
+  /* Forma: tarjetas de 12 px, controles de 10 px; la píldora queda para los chips */
+  --radius-card: 12px; --radius-control: 10px; --radius-sm: 8px; --radius-pill: 10px; --radius-chip: 999px;
+  --shadow-float: 0 4px 16px rgba(16, 32, 31, 0.10);
+  /* Las superficies son sólidas: el único vidrio es la barra de navegación */
+  --nav-glass: rgba(255, 255, 255, 0.72);
+  --nav-blur: blur(18px) saturate(160%);
+  /* Espaciado en escala de 4 y 8 */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  /* Tipografía en proporción 1,2 */
+  --fs-cap: 12px; --fs-sm: 14px; --fs-body: 16px; --fs-h3: 19px; --fs-h1: 24px; --fs-num: 28px;
   --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
 }
 
-/* Oscuro: por preferencia del sistema (salvo que el usuario elija claro) o por elección explícita */
+/* Oscuro: por preferencia del sistema (salvo que el usuario elija claro) o por elección explícita.
+   Gris casi negro neutro: la elevación se marca con superficies más claras, no con color. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0B1716; --surface: #132322; --surface-2: #0F1D1C;
-    --ink: #E6F0EF; --muted: #9BB1AF; --muted-2: #7F9795; --done: #6E8684;
-    --text-secondary: #9BB1AF; --control-border: #789592;
-    --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
-    --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
-    --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
+    --bg: #111111; --surface: #1A1A1A; --surface-2: #262626;
+    --ink: #EDEDEA; --muted: #A6A6A1; --muted-2: #8F8F8A;
+    --text-secondary: #A6A6A1; --control-border: #7A7A75;
+    --primary: #4DB8B2; --on-primary: #0B1F1E; --primary-soft: #18302F;
+    --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
+    --line: #2C2C2C; --line-soft: #222222; --border: #333333; --control: #7A7A75;
+    --ok: #7CC79A; --warn: #F0C46A; --miga-empty: #7A7A75;
+    --g-cer: #C9A24A;
     --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
     --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
     --error: #F97066; --error-bg: #3A1C1A;
-    --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.5);
-    --glass-bg: rgba(30, 56, 54, 0.42);
-    --glass-bg-strong: rgba(24, 46, 44, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-blur: blur(24px) saturate(180%);
-    --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    --glass-shadow-ahora: 0 0 0 2px var(--primary);
-    --btn-primary-bg: linear-gradient(180deg, #57C6C1, #3FB3AE);
-    --btn-primary-border: rgba(255, 255, 255, 0.25);
-    --btn-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 8px 20px rgba(63, 179, 174, 0.25);
-    --ambient-1: transparent;
-    --ambient-2: transparent;
-    --ambient-3: transparent;
+    --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.45);
+    --nav-glass: rgba(30, 30, 30, 0.72);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0B1716; --surface: #132322; --surface-2: #0F1D1C;
-  --ink: #E6F0EF; --muted: #9BB1AF; --muted-2: #7F9795; --done: #6E8684;
-  --text-secondary: #9BB1AF; --control-border: #789592;
-  --primary: #3FB3AE; --on-primary: #062120; --on-primary-muted: #0F3D3B; --primary-soft: #173634;
-  --accent-soft: #3A3016; --on-accent-soft: #F6D27A;
-  --line: #1F3533; --line-soft: #1A2D2B; --rail: #24403E; --border: #2C4644; --control: #6F8B88;
+  --bg: #111111; --surface: #1A1A1A; --surface-2: #262626;
+  --ink: #EDEDEA; --muted: #A6A6A1; --muted-2: #8F8F8A;
+  --text-secondary: #A6A6A1; --control-border: #7A7A75;
+  --primary: #4DB8B2; --on-primary: #0B1F1E; --primary-soft: #18302F;
+  --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
+  --line: #2C2C2C; --line-soft: #222222; --border: #333333; --control: #7A7A75;
+  --ok: #7CC79A; --warn: #F0C46A; --miga-empty: #7A7A75;
+  --g-cer: #C9A24A;
   --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
   --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
   --error: #F97066; --error-bg: #3A1C1A;
-  --shadow-featured: 0 6px 20px rgba(0, 0, 0, 0.5);
-  --glass-bg: rgba(30, 56, 54, 0.42);
-  --glass-bg-strong: rgba(24, 46, 44, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-blur: blur(24px) saturate(180%);
-  --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --glass-shadow-ahora: 0 0 0 2px var(--primary);
-  --btn-primary-bg: linear-gradient(180deg, #57C6C1, #3FB3AE);
-  --btn-primary-border: rgba(255, 255, 255, 0.25);
-  --btn-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 8px 20px rgba(63, 179, 174, 0.25);
-  --ambient-1: transparent;
-  --ambient-2: transparent;
-  --ambient-3: transparent;
+  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --nav-glass: rgba(30, 30, 30, 0.72);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-}
-
-/* Fondo ambiental: lo que se ve a través del vidrio */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    linear-gradient(to bottom, color-mix(in srgb, var(--ambient-1) 30%, transparent) 0%, transparent 25%),
-    radial-gradient(480px 480px at 5% 0%,    var(--ambient-1), transparent 70%),
-    radial-gradient(400px 320px at 95% 0%,   var(--ambient-2), transparent 70%),
-    radial-gradient(380px 380px at 100% 45%, var(--ambient-2), transparent 70%),
-    radial-gradient(460px 400px at 10% 100%, var(--ambient-3), transparent 70%);
-}
-
-/* Escritorio: sin vidrio, se mantiene el estilo sólido de siempre.
-   html:root:not([data-x]) le gana en especificidad a las reglas de tema claro/oscuro. */
-@media (min-width: 640px) {
-  html:root:not([data-x]) {
-    --glass-bg: var(--surface);
-    --glass-bg-strong: var(--surface);
-    --glass-border: var(--line-soft);
-    --glass-blur: none;
-    --glass-shadow: none;
-    --glass-shadow-ahora: 0 0 0 0 transparent;
-    --btn-primary-bg: var(--primary);
-    --btn-primary-border: transparent;
-    --btn-primary-shadow: none;
-    --radius-card: 16px;
-    --radius-control: 12px;
-    --radius-pill: 999px;
-    --radius-chip: 8px;
-  }
-  body::before { display: none; }
 }
 
 /* Celular: el iPhone hace zoom al tocar un campo con letra de menos de 16 px.
@@ -138,20 +82,17 @@ body::before {
   }
 }
 
-/* Si el sistema pide menos transparencias, o el navegador no difumina, el vidrio pasa a ser sólido */
+/* Si el sistema pide menos transparencias, o el navegador no difumina, la barra pasa a ser sólida */
 @media (prefers-reduced-transparency: reduce) {
   html:root:not([data-x]) {
-    --glass-bg: var(--surface);
-    --glass-bg-strong: var(--surface);
-    --glass-border: var(--line-soft);
+    --nav-glass: var(--surface);
+    --nav-blur: none;
   }
-  body::before { display: none; }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html:root:not([data-x]) {
-    --glass-bg: var(--surface);
-    --glass-bg-strong: var(--surface);
+    --nav-glass: var(--surface);
   }
 }
 
@@ -159,15 +100,24 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: var(--fs-body);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3 {
+/* Bricolage solo para el logo y el título de cada pantalla; el resto de los títulos en DM Sans */
+h1 {
   font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+h2, h3 {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
 }
 
 :focus-visible {
@@ -175,11 +125,17 @@ h1, h2, h3 {
   outline-offset: 2px;
 }
 
+/* Los títulos y el contenido principal reciben el foco al cambiar de pantalla para que el lector
+   de pantalla los anuncie; no son controles, así que no muestran el recuadro de foco. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* Logo: "miga" con el punto de la i en amarillo */
 .brand {
   font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1;
   color: var(--primary);
 }
@@ -231,15 +187,16 @@ textarea {
   align-self: flex-start;
   min-height: 44px;
   padding: 8px 20px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-pill);
-  color: var(--primary);
-  background: var(--primary-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 600;
   cursor: pointer;
 }
 
 .dictation-button[aria-pressed="true"] {
   background: var(--primary);
   color: var(--on-primary);
-  font-weight: 700;
+  border-color: transparent;
 }

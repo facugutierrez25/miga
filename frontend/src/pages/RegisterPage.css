@@ -8,14 +8,14 @@
 
 .register-card {
   border-radius: var(--radius-card);
-  padding: 32px 24px;
+  padding: var(--s3);
   width: 100%;
   max-width: 400px;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--surface);
+
+  border: 1px solid var(--line);
+  box-shadow: none;
+  gap: var(--s2);
 }
 
 .register-brand {
@@ -24,10 +24,10 @@
 
 .register-title {
   font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 34px;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-weight: 700;
+  font-size: var(--fs-h1);
+
+  line-height: 28px;
   color: var(--ink);
   margin-bottom: 24px;
 }
@@ -52,7 +52,7 @@
   font-size: 16px;
   font-family: inherit;
   color: var(--ink);
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .register-field input:focus {
@@ -62,7 +62,7 @@
 }
 
 .register-field input:focus-visible {
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  box-shadow: none;
 }
 
 .register-input-wrap {
@@ -129,15 +129,16 @@
   width: 100%;
   height: 48px;
   color: var(--on-primary);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.15s;
-  background: var(--btn-primary-bg);
-  border: 1px solid var(--btn-primary-border);
-  box-shadow: var(--btn-primary-shadow);
-  border-radius: var(--radius-pill);
+  background: var(--primary);
+  border: 1px solid transparent;
+  box-shadow: none;
+  border-radius: var(--radius-control);
+  min-height: 44px;
 }
 
 .register-submit:hover:not(:disabled) {
@@ -170,13 +171,13 @@
 
 .login-unverified {
   margin-top: 16px;
-  padding: 16px;
+  padding: var(--s3);
   border-radius: var(--radius-card);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--line);
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s2);
 }
 
 .login-unverified__msg {
@@ -187,12 +188,12 @@
 }
 
 .login-unverified__resend {
-  background: none;
-  border: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
   padding: 0;
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 13px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
   cursor: pointer;
   text-align: left;
 }
@@ -213,7 +214,10 @@
 .login-unverified__resend {
   min-height: 44px;
   padding: 8px 16px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-pill);
-  background: var(--primary-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
 }
