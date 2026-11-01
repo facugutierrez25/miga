@@ -36,7 +36,6 @@ record DayRegistroDto(
         Long foodGroupId,
         String name,
         String clave,
-        BigDecimal totalRecorded,
-        BigDecimal dailyGoal
+        BigDecimal totalRecorded
     ) {}
 }

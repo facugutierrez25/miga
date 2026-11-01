@@ -57,6 +57,7 @@ class PlanRulesService {
         boolean used = notes.planHasNotes(cur.id()) || entries.hasEntriesForMeals(plans.getMealIds(cur.id())) || habits.planHasLogs(cur.id());
         Long editable = used ? plans.forkCurrentPlan(user) : cur.id();
         change.accept(user, editable);
+        if (used) notes.reinterpretTodayNotes(email, editable);
         if (!used) plans.checkAndBumpVersion(editable, version);
         return aggregate(user);
     }

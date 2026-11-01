@@ -8,7 +8,6 @@
     "clave" : "Sintético",
     "preguntarSiFalta" : true,
     "opcional" : true,
-    "metaDiaria" : 1.5,
     "uid" : "00000000-0000-0000-0000-000000000001"
   } ],
   "meals" : [ {

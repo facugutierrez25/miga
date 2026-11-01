@@ -10,6 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RateLimiterTest {
 
     @Test
+    void accountDeletionSharesLoginIpBudget() {
+        RateLimiter limiter = new RateLimiter(new RateLimiter.Props(true, 2, 2, 2, 1, 20));
+        assertThat(limiter.checkIp("/api/v1/users/login", "192.0.2.1")).isZero();
+        assertThat(limiter.checkIp("/api/v1/users/me", "192.0.2.1")).isZero();
+        assertThat(limiter.checkIp("/api/v1/users/me", "192.0.2.1")).isEqualTo(60);
+    }
+
+    @Test
     void bucketsAreBoundedAndExpire() {
         AtomicLong clock = new AtomicLong();
         var store = new RateLimiter.BucketStore(1, Duration.ofMinutes(1), 2, clock::get);

@@ -165,3 +165,18 @@
   font-weight: 700;
   line-height: 28px;
 }
+
+.account-deletion { display: grid; gap: var(--s3); }
+.account-deletion h2 { font-size: var(--fs-h3); }
+.account-deletion form { display: grid; gap: var(--s2); }
+.account-deletion input {
+  min-height: 44px;
+  font-size: 16px;
+  padding: var(--s2);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+}
+.account-deletion [role="alert"] { color: var(--error); }
+.account-deletion button:disabled { opacity: .6; cursor: default; }

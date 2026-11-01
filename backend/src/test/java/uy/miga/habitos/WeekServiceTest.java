@@ -24,17 +24,20 @@ class WeekServiceTest {
         var service = new WeekService(habits, logs, entries, plans, users, registro);
         LocalDate monday = LocalDate.of(2026, 1, 5);
         when(users.findUserIdByEmail("user")).thenReturn(1L);
-        for (int i = 0; i < 7; i++) {
-            when(plans.getPlanIdForDate(1L, monday.plusDays(i))).thenReturn(i < 3 ? 10L : 20L);
-        }
-        when(plans.getModoRegistro(10L)).thenReturn("PORCIONES");
-        when(plans.getModoRegistro(20L)).thenReturn("LIBRE");
-        when(plans.getMealIds(10L)).thenReturn(java.util.List.of(100L));
-        when(plans.getMealPortions(100L)).thenReturn(java.util.List.of(new uy.miga.plans.MealPortionSummary(5L, new BigDecimal("2.5"))));
+        var portionPlan = new uy.miga.plans.PlanReadData(10L, monday, monday.plusDays(2), "PORCIONES",
+            new BigDecimal("0.5"), java.util.List.of(), java.util.List.of(new uy.miga.plans.PlanReadData.MealData(
+                100L, "Meal", java.util.List.of(new uy.miga.plans.MealPortionSummary(5L, new BigDecimal("2.5"))))));
+        var freePlan = new uy.miga.plans.PlanReadData(20L, monday.plusDays(3), null, "LIBRE",
+            new BigDecimal("0.5"), java.util.List.of(), java.util.List.of());
+        var plansByDate = new java.util.LinkedHashMap<LocalDate, uy.miga.plans.PlanReadData>();
+        for (int i = 0; i < 7; i++) plansByDate.put(monday.plusDays(i), i < 3 ? portionPlan : freePlan);
+        when(plans.getPlansForRange(1L, monday, monday.plusDays(6))).thenReturn(plansByDate);
         var week = service.getWeek("user", monday);
         assertThat(week.days().get(0).totalGoal()).isEqualByComparingTo("2.5");
         assertThat(week.days().get(3).totalGoal()).isZero();
-        for (int i = 0; i < 7; i++) verify(plans).getPlanIdForDate(1L, monday.plusDays(i));
+        verify(plans).getPlansForRange(1L, monday, monday.plusDays(6));
+        verify(habits).findByPlanIdOrderByDisplayOrderAsc(10L);
+        verify(habits).findByPlanIdOrderByDisplayOrderAsc(20L);
         verify(plans, never()).getCurrentPlanId(any());
         verify(plans, never()).getMealIds(20L);
     }

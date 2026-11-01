@@ -30,15 +30,25 @@ class ComparisonService {
         List<PlanFoodGroupDto> groups = planService.getPlanFoodGroups(planId);
         BigDecimal margin = planService.getMargenPorciones(planId);
 
+        return compare(planPortions, groups, margin, recordedPortions);
+    }
+
+    List<GroupStatus> compare(uy.miga.plans.PlanReadData plan, Long mealId, Map<Long, BigDecimal> recordedPortions) {
+        if ("LIBRE".equals(plan.mode())) return List.of();
+        var portions = plan.meals().stream().filter(m -> m.id().equals(mealId)).findFirst()
+            .map(uy.miga.plans.PlanReadData.MealData::portions).orElse(List.of());
+        return compare(portions, plan.groups(), plan.margin(), recordedPortions);
+    }
+
+    private List<GroupStatus> compare(List<MealPortionSummary> planPortions, List<PlanFoodGroupDto> groups,
+                                      BigDecimal margin, Map<Long, BigDecimal> recordedPortions) {
         Map<Long, String> groupNames = new HashMap<>();
         Map<Long, Boolean> askIfMissing = new HashMap<>();
         Map<Long, Boolean> optional = new HashMap<>();
-        Map<Long, BigDecimal> dailyGoal = new HashMap<>();
         for (PlanFoodGroupDto g : groups) {
             groupNames.put(g.id(), g.name());
             askIfMissing.put(g.id(), Boolean.TRUE.equals(g.preguntarSiFalta()));
             optional.put(g.id(), Boolean.TRUE.equals(g.opcional()));
-            dailyGoal.put(g.id(), g.metaDiaria());
         }
 
         List<GroupStatus> result = new ArrayList<>();
@@ -64,12 +74,11 @@ class ComparisonService {
                 status = OVER;
             }
 
-            result.add(new GroupStatus(gid, groupNames.getOrDefault(gid, ""), expected, recorded, status,
-                dailyGoal.get(gid)));
+            result.add(new GroupStatus(gid, groupNames.getOrDefault(gid, ""), expected, recorded, status));
         }
         return result;
     }
 
     record GroupStatus(Long foodGroupId, String name, BigDecimal expected,
-                       BigDecimal recorded, String status, BigDecimal dailyGoal) {}
+                       BigDecimal recorded, String status) {}
 }

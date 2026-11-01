@@ -34,3 +34,14 @@ export async function updateMe(
 ): Promise<UserProfile> {
   return apiRequest(`/api/v1/users/me`, { errorMessage: 'Error al guardar perfil.', token, method: 'PATCH', body: data })
 }
+
+export async function deleteMe(token: string, password: string): Promise<void> {
+  return apiRequest('/api/v1/users/me', {
+    token, method: 'DELETE', body: { password },
+    errorMessage: 'No se pudo eliminar tu cuenta. Intentá de nuevo.',
+    errorMessages: {
+      403: 'Contraseña incorrecta. No se eliminó tu cuenta.',
+      429: 'Demasiados intentos. Intentá de nuevo más tarde.',
+    },
+  })
+}

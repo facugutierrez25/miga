@@ -10,7 +10,7 @@ class PlanHistoryTest {
         var users = mock(uy.miga.users.UserService.class);
         when(users.findUserIdByEmail("user")).thenReturn(1L);
         var service = new PlanService(repository, mock(PlanFoodGroupRepository.class), mock(MealRepository.class),
-            users, mock(org.springframework.context.ApplicationEventPublisher.class), mock(jakarta.persistence.EntityManager.class));
+            users, mock(org.springframework.context.ApplicationEventPublisher.class), mock(jakarta.persistence.EntityManager.class), java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
         assertThat(service.getPlanHistory("user")).isEmpty();
         verify(repository).findTop50ByUserIdAndCurrentFalseOrderBySupersededAtDescIdDesc(1L);
         verifyNoMoreInteractions(repository);

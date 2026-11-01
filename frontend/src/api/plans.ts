@@ -9,7 +9,6 @@ export interface PlanFoodGroupDto {
   clave?: string | null
   preguntarSiFalta?: boolean
   opcional?: boolean
-  metaDiaria?: number | null
   uid?: string
 }
 

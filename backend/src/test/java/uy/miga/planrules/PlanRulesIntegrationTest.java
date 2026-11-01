@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 class PlanRulesIntegrationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean java.time.Clock clock;
     @Autowired WebApplicationContext context;
     @Autowired FilterChainProxy security;
     @Autowired MockEmailService email;
@@ -39,6 +40,11 @@ class PlanRulesIntegrationTest {
     JsonNode state;
     static final String BASE = "/api/v1/my-plan/";
     @BeforeEach void setup() throws Exception {
+        var zone = java.time.ZoneId.of("America/Montevideo");
+        var localDate = LocalDate.now(zone);
+        var fixed = java.time.Clock.fixed(localDate.plusDays(1).atTime(1, 30).toInstant(java.time.ZoneOffset.UTC), zone);
+        org.mockito.Mockito.when(clock.getZone()).thenReturn(zone);
+        org.mockito.Mockito.when(clock.instant()).thenReturn(fixed.instant());
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security).build();
         token = account();
         request(put("/api/v1/my-plan"), uy.miga.PlanVersions.withCurrentVersion(mvc, token, Map.of("meals", List.of(
@@ -72,6 +78,21 @@ class PlanRulesIntegrationTest {
     void addGroup(String name, Map<String,Object> fields) throws Exception {
         Map<String,Object> values = new HashMap<>(fields); values.put("name", name);
         state = request(post(BASE+"grupos"), body(values), 201);
+    }
+    @Test
+    void legacyGroupGoalIsIgnoredAndAbsentFromResponses() throws Exception {
+        addGroup("Legado", Map.of("metaDiaria", 99));
+        assertThat(group("Legado").has("metaDiaria")).isFalse();
+        String uid = group("Legado").path("uid").asText();
+        state = request(put(BASE + "grupos/" + uid), body(Map.of("name", "Legado", "metaDiaria", 50)), 200);
+        assertThat(group("Legado").has("metaDiaria")).isFalse();
+        JsonNode plan = request(get("/api/v1/my-plan"), null, 200);
+        for (JsonNode g : plan.path("foodGroups")) assertThat(g.has("metaDiaria")).isFalse();
+        JsonNode day = request(get("/api/v1/registro/" + LocalDate.now(clock)), null, 200);
+        for (JsonNode summary : day.path("summary")) assertThat(summary.has("dailyGoal")).isFalse();
+        for (JsonNode meal : day.path("meals")) {
+            for (JsonNode comparison : meal.path("comparison")) assertThat(comparison.has("dailyGoal")).isFalse();
+        }
     }
     void addHabit(String name, String type, String period, double goal, double step) throws Exception {
         state = request(post(BASE+"habitos"), body(Map.of("name", name, "habitType", type, "period", period, "goal", goal, "step", step, "unit", "lt")), 201);
@@ -180,7 +201,7 @@ class PlanRulesIntegrationTest {
     @Test void usedVersionIsCopiedOnceAndHistoricalNotesAndItemsStayIntact() throws Exception {
         long old=state.path("planId").asLong(); long meal=meals().getFirst();
         state=request(post(BASE+"alimentos"),body(Map.of("alimento","sintetico","tipo","NORMAL","groupUid",group("Proteínas").path("uid").asText())),201);
-        note(meal,LocalDate.now().minusDays(1),"1 sintetico");
+        note(meal,LocalDate.now(clock).minusDays(1),"1 sintetico");
         var oldNotes=jdbc.queryForList("select * from meal_notes where plan_id=?",old);
         var oldItems=jdbc.queryForList("select * from food_entries where meal_id=?",meal);
         assertThat(oldItems).hasSize(1);
@@ -206,8 +227,8 @@ class PlanRulesIntegrationTest {
         state=request(post(BASE+"alimentos"),body(Map.of("alimento","barrita","tipo","COMPUESTO","componentes",components)),201);
         assertThat(state.path("alimentos").get(0).path("textoRegla").asText()).isEqualTo("1 barrita = 1 Proteínas + 1 Cereales + 1 Grasas");
         var ids=meals(); String[] texts={"1 barrita","media barrita","2 barritas"}; double[] portions={1,0.5,2};
-        for(int i=0;i<3;i++) note(ids.get(i),LocalDate.now(),texts[i]);
-        JsonNode day=request(get("/api/v1/registro/"+LocalDate.now()),null,200);
+        for(int i=0;i<3;i++) note(ids.get(i),LocalDate.now(clock),texts[i]);
+        JsonNode day=request(get("/api/v1/registro/"+LocalDate.now(clock)),null,200);
         for(int i=0;i<3;i++) {
             JsonNode items=day.path("meals").get(i).path("items"); assertThat(items.size()).isEqualTo(3);
             for(JsonNode item:items) { assertThat(item.path("portions").asDouble()).isEqualTo(portions[i]); assertThat(groupIds).contains(item.path("foodGroupId").asLong()); }
@@ -228,10 +249,10 @@ class PlanRulesIntegrationTest {
         state=request(put(BASE+"alimentos/"+adjustment),body(Map.of("alimento",food,"sinonimos",List.of(synonym),"tipo","NORMAL","groupUid",group("Cereales").path("uid").asText(),"overridesRuleUid",uid)),200);
         long cereals=group("Cereales").path("id").asLong(), protein=group("Proteínas").path("id").asLong();
         catalog=request(get(BASE+"catalogo").param("q",food),null,200); assertThat(catalog.get(0).path("ajustadoPorUid").asText()).isEqualTo(adjustment);
-        long meal=meals().getFirst(); note(meal,LocalDate.now(),"1 "+synonym);
+        long meal=meals().getFirst(); note(meal,LocalDate.now(clock),"1 "+synonym);
         assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,meal)).isEqualTo(cereals);
         state=request(delete(BASE+"alimentos/"+adjustment).param("planVersion",state.path("planVersion").asText()),null,200);
-        long newMeal=meals().getFirst(); note(newMeal,LocalDate.now(),"2 "+synonym);
+        long newMeal=meals().getFirst(); note(newMeal,LocalDate.now(clock),"2 "+synonym);
         long newProtein=group("Proteínas").path("id").asLong();
         assertThat(newProtein).isNotEqualTo(protein);
         assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,newMeal)).isEqualTo(newProtein);
@@ -239,12 +260,12 @@ class PlanRulesIntegrationTest {
     @Test void habitContinuityAndArchival() throws Exception {
         addHabit("Agua","CANTIDAD","DIA",2,0.5);
         String uid=habit("Agua").path("uid").asText(); long oldHabit=habit("Agua").path("id").asLong();
-        request(put("/api/v1/habitos/"+oldHabit+"/log").param("date",LocalDate.now().toString()),Map.of("value",1),201);
+        request(put("/api/v1/habitos/"+oldHabit+"/log").param("date",LocalDate.now(clock).toString()),Map.of("value",1),201);
         addGroup("Copia",Map.of()); long newHabit=habit("Agua").path("id").asLong(); assertThat(newHabit).isNotEqualTo(oldHabit);
         JsonNode week=request(get("/api/v1/semana"),null,200);
         boolean found=false; for(JsonNode day:week.path("days")) for(JsonNode log:day.path("habitLogs")) if(log.path("habitId").asLong()==newHabit) found=true;
         assertThat(found).isTrue();
-        request(put("/api/v1/habitos/"+newHabit+"/log").param("date",LocalDate.now().toString()),Map.of("value",1.5),201);
+        request(put("/api/v1/habitos/"+newHabit+"/log").param("date",LocalDate.now(clock).toString()),Map.of("value",1.5),201);
         assertThat(jdbc.queryForObject("select count(*) from habit_logs where habit_uid=?",Integer.class,UUID.fromString(uid))).isEqualTo(1);
         state=request(delete(BASE+"habitos/"+uid).param("planVersion",state.path("planVersion").asText()),null,200);
         assertThat(state.path("habitos").size()).isZero();
@@ -255,7 +276,7 @@ class PlanRulesIntegrationTest {
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void concurrentMutationsHaveOneWinner(boolean used) throws Exception {
-        if (used) note(meals().getFirst(), LocalDate.now(), "1 manzana");
+        if (used) note(meals().getFirst(), LocalDate.now(clock), "1 manzana");
         long planId=state.path("planId").asLong();
         long revision=state.path("planVersion").asLong();
         var start=new java.util.concurrent.CountDownLatch(1);
@@ -303,7 +324,7 @@ class PlanRulesIntegrationTest {
 
     @Test void unusedGroupCanBeDeletedFromForkWithoutChangingHistory() throws Exception {
         addGroup("Borrable",Map.of()); String uid=group("Borrable").path("uid").asText();
-        long old=state.path("planId").asLong(); note(meals().getFirst(),LocalDate.now(),"1 manzana");
+        long old=state.path("planId").asLong(); note(meals().getFirst(),LocalDate.now(clock),"1 manzana");
         state=request(delete(BASE+"grupos/"+uid).param("planVersion",state.path("planVersion").asText()),null,200);
         assertThat(state.path("planId").asLong()).isNotEqualTo(old);
         assertThat(jdbc.queryForObject("select count(*) from plan_food_groups where plan_id=? and uid=?",Integer.class,old,UUID.fromString(uid))).isEqualTo(1);
@@ -355,7 +376,7 @@ class PlanRulesIntegrationTest {
         String habitUid = habit("Agua").path("uid").asText();
         long oldPlan = state.path("planId").asLong();
         long meal = meals().getFirst();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         state = request(post(BASE + "alimentos"), body(Map.of("alimento", "sintetico", "tipo", "NORMAL",
             "groupUid", group("Proteínas").path("uid").asText())), 201);
         note(meal, today.minusDays(1), "1 sintetico");
@@ -384,6 +405,70 @@ class PlanRulesIntegrationTest {
             UUID.fromString(habitUid), today)).isNotEqualTo(oldHabit);
         assertThat(jdbc.queryForObject("select plan_habit_id from habit_logs where habit_uid=? and log_date=?", Long.class,
             UUID.fromString(habitUid), today.minusDays(1))).isEqualTo(oldHabit);
+    }
+
+    @Test
+    void lateUruguayEveningResolvesLatestLocalVersion() throws Exception {
+        long oldPlan = state.path("planId").asLong();
+        long oldMeal = meals().getFirst();
+        LocalDate today = LocalDate.now(clock);
+        note(oldMeal, today, "1 manzana");
+        addGroup("Nueva versión local", Map.of());
+        long current = state.path("planId").asLong();
+        jdbc.update("update plans set created_at=? where id=?",
+            today.atTime(23, 0).atOffset(java.time.ZoneOffset.UTC), oldPlan);
+        jdbc.update("update plans set created_at=? where id=?",
+            today.plusDays(1).atTime(1, 0).atOffset(java.time.ZoneOffset.UTC), current);
+        jdbc.update("update plans set superseded_at=? where id=?",
+            today.plusDays(1).atTime(1, 0).atOffset(java.time.ZoneOffset.UTC), oldPlan);
+        JsonNode plan = request(get("/api/v1/my-plan"), null, 200);
+        JsonNode day = request(get("/api/v1/registro/" + today), null, 200);
+        assertThat(plan.path("createdAt").asText()).isEqualTo(today.toString());
+        assertThat(day.path("meals").get(0).path("mealId").asLong())
+            .isEqualTo(plan.path("meals").get(0).path("id").asLong()).isNotEqualTo(oldMeal);
+        assertThat(day.path("meals").get(0).path("noteText").asText()).isEqualTo("1 manzana");
+    }
+
+    @Test
+    void twoRuleEditsReinterpretTodayAndPreserveYesterday() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        long oldPlan = state.path("planId").asLong();
+        long meal = meals().getFirst();
+        state = request(post(BASE + "alimentos"), body(Map.of("alimento", "sintetico", "tipo", "NORMAL",
+            "groupUid", group("Proteínas").path("uid").asText(), "cantidadPorPorcion", 1, "unidad", "u")), 201);
+        String ruleUid = state.path("alimentos").get(0).path("uid").asText();
+        String groupUid = group("Proteínas").path("uid").asText();
+        JsonNode saved = note(meal, today, "4 sintetico u");
+        note(meal, today.minusDays(1), "2 sintetico u");
+        long groupId = group("Proteínas").path("id").asLong();
+        request(post("/api/v1/registro/" + today + "/comidas/" + meal + "/respuestas"),
+            Map.of("foodGroupId", groupId, "consumed", true), 201);
+        var yesterdayNotes = jdbc.queryForList("select * from meal_notes where plan_id=? and fecha=?", oldPlan, today.minusDays(1));
+        var yesterdayEntries = jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, today.minusDays(1));
+        for (int divisor : List.of(2, 4)) {
+            state = request(put(BASE + "alimentos/" + ruleUid), body(Map.of("alimento", "sintetico", "tipo", "NORMAL",
+                "groupUid", groupUid, "cantidadPorPorcion", divisor, "unidad", "u")), 200);
+            long plan = state.path("planId").asLong();
+            JsonNode day = request(get("/api/v1/registro/" + today), null, 200);
+            JsonNode currentMeal = day.path("meals").get(0);
+            assertThat(currentMeal.path("noteId").asLong()).isEqualTo(saved.path("noteId").asLong());
+            assertThat(currentMeal.path("noteText").asText()).isEqualTo("4 sintetico u");
+            assertThat(currentMeal.path("noteVersion").asLong()).isGreaterThan(saved.path("version").asLong());
+            assertThat(jdbc.queryForObject("select porciones from food_entries where meal_note_id=?", Double.class,
+                saved.path("noteId").asLong())).isEqualTo(4.0 / divisor);
+            assertThat(jdbc.queryForObject("select count(*) from meal_notes n join meals m on m.id=n.meal_id where n.id=? and (n.plan_id<>? or m.plan_id<>?)",
+                Integer.class, saved.path("noteId").asLong(), plan, plan)).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from food_entries e join meals m on m.id=e.meal_id left join plan_food_groups g on g.id=e.food_group_id where e.user_id=(select user_id from plans where id=?) and e.date=? and (m.plan_id<>? or g.plan_id<>?)",
+                Integer.class, plan, today, plan, plan)).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from food_entries where meal_id=? and date=? and origen='RESPUESTA'",
+                Integer.class, currentMeal.path("mealId").asLong(), today)).isEqualTo(1);
+        }
+        assertThat(jdbc.queryForList("select * from meal_notes where plan_id=? and fecha=?", oldPlan, today.minusDays(1))).isEqualTo(yesterdayNotes);
+        assertThat(jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, today.minusDays(1))).isEqualTo(yesterdayEntries);
+        request(put("/api/v1/registro/" + today.plusDays(1) + "/comidas/" + meal + "/nota"),
+            Map.of("text", "1 sintetico"), 409);
+        request(put("/api/v1/registro/" + today + "/comidas/" + meals().getFirst() + "/nota"),
+            Map.of("text", "1 sintetico", "version", saved.path("version").asLong()), 409);
     }
 
     @Test
@@ -416,37 +501,39 @@ class PlanRulesIntegrationTest {
     @Test
     void newTodayNoteRejectsMealFromOldVersionAfterFork() throws Exception {
         long staleMeal = meals().getFirst();
-        note(staleMeal, LocalDate.now().minusDays(1), "1 manzana");
+        note(staleMeal, LocalDate.now(clock).minusDays(1), "1 manzana");
         addGroup("Dispara copia", Map.of());
 
-        JsonNode error = request(put("/api/v1/registro/" + LocalDate.now() + "/comidas/" + staleMeal + "/nota"),
+        JsonNode error = request(put("/api/v1/registro/" + LocalDate.now(clock) + "/comidas/" + staleMeal + "/nota"),
             Map.of("text", "1 manzana"), 409);
 
-        assertThat(error.path("code").asText()).isEqualTo("VERSION_CONFLICT");
-        note(staleMeal, LocalDate.now().minusDays(1), "2 manzanas");
+        assertThat(error.path("code").asText()).isEqualTo("PLAN_CHANGED");
+        note(staleMeal, LocalDate.now(clock).minusDays(1), "2 manzanas");
     }
 
     @Test
-    void deletingGroupDetachesMovedGlobalEntryAndPreservesSnapshot() throws Exception {
+    void deletingGroupReinterpretsTodayAndPreservesYesterday() throws Exception {
         addGroup("Grupo global", Map.of("clave", "review2_global"));
         String uid = group("Grupo global").path("uid").asText();
         long oldGroup = group("Grupo global").path("id").asLong();
         jdbc.update("insert into food_rules(uid,alcance,alimento,tipo,standard_group_key,cantidad_por_porcion,unidad,porcion_por_defecto) values (?,'GLOBAL','prueba global review','NORMAL','review2_global',1,'u',1)", UUID.randomUUID());
         long oldPlan = state.path("planId").asLong();
-        note(meals().getFirst(), LocalDate.now(), "2 prueba global review u");
+        long meal = meals().getFirst();
+        note(meal, LocalDate.now(clock).minusDays(1), "1 prueba global review u");
+        var yesterday = jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, LocalDate.now(clock).minusDays(1));
+        note(meal, LocalDate.now(clock), "2 prueba global review u");
         addGroup("Copia", Map.of());
         assertThat(state.path("planId").asLong()).isNotEqualTo(oldPlan);
         long movedGroup = group("Grupo global").path("id").asLong();
         assertThat(movedGroup).isNotEqualTo(oldGroup);
-        var snapshot = jdbc.queryForMap("select id, porciones, applied_rule from food_entries where food_group_id=?", movedGroup);
 
         state = request(delete(BASE + "grupos/" + uid).param("planVersion", state.path("planVersion").asText()), null, 200);
 
-        assertThat(jdbc.queryForMap("select id, porciones, applied_rule from food_entries where id=?", snapshot.get("id")))
-            .isEqualTo(snapshot);
-        assertThat(jdbc.queryForObject("select food_group_id from food_entries where id=?", Long.class, snapshot.get("id"))).isNull();
-        JsonNode day = request(get("/api/v1/registro/" + LocalDate.now()), null, 200);
-        assertThat(day.path("meals").get(0).path("items").get(0).path("foodGroupId").isNull()).isTrue();
+        assertThat(jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, LocalDate.now(clock).minusDays(1)))
+            .isEqualTo(yesterday);
+        JsonNode day = request(get("/api/v1/registro/" + LocalDate.now(clock)), null, 200);
+        assertThat(day.path("meals").get(0).path("noteText").asText()).isEqualTo("2 prueba global review u");
+        assertThat(day.path("meals").get(0).path("items").size()).isZero();
         assertThat(jdbc.queryForObject("select count(*) from plan_food_groups where id=?", Integer.class, oldGroup)).isEqualTo(1);
     }
 
@@ -468,9 +555,9 @@ class PlanRulesIntegrationTest {
             "tipo", "NORMAL", "groupUid", group("Proteínas").path("uid").asText(),
             "cantidadPorPorcion", 1, "unidad", "u")), 201);
         long meal = meals().getFirst();
-        JsonNode saved = note(meal, LocalDate.now(), "2 yogur prueba u");
+        JsonNode saved = note(meal, LocalDate.now(clock), "2 yogur prueba u");
         long entry = saved.path("entries").get(0).path("id").asLong();
-        request(patch("/api/v1/registro/" + LocalDate.now() + "/items/" + entry),
+        request(patch("/api/v1/registro/" + LocalDate.now(clock) + "/items/" + entry),
             Map.of("quantity", 2, "portions", 3, "saveAsRule", true), 200);
         state = request(get(BASE + "reglas"), null, 200);
         JsonNode rule = state.path("alimentos").get(0);
@@ -478,7 +565,7 @@ class PlanRulesIntegrationTest {
         assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1.5);
         assertThat(rule.path("sinonimos").get(0).asText()).isEqualTo("yogurt");
         for (String text : List.of("2 yogur prueba u", "2 yogurt u", "2 yogur prueba")) {
-            JsonNode reinterpreted = note(meal, LocalDate.now(), text);
+            JsonNode reinterpreted = note(meal, LocalDate.now(clock), text);
             assertThat(reinterpreted.path("entries").get(0).path("portions").asDouble())
                 .isCloseTo(3, org.assertj.core.data.Offset.offset(0.01));
         }

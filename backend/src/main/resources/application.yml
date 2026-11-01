@@ -25,9 +25,13 @@ server:
   port: ${PORT:8080}
 
 app:
+  # Zona para el día de registro y la vigencia diaria de los planes.
+  time-zone: ${APP_TIME_ZONE:America/Montevideo}
   version: '@project.version@'
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175}
+    # Patrones para las vistas previas de Vercel, por ejemplo https://miga-*-facugutierrez25.vercel.app
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}
   base-url: ${APP_BASE_URL:http://localhost:5173}
   mail:
     from: ${MAIL_FROM:noreply@miga.uy}

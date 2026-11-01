@@ -63,7 +63,10 @@ cd frontend && npm test
 | `DB_URL` | `jdbc:postgresql://localhost:5432/miga` | Conexión JDBC |
 | `DB_USER` / `DB_PASSWORD` | `miga` | Credenciales de la base |
 | `DB_POOL_SIZE` | `10` | Tamaño del pool de conexiones |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Orígenes permitidos para el frontend |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Orígenes exactos permitidos para el frontend (sin `*`; en producción `https://miga.uy`) |
+| `CORS_ALLOWED_ORIGIN_PATTERNS` | vacío | Patrones https para las vistas previas, por ejemplo `https://miga-*-facugutierrez25.vercel.app` |
+| `JWT_SECRET` | secreto de desarrollo | Clave para firmar los tokens (al menos 32 caracteres). Obligatoria en producción y en `docker compose` |
+| `APP_TIME_ZONE` | `America/Montevideo` | Zona para el "hoy" de la app y la vigencia del plan |
 | `PORT` | `8080` | Puerto HTTP |
 
 En el frontend, `VITE_API_URL` apunta al backend desplegado (en local queda vacío y Vite usa su proxy).

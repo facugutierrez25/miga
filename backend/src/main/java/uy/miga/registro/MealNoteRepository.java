@@ -13,6 +13,7 @@ interface MealNoteRepository extends JpaRepository<MealNote, Long> {
     boolean existsByPlanId(@Param("planId") Long planId);
 
     Optional<MealNote> findByUserIdAndDateAndMealId(Long userId, LocalDate date, Long mealId);
+    List<MealNote> findByUserIdAndDateBetween(Long userId, LocalDate start, LocalDate end);
     List<MealNote> findByUserIdAndDate(Long userId, LocalDate date);
     Optional<MealNote> findByIdAndUserId(Long id, Long userId);
 

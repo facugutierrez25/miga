@@ -15,9 +15,14 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final VerificationService verificationService;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     UserService(UsersRepository repository, PasswordEncoder passwordEncoder,
-                JwtService jwtService, VerificationService verificationService) {
+                JwtService jwtService, VerificationService verificationService,
+                org.springframework.context.ApplicationEventPublisher events, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.events = events;
+        this.jdbc = jdbc;
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -55,6 +60,20 @@ public class UserService {
         user.setBirthDate(req.birthDate());
         repository.save(user);
         return new UserProfileResponse(user.getEmail(), user.getFirstName(), user.getLastName(), user.getBirthDate());
+    }
+
+    @Transactional
+    void deleteAccount(String email, String password) {
+        User user = repository.findByEmail(email).orElseThrow(InvalidCredentialsException::new);
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "Contraseña incorrecta. No se eliminó tu cuenta.");
+        }
+        events.publishEvent(new UserDeletionRequested(user.getId()));
+        jdbc.update("delete from email_outbox where user_id = ?", user.getId());
+        jdbc.update("delete from email_verification_tokens where user_id = ?", user.getId());
+        repository.delete(user);
+        repository.flush();
     }
 
     User register(String email, String password) {

@@ -43,11 +43,13 @@ public class PlanService {
     private final MealRepository mealRepository;
     private final UserService userService;
     private final ApplicationEventPublisher events;
+    private final java.time.Clock clock;
 
     PlanService(PlansRepository plansRepository,
                 PlanFoodGroupRepository groupRepository,
                 MealRepository mealRepository,
-                UserService userService, ApplicationEventPublisher events, jakarta.persistence.EntityManager entityManager) {
+                UserService userService, ApplicationEventPublisher events, jakarta.persistence.EntityManager entityManager, java.time.Clock clock) {
+        this.clock = clock;
         this.entityManager = entityManager;
         this.events = events;
         this.plansRepository = plansRepository;
@@ -66,7 +68,7 @@ public class PlanService {
 
     @Transactional(readOnly = true, noRollbackFor = PlanNotFoundException.class)
     public Long getPlanIdForDate(Long userId, LocalDate date) {
-        return plansRepository.findActiveOnDate(userId, date)
+        return plansRepository.findActiveOnDate(userId, date, clock.getZone().getId())
             .or(() -> plansRepository.findOldestByUserId(userId))
             .map(Plan::getId)
             .orElseThrow(PlanNotFoundException::new);
@@ -135,8 +137,8 @@ public class PlanService {
                         .toList()
                 )).toList();
                 return new PlanSummaryDto(
-                    p.getCreatedAt().toLocalDate(),
-                    p.getSupersededAt().toLocalDate(),
+                    p.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+                    p.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
                     p.getMeals().size(),
                     groups,
                     meals
@@ -158,7 +160,6 @@ public class PlanService {
                 group.setUid(source.getUid());
                 group.setClave(source.getClave());
                 group.setColor(source.getColor());
-                group.setMetaDiaria(source.getMetaDiaria());
                 group.setPreguntarSiFalta(source.isPreguntarSiFalta());
                 group.setOpcional(source.isOpcional());
                 plan.getFoodGroups().add(group);
@@ -254,7 +255,7 @@ public class PlanService {
                 .toList();
             return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
         }).toList();
-        return new PlanDto(groups, meals, plan.getVersion(), plan.getCreatedAt().toLocalDate());
+        return new PlanDto(groups, meals, plan.getVersion(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate());
     }
 
     // ── API pública para módulos externos ─────────────────────────────────────
@@ -263,7 +264,7 @@ public class PlanService {
     public List<PlanFoodGroupDto> getPlanFoodGroups(Long planId) {
         return groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
             .stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria(), g.getUid()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid()))
             .toList();
     }
 
@@ -317,11 +318,41 @@ public class PlanService {
 
     public record MealRef(Long id, String name) {}
 
+    @Transactional(readOnly = true)
+    public java.util.Map<LocalDate, PlanReadData> getPlansForRange(Long userId, LocalDate start, LocalDate end) {
+        var candidates = plansRepository.findForRange(userId, start, end, clock.getZone().getId());
+        var result = new java.util.LinkedHashMap<LocalDate, PlanReadData>();
+        var loaded = new java.util.HashMap<Long, PlanReadData>();
+        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
+            LocalDate day = date;
+            // Mismo orden y extremos inclusivos que findActiveOnDate; el ultimo es el mas antiguo.
+            Plan selected = candidates.stream().filter(p -> !p.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate().isAfter(day)
+                && (p.getSupersededAt() == null || !p.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate().isBefore(day)))
+                .findFirst().orElse(candidates.isEmpty() ? null : candidates.getLast());
+            if (selected != null) result.put(date, loaded.computeIfAbsent(selected.getId(), id -> readData(selected)));
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public PlanReadData getReadData(Long planId) {
+        return readData(plansRepository.findById(planId).orElseThrow(PlanNotFoundException::new));
+    }
+
+    private PlanReadData readData(Plan plan) {
+        var meals = mealRepository.findWithPortionsByPlanId(plan.getId()).stream()
+            .map(m -> new PlanReadData.MealData(m.getId(), m.getName(), m.getPortions().stream()
+                .map(p -> new MealPortionSummary(p.getFoodGroupId(), p.getPortions())).toList())).toList();
+        return new PlanReadData(plan.getId(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+            plan.getSupersededAt() == null ? null : plan.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+            plan.getModoRegistro(), plan.getMargenPorciones(), getPlanFoodGroups(plan.getId()), meals);
+    }
+
     // ── privados ──────────────────────────────────────────────────────────────
 
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {
         return groups.stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria(), g.getUid()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid()))
             .toList();
     }
 
@@ -387,7 +418,7 @@ public class PlanService {
                 .ifPresent(m -> { mealIdMap.put(source.getId(), m.getId()); taken.add(m.getId()); });
         }
         events.publishEvent(new PlanVersionCreated(old.getUserId(), old.getId(), copy.getId(),
-            Map.copyOf(groupIdMap), Map.copyOf(mealIdMap), LocalDate.now()));
+            Map.copyOf(groupIdMap), Map.copyOf(mealIdMap), LocalDate.now(clock)));
     }
 
     @Transactional(noRollbackFor = PlanNotFoundException.class)
@@ -452,7 +483,7 @@ public class PlanService {
         if (abbr.length() > 10 || (in.clave() != null && in.clave().length() > 50)) throw new IllegalArgumentException("Abreviatura o clave demasiado larga.");
         if (hasAbbreviation(others, abbr) || (in.clave() != null && others.stream().anyMatch(g -> in.clave().equals(g.getClave())))) throw new DuplicateGroupException();
         group.setName(in.name().strip()); group.setAbbreviation(abbr); group.setClave(in.clave());
-        group.setColor(in.color()); group.setMetaDiaria(in.metaDiaria());
+        group.setColor(in.color());
         group.setPreguntarSiFalta(in.preguntarSiFalta()); group.setOpcional(in.opcional());
     }
 

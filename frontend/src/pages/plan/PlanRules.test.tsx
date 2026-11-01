@@ -3,6 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import * as api from '../../api/planRules'
 import PlanRulesSection from './PlanRulesSection'
 import FoodRuleForm from './FoodRuleForm'
+import GroupsEditor from './GroupsEditor'
 
 vi.mock('../../api/planRules')
 
@@ -14,7 +15,6 @@ const groups: api.PlanGroup[] = ['Proteínas', 'Cereales', 'Grasas'].map((name, 
   displayOrder: i,
   color: null,
   clave: null,
-  metaDiaria: 2,
   preguntarSiFalta: false,
   opcional: false,
 }))
@@ -58,6 +58,23 @@ const plan: api.PlanRules = {
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(api.getPlanRules).mockResolvedValue(plan)
+})
+
+test('grupos suma las porciones de las comidas y no pide una meta diaria', () => {
+  const { rerender } = render(<GroupsEditor token="tok" plan={plan} mutate={vi.fn()} meals={[
+    { portions: [{ foodGroupId: 1, portions: 1.5 }] },
+    { portions: [{ foodGroupId: 1, portions: 2 }, { foodGroupId: 2, portions: 1 }] },
+  ]} />)
+  expect(screen.getByText('Total del día: 3,5')).toBeInTheDocument()
+  expect(screen.getByText('Total del día: 1')).toBeInTheDocument()
+  expect(screen.getByText('No está en ninguna comida')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Proteínas' }))
+  expect(screen.queryByLabelText('Meta diaria')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar grupo' }))
+  expect(screen.queryByLabelText('Meta diaria')).not.toBeInTheDocument()
+  rerender(<GroupsEditor token="tok" plan={plan} mutate={vi.fn()} meals={[]} />)
+  expect(screen.getAllByText('No está en ninguna comida')).toHaveLength(3)
 })
 
 async function open() {

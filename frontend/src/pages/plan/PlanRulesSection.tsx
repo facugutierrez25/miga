@@ -1,3 +1,4 @@
+import type { MealDto } from '../../api/plans'
 import { useCallback, useEffect, useState } from 'react'
 import { getPlanRules, type PlanRules } from '../../api/planRules'
 import GroupsEditor from './GroupsEditor'
@@ -8,7 +9,9 @@ import './PlanRules.css'
 export default function PlanRulesSection({
   token,
   onChanged,
+  meals,
 }: {
+  meals?: Pick<MealDto, 'portions'>[]
   token: string | null
   onChanged?: (plan: PlanRules) => void
 }) {
@@ -116,7 +119,7 @@ export default function PlanRulesSection({
           {busy && <p role="status">Guardando…</p>}
 
           <fieldset className="rules-editor" disabled={busy || error?.code === 'VERSION_CONFLICT'}>
-            {section === 'groups' && <GroupsEditor {...props} />}
+            {section === 'groups' && <GroupsEditor {...props} meals={meals} />}
             {section === 'foods' && <FoodRulesEditor {...props} />}
             {section === 'habits' && <HabitsEditor {...props} />}
           </fieldset>

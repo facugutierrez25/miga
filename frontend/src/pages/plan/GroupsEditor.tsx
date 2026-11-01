@@ -1,3 +1,4 @@
+import type { MealDto } from '../../api/plans'
 import { useEditorFocus } from './useEditorFocus'
 import { formatNumber } from './formatNumber'
 import { useState, type FormEvent } from 'react'
@@ -30,9 +31,15 @@ const KEYS = [
   'aceites_grasas',
   'dulces',
 ]
-export default function GroupsEditor({ token, plan, mutate }: EditorProps) {
+export default function GroupsEditor({ token, plan, mutate, meals = [] }: EditorProps & { meals?: Pick<MealDto, 'portions'>[] }) {
   const [editing, setEditing] = useState<api.PlanGroup | 'new' | null>(null)
   const [confirm, setConfirm] = useState<string | null>(null)
+  const groupTotals: Record<number, number> = {}
+  for (const meal of meals) {
+    for (const portion of meal.portions) {
+      groupTotals[portion.foodGroupId] = (groupTotals[portion.foodGroupId] ?? 0) + portion.portions
+    }
+  }
   const groups = [...plan.grupos].sort((a, b) => a.displayOrder - b.displayOrder)
   async function move(index: number, delta: number) {
     const uids = groups.map((g) => g.uid)
@@ -72,7 +79,7 @@ export default function GroupsEditor({ token, plan, mutate }: EditorProps) {
               {group.name}
             </h3>
             <p>
-              Meta diaria: {group.metaDiaria == null ? 'Sin meta' : formatNumber(group.metaDiaria)}
+              {groupTotals[group.id] ? `Total del día: ${formatNumber(groupTotals[group.id])}` : 'No está en ninguna comida'}
             </p>
             <div className="rules-row">
               {group.preguntarSiFalta && <span className="rules-chip">Preguntar si falta</span>}
@@ -180,7 +187,6 @@ function GroupForm({
       name: '',
       color: '#0e6e6b',
       clave: null,
-      metaDiaria: null,
       preguntarSiFalta: false,
       opcional: false,
     }
@@ -208,18 +214,6 @@ function GroupForm({
           type="color"
           value={value.color ?? '#0e6e6b'}
           onChange={(e) => setValue({ ...value, color: e.target.value })}
-        />
-      </label>
-      <label>
-        Meta diaria
-        <input
-          type="number"
-          min="0"
-          step="0.5"
-          value={value.metaDiaria ?? ''}
-          onChange={(e) =>
-            setValue({ ...value, metaDiaria: e.target.value ? Number(e.target.value) : null })
-          }
         />
       </label>
       <label>

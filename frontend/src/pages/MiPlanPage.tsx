@@ -349,7 +349,13 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
 
         <div id="plan-panel" role="tabpanel" aria-labelledby={tab === 'rules' ? 'plan-tab-rules' : 'plan-tab-meals'}>
         {tab === 'rules' ? (
-          <PlanRulesSection token={token} onChanged={handleRulesChanged} />
+          <PlanRulesSection
+            meals={comidas.map(meal => ({
+              portions: grupos.map(g => ({ foodGroupId: g.id, portions: meal.porciones[g.id] ?? 0 })),
+            }))}
+            token={token}
+            onChanged={handleRulesChanged}
+          />
         ) : loadError ? (
           <p role="alert">No se pudo cargar el plan. <button onClick={retry}>Reintentar</button></p>
         ) : cargando || loading ? (

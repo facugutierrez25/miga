@@ -24,25 +24,41 @@ public class RegistroService {
     @Transactional(readOnly = true)
     public List<WeekMealData> getWeekMeals(String email, LocalDate date) {
         Long userId = userService.findUserIdByEmail(email);
-        Long planId = planService.getPlanIdForDate(userId, date);
-        var day = getDayRegistro(email, date);
-        var names = planService.getMeals(planId).stream()
-            .collect(Collectors.toMap(PlanService.MealRef::id, PlanService.MealRef::name));
-        var notes = noteRepository.findByUserIdAndDate(userId, date).stream()
-            .collect(Collectors.toMap(MealNote::getMealId, n -> n));
-        return day.meals().stream().map(meal -> {
-            var note = notes.get(meal.mealId());
-            long flexible = 0;
-            if (note != null && !note.getText().isBlank()) {
-                Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
-                flexible = interpreter.interpret(note.getText(), ruleService.findApplicable(notePlan, userId))
-                    .stream().filter(item -> "FLEXIBLE".equals(item.tipo())).count();
-            }
-            String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
-                ? recordedMealStatus(meal.comparison())
-                : ComparisonService.MISSING;
-            return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
-        }).toList();
+        var plans = planService.getPlansForRange(userId, date, date);
+        if (!plans.containsKey(date)) throw new uy.miga.plans.PlanNotFoundException();
+        return getWeekMealsForRange(userId, date, date, plans,
+            entryFacade.findByUserIdAndDate(userId, date)).get(date);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, List<WeekMealData>> getWeekMealsForRange(Long userId, LocalDate start, LocalDate end,
+            Map<LocalDate, uy.miga.plans.PlanReadData> plans, List<FoodEntryFacade.EntryData> entries) {
+        var entriesByDate = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::date));
+        var notesByDate = noteRepository.findByUserIdAndDateBetween(userId, start, end).stream()
+            .collect(Collectors.groupingBy(MealNote::getDate));
+        Map<Long, List<FoodRuleDto>> rules = new HashMap<>();
+        Map<LocalDate, List<WeekMealData>> result = new LinkedHashMap<>();
+        plans.forEach((date, plan) -> {
+            var notes = notesByDate.getOrDefault(date, List.of());
+            var byMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
+            var day = buildDay(date, plan, entriesByDate.getOrDefault(date, List.of()), notes);
+            var names = plan.meals().stream().collect(Collectors.toMap(uy.miga.plans.PlanReadData.MealData::id,
+                uy.miga.plans.PlanReadData.MealData::name));
+            result.put(date, day.meals().stream().map(meal -> {
+                var note = byMeal.get(meal.mealId());
+                long flexible = 0;
+                if (note != null && !note.getText().isBlank()) {
+                    Long notePlan = note.getPlanId() != null ? note.getPlanId() : plan.id();
+                    flexible = interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
+                        id -> ruleService.findApplicable(id, userId))).stream()
+                        .filter(item -> "FLEXIBLE".equals(item.tipo())).count();
+                }
+                String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
+                    ? recordedMealStatus(meal.comparison()) : ComparisonService.MISSING;
+                return new WeekMealData(meal.mealId(), names.get(meal.mealId()), meal.noteText(), status, flexible);
+            }).toList());
+        });
+        return result;
     }
 
     // Estado de una comida con registro: un grupo sin porciones no la vuelve «sin anotar»,
@@ -61,6 +77,18 @@ public class RegistroService {
     @Transactional(readOnly = true)
     public boolean planHasNotes(Long planId) { return noteRepository.existsByPlanId(planId); }
 
+    // El fork ya trasladó las referencias; las reglas deben aplicarse después de la edición.
+    @Transactional
+    public void reinterpretTodayNotes(String email, Long planId) {
+        Long userId = userService.findUserIdByEmail(email);
+        LocalDate today = LocalDate.now(clock);
+        for (MealNote note : noteRepository.findByUserIdAndDate(userId, today)) {
+            if (!planId.equals(note.getPlanId()) || note.getText().isBlank()) continue;
+            note.touch();
+            saveNote(email, today, note.getMealId(), note.getText(), null, false);
+        }
+    }
+
     private final MealNoteRepository noteRepository;
     private final InterpreterService interpreter;
     private final ComparisonService comparison;
@@ -68,6 +96,7 @@ public class RegistroService {
     private final PlanService planService;
     private final ReglaService ruleService;
     private final UserService userService;
+    private final java.time.Clock clock;
 
     RegistroService(MealNoteRepository noteRepository,
                     InterpreterService interpreter,
@@ -75,7 +104,8 @@ public class RegistroService {
                     FoodEntryFacade entryFacade,
                     PlanService planService,
                     ReglaService ruleService,
-                    UserService userService) {
+                    UserService userService, java.time.Clock clock) {
+        this.clock = clock;
         this.noteRepository = noteRepository;
         this.interpreter    = interpreter;
         this.comparison     = comparison;
@@ -129,13 +159,14 @@ public class RegistroService {
             return n;
         });
 
-        Long planId = note.getPlanId() != null
+        // Una nota ya guardada se reinterpreta con su plan si la comida es de ese plan; si no, con el
+        // plan vigente de la fecha.
+        Long planId = note.getPlanId() != null && planService.getMealIds(note.getPlanId()).contains(mealId)
             ? note.getPlanId()
             : planService.getPlanIdForDate(userId, date);
 
-        if ((note.getPlanId() != null || date.equals(LocalDate.now()))
-            && !planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+        if (!planService.getMealIds(planId).contains(mealId)) {
+            throw new PlanChangedException();
         }
         if (note.getPlanId() == null) {
             note.setPlanId(planId);
@@ -198,7 +229,7 @@ public class RegistroService {
             items.stream().map(this::toItemDto).toList(),
             mealEntries.stream().map(this::toEntryItemDto).toList(),
             statuses.stream().map(s -> new GroupStatusDto(
-                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()
+                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()
             )).toList()
         );
     }
@@ -213,7 +244,8 @@ public class RegistroService {
             .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
 
         // All plan meals — not only those with a note (absence of note ≠ zero confirmed)
-        List<Long> planMealIds = planService.getMealIds(planId);
+        var plan = planService.getReadData(planId);
+        var planMealIds = plan.meals().stream().map(uy.miga.plans.PlanReadData.MealData::id).toList();
 
         List<MealComparisonDto> mealComparisons = new ArrayList<>();
         for (Long mealId : planMealIds) {
@@ -227,10 +259,10 @@ public class RegistroService {
                         BigDecimal::add)
                 ));
             List<ComparisonService.GroupStatus> statuses =
-                comparison.compare(planId, mealId, portionsByGroup);
+                comparison.compare(plan, mealId, portionsByGroup);
             mealComparisons.add(new MealComparisonDto(mealId, statuses.stream()
                 .map(s -> new GroupStatusDto(
-                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()))
+                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()))
                 .toList()));
         }
         return new DayComparisonDto(date, mealComparisons);
@@ -311,15 +343,16 @@ public class RegistroService {
         Long planId = planService.getPlanIdForDate(userId, date);
 
         List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserIdAndDate(userId, date);
-        Map<Long, List<FoodEntryFacade.EntryData>> byMeal = entries.stream()
-            .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
-        Map<Long, MealNote> noteByMeal = noteRepository.findByUserIdAndDate(userId, date)
-            .stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
+        return buildDay(date, planService.getReadData(planId), entries,
+            noteRepository.findByUserIdAndDate(userId, date));
+    }
 
-        List<Long> planMealIds = planService.getMealIds(planId);
-        List<uy.miga.plans.PlanFoodGroupDto> groups = planService.getPlanFoodGroups(planId);
-        Map<Long, uy.miga.plans.PlanFoodGroupDto> groupById = groups.stream()
-            .collect(Collectors.toMap(uy.miga.plans.PlanFoodGroupDto::id, g -> g));
+    private DayRegistroDto buildDay(LocalDate date, uy.miga.plans.PlanReadData plan,
+                                    List<FoodEntryFacade.EntryData> entries, List<MealNote> notes) {
+        var byMeal = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
+        var noteByMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
+        var planMealIds = plan.meals().stream().map(uy.miga.plans.PlanReadData.MealData::id).toList();
+        var groups = plan.groups();
 
         Map<Long, BigDecimal> totalByGroup = new HashMap<>();
         List<DayRegistroDto.MealDayDto> mealDtos = new ArrayList<>();
@@ -341,10 +374,10 @@ public class RegistroService {
                 .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::foodGroupId,
                     Collectors.reducing(BigDecimal.ZERO, FoodEntryFacade.EntryData::portions, BigDecimal::add)));
 
-            List<ComparisonService.GroupStatus> statuses = comparison.compare(planId, mealId, portionsByGroup);
+            List<ComparisonService.GroupStatus> statuses = comparison.compare(plan, mealId, portionsByGroup);
             List<GroupStatusDto> compDtos = statuses.stream()
                 .map(s -> new GroupStatusDto(
-                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()))
+                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()))
                 .toList();
 
             mealDtos.add(new DayRegistroDto.MealDayDto(
@@ -360,8 +393,7 @@ public class RegistroService {
         List<DayRegistroDto.DailySummaryDto> summary = groups.stream()
             .map(g -> new DayRegistroDto.DailySummaryDto(
                 g.id(), g.name(), g.clave(),
-                totalByGroup.getOrDefault(g.id(), BigDecimal.ZERO),
-                g.metaDiaria()))
+                totalByGroup.getOrDefault(g.id(), BigDecimal.ZERO)))
             .toList();
 
         return new DayRegistroDto(date, mealDtos, summary);
@@ -526,7 +558,7 @@ public class RegistroService {
         }
         Long planId = planService.getPlanIdForDate(userId, date);
         if (!planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+            throw new PlanChangedException();
         }
         if (planService.getPlanFoodGroups(planId).stream().noneMatch(g -> g.id().equals(req.foodGroupId()))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");
