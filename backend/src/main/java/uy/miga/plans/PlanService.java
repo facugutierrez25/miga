@@ -82,6 +82,13 @@ public class PlanService {
         return toDto(plan);
     }
 
+    @Transactional(readOnly = true)
+    PlanDto getMyPlanForDate(String email, LocalDate date) {
+        Long userId = userService.findUserIdByEmail(email);
+        Long planId = getPlanIdForDate(userId, date);
+        return toDto(plansRepository.findById(planId).orElseThrow(PlanNotFoundException::new));
+    }
+
     @Transactional
     PlanDto saveMyPlan(String email, PlanSaveDto dto) {
         validatePortions(dto);

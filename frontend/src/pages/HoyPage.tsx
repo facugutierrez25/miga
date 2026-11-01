@@ -974,7 +974,7 @@ function HoyContent() {
   const HOY = toISO(ahora)
   const { token, email, firstName } = useAuth()
   const [fecha, setFecha] = useState(HOY)
-  const planLoad = usePlan(token, email)
+  const planLoad = usePlan(token, email, fecha)
   const plan = planLoad.data
   const sinPlan = planLoad.status === 'empty' && !plan
   const { data: dayRegistro, setData: setDayRegistro, status: dayStatus, retry: retryDay, reload: reloadDay } = useDayRegistro(token, email, fecha)
