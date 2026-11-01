@@ -933,15 +933,15 @@ test('las preguntas y los alimentos sin grupo o sin reconocer se ven con el deta
 })
 
 test.each([
-  { recorded: 1, difference: 'falta 1', label: 'Proteínas: 1 de 2, falta 1' },
-  { recorded: 2, difference: '', label: 'Proteínas: 2 de 2' },
-  { recorded: 3, difference: '1 de más', label: 'Proteínas: 3 de 2, 1 de más' },
-  { recorded: 1.5, difference: 'falta 0,5', label: 'Proteínas: 1,5 de 2, falta 0,5' },
-])('la comida muestra solo la diferencia: $label', async ({ recorded, difference, label }) => {
+  { status: 'CASI', recorded: 1, difference: 'falta 1', label: 'Proteínas: 1 de 2, falta 1' },
+  { status: 'EN_PLAN', recorded: 2, difference: '', label: 'Proteínas: 2 de 2' },
+  { status: 'DE_MAS', recorded: 3, difference: '1 de más', label: 'Proteínas: 3 de 2, 1 de más' },
+  { status: 'CASI', recorded: 1.5, difference: 'falta 0,5', label: 'Proteínas: 1,5 de 2, falta 0,5' },
+])('la comida muestra solo la diferencia: $label', async ({ status, recorded, difference, label }) => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{
     mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche', items: [],
-    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status: 'EN_PLAN' }],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status }],
   }] })
   renderHoy()
   const meal = await screen.findByRole('article', { name: 'Desayuno' })
@@ -967,4 +967,42 @@ test('el menú se abre, se cierra con Escape y devuelve el foco al botón', asyn
   expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   expect(trigger).toHaveAttribute('aria-expanded', 'false')
   expect(trigger).toHaveFocus()
+})
+
+
+test.each([
+  { status: 'EN_PLAN', recorded: 1.5, difference: '' },
+  { status: 'PREGUNTAR', recorded: 0, difference: '' },
+  { status: 'CASI', recorded: 1, difference: 'falta 1' },
+  { status: 'SIN_ANOTAR', recorded: 0, difference: 'falta 2' },
+  { status: 'DE_MAS', recorded: 3, difference: '1 de más' },
+])('meal migas respect $status', async ({ status, recorded, difference }) => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', items: [],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status }],
+    }],
+  })
+  renderHoy()
+  await abrirNota()
+  const count = String(recorded).replace('.', ',')
+  const row = screen.getByRole('img', {
+    name: `Proteínas: ${count} de 2${status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}`,
+  })
+  expect(row.querySelector('.migas__count')).toHaveTextContent(difference)
+  if (!difference) expect(row.querySelector('.migas__count')).toBeEmptyDOMElement()
+})
+
+test('a saved note with an empty comparison has no missing portions', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', items: [], comparison: [] }],
+  })
+  renderHoy()
+  await abrirNota()
+  expect(screen.queryByText(/falta/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Proteínas: 0 de 2' })).not.toBeInTheDocument()
 })

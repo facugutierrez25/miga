@@ -412,13 +412,14 @@ function MealState({ mealDay }: { mealDay: MealDayDto | undefined }) {
 // Migas de una comida: lo comido según la comparación, o el plan vacío si todavía no se anotó.
 function mealMigas(meal: MealDto, mealDay: MealDayDto | undefined, gruposMap: Record<number, GrupoInfo>): MigaRow[] {
   const comparison = (mealDay?.noteText ? mealDay.comparison : []).filter(s => s.expected > 0)
-  if (comparison.length > 0) {
+  if (mealDay?.noteText) {
     return comparison.map(s => ({
       id: s.foodGroupId,
       name: s.name,
       color: gruposMap[s.foodGroupId]?.token ?? 'var(--muted)',
       done: Number(s.recorded),
       total: Number(s.expected),
+      status: s.status,
     }))
   }
   return meal.portions

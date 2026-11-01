@@ -23,9 +23,9 @@ export default function Migas({ rows, differencesOnly = false }: { rows: MigaRow
     <div className="migas">
       {rows.map(row => {
         const count = `${formatPortions(row.done)} de ${formatPortions(row.total)}`
-        const difference = row.done < row.total ? `falta ${formatPortions(row.total - row.done)}`
-          : row.done > row.total ? `${formatPortions(row.done - row.total)} de más` : ''
-        const label = differencesOnly ? `${row.name}: ${count}${difference ? `, ${difference}` : ''}` : migasLabel(row)
+        const difference = (row.status === 'CASI' || row.status === 'SIN_ANOTAR') ? `falta ${formatPortions(row.total - row.done)}`
+          : row.status === 'DE_MAS' ? `${formatPortions(row.done - row.total)} de más` : ''
+        const label = differencesOnly ? `${row.name}: ${count}${row.status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}` : migasLabel(row)
         return <div key={row.id} className="migas__row" role="img" aria-label={label}>
           <span className="migas__name" aria-hidden="true">{row.name}</span>
           <span className="migas__dots" aria-hidden="true">
