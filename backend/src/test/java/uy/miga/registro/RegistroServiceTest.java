@@ -9,7 +9,6 @@ import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanNotFoundException;
 import uy.miga.plans.PlanService;
-import uy.miga.plans.PlanVersionConflictException;
 import uy.miga.reglas.ReglaService;
 import uy.miga.reglas.RuleInput;
 import uy.miga.users.UserService;
@@ -70,7 +69,7 @@ class RegistroServiceTest {
         when(plans.getMealIds(20L)).thenReturn(List.of(11L));
 
         assertThatThrownBy(() -> service.saveNote("user", today, 10L, "food"))
-            .isInstanceOf(PlanVersionConflictException.class);
+            .isInstanceOf(PlanChangedException.class);
         var order = inOrder(plans, notes);
         order.verify(plans).lockCurrentPlan(1L);
         order.verify(plans).mealBelongsToUser(10L, 1L);
@@ -90,8 +89,21 @@ class RegistroServiceTest {
         when(plans.getMealIds(19L)).thenReturn(List.of(9L));
 
         assertThatThrownBy(() -> service.saveNote("user", yesterday, 10L, "food"))
-            .isInstanceOf(PlanVersionConflictException.class);
+            .isInstanceOf(PlanChangedException.class);
         verify(plans).getPlanIdForDate(1L, yesterday);
+    }
+
+    @Test
+    void existingNoteKeepsItsSavedPlanWhenTheMealBelongsToIt() {
+        LocalDate yesterday = today.minusDays(1);
+        MealNote note = new MealNote();
+        note.setPlanId(18L);
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(notes.findByUserIdAndDateAndMealId(1L, yesterday, 10L)).thenReturn(Optional.of(note));
+        when(plans.getMealIds(18L)).thenReturn(List.of(10L));
+
+        try { service.saveNote("user", yesterday, 10L, "food"); } catch (RuntimeException ignored) { }
+        verify(plans, never()).getPlanIdForDate(1L, yesterday);
     }
 
     @ParameterizedTest
@@ -111,7 +123,7 @@ class RegistroServiceTest {
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(11L));
         assertThatThrownBy(() -> service.saveRespuesta("user", today, 10L, new RespuestaRequest(7L, consumed)))
-            .isInstanceOf(PlanVersionConflictException.class);
+            .isInstanceOf(PlanChangedException.class);
         var order = inOrder(plans);
         order.verify(plans).lockCurrentPlan(1L);
         order.verify(plans).mealBelongsToUser(10L, 1L);

@@ -143,11 +143,14 @@ public class RegistroService {
             return n;
         });
 
-        Long planId = planService.getPlanIdForDate(userId, date);
+        // Una nota ya guardada se reinterpreta con su plan si la comida es de ese plan; si no, con el
+        // plan vigente de la fecha.
+        Long planId = note.getPlanId() != null && planService.getMealIds(note.getPlanId()).contains(mealId)
+            ? note.getPlanId()
+            : planService.getPlanIdForDate(userId, date);
 
         if (!planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException(
-                "La comida no pertenece al plan vigente para esa fecha. Recargá el registro.");
+            throw new PlanChangedException();
         }
         if (note.getPlanId() == null) {
             note.setPlanId(planId);
@@ -538,8 +541,7 @@ public class RegistroService {
         }
         Long planId = planService.getPlanIdForDate(userId, date);
         if (!planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException(
-                "La comida no pertenece al plan vigente para esa fecha. Recargá el registro.");
+            throw new PlanChangedException();
         }
         if (planService.getPlanFoodGroups(planId).stream().noneMatch(g -> g.id().equals(req.foodGroupId()))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");

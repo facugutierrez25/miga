@@ -492,7 +492,7 @@ class PlanRulesIntegrationTest {
         JsonNode error = request(put("/api/v1/registro/" + LocalDate.now(clock) + "/comidas/" + staleMeal + "/nota"),
             Map.of("text", "1 manzana"), 409);
 
-        assertThat(error.path("code").asText()).isEqualTo("VERSION_CONFLICT");
+        assertThat(error.path("code").asText()).isEqualTo("PLAN_CHANGED");
         note(staleMeal, LocalDate.now(clock).minusDays(1), "2 manzanas");
     }
 

@@ -119,7 +119,7 @@ export async function saveNota(
   try {
     return await apiRequest(`/api/v1/registro/${date}/comidas/${mealId}/nota`, { errorMessage: 'Error al guardar la nota.', token, method: 'PUT', body: { text, version } })
   } catch (err) {
-    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    if (err instanceof ApiError && err.status === 409 && (err.code === 'NOTE_CONFLICT' || err.code === 'PLAN_CHANGED')) throw new NoteConflictError(err.error ?? err.message, err.details)
     throw err
   }
 
@@ -137,7 +137,7 @@ export async function deleteNota(
     const result = await apiRequest<{ version: number | null }>(`/api/v1/registro/${date}/comidas/${mealId}/nota${query}`, { errorMessage: 'No se pudo borrar lo anotado.', token, method: 'DELETE' })
     return result.version
   } catch (err) {
-    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    if (err instanceof ApiError && err.status === 409 && (err.code === 'NOTE_CONFLICT' || err.code === 'PLAN_CHANGED')) throw new NoteConflictError(err.error ?? err.message, err.details)
     throw err
   }
 }
@@ -183,7 +183,7 @@ export async function removeItem(
   try {
     return await apiRequest(`/api/v1/registro/${date}/items/${itemId}${query}`, { errorMessage: 'No se pudo quitar el alimento.', token, method: 'DELETE' })
   } catch (err) {
-    if (err instanceof ApiError && err.status === 409 && err.code === 'NOTE_CONFLICT') throw new NoteConflictError(err.error ?? err.message, err.details)
+    if (err instanceof ApiError && err.status === 409 && (err.code === 'NOTE_CONFLICT' || err.code === 'PLAN_CHANGED')) throw new NoteConflictError(err.error ?? err.message, err.details)
     throw err
   }
 }
