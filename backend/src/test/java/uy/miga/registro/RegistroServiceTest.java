@@ -29,7 +29,7 @@ class RegistroServiceTest {
     private final ReglaService rules = mock(ReglaService.class);
     private final UserService users = mock(UserService.class);
     private final RegistroService service = new RegistroService(notes, mock(InterpreterService.class),
-        mock(ComparisonService.class), entries, plans, rules, users);
+        mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
     private final LocalDate today = LocalDate.now();
 
     @BeforeEach
@@ -44,7 +44,7 @@ class RegistroServiceTest {
     void persistsNonCountingMentionsWithTheirMetadata(String type) {
         InterpreterService interpreter = mock(InterpreterService.class);
         RegistroService service = new RegistroService(notes, interpreter,
-            mock(ComparisonService.class), entries, plans, rules, users);
+            mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));
         when(notes.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -79,18 +79,19 @@ class RegistroServiceTest {
     }
 
     @Test
-    void existingNoteValidatesItsOwnPlanEvenWithoutCurrentPlan() {
+    void existingNoteValidatesResolvedDatePlanEvenWithoutCurrentPlan() {
         LocalDate yesterday = today.minusDays(1);
         MealNote note = new MealNote();
         note.setPlanId(19L);
         when(plans.lockCurrentPlan(1L)).thenThrow(new PlanNotFoundException());
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(notes.findByUserIdAndDateAndMealId(1L, yesterday, 10L)).thenReturn(Optional.of(note));
+        when(plans.getPlanIdForDate(1L, yesterday)).thenReturn(19L);
         when(plans.getMealIds(19L)).thenReturn(List.of(9L));
 
         assertThatThrownBy(() -> service.saveNote("user", yesterday, 10L, "food"))
             .isInstanceOf(PlanVersionConflictException.class);
-        verify(plans, never()).getPlanIdForDate(any(), any());
+        verify(plans).getPlanIdForDate(1L, yesterday);
     }
 
     @ParameterizedTest
