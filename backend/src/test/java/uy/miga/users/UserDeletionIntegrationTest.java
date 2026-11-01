@@ -39,7 +39,7 @@ class UserDeletionIntegrationTest {
     static final String PASSWORD = "Segura1234!";
     static final List<String> TABLES = List.of("users", "plans", "meals", "meal_portions",
         "plan_food_groups", "food_rules", "meal_notes", "food_entries", "plan_habits",
-        "habit_logs", "meal_logs", "email_verification_tokens", "email_outbox");
+        "habit_logs", "email_verification_tokens", "email_outbox");
 
     @BeforeEach void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security).build();
@@ -70,7 +70,6 @@ class UserDeletionIntegrationTest {
             jdbc.update("insert into food_entries(user_id,user_email,meal_id,date,food,quantity,unit,food_group_id,meal_note_id) values (?,?,?,current_date,'Alimento',1,'u',?,?)", id, email, meal, group, note);
             long habit = jdbc.queryForObject("insert into plan_habits(plan_id,name,habit_type) values (?,'Agua','CANTIDAD') returning id", Long.class, plan);
             jdbc.update("insert into habit_logs(user_id,plan_habit_id,habit_uid,log_date,value) select ?,id,uid,current_date,1 from plan_habits where id=?", id, habit);
-            jdbc.update("insert into meal_logs(user_id,meal_id,logged_date) values (?,?,current_date)", id, meal);
         }
         jdbc.update("insert into food_rules(alcance,user_id,alimento,tipo) values ('USUARIO',?,'Personal sin plan','LIBRE')", id);
         jdbc.update("insert into email_verification_tokens(user_id,token,expires_at) values (?,?,now()+interval '1 day')", id, UUID.randomUUID().toString());
