@@ -18,11 +18,15 @@ function Miga({ color, capacity, filled }: { color: string; capacity: number; fi
   )
 }
 
-export default function Migas({ rows }: { rows: MigaRow[] }) {
+export default function Migas({ rows, differencesOnly = false }: { rows: MigaRow[]; differencesOnly?: boolean }) {
   return (
     <div className="migas">
-      {rows.map(row => (
-        <div key={row.id} className="migas__row" role="img" aria-label={migasLabel(row)}>
+      {rows.map(row => {
+        const count = `${formatPortions(row.done)} de ${formatPortions(row.total)}`
+        const difference = row.done < row.total ? `falta ${formatPortions(row.total - row.done)}`
+          : row.done > row.total ? `${formatPortions(row.done - row.total)} de más` : ''
+        const label = differencesOnly ? `${row.name}: ${count}${difference ? `, ${difference}` : ''}` : migasLabel(row)
+        return <div key={row.id} className="migas__row" role="img" aria-label={label}>
           <span className="migas__name" aria-hidden="true">{row.name}</span>
           <span className="migas__dots" aria-hidden="true">
             {migaSlots(row.done, row.total).map((slot, i) => (
@@ -30,10 +34,10 @@ export default function Migas({ rows }: { rows: MigaRow[] }) {
             ))}
           </span>
           <span className={`migas__count${row.done > row.total ? ' migas__count--over' : ''}`} aria-hidden="true">
-            {formatPortions(row.done)} de {formatPortions(row.total)}
+            {differencesOnly ? difference : count}
           </span>
         </div>
-      ))}
+      })}
     </div>
   )
 }
