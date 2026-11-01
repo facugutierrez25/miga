@@ -1,3 +1,5 @@
+import { useState, type FormEvent } from 'react'
+import { deleteMe } from '../api/users'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import { useTheme, type Theme } from '../hooks/useTheme'
@@ -13,9 +15,30 @@ const TEMAS: { value: Theme; label: string }[] = [
 
 export default function PerfilPage() {
   useTitle('Perfil | Miga')
-  const { email, logout } = useAuth()
+  const { token, email, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
+
+  const [password, setPassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deletionError, setDeletionError] = useState('')
+
+  async function deleteAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || deleting) return
+    setDeleting(true)
+    setDeletionError('')
+    try {
+      await deleteMe(token, password)
+      logout()
+      navigate('/', { replace: true, state: { accountDeleted: true } })
+    } catch (error) {
+      setDeletionError(error instanceof Error ? error.message : 'No se pudo eliminar tu cuenta.')
+      setPassword('')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   function cerrarSesion() {
     logout()
@@ -57,7 +80,28 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        <button className="btn-cerrar-sesion" onClick={cerrarSesion}>
+        <section className="perfil-card account-deletion" aria-labelledby="delete-account-title">
+          <h2 id="delete-account-title">Eliminar mi cuenta</h2>
+          <p id="delete-account-description">
+            Se borrarán tu cuenta, todos tus planes y versiones, reglas propias, notas,
+            registros de comidas, hábitos y sus registros. No se puede deshacer.
+            Escribí tu contraseña para confirmar.
+          </p>
+          <form onSubmit={deleteAccount} aria-busy={deleting}>
+            <label htmlFor="delete-password">Contraseña actual</label>
+            <input id="delete-password" type="password" autoComplete="current-password"
+              required value={password} disabled={deleting}
+              aria-describedby={`delete-account-description${deletionError ? ' delete-account-error' : ''}`}
+              aria-invalid={Boolean(deletionError)}
+              onChange={event => setPassword(event.target.value)} />
+            {deletionError && <p id="delete-account-error" role="alert">{deletionError}</p>}
+            <button type="submit" className="btn-cerrar-sesion" disabled={deleting || !password}>
+              {deleting ? 'Eliminando cuenta…' : 'Eliminar mi cuenta definitivamente'}
+            </button>
+          </form>
+        </section>
+
+        <button disabled={deleting} className="btn-cerrar-sesion" onClick={cerrarSesion}>
           Cerrar sesión
         </button>
       </div>

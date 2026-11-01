@@ -53,7 +53,7 @@ public class RateLimiter {
     public long checkIp(String path, String ip) {
         if (!props.enabled()) return 0;
         return switch (path) {
-            case "/api/v1/users/login" -> login.consume(ip) ? 0 : 60;
+            case "/api/v1/users/login", "/api/v1/users/me" -> login.consume(ip) ? 0 : 60;
             case "/api/v1/users" -> register.consume(ip) ? 0 : 3600;
             case "/api/v1/auth/resend-verification" -> resend.consume(ip) ? 0 : 3600;
             default -> 0;

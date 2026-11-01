@@ -40,6 +40,16 @@ class UserController {
         return userService.getProfile(auth.getName());
     }
 
+    @DeleteMapping("/me")
+    ResponseEntity<?> deleteMe(Authentication auth, @Valid @RequestBody DeleteAccountRequest request) {
+        if (!rateLimiter.allowLoginEmail(auth.getName())) {
+            return ResponseEntity.status(429).header("Retry-After", "900")
+                .header("Content-Type", "application/json;charset=UTF-8").body(RateLimiter.ERROR_JSON);
+        }
+        userService.deleteAccount(auth.getName(), request.password());
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/me")
     UserProfileResponse updateMe(Authentication auth, @Valid @RequestBody UpdateProfileRequest req) {
         return userService.updateProfile(auth.getName(), req);

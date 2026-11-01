@@ -17,8 +17,10 @@ import java.util.Optional;
 public class JwtService {
 
     private final SecretKey key;
+    private final UsersRepository users;
 
-    JwtService(@Value("${jwt.secret}") String secret) {
+    JwtService(@Value("${jwt.secret}") String secret, UsersRepository users) {
+        this.users = users;
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -41,7 +43,7 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
-            return Optional.ofNullable(email);
+            return Optional.ofNullable(email).filter(users::existsByEmail);
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }

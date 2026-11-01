@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import Migas from '../components/Migas'
@@ -15,6 +15,7 @@ const ALMUERZO = [
 export default function LandingPage() {
   useTitle('Miga - Tu plan, miga a miga')
   const { token } = useAuth()
+  const location = useLocation()
 
   if (token) return <Navigate to="/hoy" replace />
 
@@ -29,6 +30,9 @@ export default function LandingPage() {
       </header>
 
       <main className="land-main">
+        {location.state?.accountDeleted === true && (
+          <p role="status">Tu cuenta y todos tus datos fueron eliminados. Se cerr? tu sesión.</p>
+        )}
         <section className="land-hero" aria-labelledby="land-titulo">
           <div className="land-hero__text">
             <h1 id="land-titulo" className="land-hero__title">
