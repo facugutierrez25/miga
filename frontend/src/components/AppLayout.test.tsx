@@ -19,7 +19,7 @@ function renderConRuta(ruta: string) {
         <Route element={<AppLayout />}>
           <Route path="/hoy"     element={<div>Hoy</div>}     />
           <Route path="/semana"  element={<div>Semana</div>}  />
-          <Route path="/compras" element={<div>Compras</div>} />
+          <Route path="/mi-plan" element={<div>Mi plan</div>} />
           <Route path="/perfil"  element={<div>Perfil</div>}  />
         </Route>
       </Routes>
@@ -31,7 +31,9 @@ test('muestra los 4 ítems de navegación', () => {
   renderConRuta('/hoy')
   expect(screen.getByRole('link', { name: /hoy/i })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /semana/i })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /compras/i })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /mi plan/i })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /compras/i })).not.toBeInTheDocument()
+  expect(screen.getAllByRole('link')).toHaveLength(4)
   expect(screen.getByRole('link', { name: /perfil/i })).toBeInTheDocument()
 })
 

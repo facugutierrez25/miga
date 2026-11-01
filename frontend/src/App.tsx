@@ -7,7 +7,6 @@ import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import HoyPage from './pages/HoyPage'
 import SemanaPage from './pages/SemanaPage'
-import ComprasPage from './pages/ComprasPage'
 import PerfilPage from './pages/PerfilPage'
 import MiPlanPage from './pages/MiPlanPage'
 import OnboardingPage from './pages/OnboardingPage'
@@ -35,7 +34,6 @@ export default function App() {
           <Route element={<AuthLayout />}>
             <Route path="/hoy" element={<HoyPage />} />
             <Route path="/semana" element={<SemanaPage />} />
-            <Route path="/compras" element={<ComprasPage />} />
             <Route path="/perfil" element={<PerfilPage />} />
             <Route path="/mi-plan" element={<MiPlanPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
