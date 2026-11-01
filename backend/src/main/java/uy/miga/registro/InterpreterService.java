@@ -227,8 +227,8 @@ class InterpreterService {
                 appliedRule = rule.alimento() + " = flexible (sin porcion fija)";
             }
             case "COMPUESTO" -> {
-                portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
-                    .setScale(3, RoundingMode.HALF_UP);
+                // Sin conversión, los componentes se escalan por la cantidad anotada, como antes de la #274.
+                portions = BigDecimal.valueOf(qty).setScale(3, RoundingMode.HALF_UP);
                 appliedRule = rule.alimento() + " (compuesto)";
                 if (rule.cantidadPorPorcion() != null && rule.unidad() != null && unit != null) {
                     BigDecimal converted = convert(BigDecimal.valueOf(qty), unit, rule.unidad());
@@ -238,7 +238,7 @@ class InterpreterService {
                             + " de " + rule.alimento() + " = 1 porcion (compuesto)";
                     } else {
                         uncertain = true;
-                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " porcion (supuesto, compuesto)";
+                        appliedRule = rule.alimento() + " (compuesto, cantidad supuesta)";
                     }
                 }
             }

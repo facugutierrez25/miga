@@ -187,9 +187,17 @@ class ReglaServiceTest {
         }
     }
 
+    @Test void legacyCompoundWithUnitButNoQuantityKeepsWorkingWithoutUnit() {
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var result = service.createUserRule(2L, 1L, new RuleInput("Barrita", List.of(), "COMPUESTO", null,
+            null, "u", BigDecimal.ONE, List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)), null));
+        assertThat(result.cantidadPorPorcion()).isNull();
+        assertThat(result.unidad()).isNull();
+    }
+
     @Test void compoundRejectsIncompleteOrInvalidQuantityUnitPair() {
         for (var pair : List.of(
-            new Object[]{new BigDecimal("150"), null}, new Object[]{null, "g"},
+            new Object[]{new BigDecimal("150"), null},
             new Object[]{new BigDecimal("150"), " "}, new Object[]{BigDecimal.ZERO, "g"},
             new Object[]{new BigDecimal("-1"), "g"})) {
             var input = new RuleInput("Tarta", List.of(), "COMPUESTO", null,

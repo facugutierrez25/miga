@@ -343,6 +343,12 @@ class InterpreterServiceTest {
         assertThat(assumed.uncertain()).isTrue();
     }
 
+    @Test void compoundWithoutConversionScalesByQuantityEvenWithAnotherDefaultPortion() {
+        var compound = rule(1L, "Tarta", List.of(), "COMPUESTO", null, null, null, null, new BigDecimal("2"),
+            List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+        assertThat(interpreter.interpret("1 tarta", List.of(compound)).getFirst().portions()).isEqualTo(new BigDecimal("1.000"));
+    }
+
     @Test void compoundWithoutMentionUnitUsesDefaultPortions() {
         for (boolean measured : List.of(true, false)) {
             var compound = rule(1L, "chivito", List.of(), "COMPUESTO", null, null,

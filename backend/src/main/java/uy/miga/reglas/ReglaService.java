@@ -183,8 +183,7 @@ public class ReglaService {
                 (in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0 && in.unidad() != null && !in.unidad().isBlank())))
                 throw new InvalidRuleException("El alimento normal requiere grupo y cantidad positiva con unidad, o ambos vacíos.");
         } else if ("COMPUESTO".equals(in.tipo())) {
-            if (!((in.cantidadPorPorcion() == null && in.unidad() == null) ||
-                (in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0 && in.unidad() != null && !in.unidad().isBlank())))
+            if (in.cantidadPorPorcion() != null && (in.cantidadPorPorcion().signum() <= 0 || in.unidad() == null || in.unidad().isBlank()))
                 throw new InvalidRuleException("El compuesto requiere cantidad positiva y unidad juntas, o ambas vacías.");
             if (in.foodGroupId() != null || !components || in.componentes().size() < 2 ||
                 in.componentes().stream().anyMatch(c -> c == null || c.foodGroupId() == null || !Double.isFinite(c.porciones()) || c.porciones() <= 0) ||
@@ -197,7 +196,8 @@ public class ReglaService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un ajuste de este alimento.");
         rule.setAlimento(in.alimento().strip()); rule.setSinonimos(in.sinonimos() == null ? List.of() : in.sinonimos());
         rule.setTipo(in.tipo()); rule.setFoodGroupId(in.foodGroupId()); rule.setCantidadPorPorcion(in.cantidadPorPorcion());
-        rule.setUnidad(in.unidad()); rule.setPorcionPorDefecto(in.porcionPorDefecto() == null ? BigDecimal.ONE : in.porcionPorDefecto());
+        // Los compuestos guardados antes con unidad y sin cantidad conservan su comportamiento: la unidad suelta se descarta.
+        rule.setUnidad("COMPUESTO".equals(in.tipo()) && in.cantidadPorPorcion() == null ? null : in.unidad()); rule.setPorcionPorDefecto(in.porcionPorDefecto() == null ? BigDecimal.ONE : in.porcionPorDefecto());
         rule.setComponentes(in.componentes()); rule.setOverridesRuleUid(in.overridesRuleUid());
     }
 
