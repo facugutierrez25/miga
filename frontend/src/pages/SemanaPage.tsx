@@ -355,7 +355,12 @@ export default function SemanaPage() {
             }}>
               <button type="button" ref={menuButton} className="semana-descargar__btn"
                 aria-label="Más opciones de la semana" aria-haspopup="menu" aria-expanded={menuOpen}
-                aria-controls="semana-opciones" onClick={() => setMenuOpen(!menuOpen)}
+                aria-controls="semana-opciones" onClick={() => {
+                  // Al abrir (con clic, Enter o Espacio) el foco pasa a la primera opción, como en un menú.
+                  const opening = !menuOpen
+                  setMenuOpen(opening)
+                  if (opening) requestAnimationFrame(() => menu.current?.querySelector('button')?.focus())
+                }}
                 onKeyDown={event => {
                   if (event.key === 'ArrowDown') {
                     event.preventDefault()

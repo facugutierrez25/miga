@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, test, expect, afterEach } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import SemanaPage from './SemanaPage'
 import * as api from '../api/semana'
 import { useWeek } from '../hooks/useWeek'
@@ -115,6 +116,18 @@ test('Por día muestra cada comida, estado y nota; el contador flexible no se ed
   expect(screen.getByText(/Registrada/)).toBeInTheDocument()
   expect(screen.getByText('=pan y café')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Flexibles: completado, 2, lunes, 26 de octubre de 2026/ })).toBeDisabled()
+})
+
+test('abrir el menú con Enter lleva el foco a la primera opción y las flechas navegan', async () => {
+  const user = userEvent.setup()
+  render(<SemanaPage />)
+  screen.getByRole('button', { name: 'Más opciones de la semana' }).focus()
+  await user.keyboard('{Enter}')
+  await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Descargar CSV' })).toHaveFocus())
+  await user.keyboard('{ArrowDown}')
+  expect(screen.getByRole('menuitem', { name: 'Descargar Excel (XLSX)' })).toHaveFocus()
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('button', { name: 'Más opciones de la semana' })).toHaveFocus()
 })
 
 test('Planilla muestra la grilla con el texto escrito y los hábitos', () => {
