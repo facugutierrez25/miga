@@ -176,6 +176,7 @@ public class PlanService {
         for (Object[] g : DEFAULT_GROUPS) {
             PlanFoodGroup group = new PlanFoodGroup(plan, (String) g[0], (String) g[1], (short)(int) g[2]);
             group.setClave((String) g[3]);
+            group.setColor(GroupColors.forKey((String) g[3]));
             plan.getFoodGroups().add(group);
         }
     }
@@ -453,7 +454,7 @@ public class PlanService {
     public PlanFoodGroupDto createGroup(Long planId, GroupInput in) {
         Plan plan = plansRepository.findById(planId).orElseThrow(PlanNotFoundException::new);
         PlanFoodGroup group = new PlanFoodGroup(plan, in.name(), "", (short)(getPlanFoodGroups(planId).stream().mapToInt(PlanFoodGroupDto::displayOrder).max().orElse(0) + 1));
-        applyGroup(group, in);
+        applyGroup(group, in, true);
         plan.getFoodGroups().add(group);
         groupRepository.saveAndFlush(group);
         return toGroupDtos(List.of(group)).getFirst();
@@ -462,13 +463,12 @@ public class PlanService {
     @Transactional
     public PlanFoodGroupDto updateGroup(Long planId, java.util.UUID uid, GroupInput in) {
         PlanFoodGroup group = group(planId, uid);
-        applyGroup(group, in);
+        applyGroup(group, in, false);
         return toGroupDtos(List.of(group)).getFirst();
     }
 
-    private void applyGroup(PlanFoodGroup group, GroupInput in) {
-        if (in.name() == null || in.name().isBlank() || in.name().length() > 60 ||
-            (in.color() != null && !in.color().matches("#[0-9a-fA-F]{6}"))) throw new IllegalArgumentException("Nombre o color de grupo inválido.");
+    private void applyGroup(PlanFoodGroup group, GroupInput in, boolean creating) {
+        if (in.name() == null || in.name().isBlank() || in.name().length() > 60) throw new IllegalArgumentException("Nombre o color de grupo inválido.");
         var others = groupRepository.findByPlanIdOrderByDisplayOrderAsc(group.getPlan().getId()).stream()
             .filter(g -> !g.getUid().equals(group.getUid())).toList();
         String abbr = in.abbreviation();
@@ -483,7 +483,15 @@ public class PlanService {
         if (abbr.length() > 10 || (in.clave() != null && in.clave().length() > 50)) throw new IllegalArgumentException("Abreviatura o clave demasiado larga.");
         if (hasAbbreviation(others, abbr) || (in.clave() != null && others.stream().anyMatch(g -> in.clave().equals(g.getClave())))) throw new DuplicateGroupException();
         group.setName(in.name().strip()); group.setAbbreviation(abbr); group.setClave(in.clave());
-        group.setColor(in.color());
+        // Al editar sin indicar color, el grupo conserva el suyo.
+        String color = !creating && in.color() == null ? group.getColor() : in.color();
+        if (creating && !GroupColors.contains(color)) {
+            color = GroupColors.next(others.stream().map(PlanFoodGroup::getColor).toList());
+        } else if (!creating && !GroupColors.contains(color) && !java.util.Objects.equals(color, group.getColor())) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+                "Elegí un color de la paleta de grupos.");
+        }
+        group.setColor(color);
         group.setPreguntarSiFalta(in.preguntarSiFalta()); group.setOpcional(in.opcional());
     }
 

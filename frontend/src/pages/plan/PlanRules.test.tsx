@@ -346,3 +346,13 @@ test('un compuesto viejo con unidad y sin cantidad se puede editar y guardar', a
     alimento: 'Barrita de cereal', cantidadPorPorcion: null, unidad: null,
   })))
 })
+
+test('ofrece diez colores y preselecciona el primero libre', () => {
+  const coloredPlan = { ...plan, grupos: groups.map((g, i) => ({ ...g, color: ['#C0704A', '#A8822E', '#B5627A'][i] })) }
+  render(<GroupsEditor token="tok" plan={coloredPlan} mutate={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar grupo' }))
+  expect(screen.getAllByRole('radio')).toHaveLength(10)
+  expect(screen.getByRole('radio', { name: 'Azul' })).toBeChecked()
+  fireEvent.click(screen.getByRole('radio', { name: 'Coral' }))
+  expect(screen.getByRole('radio', { name: 'Coral' })).toBeChecked()
+})

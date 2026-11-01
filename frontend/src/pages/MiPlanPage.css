@@ -352,6 +352,8 @@
   gap: 4px;
   border-radius: var(--radius-chip);
   border: none;
+  background: var(--surface-2);
+  color: var(--ink);
   padding: 3px 9px 3px 7px;
   font-size: 13px;
   font-weight: 500;
@@ -365,19 +367,6 @@
   font-size: 13px;
   line-height: 18px;
 
-}
-
-.porcion-chip--PROTEINS   { background: var(--t-prot); color: var(--ink);   --chip-dot: var(--g-prot);
-}
-.porcion-chip--GRAINS     { background: var(--t-cer); color: var(--ink);   --chip-dot: var(--g-cer);
-}
-.porcion-chip--FRUITS     { background: var(--t-frut); color: var(--ink);   --chip-dot: var(--g-frut);
-}
-.porcion-chip--DAIRY      { background: var(--t-lac); color: var(--ink);   --chip-dot: var(--g-lac);
-}
-.porcion-chip--FATS       { background: var(--t-gras); color: var(--ink);   --chip-dot: var(--g-gras);
-}
-.porcion-chip--VEGETABLES { background: var(--t-verd); color: var(--ink);   --chip-dot: var(--g-verd);
 }
 
 .btn-editar {

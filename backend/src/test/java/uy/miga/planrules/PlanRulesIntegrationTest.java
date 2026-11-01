@@ -160,7 +160,9 @@ class PlanRulesIntegrationTest {
         request(post(BASE+"grupos"),body(Map.of("name","Duplicado","abbreviation","PRO")),409);
         addGroup("Clave",Map.of("clave","unica"));
         request(post(BASE+"grupos"),body(Map.of("name","Duplicado","clave","unica")),409);
-        request(post(BASE+"grupos"),body(Map.of("name","Color","color","red")),400);
+        // Un color fuera de la paleta al crear se reemplaza por el primero libre.
+        state=request(post(BASE+"grupos"),body(Map.of("name","Color","color","red")),201);
+        assertThat(group("Color").path("color").asText()).matches("#[0-9A-F]{6}").isNotEqualTo("red");
         List<String> uids=new ArrayList<>(); state.path("grupos").forEach(g -> uids.add(g.path("uid").asText())); Collections.reverse(uids);
         ObjectNode order=body(Map.of("uids",uids)); state=request(put(BASE+"grupos/orden"),order,200);
         assertThat(state.path("grupos").get(0).path("uid").asText()).isEqualTo(uids.getFirst());

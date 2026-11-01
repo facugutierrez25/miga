@@ -1,3 +1,4 @@
+import { GROUP_PALETTE, groupColor, nextGroupColor } from '../../groupColors'
 import type { MealDto } from '../../api/plans'
 import { useEditorFocus } from './useEditorFocus'
 import { formatNumber } from './formatNumber'
@@ -75,7 +76,7 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
         {groups.map((group, index) => (
           <li className="rules-card" key={group.uid}>
             <h3>
-              <span className="rules-dot" style={{ background: group.color ?? 'var(--primary)' }} />
+              <span className="rules-dot" style={{ background: groupColor(group, index) }} />
               {group.name}
             </h3>
             <p>
@@ -149,6 +150,7 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
             {editing !== 'new' && editing?.uid === group.uid && (
               <GroupForm
                 group={editing}
+                initialColor={GROUP_PALETTE[index % GROUP_PALETTE.length].hex}
                 onCancel={closeEditor}
                 onSave={async (input) => {
                   await save(input)
@@ -163,7 +165,7 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
       </button>
       {editing === 'new' && (
         <GroupForm
-          group={editing === 'new' ? undefined : editing}
+          initialColor={nextGroupColor(groups)}
           onCancel={closeEditor}
           onSave={async (input) => {
             await save(input)
@@ -175,17 +177,19 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
 }
 function GroupForm({
   group,
+  initialColor,
   onSave,
   onCancel,
 }: {
   group?: api.PlanGroup
+  initialColor: string
   onSave: (value: api.GroupInput) => Promise<void>
   onCancel: () => void
 }) {
   const [value, setValue] = useState<api.GroupInput>(
-    group ?? {
+    group ? { ...group, color: group.color ?? initialColor } : {
       name: '',
-      color: '#0e6e6b',
+      color: initialColor,
       clave: null,
       preguntarSiFalta: false,
       opcional: false,
@@ -208,14 +212,20 @@ function GroupForm({
           onChange={(e) => setValue({ ...value, name: e.target.value })}
         />
       </label>
-      <label>
-        Color
-        <input
-          type="color"
-          value={value.color ?? '#0e6e6b'}
-          onChange={(e) => setValue({ ...value, color: e.target.value })}
-        />
-      </label>
+      <fieldset>
+        <legend>Color</legend>
+        <div className="rules-row">
+          {GROUP_PALETTE.map(color => (
+            <label key={color.hex}>
+              <input type="radio" name="group-color" aria-label={color.name}
+                value={color.hex} checked={value.color?.toLowerCase() === color.hex.toLowerCase()}
+                onChange={() => setValue({ ...value, color: color.hex })} />
+              <span className="rules-dot" style={{ background: groupColor({ color: color.hex }, 0) }} aria-hidden="true" />
+              {color.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label>
         <input
           type="checkbox"

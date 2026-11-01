@@ -496,6 +496,42 @@ class MigrationInvariantsTest {
             .hasStackTraceContaining("checksum");
     }
 
+    @Test
+    void v34AssignsColorsPerPlanPreservingValidColorsAndOtherFields() throws Exception {
+        buildFlyway("33").migrate();
+        long planId;
+        long secondPlanId;
+        try (Connection c = connect()) {
+            planId = insertPlan(c, insertUser(c, "colors@test.com"));
+            secondPlanId = insertPlan(c, insertUser(c, "colors-other@test.com"));
+            c.createStatement().execute("""
+                INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order)
+                SELECT %d, 'Custom ' || n, 'C' || n, n FROM generate_series(1, 12) n
+                """.formatted(secondPlanId));
+            c.createStatement().execute("""
+                INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, uid)
+                VALUES (%1$d, 'Protein', 'PRO', 1, 'proteinas', null, gen_random_uuid()),
+                       (%1$d, 'Reserved', 'RES', 20, null, '#A8822E', gen_random_uuid()),
+                       (%1$d, 'Custom', 'CUS', 2, null, '#0e6e6b', gen_random_uuid()),
+                       (%1$d, 'Custom 2', 'CU2', 3, null, null, gen_random_uuid())
+                """.formatted(planId));
+        }
+        buildFlyway(null).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE plan_id = " + planId +
+                " AND ((abbreviation = 'PRO' AND color = '#C0704A') OR (abbreviation = 'RES' AND color = '#A8822E')" +
+                " OR (abbreviation = 'CUS' AND color = '#B5627A') OR (abbreviation = 'CU2' AND color = '#4F86B8'))"))
+                .isEqualTo(4);
+            assertThat(queryLong(c, "SELECT display_order FROM plan_food_groups WHERE plan_id = " + planId + " AND abbreviation = 'RES'"))
+                .isEqualTo(20);
+            for (int i = 0; i < 12; i++) {
+                String hex = uy.miga.plans.GroupColors.PALETTE.get(i % 10).hex();
+                assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE plan_id = " + secondPlanId +
+                    " AND display_order = " + (i + 1) + " AND color = '" + hex + "'" )).isEqualTo(1);
+            }
+        }
+    }
+
     private Flyway buildFlyway(String target) {
         return buildFlyway(target, false);
     }

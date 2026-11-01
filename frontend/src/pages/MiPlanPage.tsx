@@ -1,3 +1,4 @@
+import { groupColor } from '../groupColors'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDialogFocus } from './useDialogFocus'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -21,16 +22,6 @@ const DEFAULT_GRUPOS: PlanFoodGroupDto[] = [
   { id: -5, name: 'Grasas',    abbreviation: 'GRA', displayOrder: 5, color: null },
   { id: -6, name: 'Verduras',  abbreviation: 'VER', displayOrder: 6, color: null },
 ]
-
-const ABBR_DOT: Record<string, string> = {
-  PRO: 'var(--g-prot)', CER: 'var(--g-cer)', FRU: 'var(--g-frut)',
-  LAC: 'var(--g-lac)',  GRA: 'var(--g-gras)', VER: 'var(--g-verd)',
-}
-
-const ABBR_CSS: Record<string, string> = {
-  PRO: 'PROTEINS', CER: 'GRAINS', FRU: 'FRUITS',
-  LAC: 'DAIRY',    GRA: 'FATS',   VER: 'VEGETABLES',
-}
 
 type Porciones = Record<number, number>
 
@@ -126,9 +117,9 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
                 {meal.portions.filter(p => p.portions > 0).map(p => {
                   const g = gruposMap[p.foodGroupId]
                   if (!g) return null
-                  const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
+                  const color = groupColor(g, plan.foodGroups.indexOf(g))
                   return (
-                    <span key={p.foodGroupId} className={`porcion-chip porcion-chip--${cssKey}`}>
+                    <span key={p.foodGroupId} className="porcion-chip" style={{ '--chip-dot': color } as React.CSSProperties}>
                       <span className="porcion-chip__num">{formatPorcion(Number(p.portions))}</span>
                       {g.name}
                     </span>
@@ -370,9 +361,9 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                   {comida.hora && <span className="comida-min__hora">{comida.hora}</span>}
                   <div className="comida-min__chips">
                     {grupos.filter(g => (comida.porciones[g.id] ?? 0) > 0).map(g => {
-                      const cssKey = ABBR_CSS[g.abbreviation] ?? g.abbreviation
+                      const color = groupColor(g, grupos.indexOf(g))
                       return (
-                        <span key={g.id} className={`porcion-chip porcion-chip--${cssKey}`}>
+                        <span key={g.id} className="porcion-chip" style={{ '--chip-dot': color } as React.CSSProperties}>
                           <span className="porcion-chip__num">{formatPorcion(comida.porciones[g.id])}</span>
                           {g.name}
                         </span>
@@ -434,8 +425,8 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                       onChange={e => actualizarHora(i, e.target.value)}
                     />
                   </div>
-                  {grupos.map(g => {
-                    const dot = ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)'
+                  {grupos.map((g, index) => {
+                    const dot = groupColor(g, index)
                     return (
                       <div key={g.id} className="porcion-row">
                         <span className="porcion-row__dot" style={{ background: dot }} />
