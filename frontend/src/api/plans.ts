@@ -56,8 +56,8 @@ export class PlanConflictError extends ApiError {
   }
 }
 
-export async function getMyPlan(token: string, signal?: AbortSignal): Promise<PlanDto> {
-  return apiRequest(`/api/v1/my-plan`, { errorMessage: 'Error al cargar el plan.', token, signal, errorMessages: { 404: 'sin-plan' } })
+export async function getMyPlan(token: string, signal?: AbortSignal, date?: string): Promise<PlanDto> {
+  return apiRequest(`/api/v1/my-plan${date ? `?date=${encodeURIComponent(date)}` : ''}`, { errorMessage: 'Error al cargar el plan.', token, signal, errorMessages: { 404: 'sin-plan' } })
 }
 
 export interface MealSummaryDto {
