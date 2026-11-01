@@ -28,6 +28,7 @@ public class JwtService {
         Instant now = Instant.now();
         return Jwts.builder()
             .subject(user.getEmail())
+            .claim("uid", user.getId().toString())
             .claim("role", user.getRole().name())
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plus(24, ChronoUnit.HOURS)))
@@ -37,13 +38,17 @@ public class JwtService {
 
     public Optional<String> extractEmail(String token) {
         try {
-            String email = Jwts.parser()
+            var claims = Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-            return Optional.ofNullable(email).filter(users::existsByEmail);
+                .getPayload();
+            String email = claims.getSubject();
+            String uid = claims.get("uid", String.class);
+            // Los tokens anteriores sin uid quedan invalidados y requieren iniciar sesión otra vez.
+            if (email == null || uid == null) return Optional.empty();
+            long userId = Long.parseLong(uid);
+            return users.existsByIdAndEmail(userId, email) ? Optional.of(email) : Optional.empty();
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }

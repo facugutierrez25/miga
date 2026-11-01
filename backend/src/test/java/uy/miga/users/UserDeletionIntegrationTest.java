@@ -122,6 +122,32 @@ class UserDeletionIntegrationTest {
             .andExpect(status().isUnauthorized());
     }
 
+    @Test void oldTokenRemainsInvalidAfterRegisteringSameEmail() throws Exception {
+        Account removed = account();
+        mvc.perform(delete("/api/v1/users/me").header("Authorization", "Bearer " + removed.token())
+            .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("password", PASSWORD))))
+            .andExpect(status().isNoContent());
+        mockEmailService.reset();
+        mvc.perform(post("/api/v1/users").contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of("email", removed.email(), "password", PASSWORD))))
+            .andExpect(status().isCreated());
+        long newId = jdbc.queryForObject("select id from users where email=?", Long.class, removed.email());
+        assertThat(newId).isNotEqualTo(removed.id());
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + removed.token()))
+            .andExpect(status().isUnauthorized());
+
+        String verification = mockEmailService.tokenAfterProcessing(outboxWorker, removed.email());
+        mvc.perform(get("/api/v1/auth/verify").param("token", verification)).andExpect(status().isOk());
+        String body = mvc.perform(post("/api/v1/users/login").contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of("email", removed.email(), "password", PASSWORD))))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String newToken = mapper.readTree(body).path("token").asText();
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + newToken))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.email").value(removed.email()));
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + removed.token()))
+            .andExpect(status().isUnauthorized());
+    }
+
     @Test void wrongPasswordDoesNotDeleteAnything() throws Exception {
         Account account = account();
         var before = snapshot();
