@@ -497,7 +497,7 @@ class MigrationInvariantsTest {
     }
 
     @Test
-    void v34AssignsColorsPerPlanPreservingValidColorsAndOtherFields() throws Exception {
+    void v34FillsMissingColorsPreservingExistingOnesAndVersions() throws Exception {
         buildFlyway("33").migrate();
         long planId;
         long secondPlanId;
@@ -520,7 +520,7 @@ class MigrationInvariantsTest {
         try (Connection c = connect()) {
             assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE plan_id = " + planId +
                 " AND ((abbreviation = 'PRO' AND color = '#C0704A') OR (abbreviation = 'RES' AND color = '#A8822E')" +
-                " OR (abbreviation = 'CUS' AND color = '#B5627A') OR (abbreviation = 'CU2' AND color = '#4F86B8'))"))
+                " OR (abbreviation = 'CUS' AND color = '#0e6e6b') OR (abbreviation = 'CU2' AND color = '#B5627A'))"))
                 .isEqualTo(4);
             assertThat(queryLong(c, "SELECT display_order FROM plan_food_groups WHERE plan_id = " + planId + " AND abbreviation = 'RES'"))
                 .isEqualTo(20);
@@ -529,6 +529,33 @@ class MigrationInvariantsTest {
                 assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE plan_id = " + secondPlanId +
                     " AND display_order = " + (i + 1) + " AND color = '" + hex + "'" )).isEqualTo(1);
             }
+        }
+    }
+
+    @Test
+    void v34KeepsTheSameColorForAGroupAcrossPlanVersions() throws Exception {
+        buildFlyway("33").migrate();
+        long older;
+        long newer;
+        try (Connection c = connect()) {
+            long user = insertUser(c, "colors-versions@test.com");
+            older = insertPlan(c, user);
+            c.createStatement().execute("UPDATE plans SET is_current = false, superseded_at = now() WHERE id = " + older);
+            newer = insertPlan(c, user);
+            c.createStatement().execute("""
+                INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, uid)
+                VALUES (%1$d, 'Protein', 'PRO', 1, 'proteinas', null, gen_random_uuid()),
+                       (%1$d, 'Propio', 'PRP', 2, null, null, '00000000-0000-0000-0000-0000000000aa'),
+                       (%2$d, 'Otro', 'OTR', 1, null, '#C0704A', gen_random_uuid()),
+                       (%2$d, 'Propio', 'PRP', 2, null, null, '00000000-0000-0000-0000-0000000000aa')
+                """.formatted(older, newer));
+        }
+        buildFlyway(null).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT count(DISTINCT color) FROM plan_food_groups WHERE uid = '00000000-0000-0000-0000-0000000000aa'"))
+                .isEqualTo(1);
+            assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE plan_id = " + newer + " AND abbreviation = 'OTR' AND color = '#C0704A'"))
+                .isEqualTo(1);
         }
     }
 
