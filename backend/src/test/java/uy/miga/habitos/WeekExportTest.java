@@ -14,7 +14,7 @@ class WeekExportTest {
     void csvAndXlsxContainTheSameNotesAndDecimalComma() throws Exception {
         var date = LocalDate.of(2026, 10, 26);
         var week = new WeekSummaryDto(date, date.plusDays(6),
-            List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1)),
+            List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1, java.util.UUID.randomUUID())),
             List.of(new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO,
                 List.of(new HabitLogDto(1L, date, new BigDecimal("1.5"))),
                 List.of(new WeekMealData(10L, "Desayuno", "=caf\u00e9; \"pan\"\nfruta", "REGISTRADA", 0)), List.of(1L))));

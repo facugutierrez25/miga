@@ -476,7 +476,7 @@ class PlanIntegrationTest {
         savePlan(t, PLAN_UNA_COMIDA);
         long oldId = jdbc.queryForObject("select max(id) from plans", Long.class);
         jdbc.update("update plans set modo_registro = 'LIBRE', margen_porciones = 1.5 where id = ?", oldId);
-        jdbc.update("insert into plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, meta_diaria, preguntar_si_falta, opcional) values (?, 'Grupo propio', 'ABC', 9, 'propio', '#123456', 3, true, true)", oldId);
+        jdbc.update("insert into plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, preguntar_si_falta, opcional) values (?, 'Grupo propio', 'ABC', 9, 'propio', '#123456', true, true)", oldId);
         long groupId = jdbc.queryForObject("select id from plan_food_groups where plan_id = ? and abbreviation = 'ABC'", Long.class, oldId);
         jdbc.update("insert into food_rules (plan_id, user_id, alcance, alimento, tipo, food_group_id, cantidad_por_porcion, unidad) select id, user_id, 'USUARIO', 'Alimento sintético', 'NORMAL', ?, 100, 'g' from plans where id = ?", groupId, oldId);
         mockMvc.perform(post("/api/v1/habitos").header("Authorization", "Bearer " + t)
@@ -489,8 +489,8 @@ class PlanIntegrationTest {
         savePlan(t, PLAN_UNA_COMIDA.replace("Desayuno", "Cena"));
         long newId = jdbc.queryForObject("select max(id) from plans", Long.class);
         assertThat(newId).isNotEqualTo(oldId);
-        assertThat(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, meta_diaria, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", oldId))
-                .isEqualTo(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, meta_diaria, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", newId));
+        assertThat(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", oldId))
+                .isEqualTo(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", newId));
         assertThat(jdbc.queryForMap("select modo_registro, margen_porciones from plans where id = ?", oldId))
                 .isEqualTo(jdbc.queryForMap("select modo_registro, margen_porciones from plans where id = ?", newId));
         assertThat(jdbc.queryForList("select uid, name, habit_type, unit, daily_goal, step, period, display_order, created_at from plan_habits where plan_id = ? and archived_at is null", oldId))

@@ -2,7 +2,7 @@ import { apiRequest, ApiError } from './client'
 
 export interface PlanGroup {
   id: number; uid: string; name: string; abbreviation: string; displayOrder: number
-  color: string | null; clave: string | null; metaDiaria: number | null; preguntarSiFalta: boolean; opcional: boolean
+  color: string | null; clave: string | null; preguntarSiFalta: boolean; opcional: boolean
 }
 export interface Component { groupUid: string; porciones: number }
 export type RuleType = 'NORMAL' | 'COMPUESTO' | 'LIBRE' | 'FLEXIBLE' | 'NO_CUENTA'
@@ -15,7 +15,7 @@ export interface FoodRule extends FoodInput { uid: string; alcance: string; text
 export interface HabitInput { countsFlexibleMeals?: boolean; name: string; habitType: 'CONTADOR' | 'SI_NO' | 'CANTIDAD'; unit: string | null; goal: number | null; period: 'DIA' | 'SEMANA'; step: number }
 export interface Habit extends HabitInput { uid: string; id: number; displayOrder: number }
 export interface PlanRules { planId: number; planVersion: number; modoRegistro: string; grupos: PlanGroup[]; alimentos: FoodRule[]; habitos: Habit[] }
-export interface GroupInput { name: string; abbreviation?: string; clave: string | null; color: string | null; metaDiaria: number | null; preguntarSiFalta: boolean; opcional: boolean }
+export interface GroupInput { name: string; abbreviation?: string; clave: string | null; color: string | null; preguntarSiFalta: boolean; opcional: boolean }
 export interface CatalogItem { uid: string; alcance: string; alimento: string; sinonimos: string[]; tipo: RuleType; groupUid: string | null; textoRegla: string; ajustadoPorUid: string | null }
 export type ErrorCode = 'VERSION_CONFLICT' | 'GROUP_IN_USE' | 'DUPLICATE' | 'VALIDATION' | 'NOT_FOUND'
 export class PlanRulesError extends ApiError {

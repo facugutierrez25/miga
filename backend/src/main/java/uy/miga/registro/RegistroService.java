@@ -229,7 +229,7 @@ public class RegistroService {
             items.stream().map(this::toItemDto).toList(),
             mealEntries.stream().map(this::toEntryItemDto).toList(),
             statuses.stream().map(s -> new GroupStatusDto(
-                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()
+                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()
             )).toList()
         );
     }
@@ -262,7 +262,7 @@ public class RegistroService {
                 comparison.compare(plan, mealId, portionsByGroup);
             mealComparisons.add(new MealComparisonDto(mealId, statuses.stream()
                 .map(s -> new GroupStatusDto(
-                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()))
+                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()))
                 .toList()));
         }
         return new DayComparisonDto(date, mealComparisons);
@@ -377,7 +377,7 @@ public class RegistroService {
             List<ComparisonService.GroupStatus> statuses = comparison.compare(plan, mealId, portionsByGroup);
             List<GroupStatusDto> compDtos = statuses.stream()
                 .map(s -> new GroupStatusDto(
-                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status(), s.dailyGoal()))
+                    s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()))
                 .toList();
 
             mealDtos.add(new DayRegistroDto.MealDayDto(
@@ -393,8 +393,7 @@ public class RegistroService {
         List<DayRegistroDto.DailySummaryDto> summary = groups.stream()
             .map(g -> new DayRegistroDto.DailySummaryDto(
                 g.id(), g.name(), g.clave(),
-                totalByGroup.getOrDefault(g.id(), BigDecimal.ZERO),
-                g.metaDiaria()))
+                totalByGroup.getOrDefault(g.id(), BigDecimal.ZERO)))
             .toList();
 
         return new DayRegistroDto(date, mealDtos, summary);

@@ -337,7 +337,7 @@ test('un borrador empezado sobre una versión vieja sigue dando conflicto tras u
     date: '2025-01-01', summary: [],
     meals: [{
       mealId: 1, noteId: 1, noteText: 'leche', noteVersion, items: [],
-      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR', dailyGoal: null }],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }],
     }],
   })
   mockGetDayRegistro.mockResolvedValueOnce(dia(2)).mockResolvedValue(dia(3))
@@ -566,7 +566,7 @@ test('si falla una respuesta a la pregunta, se muestra el error', async () => {
     date: '2025-01-01', summary: [],
     meals: [{
       mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
-      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR', dailyGoal: null }],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }],
     }],
   })
   renderHoy()
@@ -583,7 +583,7 @@ test('al guardar dice qué faltó y suma lo anotado al día', async () => {
     noteId: 1, version: 0, text: 'un huevo', date: '2025-01-01', mealId: 1, items: [],
     entries: [{ id: 7, food: 'huevo', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: 'REGLA',
       uncertain: false, originalText: 'un huevo', appliedRule: null, occurrenceId: null }],
-    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'CASI', dailyGoal: null }],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'CASI' }],
   })
   renderHoy()
   const textarea = await screen.findByRole('textbox', { name: '¿Qué comiste?' })
@@ -606,7 +606,7 @@ test('las otras comidas muestran su estado en texto y se abren para anotar', asy
     ...dayVacio,
     meals: [{
       mealId: 1, noteId: 3, noteVersion: 0, noteText: 'dos huevos', items: [],
-      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 2, status: 'DE_MAS', dailyGoal: null }],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 2, status: 'DE_MAS' }],
     }],
   })
   renderHoy()
@@ -647,7 +647,7 @@ test('un grupo por confirmar muestra la pregunta y el estado', async () => {
     ...dayVacio,
     meals: [{
       mealId: 1, noteId: 3, noteVersion: 0, noteText: 'tostadas', items: [],
-      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR', dailyGoal: null }],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }],
     }],
   })
   renderHoy()
@@ -663,7 +663,7 @@ test('respeta el margen del plan: dentro del margen la comida es como el plan', 
     ...dayVacio,
     meals: [{
       mealId: 1, noteId: 3, noteVersion: 0, noteText: 'medio huevo', items: [],
-      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0.5, status: 'EN_PLAN', dailyGoal: null }],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0.5, status: 'EN_PLAN' }],
     }],
   })
   renderHoy()
@@ -680,7 +680,7 @@ test('al guardar suma al día también los grupos que esa comida no tenía previ
       { id: 9, food: 'manzana', quantity: 1, unit: 'u', foodGroupId: 2, portions: 1, origin: 'REGLA',
         uncertain: false, originalText: 'manzana', appliedRule: null, occurrenceId: null },
     ],
-    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN', dailyGoal: null }],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN' }],
   })
   renderHoy()
   const textarea = await screen.findByRole('textbox', { name: '¿Qué comiste?' })
@@ -700,9 +700,9 @@ const dayConNota = {
       { id: 22, food: 'pan', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: 'REGLA',
         uncertain: false, originalText: 'pan', appliedRule: null, occurrenceId: 'occ-b' },
     ],
-    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN', dailyGoal: null }],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN' }],
   }],
-  summary: [{ foodGroupId: 1, name: 'Proteínas', clave: 'PRO', totalRecorded: 2, dailyGoal: null }],
+  summary: [{ foodGroupId: 1, name: 'Proteínas', clave: 'PRO', totalRecorded: 2 }],
 }
 
 test('borrar lo anotado pide confirmación, vacía la comida y conserva la versión', async () => {
@@ -832,8 +832,8 @@ test.each([
 ])('describe las faltas: $expected', async ({ names, amounts, expected }) => {
   mockGetMyPlan.mockResolvedValue(planDosComidas)
   mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{ mealId: 1, noteId: 1, noteVersion: 0, noteText: 'comida', items: [], comparison: [
-    ...names.map((name, i) => ({ foodGroupId: 9876 + i, name, expected: amounts[i], recorded: 0, status: 'CASI', dailyGoal: null })),
-    { foodGroupId: 9999, name: 'Grasas', expected: 0, recorded: 1, status: 'DE_MAS', dailyGoal: null },
+    ...names.map((name, i) => ({ foodGroupId: 9876 + i, name, expected: amounts[i], recorded: 0, status: 'CASI' })),
+    { foodGroupId: 9999, name: 'Grasas', expected: 0, recorded: 1, status: 'DE_MAS' },
   ] }] })
   renderHoy()
   const row = await screen.findByRole('button', { name: /Desayuno/ })

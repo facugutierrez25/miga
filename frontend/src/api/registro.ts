@@ -20,7 +20,6 @@ export interface GroupStatusDto {
   expected: number
   recorded: number
   status: string
-  dailyGoal: number | null
 }
 
 export interface NoteInterpretationDto {
@@ -53,7 +52,6 @@ export interface DailySummaryDto {
   name: string
   clave: string
   totalRecorded: number
-  dailyGoal: number | null
 }
 
 export interface MealDayDto {
