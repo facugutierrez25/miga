@@ -302,3 +302,47 @@ test('editar grupo abre el formulario dentro de su tarjeta y enfoca el nombre', 
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
   await waitFor(() => expect(trigger).toHaveFocus())
 })
+
+
+test('compuesto muestra cantidad y unidad, valida el par y conserva los valores al guardar', async () => {
+  const onSave = vi.fn().mockResolvedValue(true)
+  render(<FoodRuleForm groups={groups} onSave={onSave} onCancel={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Tarta' } })
+  fireEvent.click(screen.getByRole('radio', { name: 'Compuesto' }))
+  fireEvent.change(screen.getByLabelText('Grupo 1'), { target: { value: 'group-0' } })
+  fireEvent.change(screen.getByLabelText('Grupo 2'), { target: { value: 'group-1' } })
+  const quantity = screen.getByLabelText('Cantidad por porci\u00f3n')
+  const unit = screen.getByLabelText('Unidad')
+  const save = screen.getByRole('button', { name: 'Guardar alimento' })
+  expect(save).toBeEnabled()
+  fireEvent.change(quantity, { target: { value: '150' } })
+  expect(save).toBeDisabled()
+  expect(quantity).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByRole('alert')).toHaveTextContent('Complet\u00e1 la cantidad y la unidad juntas')
+  fireEvent.change(unit, { target: { value: 'g' } })
+  expect(save).toBeEnabled()
+  fireEvent.change(quantity, { target: { value: '' } })
+  expect(save).toBeDisabled()
+  fireEvent.change(quantity, { target: { value: '150' } })
+  fireEvent.click(save)
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    tipo: 'COMPUESTO', cantidadPorPorcion: 150, unidad: 'g', groupUid: null,
+  })))
+})
+
+test('un compuesto viejo con unidad y sin cantidad se puede editar y guardar', async () => {
+  const onSave = vi.fn().mockResolvedValue(true)
+  const legacy: api.FoodRule = {
+    uid: 'rule-legacy', alcance: 'USUARIO', textoRegla: '', alimento: 'Barrita', sinonimos: [], tipo: 'COMPUESTO',
+    groupUid: null, cantidadPorPorcion: null, unidad: 'u', porcionPorDefecto: 1, overridesRuleUid: null,
+    componentes: [{ groupUid: 'group-0', porciones: 1 }, { groupUid: 'group-1', porciones: 1 }],
+  }
+  render(<FoodRuleForm groups={groups} rule={legacy} onSave={onSave} onCancel={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Barrita de cereal' } })
+  const save = screen.getByRole('button', { name: 'Guardar alimento' })
+  expect(save).toBeEnabled()
+  fireEvent.click(save)
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    alimento: 'Barrita de cereal', cantidadPorPorcion: null, unidad: null,
+  })))
+})

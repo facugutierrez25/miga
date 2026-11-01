@@ -327,4 +327,37 @@ class InterpreterServiceTest {
         assertThat(interpreter.findRule(name + "s", List.of(aliased))).isEqualTo(aliased);
     }
 
+
+    @Test void compoundConvertsMeasuredQuantityToPortions() {
+        var compound = rule(1L, "Tarta", List.of(), "COMPUESTO", null, null,
+            new BigDecimal("150"), "g", BigDecimal.ONE,
+            List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+        for (String text : List.of("200 g de tarta", "0.2 kg de tarta")) {
+            var item = interpreter.interpret(text, List.of(compound)).getFirst();
+            assertThat(item.portions()).isEqualTo(new BigDecimal("1.333"));
+            assertThat(item.uncertain()).isFalse();
+            assertThat(item.appliedRule()).isEqualTo("150 g de Tarta = 1 porcion (compuesto)");
+        }
+        var assumed = interpreter.interpret("2 ml de tarta", List.of(compound)).getFirst();
+        assertThat(assumed.portions()).isEqualTo(new BigDecimal("2.000"));
+        assertThat(assumed.uncertain()).isTrue();
+    }
+
+    @Test void compoundWithoutConversionScalesByQuantityEvenWithAnotherDefaultPortion() {
+        var compound = rule(1L, "Tarta", List.of(), "COMPUESTO", null, null, null, null, new BigDecimal("2"),
+            List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+        assertThat(interpreter.interpret("1 tarta", List.of(compound)).getFirst().portions()).isEqualTo(new BigDecimal("1.000"));
+    }
+
+    @Test void compoundWithoutMentionUnitUsesDefaultPortions() {
+        for (boolean measured : List.of(true, false)) {
+            var compound = rule(1L, "chivito", List.of(), "COMPUESTO", null, null,
+                measured ? new BigDecimal("150") : null, measured ? "g" : null, BigDecimal.ONE,
+                List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+            var item = interpreter.interpret("2 chivitos", List.of(compound)).getFirst();
+            assertThat(item.portions()).isEqualTo(new BigDecimal("2.000"));
+            assertThat(item.uncertain()).isFalse();
+        }
+    }
+
 }

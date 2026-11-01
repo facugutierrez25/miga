@@ -11,7 +11,8 @@ public final class RuleText {
             case "LIBRE" -> r.alimento() + ": libre";
             case "FLEXIBLE" -> r.alimento() + ": cuenta como comida flexible";
             case "NO_CUENTA" -> r.alimento() + ": no suma";
-            case "COMPUESTO" -> "1 " + r.alimento() + " = " + r.componentes().stream()
+            case "COMPUESTO" -> "1 " + r.alimento()
+                + (r.cantidadPorPorcion() != null ? " (" + number(r.cantidadPorPorcion()) + " " + r.unidad() + ")" : "") + " = " + r.componentes().stream()
                 .map(c -> number(BigDecimal.valueOf(c.porciones())) + " " + (c.foodGroupId() == null ? (c.standardGroupKey() == null ? "grupo" : c.standardGroupKey()) : groupNames.getOrDefault(c.foodGroupId(), "grupo")))
                 .collect(Collectors.joining(" + "));
             default -> r.cantidadPorPorcion() != null ? number(r.cantidadPorPorcion()) + " " + r.unidad() + " de " + r.alimento() + " = 1 porción de " + group
