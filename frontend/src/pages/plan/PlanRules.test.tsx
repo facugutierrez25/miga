@@ -329,3 +329,20 @@ test('compuesto muestra cantidad y unidad, valida el par y conserva los valores 
     tipo: 'COMPUESTO', cantidadPorPorcion: 150, unidad: 'g', groupUid: null,
   })))
 })
+
+test('un compuesto viejo con unidad y sin cantidad se puede editar y guardar', async () => {
+  const onSave = vi.fn().mockResolvedValue(true)
+  const legacy: api.FoodRule = {
+    uid: 'rule-legacy', alcance: 'USUARIO', textoRegla: '', alimento: 'Barrita', sinonimos: [], tipo: 'COMPUESTO',
+    groupUid: null, cantidadPorPorcion: null, unidad: 'u', porcionPorDefecto: 1, overridesRuleUid: null,
+    componentes: [{ groupUid: 'group-0', porciones: 1 }, { groupUid: 'group-1', porciones: 1 }],
+  }
+  render(<FoodRuleForm groups={groups} rule={legacy} onSave={onSave} onCancel={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Barrita de cereal' } })
+  const save = screen.getByRole('button', { name: 'Guardar alimento' })
+  expect(save).toBeEnabled()
+  fireEvent.click(save)
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    alimento: 'Barrita de cereal', cantidadPorPorcion: null, unidad: null,
+  })))
+})

@@ -30,6 +30,8 @@ export default function FoodRuleForm({
     rule
       ? {
           ...rule,
+          // Compuestos viejos guardaban la unidad sin cantidad: se descarta para poder guardarlos.
+          unidad: rule.tipo === 'COMPUESTO' && rule.cantidadPorPorcion == null ? null : rule.unidad,
           componentes:
             rule.tipo === 'COMPUESTO' && !rule.componentes.length
               ? emptyComponents()
