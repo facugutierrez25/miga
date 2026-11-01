@@ -1,3 +1,4 @@
+import { useDraftGuard } from './useDraftGuard'
 import { useId, useState, type FormEvent } from 'react'
 import type { FoodInput, FoodRule, PlanGroup, RuleType } from '../../api/planRules'
 import CompoundComponentsField from './CompoundComponentsField'
@@ -21,11 +22,13 @@ export default function FoodRuleForm({
   onSave,
   onCancel,
   deleteAction,
+  onDirtyChange,
 }: {
   groups: PlanGroup[]
   rule?: FoodRule
   onSave: (input: FoodInput) => Promise<boolean>
   onCancel: () => void
+  onDirtyChange?: (dirty: boolean) => void
   deleteAction?: React.ReactNode
 }) {
   const helpId = useId()
@@ -56,6 +59,8 @@ export default function FoodRuleForm({
 
   const [synonyms, setSynonyms] = useState(rule?.sinonimos.join(', ') ?? '')
 
+  const draft = useDraftGuard({ input, synonyms }, onDirtyChange)
+  const cancel = () => draft.cancel(onCancel)
   const parsedSynonyms = synonyms.split(',').map((s) => s.trim()).filter(Boolean)
   const previousSynonyms = rule?.sinonimos ?? []
   const nameInvalid = input.alimento.length > 100 && input.alimento !== rule?.alimento
@@ -106,7 +111,7 @@ export default function FoodRuleForm({
   }
 
   return (
-    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
+    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}>
       <h3>{rule ? 'Editar alimento' : 'Agregar alimento'}</h3>
 
       <label>
@@ -251,12 +256,13 @@ export default function FoodRuleForm({
           </label>
         </>}
       </details>
+      {draft.notice(onCancel)}
       {deleteAction}
       <div className="rules-row">
         <button type="submit" disabled={!valid}>
           Guardar alimento
         </button>
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={cancel}>
           Cancelar
         </button>
       </div>

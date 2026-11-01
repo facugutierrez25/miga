@@ -14,7 +14,7 @@ import FoodRuleForm from './FoodRuleForm'
 import CatalogSearch from './CatalogSearch'
 
 export default function FoodRulesEditor(props: EditorProps) {
-  const { token, plan, mutate } = props
+  const { token, plan, mutate, onDirtyChange } = props
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<FoodRule | 'new' | null>(null)
   const { rememberTrigger, restoreFocus } = useEditorFocus()
@@ -49,6 +49,7 @@ export default function FoodRulesEditor(props: EditorProps) {
       </button>
       {editing === 'new' && (
         <FoodRuleForm
+          onDirtyChange={onDirtyChange}
           groups={plan.grupos}
           rule={editing === 'new' ? undefined : editing}
           onCancel={closeEditor}
@@ -72,6 +73,7 @@ export default function FoodRulesEditor(props: EditorProps) {
             <span className="rules-secondary">{rule.textoRegla}</span></button>
             {editing !== 'new' && editing?.uid === rule.uid && rule.alcance === 'USUARIO' && (
               <FoodRuleForm
+          onDirtyChange={onDirtyChange}
                 groups={plan.grupos}
                 rule={editing}
                 onCancel={closeEditor}

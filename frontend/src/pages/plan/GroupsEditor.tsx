@@ -1,3 +1,4 @@
+import { useDraftGuard } from './useDraftGuard'
 import InlineDelete from './InlineDelete'
 import { GROUP_PALETTE, groupColor, nextGroupColor } from '../../groupColors'
 import type { MealDto } from '../../api/plans'
@@ -9,6 +10,7 @@ import * as api from '../../api/planRules'
 export interface EditorProps {
   token: string
   plan: api.PlanRules
+  onDirtyChange?: (dirty: boolean) => void
   mutate: (operation: () => Promise<api.PlanRules>) => Promise<api.PlanRules | null>
 }
 const KEY_LABELS = [
@@ -33,7 +35,7 @@ const KEYS = [
   'aceites_grasas',
   'dulces',
 ]
-export default function GroupsEditor({ token, plan, mutate, meals = [] }: EditorProps & { meals?: Pick<MealDto, 'portions'>[] }) {
+export default function GroupsEditor({ token, plan, mutate, onDirtyChange, meals = [] }: EditorProps & { meals?: Pick<MealDto, 'portions'>[] }) {
   const [ordering, setOrdering] = useState(false)
   const [editing, setEditing] = useState<api.PlanGroup | 'new' | null>(null)
   const groupTotals: Record<number, number> = {}
@@ -136,6 +138,7 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
             </div>
             {editing !== 'new' && editing?.uid === group.uid && (
               <GroupForm
+          onDirtyChange={onDirtyChange}
                 group={editing}
                 initialColor={GROUP_PALETTE[index % GROUP_PALETTE.length].hex}
                 onCancel={closeEditor}
@@ -153,6 +156,7 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
       </button>
       {editing === 'new' && (
         <GroupForm
+          onDirtyChange={onDirtyChange}
           initialColor={nextGroupColor(groups)}
           onCancel={closeEditor}
           onSave={async (input) => {
@@ -169,11 +173,13 @@ function GroupForm({
   onSave,
   onCancel,
   deleteAction,
+  onDirtyChange,
 }: {
   group?: api.PlanGroup
   initialColor: string
   onSave: (value: api.GroupInput) => Promise<void>
   onCancel: () => void
+  onDirtyChange?: (dirty: boolean) => void
   deleteAction?: React.ReactNode
 }) {
   const [value, setValue] = useState<api.GroupInput>(
@@ -185,13 +191,15 @@ function GroupForm({
       opcional: false,
     }
   )
+  const draft = useDraftGuard(value, onDirtyChange)
+  const cancel = () => draft.cancel(onCancel)
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     void onSave({ ...value, name: value.name.trim() })
   }
 
   return (
-    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
+    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}>
       <label>
         Nombre del grupo
         <input
@@ -248,12 +256,13 @@ function GroupForm({
         </select>
       </label>
       </details>
+      {draft.notice(onCancel)}
       {deleteAction}
       <div className="rules-row">
         <button type="submit" disabled={!value.name.trim()}>
           Guardar grupo
         </button>
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={cancel}>
           Cancelar
         </button>
       </div>

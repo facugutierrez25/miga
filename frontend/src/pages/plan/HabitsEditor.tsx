@@ -1,3 +1,4 @@
+import { useDraftGuard } from './useDraftGuard'
 import InlineDelete from './InlineDelete'
 import { useEditorFocus } from './useEditorFocus'
 import { formatNumber } from './formatNumber'
@@ -11,7 +12,7 @@ import {
 } from '../../api/planRules'
 import type { EditorProps } from './GroupsEditor'
 
-export default function HabitsEditor({ token, plan, mutate }: EditorProps) {
+export default function HabitsEditor({ token, plan, mutate, onDirtyChange }: EditorProps) {
   const [editing, setEditing] = useState<Habit | 'new' | null>(null)
   const { rememberTrigger, restoreFocus } = useEditorFocus()
   function openEditor(value: Habit | 'new') {
@@ -46,6 +47,7 @@ export default function HabitsEditor({ token, plan, mutate }: EditorProps) {
           <span className="rules-secondary">{habitSummary(habit)}</span></button>
           {editing !== 'new' && editing?.uid === habit.uid && (
             <HabitForm
+          onDirtyChange={onDirtyChange}
               habit={editing}
               onCancel={closeEditor}
               deleteAction={<InlineDelete name={habit.name} onDelete={() => confirmDelete(habit.uid)} hint="Si ya tiene registros, se archiva y deja de mostrarse; sus registros se conservan." />}
@@ -61,6 +63,7 @@ export default function HabitsEditor({ token, plan, mutate }: EditorProps) {
       </button>
       {editing === 'new' && (
         <HabitForm
+          onDirtyChange={onDirtyChange}
           habit={editing === 'new' ? undefined : editing}
           onCancel={closeEditor}
           onSave={async (input) => {
@@ -76,22 +79,26 @@ function HabitForm({
   onSave,
   onCancel,
   deleteAction,
+  onDirtyChange,
 }: {
   habit?: Habit
   onSave: (input: HabitInput) => Promise<void>
   onCancel: () => void
+  onDirtyChange?: (dirty: boolean) => void
   deleteAction?: React.ReactNode
 }) {
   const [value, setValue] = useState<HabitInput>(
     habit ?? { name: '', habitType: 'CONTADOR', unit: null, goal: null, period: 'DIA', step: 1 }
   )
+  const draft = useDraftGuard(value, onDirtyChange)
+  const cancel = () => draft.cancel(onCancel)
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     void onSave({ ...value, name: value.name.trim() })
   }
 
   return (
-    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
+    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}>
       <label>
         Nombre del hábito
         <input
@@ -161,12 +168,13 @@ function HabitForm({
           onChange={(e) => setValue({ ...value, step: Number(e.target.value) })}
         />
       </label>
+      {draft.notice(onCancel)}
       {deleteAction}
       <div className="rules-row">
         <button type="submit" disabled={!value.name.trim()}>
           Guardar hábito
         </button>
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={cancel}>
           Cancelar
         </button>
       </div>

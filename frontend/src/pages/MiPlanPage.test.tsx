@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter, createMemoryRouter, RouterProvider, Link } from 'react-router-dom'
 import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MiPlanPage from './MiPlanPage'
 import * as plansApi from '../api/plans'
@@ -279,4 +279,60 @@ test('un conflicto conserva el borrador y permite recargar la versión actual', 
   fireEvent.click(screen.getByRole('button', { name: 'Recargar plan' }))
   await screen.findByText('Desayuno')
   expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
+})
+
+
+test('back protects a modified food draft and discard returns to summary', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Tus alimentos (0)' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Agregar alimento' }))
+  fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Manzana' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('cambios sin guardar')
+  fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
+  expect(screen.getByDisplayValue('Manzana')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }))
+  expect(screen.getByRole('button', { name: 'Editar plan' })).toBeInTheDocument()
+})
+
+test('pending save disables cancellation and failure keeps the draft open', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  let rejectSave!: (error: Error) => void
+  mockSaveMyPlan.mockReturnValue(new Promise((_, reject) => { rejectSave = reject }))
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Descartar cambios' })).toBeDisabled()
+  rejectSave(new Error('network'))
+  await screen.findByText(/No se pudo guardar el plan/)
+  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled()
+})
+
+test('navigation and browser unload protect meal drafts', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  const router = createMemoryRouter([
+    { path: '/', element: <><Link to="/other">Salir</Link><MiPlanPage /></> },
+    { path: '/other', element: <p>Other page</p> },
+  ], { initialEntries: ['/other', '/'], initialIndex: 1 })
+  render(<RouterProvider router={router} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
+  const unload = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(unload)
+  expect(unload.defaultPrevented).toBe(true)
+  fireEvent.click(screen.getByRole('link', { name: 'Salir' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Seguir editando' }))
+  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
+  await act(async () => { await router.navigate(-1) })
+  fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }))
+  expect(await screen.findByText('Other page')).toBeInTheDocument()
+  const cleanUnload = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(cleanUnload)
+  expect(cleanUnload.defaultPrevented).toBe(false)
 })
