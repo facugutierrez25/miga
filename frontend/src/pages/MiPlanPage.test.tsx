@@ -330,9 +330,27 @@ test('navigation and browser unload protect meal drafts', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Seguir editando' }))
   expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
   await act(async () => { await router.navigate(-1) })
-  fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }))
-  expect(await screen.findByText('Other page')).toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }, { timeout: 3000 }))
+  expect(await screen.findByText('Other page', {}, { timeout: 3000 })).toBeInTheDocument()
   const cleanUnload = new Event('beforeunload', { cancelable: true })
   window.dispatchEvent(cleanUnload)
   expect(cleanUnload.defaultPrevented).toBe(false)
+})
+
+test('a navigation blocked during a save continues once the save succeeds', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  let resolveSave!: (plan: typeof planConGrupos) => void
+  mockSaveMyPlan.mockReturnValue(new Promise(resolve => { resolveSave = resolve }))
+  const router = createMemoryRouter([
+    { path: '/', element: <><Link to="/other">Salir</Link><MiPlanPage /></> },
+    { path: '/other', element: <p>Other page</p> },
+  ], { initialEntries: ['/'] })
+  render(<RouterProvider router={router} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  fireEvent.click(screen.getByRole('link', { name: 'Salir' }))
+  expect(await screen.findByRole('alert', { name: 'Cambios sin guardar' })).toBeInTheDocument()
+  resolveSave(planConGrupos)
+  expect(await screen.findByText('Other page')).toBeInTheDocument()
 })

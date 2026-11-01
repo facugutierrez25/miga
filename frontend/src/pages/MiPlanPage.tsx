@@ -151,6 +151,10 @@ function PlanLoader() {
 
 function NavigationGuard({ dirty, busy }: { dirty: boolean; busy: boolean }) {
   const blocker = useBlocker(dirty || busy)
+  // Si los cambios se guardaron o se revirtieron mientras la navegación esperaba, sigue su curso.
+  useEffect(() => {
+    if (blocker.state === 'blocked' && !dirty && !busy) blocker.proceed()
+  }, [blocker, dirty, busy])
   return blocker.state === 'blocked' && <div role="alert" aria-label="Cambios sin guardar">
     <p>Tenés cambios sin guardar. ¿Querés descartarlos?</p>
     <button disabled={busy} onClick={() => blocker.proceed()}>Descartar cambios</button>
