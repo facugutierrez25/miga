@@ -43,11 +43,13 @@ public class PlanService {
     private final MealRepository mealRepository;
     private final UserService userService;
     private final ApplicationEventPublisher events;
+    private final java.time.Clock clock;
 
     PlanService(PlansRepository plansRepository,
                 PlanFoodGroupRepository groupRepository,
                 MealRepository mealRepository,
-                UserService userService, ApplicationEventPublisher events, jakarta.persistence.EntityManager entityManager) {
+                UserService userService, ApplicationEventPublisher events, jakarta.persistence.EntityManager entityManager, java.time.Clock clock) {
+        this.clock = clock;
         this.entityManager = entityManager;
         this.events = events;
         this.plansRepository = plansRepository;
@@ -66,7 +68,7 @@ public class PlanService {
 
     @Transactional(readOnly = true, noRollbackFor = PlanNotFoundException.class)
     public Long getPlanIdForDate(Long userId, LocalDate date) {
-        return plansRepository.findActiveOnDate(userId, date)
+        return plansRepository.findActiveOnDate(userId, date, clock.getZone().getId())
             .or(() -> plansRepository.findOldestByUserId(userId))
             .map(Plan::getId)
             .orElseThrow(PlanNotFoundException::new);
@@ -135,8 +137,8 @@ public class PlanService {
                         .toList()
                 )).toList();
                 return new PlanSummaryDto(
-                    p.getCreatedAt().toLocalDate(),
-                    p.getSupersededAt().toLocalDate(),
+                    p.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+                    p.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
                     p.getMeals().size(),
                     groups,
                     meals
@@ -254,7 +256,7 @@ public class PlanService {
                 .toList();
             return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
         }).toList();
-        return new PlanDto(groups, meals, plan.getVersion(), plan.getCreatedAt().toLocalDate());
+        return new PlanDto(groups, meals, plan.getVersion(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate());
     }
 
     // ── API pública para módulos externos ─────────────────────────────────────
@@ -387,7 +389,7 @@ public class PlanService {
                 .ifPresent(m -> { mealIdMap.put(source.getId(), m.getId()); taken.add(m.getId()); });
         }
         events.publishEvent(new PlanVersionCreated(old.getUserId(), old.getId(), copy.getId(),
-            Map.copyOf(groupIdMap), Map.copyOf(mealIdMap), LocalDate.now()));
+            Map.copyOf(groupIdMap), Map.copyOf(mealIdMap), LocalDate.now(clock)));
     }
 
     @Transactional(noRollbackFor = PlanNotFoundException.class)
