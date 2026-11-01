@@ -175,6 +175,9 @@ class RegistroServiceTest {
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));
         when(notes.findByUserIdAndDateAndMealId(1L, today, 10L)).thenReturn(Optional.of(note));
         when(notes.findByUserIdAndDate(1L, today)).thenReturn(List.of(note));
+        when(plans.getReadData(20L)).thenReturn(new uy.miga.plans.PlanReadData(20L, today, null,
+            "LIBRE", new BigDecimal("0.5"), List.of(), List.of(new uy.miga.plans.PlanReadData.MealData(
+                10L, "Meal", List.of()))));
         NoteInterpretationDto result = service.saveNote("user", today, 10L, "leche", 2L);
         assertThat(result.version()).isEqualTo(2L);
         verify(notes, never()).saveAndFlush(any());

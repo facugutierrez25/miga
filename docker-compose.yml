@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${DB_USER:-miga}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-miga}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -29,8 +29,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
       MAIL_FROM: ${MAIL_FROM:-onboarding@resend.dev}
+      # Nunca el secreto de desarrollo, que es público: sin JWT_SECRET en .env el backend no arranca.
+      JWT_SECRET: ${JWT_SECRET:-}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       db:
         condition: service_healthy

@@ -63,6 +63,12 @@ public class FoodEntryFacade {
     }
 
     @Transactional(readOnly = true)
+    public List<EntryData> findByUserIdAndDateRange(Long userId, LocalDate start, LocalDate end) {
+        return repository.findByUserIdAndDateBetweenOrderByIdAsc(userId, start, end)
+            .stream().map(this::toEntryData).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<EntryData> findByUserIdAndDate(Long userId, LocalDate date) {
         return repository.findByUserIdAndDateOrderByIdAsc(userId, date)
             .stream().map(this::toEntryData).toList();
