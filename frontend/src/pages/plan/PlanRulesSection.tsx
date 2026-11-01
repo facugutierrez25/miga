@@ -9,8 +9,14 @@ import './PlanRules.css'
 export default function PlanRulesSection({
   token,
   onChanged,
+  onDirtyChange,
+  onBusyChange,
   meals,
+  initialSection = 'groups',
 }: {
+  onDirtyChange?: (dirty: boolean) => void
+  onBusyChange?: (busy: boolean) => void
+  initialSection?: string
   meals?: Pick<MealDto, 'portions'>[]
   token: string | null
   onChanged?: (plan: PlanRules) => void
@@ -21,7 +27,11 @@ export default function PlanRulesSection({
 
   const [busy, setBusy] = useState(false)
 
-  const [section, setSection] = useState('groups')
+  const [dirty, setDirty] = useState(false)
+  const reportDirty = useCallback((value: boolean) => { setDirty(value); onDirtyChange?.(value) }, [onDirtyChange])
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false) }, [busy, onBusyChange])
+
+  const [section, setSection] = useState(initialSection)
 
   const [reload, setReload] = useState(0)
 
@@ -82,7 +92,7 @@ export default function PlanRulesSection({
     setReload((value) => value + 1)
   }
 
-  const props = plan && token ? { token, plan, mutate } : null
+  const props = plan && token ? { token, plan, mutate, onDirtyChange: reportDirty } : null
 
   return (
     <div className="plan-rules">
@@ -108,6 +118,7 @@ export default function PlanRulesSection({
               <button
                 type="button"
                 key={key}
+                disabled={busy || (dirty && section !== key)}
                 aria-pressed={section === key}
                 onClick={() => setSection(key)}
               >

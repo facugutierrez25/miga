@@ -163,3 +163,9 @@
   align-items: center;
   justify-content: center;
 }
+
+.plan-rules .rules-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; }
+.rules-item p { margin-bottom: 0; font-weight: 400; }
+.plan-rules button[hidden] { display: none; }
+.plan-rules summary { min-height: 44px; cursor: pointer; padding-block: 12px; }
+.plan-rules details[open] { display: grid; gap: 12px; }

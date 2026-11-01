@@ -1,3 +1,5 @@
+import { useDraftGuard } from './useDraftGuard'
+import InlineDelete from './InlineDelete'
 import { GROUP_PALETTE, groupColor, nextGroupColor } from '../../groupColors'
 import type { MealDto } from '../../api/plans'
 import { useEditorFocus } from './useEditorFocus'
@@ -8,6 +10,7 @@ import * as api from '../../api/planRules'
 export interface EditorProps {
   token: string
   plan: api.PlanRules
+  onDirtyChange?: (dirty: boolean) => void
   mutate: (operation: () => Promise<api.PlanRules>) => Promise<api.PlanRules | null>
 }
 const KEY_LABELS = [
@@ -32,9 +35,9 @@ const KEYS = [
   'aceites_grasas',
   'dulces',
 ]
-export default function GroupsEditor({ token, plan, mutate, meals = [] }: EditorProps & { meals?: Pick<MealDto, 'portions'>[] }) {
+export default function GroupsEditor({ token, plan, mutate, onDirtyChange, meals = [] }: EditorProps & { meals?: Pick<MealDto, 'portions'>[] }) {
+  const [ordering, setOrdering] = useState(false)
   const [editing, setEditing] = useState<api.PlanGroup | 'new' | null>(null)
-  const [confirm, setConfirm] = useState<string | null>(null)
   const groupTotals: Record<number, number> = {}
   for (const meal of meals) {
     for (const portion of meal.portions) {
@@ -45,7 +48,13 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
   async function move(index: number, delta: number) {
     const uids = groups.map((g) => g.uid)
     ;[uids[index], uids[index + delta]] = [uids[index + delta], uids[index]]
-    await mutate(() => api.reorderGroups(token, { planVersion: plan.planVersion, uids }))
+    const trigger = document.activeElement as HTMLElement
+    const next = await mutate(() => api.reorderGroups(token, { planVersion: plan.planVersion, uids }))
+    if (next) requestAnimationFrame(() => {
+      if (document.activeElement !== document.body && document.activeElement !== trigger) return
+      if (trigger instanceof HTMLButtonElement && !trigger.disabled) trigger.focus()
+      else document.querySelector<HTMLElement>(`[data-group-uid="${groups[index].uid}"]`)?.focus()
+    })
   }
   const { rememberTrigger, restoreFocus } = useEditorFocus()
   function openEditor(value: api.PlanGroup | 'new') {
@@ -66,27 +75,31 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
     return !!next
   }
   async function confirmDelete(uid: string) {
-    if (await mutate(() => api.deleteGroup(token, uid, plan.planVersion))) setConfirm(null)
+    if (await mutate(() => api.deleteGroup(token, uid, plan.planVersion))) {
+      closeEditor()
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-add-group]')?.focus())
+    }
   }
 
   return (
-    <section aria-label="Grupos">
-      <h2>Grupos</h2>
+    <section aria-label="Grupos" onKeyDown={e => { if (e.key === 'Escape') { closeEditor(); setOrdering(false) } }}>
+      <button type="button" aria-pressed={ordering} onClick={() => setOrdering(!ordering)}>{ordering ? 'Listo' : 'Ordenar'}</button>
       <ol className="rules-list">
         {groups.map((group, index) => (
           <li className="rules-card" key={group.uid}>
-            <h3>
+            <button type="button" className="rules-item" data-group-uid={group.uid} aria-label={`Editar ${group.name}`} onClick={() => openEditor(group)}><strong>
               <span className="rules-dot" style={{ background: groupColor(group, index) }} />
               {group.name}
-            </h3>
-            <p>
+            </strong>
+            <span className="rules-secondary">
               {groupTotals[group.id] ? `Total del día: ${formatNumber(groupTotals[group.id])}` : 'No está en ninguna comida'}
-            </p>
+            </span></button>
             <div className="rules-row">
               {group.preguntarSiFalta && <span className="rules-chip">Preguntar si falta</span>}
               {group.opcional && <span className="rules-chip">Opcional</span>}
             </div>
             <div className="rules-row">
+              {ordering && <>
               <button
                 type="button"
                 aria-label={`Subir ${group.name}`}
@@ -121,37 +134,15 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
                   />
                 </svg>
               </button>
-              <button
-                type="button"
-                aria-label={`Editar ${group.name}`}
-                onClick={() => openEditor(group)}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                aria-label={`Borrar ${group.name}`}
-                onClick={() => setConfirm(group.uid)}
-              >
-                Borrar
-              </button>
+              </>}
             </div>
-            {confirm === group.uid && (
-              <div>
-                <p>¿Borrar {group.name}?</p>
-                <button type="button" onClick={() => confirmDelete(group.uid)}>
-                  Confirmar borrado
-                </button>
-                <button type="button" onClick={() => setConfirm(null)}>
-                  Cancelar
-                </button>
-              </div>
-            )}
             {editing !== 'new' && editing?.uid === group.uid && (
               <GroupForm
+          onDirtyChange={onDirtyChange}
                 group={editing}
                 initialColor={GROUP_PALETTE[index % GROUP_PALETTE.length].hex}
                 onCancel={closeEditor}
+                deleteAction={<InlineDelete name={group.name} onDelete={() => confirmDelete(group.uid)} />}
                 onSave={async (input) => {
                   await save(input)
                 }}
@@ -160,11 +151,12 @@ export default function GroupsEditor({ token, plan, mutate, meals = [] }: Editor
           </li>
         ))}
       </ol>
-      <button type="button" onClick={() => openEditor('new')}>
+      <button type="button" data-add-group onClick={() => openEditor('new')}>
         Agregar grupo
       </button>
       {editing === 'new' && (
         <GroupForm
+          onDirtyChange={onDirtyChange}
           initialColor={nextGroupColor(groups)}
           onCancel={closeEditor}
           onSave={async (input) => {
@@ -180,11 +172,15 @@ function GroupForm({
   initialColor,
   onSave,
   onCancel,
+  deleteAction,
+  onDirtyChange,
 }: {
   group?: api.PlanGroup
   initialColor: string
   onSave: (value: api.GroupInput) => Promise<void>
   onCancel: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  deleteAction?: React.ReactNode
 }) {
   const [value, setValue] = useState<api.GroupInput>(
     group ? { ...group, color: group.color ?? initialColor } : {
@@ -195,13 +191,15 @@ function GroupForm({
       opcional: false,
     }
   )
+  const draft = useDraftGuard(value, onDirtyChange)
+  const cancel = () => draft.cancel(onCancel)
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     void onSave({ ...value, name: value.name.trim() })
   }
 
   return (
-    <form className="rules-form" onSubmit={handleSubmit}>
+    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}>
       <label>
         Nombre del grupo
         <input
@@ -226,6 +224,7 @@ function GroupForm({
           ))}
         </div>
       </fieldset>
+      <details><summary>Más opciones</summary>
       <label>
         <input
           type="checkbox"
@@ -256,11 +255,14 @@ function GroupForm({
           ))}
         </select>
       </label>
+      </details>
+      {draft.notice(onCancel)}
+      {deleteAction}
       <div className="rules-row">
         <button type="submit" disabled={!value.name.trim()}>
           Guardar grupo
         </button>
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={cancel}>
           Cancelar
         </button>
       </div>
