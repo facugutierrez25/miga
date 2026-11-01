@@ -1,3 +1,5 @@
+import userEvent from '@testing-library/user-event'
+import { within } from '@testing-library/react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 import * as api from '../../api/planRules'
@@ -108,6 +110,7 @@ test('crea grupo con preguntar si falta y reemplaza el estado', async () => {
 
   fireEvent.change(screen.getByLabelText('Nombre del grupo'), { target: { value: 'Nuevo' } })
 
+  fireEvent.click(screen.getByText('Más opciones'))
   fireEvent.click(screen.getByLabelText('Preguntar si falta'))
 
   fireEvent.click(screen.getByText('Guardar grupo'))
@@ -124,6 +127,7 @@ test('reordena por uid', async () => {
   vi.mocked(api.reorderGroups).mockResolvedValue(plan)
 
   await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Ordenar' }))
   fireEvent.click(screen.getByLabelText('Subir Cereales'))
 
   await waitFor(() =>
@@ -141,6 +145,7 @@ test('muestra GROUP_IN_USE del backend', async () => {
   })
 
   await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Proteínas' }))
   fireEvent.click(screen.getByRole('button', { name: 'Borrar Proteínas' }))
   fireEvent.click(screen.getByText('Confirmar borrado'))
 
@@ -151,6 +156,7 @@ test('conflicto bloquea cambios y permite recargar', async () => {
   vi.mocked(api.reorderGroups).mockRejectedValue({ code: 'VERSION_CONFLICT' })
 
   await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Ordenar' }))
   fireEvent.click(screen.getByLabelText('Subir Cereales'))
 
   expect(await screen.findByRole('alert')).toHaveTextContent('El plan cambió en otra sesión.')
@@ -169,7 +175,7 @@ test('compuesto valida grupos y envía componentes con vista previa', async () =
 
   fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'barrita' } })
 
-  fireEvent.click(screen.getByRole('radio', { name: 'Compuesto' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Varios grupos' }))
 
   fireEvent.change(screen.getByLabelText('Grupo 1'), { target: { value: 'group-0' } })
 
@@ -221,7 +227,7 @@ test('busca catálogo, ajusta y abre la regla nueva', async () => {
   await open()
   fireEvent.click(screen.getByRole('button', { name: 'Alimentos' }))
 
-  fireEvent.change(screen.getByLabelText('Buscar en catálogo'), { target: { value: 'pe' } })
+  fireEvent.change(screen.getByLabelText('Buscar alimentos'), { target: { value: 'pe' } })
 
   fireEvent.click(await screen.findByText('Ajustar para mi plan'))
 
@@ -263,7 +269,7 @@ test('crea hábito Cantidad por día con paso 0.5', async () => {
 
 test('Compuesto muestra nombres legibles y empieza con dos filas', () => {
   render(<FoodRuleForm groups={groups} onSave={vi.fn()} onCancel={vi.fn()} />)
-  fireEvent.click(screen.getByRole('radio', { name: 'Compuesto' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Varios grupos' }))
   expect(screen.queryByText('COMPUESTO')).not.toBeInTheDocument()
   expect(screen.getByLabelText('Grupo 1')).toBeInTheDocument()
   expect(screen.getByLabelText('Grupo 2')).toBeInTheDocument()
@@ -280,6 +286,7 @@ test('borrar hábito pide confirmación y conserva los registros', async () => {
   vi.mocked(api.deleteHabit).mockResolvedValue({ ...plan, habitos: [] })
   await open()
   fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Agua' }))
   fireEvent.click(screen.getByRole('button', { name: 'Borrar Agua' }))
   expect(api.deleteHabit).not.toHaveBeenCalled()
   expect(
@@ -308,7 +315,7 @@ test('compuesto muestra cantidad y unidad, valida el par y conserva los valores 
   const onSave = vi.fn().mockResolvedValue(true)
   render(<FoodRuleForm groups={groups} onSave={onSave} onCancel={vi.fn()} />)
   fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Tarta' } })
-  fireEvent.click(screen.getByRole('radio', { name: 'Compuesto' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Varios grupos' }))
   fireEvent.change(screen.getByLabelText('Grupo 1'), { target: { value: 'group-0' } })
   fireEvent.change(screen.getByLabelText('Grupo 2'), { target: { value: 'group-1' } })
   const quantity = screen.getByLabelText('Cantidad por porci\u00f3n')
@@ -355,4 +362,81 @@ test('ofrece diez colores y preselecciona el primero libre', () => {
   expect(screen.getByRole('radio', { name: 'Azul' })).toBeChecked()
   fireEvent.click(screen.getByRole('radio', { name: 'Coral' }))
   expect(screen.getByRole('radio', { name: 'Coral' })).toBeChecked()
+})
+
+test('Ordenar muestra controles operables con teclado y Listo los oculta', async () => {
+  const user = userEvent.setup()
+  vi.mocked(api.reorderGroups).mockResolvedValue(plan)
+  await open()
+  expect(screen.queryByRole('button', { name: 'Subir Cereales' })).not.toBeInTheDocument()
+  screen.getByRole('button', { name: 'Ordenar' }).focus()
+  await user.keyboard('{Enter}')
+  screen.getByRole('button', { name: 'Subir Cereales' }).focus()
+  await user.keyboard(' ')
+  await waitFor(() => expect(api.reorderGroups).toHaveBeenCalledTimes(1))
+  screen.getByRole('button', { name: 'Listo' }).focus()
+  await user.keyboard('{Enter}')
+  expect(screen.queryByRole('button', { name: 'Subir Cereales' })).not.toBeInTheDocument()
+})
+
+test('una sola búsqueda muestra el plan y el catálogo y exige dos caracteres', async () => {
+  vi.mocked(api.searchCatalog).mockResolvedValue([{
+    uid: 'catalog', alcance: 'GLOBAL', alimento: 'Manzana verde', sinonimos: [], tipo: 'LIBRE',
+    groupUid: null, textoRegla: 'Libre', ajustadoPorUid: null,
+  }])
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Alimentos' }))
+  expect(screen.getAllByRole('textbox')).toHaveLength(1)
+  const search = screen.getByRole('textbox', { name: 'Buscar alimentos' })
+  fireEvent.change(search, { target: { value: 'm' } })
+  expect(screen.getByText(/al menos 2 caracteres/)).toBeInTheDocument()
+  expect(api.searchCatalog).not.toHaveBeenCalled()
+  fireEvent.change(search, { target: { value: 'man' } })
+  expect(screen.getByRole('heading', { name: 'En tu plan' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Del catálogo' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Editar Manzana' })).toBeInTheDocument()
+  expect(await screen.findByText('Manzana verde')).toBeInTheDocument()
+  expect(api.searchCatalog).toHaveBeenCalledWith('tok', 'man')
+  fireEvent.change(search, { target: { value: 'x' } })
+  expect(screen.queryByText('Manzana verde')).not.toBeInTheDocument()
+})
+
+test('fila de alimento abre editor, Escape devuelve el foco y borrar se confirma adentro', async () => {
+  const user = userEvent.setup()
+  vi.mocked(api.deleteFood).mockResolvedValue({ ...plan, alimentos: [] })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Alimentos' }))
+  expect(screen.queryByRole('button', { name: 'Borrar Manzana' })).not.toBeInTheDocument()
+  const row = screen.getByRole('button', { name: 'Editar Manzana' })
+  await user.click(row)
+  expect(screen.getByLabelText('Alimento')).toHaveFocus()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(row).toHaveFocus())
+  await user.click(row)
+  await user.click(screen.getByRole('button', { name: 'Borrar Manzana' }))
+  expect(api.deleteFood).not.toHaveBeenCalled()
+  const confirmation = screen.getByRole('group', { name: 'Confirmar borrado' })
+  await user.keyboard('{Escape}')
+  expect(confirmation).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Borrar Manzana' })).toHaveFocus()
+  await user.click(screen.getByRole('button', { name: 'Borrar Manzana' }))
+  await user.click(within(screen.getByRole('group', { name: 'Confirmar borrado' })).getByRole('button', { name: 'Confirmar borrado' }))
+  await waitFor(() => expect(api.deleteFood).toHaveBeenCalledWith('tok', 'food', 3))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Agregar alimento' })).toHaveFocus())
+})
+
+test('Más opciones y la ayuda de tipos se despliegan a pedido', async () => {
+  const user = userEvent.setup()
+  render(<FoodRuleForm groups={groups} onSave={vi.fn()} onCancel={vi.fn()} />)
+  const options = screen.getByText('Más opciones').closest('details')!
+  expect(options).not.toHaveAttribute('open')
+  await user.click(screen.getByText('Más opciones'))
+  expect(options).toHaveAttribute('open')
+  expect(within(options).getByLabelText('Sinónimos separados por comas')).toBeVisible()
+  expect(within(options).getByLabelText('Porción por defecto')).toBeVisible()
+  const help = screen.getByRole('button', { name: 'Ayuda sobre tipos de alimento' })
+  expect(help).toHaveAttribute('aria-expanded', 'false')
+  await user.click(help)
+  expect(help).toHaveAttribute('aria-expanded', 'true')
+  expect(document.getElementById(help.getAttribute('aria-describedby')!)).toHaveTextContent('Suma a varios grupos')
 })

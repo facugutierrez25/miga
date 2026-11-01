@@ -10,7 +10,9 @@ export default function PlanRulesSection({
   token,
   onChanged,
   meals,
+  initialSection = 'groups',
 }: {
+  initialSection?: string
   meals?: Pick<MealDto, 'portions'>[]
   token: string | null
   onChanged?: (plan: PlanRules) => void
@@ -21,7 +23,7 @@ export default function PlanRulesSection({
 
   const [busy, setBusy] = useState(false)
 
-  const [section, setSection] = useState('groups')
+  const [section, setSection] = useState(initialSection)
 
   const [reload, setReload] = useState(0)
 

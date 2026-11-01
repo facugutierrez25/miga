@@ -1022,3 +1022,9 @@
   background: var(--chip-dot, var(--primary));
 }
 .btn-confirmar { margin-top: var(--s3); }
+
+.mi-plan-page button, .mi-plan-page summary { min-height: 44px; min-width: 44px; }
+.mi-plan-page summary { cursor: pointer; padding: 12px 0; }
+.mi-plan-page button:focus-visible, .mi-plan-page summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.plan-summary-links { display: grid; margin-block: var(--s4); }
+.plan-summary-links button { text-align: left; padding: var(--s3); background: var(--surface); color: var(--ink); border: 1px solid var(--line); font: inherit; }

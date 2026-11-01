@@ -9,7 +9,7 @@ import {
   getMyPlan, getPlanHistory, saveMyPlan, PlanConflictError,
   type PlanFoodGroupDto, type PlanDto, type PlanSummaryDto,
 } from '../api/plans'
-import type { PlanRules } from '../api/planRules'
+import { getPlanRules, type PlanRules } from '../api/planRules'
 import PlanRulesSection from './plan/PlanRulesSection'
 import './MiPlanPage.css'
 import { usePlan } from '../hooks/usePlan'
@@ -65,7 +65,7 @@ function formatPorcion(value: number) {
 }
 
 function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function ConfirmDeleteModal({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
@@ -134,7 +134,7 @@ function PlanDetalleModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: ()
   )
 }
 
-type Tab = 'comidas' | 'rules'
+type Tab = 'resumen' | 'comidas' | 'rules'
 
 export default function MiPlanPage() {
   const { token, email } = useAuth()
@@ -145,7 +145,7 @@ function PlanLoader() {
   useTitle('Mi plan | Miga')
   const { token, email } = useAuth()
   const { data, status, retry } = usePlan(token, email)
-  const [tab, setTab] = useState<Tab>('comidas')
+  const [tab, setTab] = useState<Tab>('resumen')
   return <PlanEditor initialPlan={data} loading={status === 'loading'} loadError={status === 'error'} retry={retry} tab={tab} setTab={setTab} />
 }
 
@@ -159,12 +159,45 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   const navigate = useNavigate()
   const desdeWizard = !!(location.state as { meals?: unknown } | null)?.meals
 
+  const [rulesSection, setRulesSection] = useState('groups')
+  const [counts, setCounts] = useState<{ foods: number; habits: number } | null>(null)
+  const [savedPlan, setSavedPlan] = useState(initialPlan)
+  const [discard, setDiscard] = useState(false)
+  const summaryTrigger = useRef('edit')
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    getPlanRules(token).then(rules => {
+      if (active) setCounts({ foods: rules.alimentos.length, habits: rules.habitos.length })
+    }).catch(() => {})
+    return () => { active = false }
+  }, [token])
+  function returnToSummary() {
+    setTab('resumen')
+    setDiscard(false)
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-summary-target="${summaryTrigger.current}"]`)?.focus()
+    })
+  }
+
+  function cancelEditing() {
+    if (hasChanges) {
+      setDiscard(true)
+    } else returnToSummary()
+  }
+  function startEditing() {
+    summaryTrigger.current = 'edit'
+    setTab('comidas')
+    setConfirmado(false)
+    if (comidas.length) editarComida(0)
+  }
   const [grupos, setGrupos] = useState<PlanFoodGroupDto[]>(initialPlan?.foodGroups ?? DEFAULT_GRUPOS)
   const [comidas, setComidas] = useState<ComidaLocal[]>(() => initialPlan ? planALocal(initialPlan) :
     ((location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals ?? []).map(meal => ({
       nombre: meal.name, hora: meal.suggestedTime?.slice(0, 5) ?? '',
       porciones: porcionesVacias(DEFAULT_GRUPOS), minimizada: false,
     })))
+  const hasChanges = JSON.stringify(localAPlan(comidas, grupos)) !== JSON.stringify(localAPlan(savedPlan ? planALocal(savedPlan) : [], grupos))
   // El foco solo se mueve por una acción de la persona: al guardar una comida vuelve a
   // su «Editar», al editar o agregar va al nombre y al eliminar va a «Agregar comida».
   const focoEditar = useRef<number | null>(null)
@@ -194,6 +227,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   const [loadedPlan, setLoadedPlan] = useState(initialPlan)
   if (loadedPlan !== initialPlan) {
     setLoadedPlan(initialPlan)
+    setSavedPlan(initialPlan)
     setGrupos(initialPlan?.foodGroups ?? DEFAULT_GRUPOS)
     setComidas(initialPlan ? planALocal(initialPlan) : [])
     setPlanVersion(initialPlan?.version)
@@ -203,11 +237,13 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   // Una edición de reglas puede crear una versión nueva del plan con otros ids de
   // grupos: se recargan las comidas para no confirmar porciones con ids viejos.
   const handleRulesChanged = useCallback((dto: PlanRules) => {
+    setCounts({ foods: dto.alimentos.length, habits: dto.habitos.length })
     setGrupos(dto.grupos)
     setPlanVersion(dto.planVersion)
     if (!token) return
     getMyPlan(token)
       .then(plan => {
+        setSavedPlan(plan)
         setGrupos(plan.foodGroups ?? DEFAULT_GRUPOS)
         setComidas(planALocal(plan))
         setPlanVersion(plan.version)
@@ -269,11 +305,13 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
     setConflicto(false)
     try {
       const dto = await saveMyPlan(token, { ...localAPlan(comidas, grupos), clientVersion: planVersion })
+      setSavedPlan(dto)
       setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
       setComidas(planALocal(dto))
       setPlanVersion(dto.version)
       if (token) getPlanHistory(token).then(setHistorial).catch(() => {})
       setConfirmado(true)
+      returnToSummary()
       if (desdeWizard) setTimeout(() => navigate('/hoy', { replace: true }), 1800)
     } catch (err) {
       if (err instanceof PlanConflictError) {
@@ -293,6 +331,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
     setCargando(true)
     try {
       const dto = await getMyPlan(token)
+      setSavedPlan(dto)
       setGrupos(dto.foodGroups ?? DEFAULT_GRUPOS)
       setComidas(planALocal(dto))
       setPlanVersion(dto.version)
@@ -313,34 +352,34 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       </header>
 
       <div className="mi-plan-body">
-        <div className="plan-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            id="plan-tab-meals"
-            aria-controls="plan-panel"
-            aria-selected={tab === 'comidas'}
-            className={`plan-tab${tab === 'comidas' ? ' plan-tab--active' : ''}`}
-            onClick={() => setTab('comidas')}
-          >
-            Comidas
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="plan-tab-rules"
-            aria-controls="plan-panel"
-            aria-selected={tab === 'rules'}
-            className={`plan-tab${tab === 'rules' ? ' plan-tab--active' : ''}`}
-            onClick={() => setTab('rules')}
-          >
-            Reglas de tu plan
-          </button>
-        </div>
+        {tab === 'resumen' && !loading && !loadError && <>
+          <p>{savedPlan?.createdAt ? `Cargado el ${formatFecha(savedPlan.createdAt)}` : 'Fecha de carga no disponible'}</p>
+          <button data-summary-target="edit" className="btn-confirmar" onClick={startEditing}>Editar plan</button>
 
-        <div id="plan-panel" role="tabpanel" aria-labelledby={tab === 'rules' ? 'plan-tab-rules' : 'plan-tab-meals'}>
+        </>}
+        {tab === 'comidas' && <>
+          <button onClick={cancelEditing}>Cancelar</button>
+          {discard && <div role="alert">
+            <p>Tenés cambios sin guardar. ¿Querés descartarlos?</p>
+            <button onClick={() => {
+              setComidas(savedPlan ? planALocal(savedPlan) : [])
+              setError(null)
+              setConflicto(false)
+              returnToSummary()
+            }}>Descartar cambios</button>
+            <button onClick={() => setDiscard(false)}>Seguir editando</button>
+          </div>}
+          <button disabled={hasChanges} onClick={() => { setRulesSection('groups'); setTab('rules') }}>Grupos</button>
+          {hasChanges && <p>Guardá o descartá los cambios de comidas antes de editar grupos.</p>}
+        </>}
+        {tab === 'rules' && <button onClick={() => {
+          if (rulesSection === 'groups') { setTab('comidas'); requestAnimationFrame(() => document.querySelector<HTMLElement>('.btn-agregar')?.focus()) }
+          else returnToSummary()
+        }}>Volver</button>}
+        <div id="plan-panel">
         {tab === 'rules' ? (
           <PlanRulesSection
+            initialSection={rulesSection}
             meals={comidas.map(meal => ({
               portions: grupos.map(g => ({ foodGroupId: g.id, portions: meal.porciones[g.id] ?? 0 })),
             }))}
@@ -355,7 +394,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
           <>
             <div className="meal-list">
             {comidas.map((comida, i) =>
-              comida.minimizada ? (
+              (tab === 'resumen' || comida.minimizada) ? (
                 <div key={i} className="comida-card comida-card--min">
                   <span className="comida-min__nombre">{comida.nombre || 'Sin nombre'}</span>
                   {comida.hora && <span className="comida-min__hora">{comida.hora}</span>}
@@ -370,7 +409,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                       )
                     })}
                   </div>
-                  <button
+                  {tab === 'comidas' && <button
                     className="btn-editar"
                     data-edit-index={i}
                     onClick={() => editarComida(i)}
@@ -379,19 +418,11 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                       <path d="M12.5 2.5a1.414 1.414 0 0 1 2 2L5 14H3v-2L12.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                  </button>
-                  <button
-                    className="btn-eliminar-min"
-                    onClick={() => setConfirmDeleteIdx(i)}
-                    aria-label="Eliminar comida"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                      <path d="M6 3.5h6M2.5 5.5h13M7.5 8v5M10.5 8v5M4 5.5l.9 9.5h8.2l.9-9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+                  </button>}
+
                 </div>
               ) : (
-                <div key={i} className="comida-card comida-card--exp">
+                <div key={i} className="comida-card comida-card--exp" onKeyDown={e => { if (e.key === 'Escape') guardarComida(i) }}>
                   <div className="comida-card__header">
                     <input
                       className="comida-card__nombre"
@@ -454,20 +485,28 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                     onClick={() => guardarComida(i)}
                     disabled={!comida.nombre.trim()}
                   >
-                    Guardar comida
+                    Listo
                   </button>
                 </div>
               )
             )}
 
-            <button className="btn-agregar" onClick={agregarComida}>
+            {tab === 'comidas' && <button className="btn-agregar" onClick={agregarComida}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               Agregar comida
-            </button>
+            </button>}
             </div>
 
+            {tab === 'resumen' && <>          <div className="plan-summary-links">
+            {([['foods', 'Tus alimentos', counts?.foods], ['habits', 'Hábitos', counts?.habits]] as const).map(([section, label, count]) =>
+              <button key={section} data-summary-target={section} onClick={() => {
+                summaryTrigger.current = section
+                setRulesSection(section)
+                setTab('rules')
+              }}>{label} ({count ?? '…'})</button>)}
+          </div></>}
             {error && <p className="plan-error" role="alert">{error}</p>}
 
             {conflicto && (
@@ -477,9 +516,9 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
               </div>
             )}
 
-            <button className="btn-confirmar" onClick={confirmarPlan} disabled={confirmando || conflicto}>
-              {confirmando ? 'Confirmando…' : 'Confirmar plan'}
-            </button>
+            {tab === 'comidas' && <button className="btn-confirmar" onClick={confirmarPlan} disabled={confirmando || conflicto || comidas.some(c => !c.nombre.trim())}>
+              {confirmando ? 'Guardando…' : 'Guardar cambios'}
+            </button>}
 
             <p className="confirmado-msg" role="status">{confirmado ? '¡Plan guardado!' : ''}</p>
 

@@ -32,6 +32,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(),
     sessionExpired: false, logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
+  vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 1, planVersion: 0, modoRegistro: 'LIBRE', grupos: [], alimentos: [], habitos: [] })
 
 })
 
@@ -72,18 +73,18 @@ test('expande una comida al hacer clic en editar', async () => {
     meals: [{ name: 'Almuerzo', displayOrder: 1, portions: [] }],
   })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByLabelText('Editar Almuerzo'))
-  fireEvent.click(screen.getByLabelText('Editar Almuerzo'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
   expect(screen.getByDisplayValue('Almuerzo')).toBeInTheDocument()
 })
 
 test('minimiza una comida al guardarla', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Agregar comida'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  await screen.findByText('Agregar comida')
   fireEvent.click(screen.getByText('Agregar comida'))
   fireEvent.change(screen.getByPlaceholderText('Nombre de la comida'), { target: { value: 'Merienda' } })
-  fireEvent.click(screen.getByText('Guardar comida'))
+  fireEvent.click(screen.getByText('Listo'))
   expect(screen.getByText('Merienda')).toBeInTheDocument()
   expect(screen.queryByPlaceholderText('Nombre de la comida')).not.toBeInTheDocument()
 })
@@ -91,15 +92,17 @@ test('minimiza una comida al guardarla', async () => {
 test('deshabilita guardar comida si el nombre está vacío', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Agregar comida'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  await screen.findByText('Agregar comida')
   fireEvent.click(screen.getByText('Agregar comida'))
-  expect(screen.getByText('Guardar comida')).toBeDisabled()
+  expect(screen.getByText('Listo')).toBeDisabled()
 })
 
 test('agrega una comida expandida al hacer clic en agregar', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Agregar comida'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  await screen.findByText('Agregar comida')
   fireEvent.click(screen.getByText('Agregar comida'))
   expect(screen.getByPlaceholderText('Nombre de la comida')).toBeInTheDocument()
 })
@@ -107,7 +110,8 @@ test('agrega una comida expandida al hacer clic en agregar', async () => {
 test('elimina una comida expandida', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Agregar comida'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  await screen.findByText('Agregar comida')
   fireEvent.click(screen.getByText('Agregar comida'))
   fireEvent.click(screen.getByLabelText('Eliminar comida'))
   await waitFor(() => expect(screen.getByText('Eliminar')).toBeInTheDocument())
@@ -119,8 +123,9 @@ test('confirma el plan y muestra mensaje de éxito', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   mockSaveMyPlan.mockResolvedValue({ foodGroups: [], meals: [] })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Confirmar plan'))
-  fireEvent.click(screen.getByText('Confirmar plan'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  await screen.findByText('Guardar cambios')
+  fireEvent.click(screen.getByText('Guardar cambios'))
   await waitFor(() => expect(screen.getByText('¡Plan guardado!')).toBeInTheDocument())
 })
 
@@ -128,8 +133,9 @@ test('muestra error si falla el confirmar', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   mockSaveMyPlan.mockRejectedValue(new Error('error de red'))
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('Confirmar plan'))
-  fireEvent.click(screen.getByText('Confirmar plan'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  await screen.findByText('Guardar cambios')
+  fireEvent.click(screen.getByText('Guardar cambios'))
   await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
 })
 
@@ -193,31 +199,84 @@ test('el detalle del plan enfoca su primer control, cierra con Escape y devuelve
   expect(trigger).toHaveFocus()
 })
 
-test('abre Reglas de tu plan con una pestaña accesible', async () => {
+test('abre Tus alimentos desde el resumen y recarga las comidas al cambiar reglas', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
-  vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 1, planVersion: 0, modoRegistro: 'LIBRE', grupos: [], alimentos: [], habitos: [] })
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  fireEvent.click(screen.getByRole('tab', { name: 'Reglas de tu plan' }))
-  expect(screen.getByRole('tab', { name: 'Reglas de tu plan' })).toHaveAttribute('aria-selected', 'true')
-  await waitFor(() => expect(rulesApi.getPlanRules).toHaveBeenCalledWith('tok'))
-})
-
-test('recarga las comidas cuando cambian las reglas del plan', async () => {
-  mockGetMyPlan.mockResolvedValue(planConGrupos)
-  vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 2, planVersion: 4, modoRegistro: 'PORCIONES', grupos: [], alimentos: [], habitos: [] })
-  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(1))
-  fireEvent.click(screen.getByRole('tab', { name: 'Reglas de tu plan' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Tus alimentos (0)' }))
+  await screen.findByRole('button', { name: 'Agregar alimento' })
   await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
 })
 
 test('cargar Mi plan no mueve el foco y editar lo lleva al nombre de la comida', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getAllByRole('button', { name: /^Editar / }))
+  await screen.findByRole('button', { name: 'Editar plan' })
+  await screen.findByText('Desayuno')
   expect(document.activeElement).toBe(document.body)
 
-  fireEvent.click(screen.getAllByRole('button', { name: /^Editar / })[0])
+  fireEvent.click(screen.getByRole('button', { name: 'Editar plan' }))
 
   await waitFor(() => expect(screen.getByRole('textbox', { name: 'Nombre de la comida' })).toHaveFocus())
+})
+
+test('cancelar con cambios pide aviso inline y descarta el borrador', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConGrupos, version: 3, createdAt: '2026-10-01' })
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  expect(await screen.findByText(/Cargado el/)).toBeInTheDocument()
+  const edit = screen.getByRole('button', { name: 'Editar plan' })
+  edit.focus()
+  fireEvent.click(edit)
+  fireEvent.change(await screen.findByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('cambios sin guardar')
+  fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
+  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }))
+  expect(screen.getByText('Desayuno')).toBeInTheDocument()
+  expect(mockSaveMyPlan).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Editar plan' })).toHaveFocus())
+})
+
+test('guardar cambios envía la versión y vuelve al resumen', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConGrupos, version: 3 })
+  mockSaveMyPlan.mockResolvedValue({ ...planConGrupos, version: 4 })
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await screen.findByRole('button', { name: 'Editar plan' })
+  expect(mockSaveMyPlan).toHaveBeenCalledWith('tok', expect.objectContaining({ clientVersion: 3 }))
+  expect(screen.queryByRole('button', { name: 'Guardar cambios' })).not.toBeInTheDocument()
+})
+
+test('resumen muestra fecha, hora, porciones y color del grupo sin controles de edición', async () => {
+  mockGetMyPlan.mockResolvedValue({
+    ...planConGrupos, createdAt: '2026-10-01',
+    foodGroups: [{ ...gruposDefault[0], color: '#B5627A' }],
+    meals: [{ name: 'Desayuno', suggestedTime: '08:30:00', displayOrder: 1, portions: [{ foodGroupId: 1, portions: 1.5 }] }],
+  })
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  await screen.findByText('Desayuno')
+  expect(screen.getByText('08:30')).toBeInTheDocument()
+  expect(screen.getByText('1,5')).toBeInTheDocument()
+  expect(screen.getByText('Proteínas').closest('.porcion-chip')).toHaveStyle({ '--chip-dot': 'var(--g-frut)' })
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Eliminar comida' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Hábitos (0)' })).toBeInTheDocument()
+})
+
+test('un conflicto conserva el borrador y permite recargar la versión actual', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConGrupos, version: 3 })
+  mockSaveMyPlan.mockRejectedValue(new plansApi.PlanConflictError())
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('otro dispositivo')
+  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled()
+  mockGetMyPlan.mockResolvedValue({ ...planConGrupos, version: 4 })
+  fireEvent.click(screen.getByRole('button', { name: 'Recargar plan' }))
+  await screen.findByText('Desayuno')
+  expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
 })

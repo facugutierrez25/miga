@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import type { FoodInput, FoodRule, PlanGroup, RuleType } from '../../api/planRules'
 import CompoundComponentsField from './CompoundComponentsField'
 
 const TYPES: [RuleType, string, string][] = [
-  ['NORMAL', 'Normal', 'Suma a un grupo'],
-  ['COMPUESTO', 'Compuesto', 'Suma a varios grupos'],
+  ['NORMAL', 'Un grupo', 'Suma a un grupo'],
+  ['COMPUESTO', 'Varios grupos', 'Suma a varios grupos'],
   ['LIBRE', 'Libre', 'Se anota pero no suma'],
   ['FLEXIBLE', 'Flexible', 'Cuenta como comida flexible'],
   ['NO_CUENTA', 'No cuenta', 'No suma ni cuenta'],
@@ -20,12 +20,16 @@ export default function FoodRuleForm({
   rule,
   onSave,
   onCancel,
+  deleteAction,
 }: {
   groups: PlanGroup[]
   rule?: FoodRule
   onSave: (input: FoodInput) => Promise<boolean>
   onCancel: () => void
+  deleteAction?: React.ReactNode
 }) {
+  const helpId = useId()
+  const [showHelp, setShowHelp] = useState(false)
   const [input, setInput] = useState<FoodInput>(
     rule
       ? {
@@ -102,7 +106,7 @@ export default function FoodRuleForm({
   }
 
   return (
-    <form className="rules-form" onSubmit={handleSubmit}>
+    <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
       <h3>{rule ? 'Editar alimento' : 'Agregar alimento'}</h3>
 
       <label>
@@ -117,11 +121,6 @@ export default function FoodRuleForm({
         />
       </label>
 
-      <label>
-        Sinónimos separados por comas
-        <input value={synonyms} onChange={(e) => setSynonyms(e.target.value)} />
-      </label>
-
       {(nameInvalid || synonymsInvalid) && (
         <p className="rules-error" role="alert">
           Usá hasta 100 caracteres para nombres y sinónimos nuevos o modificados, y hasta 20 sinónimos.
@@ -131,7 +130,9 @@ export default function FoodRuleForm({
 
       <fieldset>
         <legend>Tipo de alimento</legend>
-        {TYPES.map(([type, label, text]) => (
+        <button type="button" aria-label="Ayuda sobre tipos de alimento" aria-expanded={showHelp} aria-describedby={showHelp ? helpId : undefined} onClick={() => setShowHelp(!showHelp)}>?</button>
+        {showHelp && <p id={helpId}>{TYPES.map(([, label, text]) => `${label}: ${text}.`).join(' ')}</p>}
+        {TYPES.map(([type, label]) => (
           <label key={type}>
             <input
               type="radio"
@@ -142,7 +143,7 @@ export default function FoodRuleForm({
             />
             <span>
               {label}
-              <small className="rules-secondary">{text}</small>
+
             </span>
           </label>
         ))}
@@ -211,17 +212,6 @@ export default function FoodRuleForm({
               : 'Cantidad y unidad van juntas; si las dejás vacías se usa la porción por defecto.'}
           </p>
 
-          <label>
-            Porción por defecto
-            <input
-              type="number"
-              required
-              min="0.01"
-              step="any"
-              value={input.porcionPorDefecto ?? ''}
-              onChange={(e) => setInput({ ...input, porcionPorDefecto: Number(e.target.value) })}
-            />
-          </label>
         </>
       )}
 
@@ -241,6 +231,27 @@ export default function FoodRuleForm({
         </>
       )}
 
+      <details><summary>Más opciones</summary>
+      <label>
+        Sinónimos separados por comas
+        <input value={synonyms} onChange={(e) => setSynonyms(e.target.value)} />
+      </label>
+
+        {hasQuantityUnit && <>
+          <label>
+            Porción por defecto
+            <input
+              type="number"
+              required
+              min="0.01"
+              step="any"
+              value={input.porcionPorDefecto ?? ''}
+              onChange={(e) => setInput({ ...input, porcionPorDefecto: Number(e.target.value) })}
+            />
+          </label>
+        </>}
+      </details>
+      {deleteAction}
       <div className="rules-row">
         <button type="submit" disabled={!valid}>
           Guardar alimento
