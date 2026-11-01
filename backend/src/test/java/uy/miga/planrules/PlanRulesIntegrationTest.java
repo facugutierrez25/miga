@@ -79,6 +79,21 @@ class PlanRulesIntegrationTest {
         Map<String,Object> values = new HashMap<>(fields); values.put("name", name);
         state = request(post(BASE+"grupos"), body(values), 201);
     }
+    @Test
+    void legacyGroupGoalIsIgnoredAndAbsentFromResponses() throws Exception {
+        addGroup("Legado", Map.of("metaDiaria", 99));
+        assertThat(group("Legado").has("metaDiaria")).isFalse();
+        String uid = group("Legado").path("uid").asText();
+        state = request(put(BASE + "grupos/" + uid), body(Map.of("name", "Legado", "metaDiaria", 50)), 200);
+        assertThat(group("Legado").has("metaDiaria")).isFalse();
+        JsonNode plan = request(get("/api/v1/my-plan"), null, 200);
+        for (JsonNode g : plan.path("foodGroups")) assertThat(g.has("metaDiaria")).isFalse();
+        JsonNode day = request(get("/api/v1/registro/" + LocalDate.now(clock)), null, 200);
+        for (JsonNode summary : day.path("summary")) assertThat(summary.has("dailyGoal")).isFalse();
+        for (JsonNode meal : day.path("meals")) {
+            for (JsonNode comparison : meal.path("comparison")) assertThat(comparison.has("dailyGoal")).isFalse();
+        }
+    }
     void addHabit(String name, String type, String period, double goal, double step) throws Exception {
         state = request(post(BASE+"habitos"), body(Map.of("name", name, "habitType", type, "period", period, "goal", goal, "step", step, "unit", "lt")), 201);
     }

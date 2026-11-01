@@ -821,7 +821,7 @@ function ajustarResumen(
   })
   for (const [foodGroupId, value] of delta) {
     if (value !== 0 && !summary.some(s => s.foodGroupId === foodGroupId)) {
-      ajustado.push({ foodGroupId, name: gruposMap[foodGroupId]?.name ?? '', clave: '', totalRecorded: value, dailyGoal: null })
+      ajustado.push({ foodGroupId, name: gruposMap[foodGroupId]?.name ?? '', clave: '', totalRecorded: value })
     }
   }
   return ajustado

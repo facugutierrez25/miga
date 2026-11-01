@@ -45,12 +45,10 @@ class ComparisonService {
         Map<Long, String> groupNames = new HashMap<>();
         Map<Long, Boolean> askIfMissing = new HashMap<>();
         Map<Long, Boolean> optional = new HashMap<>();
-        Map<Long, BigDecimal> dailyGoal = new HashMap<>();
         for (PlanFoodGroupDto g : groups) {
             groupNames.put(g.id(), g.name());
             askIfMissing.put(g.id(), Boolean.TRUE.equals(g.preguntarSiFalta()));
             optional.put(g.id(), Boolean.TRUE.equals(g.opcional()));
-            dailyGoal.put(g.id(), g.metaDiaria());
         }
 
         List<GroupStatus> result = new ArrayList<>();
@@ -76,12 +74,11 @@ class ComparisonService {
                 status = OVER;
             }
 
-            result.add(new GroupStatus(gid, groupNames.getOrDefault(gid, ""), expected, recorded, status,
-                dailyGoal.get(gid)));
+            result.add(new GroupStatus(gid, groupNames.getOrDefault(gid, ""), expected, recorded, status));
         }
         return result;
     }
 
     record GroupStatus(Long foodGroupId, String name, BigDecimal expected,
-                       BigDecimal recorded, String status, BigDecimal dailyGoal) {}
+                       BigDecimal recorded, String status) {}
 }

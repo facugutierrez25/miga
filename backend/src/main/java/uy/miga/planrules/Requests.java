@@ -10,11 +10,12 @@ final class Requests {
     private Requests() {}
     record Version(@NotNull @PositiveOrZero Long planVersion) {}
     record Order(@NotNull @PositiveOrZero Long planVersion, @NotNull List<@NotNull UUID> uids) {}
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("metaDiaria")
     record Group(@NotNull @PositiveOrZero Long planVersion, @NotBlank @Size(max=60) String name,
         @Size(max=10) String abbreviation, @Size(max=50) String clave, @Pattern(regexp="#[0-9a-fA-F]{6}") String color,
-        BigDecimal metaDiaria, Boolean preguntarSiFalta, Boolean opcional) {
+        Boolean preguntarSiFalta, Boolean opcional) {
         GroupInput input() {
-            return new GroupInput(name, abbreviation, clave, color, metaDiaria,
+            return new GroupInput(name, abbreviation, clave, color,
                 Boolean.TRUE.equals(preguntarSiFalta), Boolean.TRUE.equals(opcional));
         }
     }

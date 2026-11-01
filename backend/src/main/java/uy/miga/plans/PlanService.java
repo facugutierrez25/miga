@@ -160,7 +160,6 @@ public class PlanService {
                 group.setUid(source.getUid());
                 group.setClave(source.getClave());
                 group.setColor(source.getColor());
-                group.setMetaDiaria(source.getMetaDiaria());
                 group.setPreguntarSiFalta(source.isPreguntarSiFalta());
                 group.setOpcional(source.isOpcional());
                 plan.getFoodGroups().add(group);
@@ -265,7 +264,7 @@ public class PlanService {
     public List<PlanFoodGroupDto> getPlanFoodGroups(Long planId) {
         return groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
             .stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria(), g.getUid()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid()))
             .toList();
     }
 
@@ -353,7 +352,7 @@ public class PlanService {
 
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {
         return groups.stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getMetaDiaria(), g.getUid()))
+            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid()))
             .toList();
     }
 
@@ -484,7 +483,7 @@ public class PlanService {
         if (abbr.length() > 10 || (in.clave() != null && in.clave().length() > 50)) throw new IllegalArgumentException("Abreviatura o clave demasiado larga.");
         if (hasAbbreviation(others, abbr) || (in.clave() != null && others.stream().anyMatch(g -> in.clave().equals(g.getClave())))) throw new DuplicateGroupException();
         group.setName(in.name().strip()); group.setAbbreviation(abbr); group.setClave(in.clave());
-        group.setColor(in.color()); group.setMetaDiaria(in.metaDiaria());
+        group.setColor(in.color());
         group.setPreguntarSiFalta(in.preguntarSiFalta()); group.setOpcional(in.opcional());
     }
 

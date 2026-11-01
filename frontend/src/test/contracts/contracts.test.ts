@@ -40,8 +40,7 @@ describe('contratos del backend', () => {
               "name": "Sintético",
               "expected": 1.5,
               "recorded": 1.5,
-              "status": "OK",
-              "dailyGoal": 1.5
+              "status": "OK"
             }
           ]
         }
@@ -51,8 +50,7 @@ describe('contratos del backend', () => {
           "foodGroupId": 1,
           "name": "Sintético",
           "clave": "Sintético",
-          "totalRecorded": 1.5,
-          "dailyGoal": 1.5
+          "totalRecorded": 1.5
         }
       ]
     }
@@ -71,7 +69,6 @@ describe('contratos del backend', () => {
           "clave": "Sintético",
           "preguntarSiFalta": true,
           "opcional": true,
-          "metaDiaria": 1.5,
           "uid": "00000000-0000-0000-0000-000000000001"
         }
       ],
@@ -110,7 +107,6 @@ describe('contratos del backend', () => {
           "clave": "Sintético",
           "preguntarSiFalta": true,
           "opcional": true,
-          "metaDiaria": 1.5,
           "uid": "00000000-0000-0000-0000-000000000001"
         }
       ],

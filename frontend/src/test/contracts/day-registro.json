@@ -23,15 +23,13 @@
       "name" : "Sintético",
       "expected" : 1.5,
       "recorded" : 1.5,
-      "status" : "OK",
-      "dailyGoal" : 1.5
+      "status" : "OK"
     } ]
   } ],
   "summary" : [ {
     "foodGroupId" : 1,
     "name" : "Sintético",
     "clave" : "Sintético",
-    "totalRecorded" : 1.5,
-    "dailyGoal" : 1.5
+    "totalRecorded" : 1.5
   } ]
 }

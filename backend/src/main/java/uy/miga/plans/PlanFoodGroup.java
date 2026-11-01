@@ -34,8 +34,7 @@ class PlanFoodGroup {
     @Column(length = 50)
     private String clave;
 
-    @Column(name = "meta_diaria", precision = 8, scale = 3)
-    private java.math.BigDecimal metaDiaria;
+    // La columna meta_diaria se elimina en una migración posterior; el total sale de las comidas.
 
     @Column(name = "preguntar_si_falta", nullable = false)
     private boolean preguntarSiFalta = false;
@@ -60,7 +59,6 @@ class PlanFoodGroup {
     int getDisplayOrder()    { return displayOrder; }
     String getColor()        { return color; }
     String getClave()        { return clave; }
-    java.math.BigDecimal getMetaDiaria()  { return metaDiaria; }
     boolean isPreguntarSiFalta()          { return preguntarSiFalta; }
     boolean isOpcional()                  { return opcional; }
 
@@ -68,7 +66,6 @@ class PlanFoodGroup {
     void setAbbreviation(String abbreviation) { this.abbreviation = abbreviation; }
     void setDisplayOrder(short order) { this.displayOrder = order; }
     void setUid(UUID uid) { this.uid = uid; }
-    void setMetaDiaria(java.math.BigDecimal metaDiaria) { this.metaDiaria = metaDiaria; }
     void setPreguntarSiFalta(boolean preguntarSiFalta) { this.preguntarSiFalta = preguntarSiFalta; }
     void setOpcional(boolean opcional) { this.opcional = opcional; }
     void setPlan(Plan plan)        { this.plan = plan; }
