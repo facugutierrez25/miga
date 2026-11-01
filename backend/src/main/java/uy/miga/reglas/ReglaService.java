@@ -183,6 +183,9 @@ public class ReglaService {
                 (in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0 && in.unidad() != null && !in.unidad().isBlank())))
                 throw new InvalidRuleException("El alimento normal requiere grupo y cantidad positiva con unidad, o ambos vacíos.");
         } else if ("COMPUESTO".equals(in.tipo())) {
+            if (!((in.cantidadPorPorcion() == null && in.unidad() == null) ||
+                (in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0 && in.unidad() != null && !in.unidad().isBlank())))
+                throw new InvalidRuleException("El compuesto requiere cantidad positiva y unidad juntas, o ambas vacías.");
             if (in.foodGroupId() != null || !components || in.componentes().size() < 2 ||
                 in.componentes().stream().anyMatch(c -> c == null || c.foodGroupId() == null || !Double.isFinite(c.porciones()) || c.porciones() <= 0) ||
                 in.componentes().stream().map(Componente::foodGroupId).distinct().count() != in.componentes().size())

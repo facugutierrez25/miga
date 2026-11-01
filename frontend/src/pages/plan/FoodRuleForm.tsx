@@ -64,11 +64,14 @@ export default function FoodRuleForm({
     input.componentes.every((c) => c.groupUid && c.porciones > 0)
 
   // Cantidad y unidad van juntas: las dos o ninguna (en ese caso se usa la porción por defecto).
-  const quantityUnitMismatch = input.tipo === 'NORMAL' && !!input.cantidadPorPorcion !== !!input.unidad
+  const hasQuantityUnit = input.tipo === 'NORMAL' || input.tipo === 'COMPUESTO'
+  const quantityUnitMismatch = hasQuantityUnit && !!input.cantidadPorPorcion !== !!input.unidad
   const valid =
     input.alimento.trim() && !nameInvalid && !synonymsInvalid &&
     (input.tipo !== 'COMPUESTO' || compoundValid) &&
-    (input.tipo !== 'NORMAL' || (input.groupUid && !!input.cantidadPorPorcion === !!input.unidad))
+    (input.tipo !== 'NORMAL' || input.groupUid) &&
+    !quantityUnitMismatch &&
+    (!hasQuantityUnit || input.cantidadPorPorcion == null || input.cantidadPorPorcion > 0)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -81,8 +84,8 @@ export default function FoodRuleForm({
         .map((s) => s.trim())
         .filter(Boolean),
       groupUid: input.tipo === 'NORMAL' ? input.groupUid : null,
-      cantidadPorPorcion: input.tipo === 'NORMAL' ? input.cantidadPorPorcion : null,
-      unidad: input.tipo === 'NORMAL' ? input.unidad : null,
+      cantidadPorPorcion: hasQuantityUnit ? input.cantidadPorPorcion : null,
+      unidad: hasQuantityUnit ? input.unidad : null,
       componentes: input.tipo === 'COMPUESTO' ? input.componentes : [],
     })
   }
@@ -161,6 +164,11 @@ export default function FoodRuleForm({
             </select>
           </label>
 
+        </>
+      )}
+
+      {hasQuantityUnit && (
+        <>
           <label>
             Cantidad por porción
             <input

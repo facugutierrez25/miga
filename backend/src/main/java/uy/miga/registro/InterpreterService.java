@@ -230,6 +230,17 @@ class InterpreterService {
                 portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
                     .setScale(3, RoundingMode.HALF_UP);
                 appliedRule = rule.alimento() + " (compuesto)";
+                if (rule.cantidadPorPorcion() != null && rule.unidad() != null && unit != null) {
+                    BigDecimal converted = convert(BigDecimal.valueOf(qty), unit, rule.unidad());
+                    if (converted != null) {
+                        portions = converted.divide(rule.cantidadPorPorcion(), 3, RoundingMode.HALF_UP);
+                        appliedRule = rule.cantidadPorPorcion() + " " + rule.unidad()
+                            + " de " + rule.alimento() + " = 1 porcion (compuesto)";
+                    } else {
+                        uncertain = true;
+                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " porcion (supuesto, compuesto)";
+                    }
+                }
             }
             default -> {
                 if (rule.cantidadPorPorcion() != null && rule.unidad() != null && unit != null) {

@@ -173,4 +173,32 @@ class ReglaServiceTest {
             .isInstanceOf(InvalidRuleException.class);
     }
 
+
+    @Test void compoundAcceptsQuantityAndUnitOrNeither() {
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        for (boolean measured : List.of(true, false)) {
+            var result = service.createUserRule(2L, 1L, new RuleInput("Tarta", List.of(), "COMPUESTO", null,
+                measured ? new BigDecimal("150") : null, measured ? "g" : null, BigDecimal.ONE,
+                List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)), null));
+            assertThat(result.cantidadPorPorcion()).isEqualTo(measured ? new BigDecimal("150") : null);
+            assertThat(result.unidad()).isEqualTo(measured ? "g" : null);
+            assertThat(RuleText.describe(result, Map.of(3L, "Cereales", 4L, "Verduras")))
+                .isEqualTo("1 Tarta" + (measured ? " (150 g)" : "") + " = 1 Cereales + 1 Verduras");
+        }
+    }
+
+    @Test void compoundRejectsIncompleteOrInvalidQuantityUnitPair() {
+        for (var pair : List.of(
+            new Object[]{new BigDecimal("150"), null}, new Object[]{null, "g"},
+            new Object[]{new BigDecimal("150"), " "}, new Object[]{BigDecimal.ZERO, "g"},
+            new Object[]{new BigDecimal("-1"), "g"})) {
+            var input = new RuleInput("Tarta", List.of(), "COMPUESTO", null,
+                (BigDecimal) pair[0], (String) pair[1], BigDecimal.ONE,
+                List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)), null);
+            assertThatThrownBy(() -> service.createUserRule(2L, 1L, input))
+                .isInstanceOf(InvalidRuleException.class).hasMessageContaining("cantidad positiva y unidad juntas");
+        }
+        verify(repository, never()).save(any());
+    }
+
 }

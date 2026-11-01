@@ -283,7 +283,7 @@ public class RegistroService {
                         item.originalText(), item.foodName(),
                         item.quantity(), item.unit(),
                         groupId, comp.standardGroupKey(),
-                        BigDecimal.valueOf(comp.porciones()).multiply(item.quantity()).setScale(3, java.math.RoundingMode.HALF_UP),
+                        BigDecimal.valueOf(comp.porciones()).multiply(item.portions()).setScale(3, java.math.RoundingMode.HALF_UP),
                         item.appliedRule(), item.uncertain(), item.ruleId(), null, null
                     ));
                 }
@@ -481,8 +481,9 @@ public class RegistroService {
                     .map(g -> new Componente(g.foodGroupId(), null,
                         g.porciones().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
                     .toList();
+                // Los componentes quedan por unidad de lo anotado: "200 g" guarda lo de 1 g.
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
-                    null, null, entry.unit(), BigDecimal.ONE, components, null));
+                    null, entry.unit() != null ? BigDecimal.ONE : null, entry.unit(), BigDecimal.ONE, components, null));
             }
         } else {
             BigDecimal portions = req.portions() != null ? req.portions() : scaledPortions(entry, quantity);

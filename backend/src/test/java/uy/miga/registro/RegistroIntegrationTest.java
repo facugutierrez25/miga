@@ -994,4 +994,40 @@ class RegistroIntegrationTest {
             .andExpect(jsonPath("$.meals").isArray())
             .andExpect(jsonPath("$.date").value(yesterday));
     }
+
+    @Test
+    void measuredCompoundScalesEveryGroupAndSurvivesReload() throws Exception {
+        JsonNode rules = planRules();
+        var components = new java.util.ArrayList<java.util.Map<String, Object>>();
+        var groupIds = new java.util.ArrayList<Long>();
+        for (JsonNode group : rules.path("grupos")) {
+            if (!java.util.List.of("Cereales", "Verduras").contains(group.path("name").asText())) continue;
+            components.add(java.util.Map.of("groupUid", group.path("uid").asText(), "porciones", 1));
+            groupIds.add(group.path("id").asLong());
+        }
+        assertThat(components).hasSize(2);
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "Tarta",
+                "tipo", "COMPUESTO", "cantidadPorPorcion", 150, "unidad", "g", "componentes", components))))
+            .andExpect(status().isCreated());
+        String date = LocalDate.now().toString();
+        JsonNode entries = putNote(date, "200 g de tarta").path("entries");
+        assertThat(entries.size()).isEqualTo(2);
+        assertThat(entries.findValues("foodGroupId").stream().map(JsonNode::asLong).toList())
+            .containsExactlyInAnyOrderElementsOf(groupIds);
+        for (JsonNode entry : entries) {
+            assertThat(entry.path("portions").decimalValue()).isEqualByComparingTo("1.333");
+            assertThat(entry.path("uncertain").asBoolean()).isFalse();
+        }
+        JsonNode meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("items")).isEqualTo(entries);
+        for (JsonNode group : meal.path("comparison")) {
+            if (groupIds.contains(group.path("foodGroupId").asLong())) {
+                assertThat(group.path("recorded").decimalValue()).isEqualByComparingTo("1.333");
+            }
+        }
+    }
+
 }
