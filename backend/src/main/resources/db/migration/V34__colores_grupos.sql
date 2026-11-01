@@ -8,6 +8,14 @@ DECLARE
     chosen text;
     group_count integer;
 BEGIN
+    -- Primero, un grupo sin color toma el que ya tiene el mismo grupo (uid) en otra versión del plan.
+    UPDATE plan_food_groups g SET color = (
+        SELECT o.color FROM plan_food_groups o
+        WHERE o.uid = g.uid AND o.color IS NOT NULL AND o.id <> g.id
+        ORDER BY o.plan_id LIMIT 1)
+    WHERE g.color IS NULL AND EXISTS (
+        SELECT 1 FROM plan_food_groups o WHERE o.uid = g.uid AND o.color IS NOT NULL AND o.id <> g.id);
+
     UPDATE plan_food_groups SET color = CASE clave
         WHEN 'proteinas' THEN '#C0704A'
         WHEN 'cereales_tuberculos' THEN '#A8822E'

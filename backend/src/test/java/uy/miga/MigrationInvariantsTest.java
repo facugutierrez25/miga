@@ -547,13 +547,17 @@ class MigrationInvariantsTest {
                 VALUES (%1$d, 'Protein', 'PRO', 1, 'proteinas', null, gen_random_uuid()),
                        (%1$d, 'Propio', 'PRP', 2, null, null, '00000000-0000-0000-0000-0000000000aa'),
                        (%2$d, 'Otro', 'OTR', 1, null, '#C0704A', gen_random_uuid()),
-                       (%2$d, 'Propio', 'PRP', 2, null, null, '00000000-0000-0000-0000-0000000000aa')
+                       (%2$d, 'Propio', 'PRP', 2, null, null, '00000000-0000-0000-0000-0000000000aa'),
+                       (%1$d, 'Cereal', 'CER', 3, 'cereales_tuberculos', '#0e6e6b', '00000000-0000-0000-0000-0000000000bb'),
+                       (%2$d, 'Cereal', 'CER', 3, 'cereales_tuberculos', null, '00000000-0000-0000-0000-0000000000bb')
                 """.formatted(older, newer));
         }
         buildFlyway(null).migrate();
         try (Connection c = connect()) {
             assertThat(queryLong(c, "SELECT count(DISTINCT color) FROM plan_food_groups WHERE uid = '00000000-0000-0000-0000-0000000000aa'"))
                 .isEqualTo(1);
+            assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE uid = '00000000-0000-0000-0000-0000000000bb' AND color = '#0e6e6b'"))
+                .isEqualTo(2);
             assertThat(queryLong(c, "SELECT count(*) FROM plan_food_groups WHERE plan_id = " + newer + " AND abbreviation = 'OTR' AND color = '#C0704A'"))
                 .isEqualTo(1);
         }
