@@ -52,7 +52,8 @@ test.each([[1, 2, false], [2, 3, true]])('meta semanal suma %s y %s', (first, se
   const summary = screen.getByRole('listitem', { name: `Agua: ${first + second} de 5 esta semana, ${done ? 'completado' : 'pendiente'}` })
   expect(summary.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
   expect(screen.getByRole('group', { name: new RegExp(`Agua: ${first}, lunes`) })).not.toHaveClass('semana-habito--ok')
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
   expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeInTheDocument()
 })
 
@@ -103,7 +104,8 @@ test('sí/no conserva su comportamiento aunque tenga una meta configurada', () =
 
 test('planilla muestra la meta diaria con su unidad y fecha accesible', () => {
   renderProgress({}, [1.5])
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
   expect(screen.getByRole('cell', { name: /Agua: 1,5 de 2 lt, lunes/ })).toHaveTextContent('1,5 de 2 lt')
 })
 
@@ -117,7 +119,8 @@ test('Por día muestra cada comida, estado y nota; el contador flexible no se ed
 
 test('Planilla muestra la grilla con el texto escrito y los hábitos', () => {
   render(<SemanaPage />)
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
   expect(screen.getByRole('table')).toBeInTheDocument()
   expect(screen.getByRole('columnheader', { name: 'Desayuno' })).toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '=pan y café' })).toBeInTheDocument()
@@ -130,7 +133,8 @@ test('identifica el día actual y su fecha completa en ambas vistas', () => {
   expect(screen.getByRole('heading', { name: 'lunes, 26 de octubre de 2026' }).closest('article'))
     .toHaveAttribute('aria-current', 'date')
   expect(screen.getByText('Hoy')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
   expect(screen.getByRole('rowheader', { name: /lunes, 26 de octubre de 2026/ }))
     .toHaveAttribute('aria-current', 'date')
 })
@@ -163,4 +167,35 @@ test('un contador se puede bajar si se sumó de más', async () => {
   expect(screen.getByText('500 ml')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /Restar 250 ml de Agua, lunes, 26 de octubre de 2026/ }))
   await waitFor(() => expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 250))
+})
+
+
+test('el menú ofrece descargas y Planilla, Escape cierra y devuelve el foco', () => {
+  render(<SemanaPage />)
+  const trigger = screen.getByRole('button', { name: 'Más opciones de la semana' })
+  expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(trigger)
+  expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('menuitem', { name: 'Descargar CSV' })).toBeInTheDocument()
+  const excel = screen.getByRole('menuitem', { name: 'Descargar Excel (XLSX)' })
+  expect(screen.getByRole('menuitem', { name: 'Planilla' })).toBeInTheDocument()
+  excel.focus()
+  fireEvent.keyDown(excel, { key: 'Escape' })
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+})
+
+test.each(['CASI', 'DE_MAS', 'PREGUNTAR'])('media miga de %s usa la marca sin acento', status => {
+  const data = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26').data!
+  const week = { ...data, days: data.days.map(day => ({ ...day,
+    meals: day.meals?.map(meal => ({ ...meal, status })) })) }
+  vi.mocked(useWeek).mockReturnValue({ ...defaultUseWeek('tok', 'user@miga.uy', '2026-10-26'), data: week })
+  const { container } = render(<SemanaPage />)
+  const half = container.querySelector('.semana-miga--half')!
+  expect(half).toBeInTheDocument()
+  expect(half.className).not.toMatch(/accent|amarill/)
+  expect(half.getAttribute('style') ?? '').not.toMatch(/accent|#f6c344/i)
+
 })

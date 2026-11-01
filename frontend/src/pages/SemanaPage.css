@@ -72,7 +72,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0 var(--s3);
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
@@ -132,31 +133,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--s4);
-}
-
-.semana-views {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 2px;
-  background: var(--surface-2);
-  border-radius: var(--radius-control);
-}
-
-.semana-views button {
-  min-height: 36px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.semana-views button[aria-pressed="true"] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
 }
 
 .semana-estado,
@@ -289,6 +265,8 @@
   font-size: var(--fs-sm);
   color: var(--text-secondary);
   text-align: center;
+  white-space: nowrap;
+  font-size: clamp(12px, 3.3vw, 14px);
 }
 
 /* ── Detalle del día elegido ── */
