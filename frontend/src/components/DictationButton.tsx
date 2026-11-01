@@ -14,7 +14,8 @@ type SpeechWindow = Window & {
   SpeechRecognition?: new () => Recognition
   webkitSpeechRecognition?: new () => Recognition
 }
-export default function DictationButton({ disabled, onTranscript }: {
+export default function DictationButton({ disabled, onTranscript, iconOnly = false }: {
+  iconOnly?: boolean
   disabled: boolean
   onTranscript: (text: string) => void
 }) {
@@ -57,8 +58,12 @@ export default function DictationButton({ disabled, onTranscript }: {
     }
   }
   return <>
-    <button type="button" className="dictation-button" disabled={disabled} aria-pressed={listening} onClick={toggle}>
-      {listening ? 'Dejar de dictar' : 'Dictar'}
+    <button type="button" className="dictation-button" disabled={disabled} aria-label={listening ? 'Dejar de dictar' : 'Dictar'} aria-pressed={listening} onClick={toggle}>
+      {!iconOnly && <span className="dictation-button__label">{listening ? 'Dejar de dictar' : 'Dictar'}</span>}
+      {iconOnly && <svg className="dictation-button__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" />
+      </svg>}
     </button>
     {error && <p role="alert">No se pudo dictar. Podés seguir escribiendo.</p>}
   </>

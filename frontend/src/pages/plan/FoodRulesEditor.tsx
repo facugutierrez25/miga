@@ -1,7 +1,9 @@
+import InlineDelete from './InlineDelete'
 import { useEditorFocus } from './useEditorFocus'
 import { useState } from 'react'
 import {
   createFood,
+  adjustFromCatalog,
   updateFood,
   deleteFood,
   type FoodRule,
@@ -12,9 +14,8 @@ import FoodRuleForm from './FoodRuleForm'
 import CatalogSearch from './CatalogSearch'
 
 export default function FoodRulesEditor(props: EditorProps) {
-  const { token, plan, mutate } = props
+  const { token, plan, mutate, onDirtyChange } = props
   const [query, setQuery] = useState('')
-  const [confirm, setConfirm] = useState<string | null>(null)
   const [editing, setEditing] = useState<FoodRule | 'new' | null>(null)
   const { rememberTrigger, restoreFocus } = useEditorFocus()
   function openEditor(value: FoodRule | 'new') {
@@ -35,77 +36,62 @@ export default function FoodRulesEditor(props: EditorProps) {
     return !!next
   }
   async function confirmDelete(uid: string) {
-    if (await mutate(() => deleteFood(token, uid, plan.planVersion))) setConfirm(null)
+    if (await mutate(() => deleteFood(token, uid, plan.planVersion))) {
+      closeEditor()
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-add-rule]')?.focus())
+    }
   }
 
   return (
-    <section aria-label="Alimentos">
-      <h2>Alimentos</h2>
-      <button type="button" onClick={() => openEditor('new')}>
+    <section aria-label="Alimentos" onKeyDown={e => { if (e.key === 'Escape') closeEditor() }}>
+      <button type="button" data-add-rule onClick={() => openEditor('new')}>
         Agregar alimento
       </button>
       {editing === 'new' && (
         <FoodRuleForm
+          onDirtyChange={onDirtyChange}
           groups={plan.grupos}
           rule={editing === 'new' ? undefined : editing}
           onCancel={closeEditor}
           onSave={save}
         />
       )}
-      <CatalogSearch {...props} onAdjusted={openEditor} />
       <label>
-        Buscar en tu plan
+        Buscar alimentos
         <input value={query} onChange={(e) => setQuery(e.target.value)} />
       </label>
+      <h3>En tu plan</h3>
       {plan.alimentos
         .filter((rule) =>
-          [rule.alimento, ...rule.sinonimos].some((s) =>
+          (editing !== 'new' && editing?.uid === rule.uid) || [rule.alimento, ...rule.sinonimos].some((s) =>
             s.toLocaleLowerCase().includes(query.toLocaleLowerCase())
           )
         )
         .map((rule) => (
           <article className="rules-card" key={rule.uid}>
-            <h3>{rule.alimento}</h3>
-            <p>{rule.textoRegla}</p>
-            {rule.alcance === 'USUARIO' && (
-              <div className="rules-row">
-                <button
-                  type="button"
-                  aria-label={`Editar ${rule.alimento}`}
-                  onClick={() => openEditor(rule)}
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Borrar ${rule.alimento}`}
-                  onClick={() => setConfirm(rule.uid)}
-                >
-                  Borrar
-                </button>
-              </div>
-            )}
-            {editing !== 'new' && editing?.uid === rule.uid && (
+            <button type="button" className="rules-item" aria-label={`Editar ${rule.alimento}`} onClick={() => openEditor(rule)}><strong>{rule.alimento}</strong>
+            <span className="rules-secondary">{rule.textoRegla}</span></button>
+            {editing !== 'new' && editing?.uid === rule.uid && rule.alcance === 'USUARIO' && (
               <FoodRuleForm
+          onDirtyChange={onDirtyChange}
                 groups={plan.grupos}
                 rule={editing}
                 onCancel={closeEditor}
+                deleteAction={<InlineDelete name={rule.alimento} onDelete={() => confirmDelete(rule.uid)} />}
                 onSave={save}
               />
             )}
-            {confirm === rule.uid && (
-              <div>
-                <p>¿Borrar {rule.alimento}?</p>
-                <button type="button" onClick={() => confirmDelete(rule.uid)}>
-                  Confirmar borrado
-                </button>
-                <button type="button" onClick={() => setConfirm(null)}>
-                  Cancelar
-                </button>
-              </div>
-            )}
+            {editing !== 'new' && editing?.uid === rule.uid && rule.alcance !== 'USUARIO' && <div>
+              <button autoFocus type="button" onClick={async () => {
+                const next = await mutate(() => adjustFromCatalog(token, rule.uid, plan.planVersion))
+                const adjusted = next?.alimentos.find(food => food.overridesRuleUid === rule.uid)
+                if (adjusted) setEditing(adjusted)
+              }}>Ajustar para mi plan</button>
+              <button type="button" onClick={closeEditor}>Cancelar</button>
+            </div>}
           </article>
         ))}
+      <CatalogSearch {...props} query={query} onAdjusted={openEditor} />
     </section>
   )
 }

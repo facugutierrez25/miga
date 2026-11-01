@@ -352,6 +352,8 @@
   gap: 4px;
   border-radius: var(--radius-chip);
   border: none;
+  background: var(--surface-2);
+  color: var(--ink);
   padding: 3px 9px 3px 7px;
   font-size: 13px;
   font-weight: 500;
@@ -365,19 +367,6 @@
   font-size: 13px;
   line-height: 18px;
 
-}
-
-.porcion-chip--PROTEINS   { background: var(--t-prot); color: var(--ink);   --chip-dot: var(--g-prot);
-}
-.porcion-chip--GRAINS     { background: var(--t-cer); color: var(--ink);   --chip-dot: var(--g-cer);
-}
-.porcion-chip--FRUITS     { background: var(--t-frut); color: var(--ink);   --chip-dot: var(--g-frut);
-}
-.porcion-chip--DAIRY      { background: var(--t-lac); color: var(--ink);   --chip-dot: var(--g-lac);
-}
-.porcion-chip--FATS       { background: var(--t-gras); color: var(--ink);   --chip-dot: var(--g-gras);
-}
-.porcion-chip--VEGETABLES { background: var(--t-verd); color: var(--ink);   --chip-dot: var(--g-verd);
 }
 
 .btn-editar {
@@ -1033,3 +1022,9 @@
   background: var(--chip-dot, var(--primary));
 }
 .btn-confirmar { margin-top: var(--s3); }
+
+.mi-plan-page button, .mi-plan-page summary { min-height: 44px; min-width: 44px; }
+.mi-plan-page summary { cursor: pointer; padding: 12px 0; }
+.mi-plan-page button:focus-visible, .mi-plan-page summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.plan-summary-links { display: grid; margin-block: var(--s4); }
+.plan-summary-links button { text-align: left; padding: var(--s3); background: var(--surface); color: var(--ink); border: 1px solid var(--line); font: inherit; }

@@ -21,15 +21,6 @@ function IcSemana() {
   )
 }
 
-function IcCompras() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M3 6h18M16 10a4 4 0 0 1-8 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
 function IcPlan() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -60,7 +51,6 @@ function IcMenu() {
 const NAV_ITEMS = [
   { to: '/hoy',     label: 'Hoy',     Icon: IcHoy     },
   { to: '/semana',  label: 'Semana',  Icon: IcSemana  },
-  { to: '/compras', label: 'Compras', Icon: IcCompras },
   { to: '/mi-plan', label: 'Mi plan', Icon: IcPlan    },
   { to: '/perfil',  label: 'Perfil',  Icon: IcPerfil  },
 ]

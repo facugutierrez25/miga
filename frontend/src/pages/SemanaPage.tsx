@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
@@ -101,7 +101,6 @@ function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
         )}</span>
         <span className="semana-habito__name">{h.name}</span>
         <span className="semana-habito__val">{progress}</span>
-        <span>{done ? 'Completado' : 'Pendiente'}</span>
       </li>
     })}</ul>
   </section>
@@ -266,10 +265,8 @@ function WeekStrip({ week, todayISO, selected, onSelect }: {
   return (
     <div className="semana-tira" role="group" aria-label="Días de la semana">
       {week.days.map(day => {
-        const d = new Date(day.date + 'T12:00:00')
         const futuro = day.date > todayISO
         const isToday = day.date === todayISO
-        const letra = d.toLocaleDateString('es-UY', { weekday: 'narrow' }).toUpperCase()
         return (
           <button
             key={day.date}
@@ -280,8 +277,6 @@ function WeekStrip({ week, todayISO, selected, onSelect }: {
             aria-label={`${fullDate(day.date)}${isToday ? ', hoy' : ''}: ${resumenDia(day, futuro)}`}
             onClick={() => onSelect(day.date)}
           >
-            <span className="semana-tira__letra" aria-hidden="true">{letra}</span>
-            <span className="semana-tira__num" aria-hidden="true">{d.getDate()}</span>
             <span className="semana-tira__migas" aria-hidden="true">
               {(day.meals ?? []).map(meal => (
                 <i key={meal.mealId} className={`semana-miga semana-miga--${futuro ? 'futuro' : mealStatus(meal.status).miga}`} />
@@ -298,6 +293,13 @@ export default function SemanaPage() {
   useTitle('Semana | Miga')
   const { token, email } = useAuth()
   const [view, setView] = useState<'day' | 'sheet'>('day')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  function closeMenu() {
+    setMenuOpen(false)
+    menuButton.current?.focus()
+  }
   const [exportError, setExportError] = useState('')
   const [refDate, setRefDate] = useState(() => mondayOf(toISO(new Date())))
   const { data: week, setData: setWeek, status, retry } = useWeek(token, email, refDate)
@@ -346,18 +348,42 @@ export default function SemanaPage() {
         <div className="semana-header__top">
           <Brand size={20} />
           {week && token && (
-            <details className="semana-descargar">
-              <summary className="semana-descargar__btn">
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="M10 3v10M6 9l4 4 4-4M4 16h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Descargar
-              </summary>
-              <div className="semana-descargar__menu">
-                <button type="button" onClick={() => void download('csv')}>CSV</button>
-                <button type="button" onClick={() => void download('xlsx')}>Excel (XLSX)</button>
-              </div>
-            </details>
+            <div className="semana-descargar" onKeyDown={event => {
+              if (event.key === 'Escape') { event.preventDefault(); closeMenu() }
+            }} onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
+            }}>
+              <button type="button" ref={menuButton} className="semana-descargar__btn"
+                aria-label="Más opciones de la semana" aria-haspopup="menu" aria-expanded={menuOpen}
+                aria-controls="semana-opciones" onClick={() => {
+                  // Al abrir (con clic, Enter o Espacio) el foco pasa a la primera opción, como en un menú.
+                  const opening = !menuOpen
+                  setMenuOpen(opening)
+                  if (opening) requestAnimationFrame(() => menu.current?.querySelector('button')?.focus())
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    setMenuOpen(true)
+                    requestAnimationFrame(() => menu.current?.querySelector('button')?.focus())
+                  }
+                }}>⋯</button>
+              {menuOpen && <div id="semana-opciones" ref={menu} role="menu" aria-label="Opciones de la semana"
+                className="semana-descargar__menu" onKeyDown={event => {
+                  const items = Array.from(event.currentTarget.querySelectorAll('button'))
+                  const index = items.indexOf(document.activeElement as HTMLButtonElement)
+                  const next = event.key === 'ArrowDown' ? (index + 1) % items.length
+                    : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length
+                    : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : null
+                  if (next !== null) { event.preventDefault(); items[next]?.focus() }
+                }}>
+                <button type="button" role="menuitem" onClick={() => { closeMenu(); void download('csv') }}>Descargar CSV</button>
+                <button type="button" role="menuitem" onClick={() => { closeMenu(); void download('xlsx') }}>Descargar Excel (XLSX)</button>
+                <button type="button" role="menuitem" onClick={() => { setView(view === 'day' ? 'sheet' : 'day'); closeMenu() }}>
+                  {view === 'day' ? 'Planilla' : 'Por día'}
+                </button>
+              </div>}
+            </div>
           )}
         </div>
         <h1 className="semana-title" tabIndex={-1}>Semana</h1>
@@ -384,10 +410,6 @@ export default function SemanaPage() {
       </div>
 
       <div className="semana-body">
-        <div className="semana-views" role="group" aria-label="Vista de la semana">
-          <button aria-pressed={view === 'day'} onClick={() => setView('day')}>Por día</button>
-          <button aria-pressed={view === 'sheet'} onClick={() => setView('sheet')}>Planilla</button>
-        </div>
         {exportError && <p className="semana-error" role="alert">{exportError}</p>}
         {loading && <p className="semana-estado">Cargando…</p>}
 
@@ -404,6 +426,11 @@ export default function SemanaPage() {
               <p className="semana-vacia">Todavía no hay migas esta semana: lo que anotes en Hoy aparece acá.</p>
             )}
 
+            {comidasPasadas.length > 0 && (
+              <p className="semana-resumen__texto">
+                Esta semana: {comidasEnPlan} de {comidasPasadas.length} comidas como el plan
+              </p>
+            )}
             <WeeklyHabitSummary week={week} />
             {view === 'day' ? (
               <>
@@ -414,11 +441,6 @@ export default function SemanaPage() {
                     selected={selectedDate ?? ''}
                     onSelect={date => setSeleccion({ weekStart: week.weekStart, date })}
                   />
-                  {comidasPasadas.length > 0 && (
-                    <p className="semana-resumen__texto">
-                      Esta semana: {comidasEnPlan} de {comidasPasadas.length} comidas como el plan
-                    </p>
-                  )}
                 </div>
                 {selectedDay && (
                   <DayDetail

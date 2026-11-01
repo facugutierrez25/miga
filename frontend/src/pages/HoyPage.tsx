@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { groupColor } from '../groupColors'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
@@ -17,11 +18,6 @@ import './HoyPage.css'
 import { usePlan } from '../hooks/usePlan'
 import { useDayRegistro } from '../hooks/useDayRegistro'
 
-const ABBR_DOT: Record<string, string> = {
-  PRO: 'var(--g-prot)', CER: 'var(--g-cer)', FRU: 'var(--g-frut)',
-  LAC: 'var(--g-lac)',  GRA: 'var(--g-gras)', VER: 'var(--g-verd)',
-}
-
 interface GrupoInfo {
   name: string
   token: string
@@ -29,9 +25,9 @@ interface GrupoInfo {
 
 function buildGruposMap(foodGroups: PlanFoodGroupDto[]): Record<number, GrupoInfo> {
   return Object.fromEntries(
-    foodGroups.map(g => [g.id, {
+    foodGroups.map((g, index) => [g.id, {
       name: g.name,
-      token: ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)',
+      token: groupColor(g, index),
     }])
   )
 }
@@ -108,14 +104,59 @@ function fmt(n: number): string {
 
 // ── ItemRow ───────────────────────────────────────────────────────────────
 
-function RemoveItemButton({ item, disabled, onClick }: { item: EntryItemDto; disabled: boolean; onClick: () => void }) {
-  if (item.id <= 0 || item.origin === 'RESPUESTA') return null
-  return <button type="button" className="nota-item__edit" aria-label={`Quitar ${item.food}`}
-    disabled={disabled} onClick={onClick}>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
-    </svg>
-  </button>
+function ActionsMenu({ label, actions, buttonRef, disabled = false }: {
+  label: string
+  actions: { label: string; onClick: () => void; disabled?: boolean }[]
+  buttonRef?: React.RefObject<HTMLButtonElement | null>
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const localRef = useRef<HTMLButtonElement>(null)
+  const triggerRef = buttonRef ?? localRef
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuId = useId()
+  useEffect(() => {
+    if (open) menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+  }, [open])
+  function close() {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+  return <div className="nota-menu" onBlur={event => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+  }} onKeyDown={event => {
+    if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); close() }
+    if (open && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault()
+      const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+        : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
+      buttons[next]?.focus()
+    }
+  }}>
+    <button type="button" className="nota-menu__trigger" ref={triggerRef} aria-label={label}
+      aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
+      disabled={disabled} onClick={() => setOpen(value => !value)}>⋯</button>
+    {open && <div className="nota-menu__items" ref={menuRef} id={menuId} role="menu" aria-label={label}>
+      {actions.map(action => <button key={action.label} type="button" role="menuitem"
+        disabled={action.disabled} onClick={() => { close(); action.onClick() }}>{action.label}</button>)}
+    </div>}
+  </div>
+}
+
+function ItemActions({ item, disabled, onRemove }: {
+  item: EntryItemDto; disabled: boolean; onRemove?: () => void
+}) {
+  const [showRule, setShowRule] = useState(false)
+  return <>
+    <ActionsMenu label={`Más opciones de ${item.food}`} actions={[
+      { label: 'Cómo lo calculé', disabled: !item.appliedRule, onClick: () => setShowRule(value => !value) },
+      ...(onRemove && item.id > 0 && item.origin !== 'RESPUESTA'
+        ? [{ label: 'Quitar', disabled, onClick: onRemove }] : []),
+    ]} />
+    {showRule && <p className="nota-item__regla">{item.appliedRule}</p>}
+  </>
 }
 
 interface ItemRowProps {
@@ -188,7 +229,6 @@ function ItemRow({ item, date, token, gruposMap, onPatched, onRemove, removing }
       <div className="nota-item__linea">
         <span className="nota-item__dot" style={{ background: dot }} aria-hidden="true" />
         <span className="nota-item__food">{item.food}</span>
-        {onRemove && <RemoveItemButton item={item} disabled={!!removing} onClick={onRemove} />}
         {editando ? (
           <>
             <input
@@ -219,21 +259,14 @@ function ItemRow({ item, date, token, gruposMap, onPatched, onRemove, removing }
             )}
             {editable && (
               <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => setEditando(true)} aria-label={`Corregir ${item.food}`}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                  <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                Corregir
               </button>
             )}
           </>
         )}
+        <ItemActions item={item} disabled={!!removing} onRemove={onRemove} />
       </div>
-      {(item.appliedRule || item.uncertain) && (
-        <p className="nota-item__regla">
-          {item.appliedRule}
-          {item.appliedRule && item.uncertain && ' · '}
-          {item.uncertain && 'cantidad supuesta'}
-        </p>
-      )}
+      {item.uncertain && <p className="nota-item__regla">cantidad estimada</p>}
       {editando && !repartiendo && (
         <button type="button" className="nota-item__repartir" onClick={abrirReparto}>
           Repartir en varios grupos
@@ -379,13 +412,14 @@ function MealState({ mealDay }: { mealDay: MealDayDto | undefined }) {
 // Migas de una comida: lo comido según la comparación, o el plan vacío si todavía no se anotó.
 function mealMigas(meal: MealDto, mealDay: MealDayDto | undefined, gruposMap: Record<number, GrupoInfo>): MigaRow[] {
   const comparison = (mealDay?.noteText ? mealDay.comparison : []).filter(s => s.expected > 0)
-  if (comparison.length > 0) {
+  if (mealDay?.noteText) {
     return comparison.map(s => ({
       id: s.foodGroupId,
       name: s.name,
       color: gruposMap[s.foodGroupId]?.token ?? 'var(--muted)',
       done: Number(s.recorded),
       total: Number(s.expected),
+      status: s.status,
     }))
   }
   return meal.portions
@@ -430,6 +464,7 @@ function NotaMealSection({
   meal, drafts, mealDay, date, token, gruposMap,
   onNotaSaved, onItemPatched, onNotaBorrada, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
+  const [detailOpen, setDetailOpen] = useState(false)
   const [expandedMentions, setExpandedMentions] = useState<Set<string>>(() => new Set())
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
@@ -460,6 +495,10 @@ function NotaMealSection({
   const items = mealDay?.items ?? []
   const comparison = mealDay?.comparison ?? []
   const preguntas = comparison.filter(s => s.status === 'PREGUNTAR')
+  const understoodFoods = [...new Set(items.map(item => item.food))]
+  const understoodSummary = understoodFoods.slice(0, 3).join(', ')
+    + (understoodFoods.length > 3 ? ' y otros alimentos' : '')
+  const estimatedCount = items.filter(item => item.uncertain).length
 
   useEffect(() => {
     if (!dirty.current) {
@@ -634,15 +673,12 @@ function NotaMealSection({
         >
           {guardando ? 'Guardando…' : hasNote ? 'Guardar cambios' : 'Guardar'}
         </button>
-        <DictationButton disabled={guardando} onTranscript={transcript => {
+        <DictationButton iconOnly disabled={guardando} onTranscript={transcript => {
           editarBorrador(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
         }} />
-        {hasNote && !confirmando && (
-          <button type="button" ref={borrarRef} className="nota-btn-borrar" disabled={guardando}
-            onClick={() => { setConfirmando(true); foco.current = 'confirmar' }}>
-            Borrar lo anotado
-          </button>
-        )}
+        {hasNote && <ActionsMenu label={`Más opciones de ${meal.name}`} buttonRef={borrarRef} disabled={guardando}
+          actions={[{ label: 'Borrar lo anotado', onClick: () => { setConfirmando(true); foco.current = 'confirmar' } }]} />}
+
       </div>
 
       {confirmando && (
@@ -697,11 +733,25 @@ function NotaMealSection({
         </div>
       ))}
 
-      {items.length > 0 && (
+      {(hasNote || items.length > 0) && (
         <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
           <h3 ref={understoodRef} tabIndex={-1} id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
+          <p className="nota-entendido__resumen">
+            Entendí: {understoodSummary || 'sin alimentos reconocidos'}.
+            {' '}{mealState(mealDay).text}.
+          </p>
+          <button type="button" className="nota-revisar" aria-expanded={detailOpen}
+            aria-controls={`entendido-detalle-${meal.id}`} onClick={() => setDetailOpen(value => !value)}>
+            Revisar lo que entendí{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
+          </button>
           <ul className="nota-items">
-            {agruparPorMencion(items).map(mencion => {
+            {items.filter(item => item.foodGroupId === null || item.origin === 'UNKNOWN').map(item => <ItemRow
+              key={item.id} item={item} date={date} token={token} gruposMap={gruposMap}
+              onRemove={() => handleRemove(item)} removing={guardando || conflict}
+              onPatched={result => onItemPatched(meal.id!, result)} />)}
+          </ul>
+          <ul className="nota-items" id={`entendido-detalle-${meal.id}`} hidden={!detailOpen}>
+            {agruparPorMencion(items.filter(item => item.foodGroupId !== null && item.origin !== 'UNKNOWN')).map(mencion => {
               const fila = (item: EntryItemDto) => (
                 <ItemRow
                   key={item.id}
@@ -742,15 +792,12 @@ function NotaMealSection({
                         else next.add(mentionKey)
                         return next
                       })}>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                        <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                      Corregir
                     </button>
-                    <RemoveItemButton item={primero} disabled={guardando || conflict} onClick={() => handleRemove(primero)} />
+                    <ItemActions item={primero} disabled={guardando || conflict} onRemove={() => handleRemove(primero)} />
                   </div>
-                  {primero.appliedRule && <p className="nota-item__regla">{primero.appliedRule}</p>}
                   <ul id={detailId} hidden={!expanded} className="nota-items" aria-label={`Grupos de ${primero.food}`}>
-                    {mencion.map(item => fila({ ...item, appliedRule: null }))}
+                    {mencion.map(item => fila(item))}
                   </ul>
                 </li>
               )
@@ -847,7 +894,7 @@ function MealDetail(props: MealProps) {
   const { meal, mealDay, fecha, token, gruposMap } = props
   return (
     <>
-      <Migas rows={mealMigas(meal, mealDay, gruposMap)} />
+      <Migas rows={mealMigas(meal, mealDay, gruposMap)} differencesOnly />
       {meal.id !== undefined && (
         <NotaMealSection
           key={fecha}
@@ -1077,12 +1124,6 @@ function HoyContent() {
           {navFecha}
           <h1 className="hoy-desktop-saludo__titulo">{titulo}</h1>
         </div>
-        {plan?.createdAt && !sinPlan && !cargando && (
-          <p className="hoy-plan-fecha">
-            Según tu plan · cargado el {plan.createdAt.slice(8, 10)}/{plan.createdAt.slice(5, 7)}
-          </p>
-        )}
-
         {cargando ? (
           <p className="hoy-loading">Cargando tu día…</p>
         ) : planLoad.status === 'error' ? (

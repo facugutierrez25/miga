@@ -4,6 +4,7 @@ export interface MigaRow {
   color: string
   done: number
   total: number
+  status?: string
 }
 
 export function formatPortions(n: number): string {

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Outlet, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/authTypes'
 import AppLayout from './components/AppLayout'
@@ -7,7 +7,6 @@ import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import HoyPage from './pages/HoyPage'
 import SemanaPage from './pages/SemanaPage'
-import ComprasPage from './pages/ComprasPage'
 import PerfilPage from './pages/PerfilPage'
 import MiPlanPage from './pages/MiPlanPage'
 import OnboardingPage from './pages/OnboardingPage'
@@ -21,28 +20,24 @@ function AuthLayout() {
   return <AppLayout />
 }
 
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route element={<><ScrollToTop /><Outlet /></>}>
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/register" element={<RegisterPage />} />
+    <Route path="/login" element={<LoginPage />} />
+    <Route path="/privacidad" element={<PrivacidadPage />} />
+    <Route path="/verificar-email" element={<VerificarEmailPage />} />
+    <Route element={<AuthLayout />}>
+      <Route path="/hoy" element={<HoyPage />} />
+      <Route path="/semana" element={<SemanaPage />} />
+      <Route path="/perfil" element={<PerfilPage />} />
+      <Route path="/mi-plan" element={<MiPlanPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
+    </Route>
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Route>
+))
+
 export default function App() {
-  return (
-    <AuthProvider>
-      <BrowserRouter>
-        <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/privacidad" element={<PrivacidadPage />} />
-          <Route path="/verificar-email" element={<VerificarEmailPage />} />
-          <Route element={<AuthLayout />}>
-            <Route path="/hoy" element={<HoyPage />} />
-            <Route path="/semana" element={<SemanaPage />} />
-            <Route path="/compras" element={<ComprasPage />} />
-            <Route path="/perfil" element={<PerfilPage />} />
-            <Route path="/mi-plan" element={<MiPlanPage />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  )
+  return <AuthProvider><RouterProvider router={router} /></AuthProvider>
 }

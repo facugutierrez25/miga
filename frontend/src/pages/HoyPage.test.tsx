@@ -226,6 +226,9 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
   const titulo = await screen.findByRole('heading', { name: 'Así lo entendí' })
   expect(titulo).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Así lo entendí' })).not.toBeInTheDocument()
+  await abrirDetalle()
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de barrita' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
   expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: 'Corregir grupos de barrita' }))
   expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
@@ -246,7 +249,9 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   renderHoy()
   await abrirNota()
 
-  expect(screen.getByText(/cantidad supuesta/)).toBeInTheDocument()
+  await abrirDetalle()
+  expect(screen.getByText(/cantidad estimada/)).toBeInTheDocument()
+  if (screen.getByRole('button', { name: /Revisar lo que/ }).getAttribute('aria-expanded') === 'false') await abrirDetalle()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
   fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
@@ -274,7 +279,9 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'mate' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-  expect(await screen.findByText('mate = libre (sin porcion asignada)')).toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de mate' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
+  expect(screen.getByText('mate = libre (sin porcion asignada)')).toBeInTheDocument()
   expect(screen.queryByText('Sin grupo en tu plan')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Corregir mate' })).not.toBeInTheDocument()
 })
@@ -297,6 +304,9 @@ test('no duplica las menciones que ya generaron ítems', async () => {
 
   await screen.findByRole('heading', { name: 'Así lo entendí' })
   expect(screen.queryByText('barrita (compuesto)')).not.toBeInTheDocument()
+  await abrirDetalle()
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de barrita' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
   expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
 })
 
@@ -452,7 +462,7 @@ test('lo de siempre guarda en un toque, bloquea doble envío y permite editar de
   mockSaveNota.mockReturnValue(new Promise(resolve => { finish = resolve }))
   renderHoy()
   await abrirNota()
-  expect(screen.getByText('Según tu plan · cargado el 03/10')).toBeInTheDocument()
+  expect(screen.queryByText(/Según tu plan/)).not.toBeInTheDocument()
   const suggestion = await screen.findByRole('button', { name: 'leche con pan' })
   fireEvent.click(suggestion)
   fireEvent.click(suggestion)
@@ -552,6 +562,7 @@ test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', as
   renderHoy()
   await abrirNota()
 
+  if (screen.getByRole('button', { name: /Revisar lo que/ }).getAttribute('aria-expanded') === 'false') await abrirDetalle()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveFocus()
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
@@ -714,7 +725,8 @@ test('borrar lo anotado pide confirmación, vacía la comida y conserva la versi
     entries: dayConNota.meals[0].items, comparison: dayConNota.meals[0].comparison,
   })
   renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de Desayuno' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Borrar lo anotado' }))
   const confirmar = screen.getByRole('button', { name: 'Borrar' })
   expect(confirmar).toHaveFocus()
   fireEvent.click(confirmar)
@@ -733,9 +745,10 @@ test('cancelar el borrado devuelve el foco al botón', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockGetDayRegistro.mockResolvedValue(dayConNota)
   renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de Desayuno' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Borrar lo anotado' }))
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
-  expect(screen.getByRole('button', { name: 'Borrar lo anotado' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Más opciones de Desayuno' })).toHaveFocus()
   expect(mockDeleteNota).not.toHaveBeenCalled()
 })
 
@@ -744,7 +757,8 @@ test('si la nota cambió en otro dispositivo, no la borra y ofrece recargar', as
   mockGetDayRegistro.mockResolvedValue(dayConNota)
   mockDeleteNota.mockRejectedValue(new registroApi.NoteConflictError('Esta nota cambió en otro dispositivo. Recargá para ver la versión actual.'))
   renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de Desayuno' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Borrar lo anotado' }))
   fireEvent.click(screen.getByRole('button', { name: 'Borrar' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Esta nota cambió en otro dispositivo')
   expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
@@ -757,7 +771,8 @@ test('lo que se escribe mientras se borra no se pierde', async () => {
   let resolver: (v: number) => void = () => {}
   mockDeleteNota.mockReturnValue(new Promise<number>(r => { resolver = r }))
   renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de Desayuno' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Borrar lo anotado' }))
   fireEvent.click(screen.getByRole('button', { name: 'Borrar' }))
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'una manzana' } })
   await act(async () => { resolver(4) })
@@ -770,7 +785,7 @@ const removableItems = [
   { id: 102, food: 'manzana', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: 'MENTION', uncertain: false, occurrenceId: 'apple' },
 ]
 
-function setupRemoval(items = removableItems) {
+function setupRemoval(items: registroApi.EntryItemDto[] = removableItems) {
   mockGetMyPlan.mockResolvedValue(planConComida)
   const meal = { mealId: 1, noteId: 3, noteVersion: 7, noteText: 'leche, manzana', items, comparison: [] }
   mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [meal] })
@@ -781,7 +796,8 @@ test('quitar usa la versión, actualiza texto y lista, anuncia y enfoca el títu
   const meal = setupRemoval()
   vi.mocked(registroApi.removeItem).mockResolvedValue({ ...meal, noteVersion: 8, noteText: 'leche', items: [removableItems[0]] })
   renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Quitar manzana' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de manzana' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Quitar' }))
   await waitFor(() => expect(registroApi.removeItem).toHaveBeenCalledWith('tok', expect.any(String), 102, 7))
   expect(await screen.findByText('Quitaste manzana.')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Quitar manzana' })).not.toBeInTheDocument()
@@ -793,17 +809,20 @@ test('quitar con conflicto ofrece Recargar', async () => {
   setupRemoval()
   vi.mocked(registroApi.removeItem).mockRejectedValue(new registroApi.NoteConflictError('La nota cambió.'))
   renderHoy()
-  fireEvent.click(await screen.findByRole('button', { name: 'Quitar manzana' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de manzana' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Quitar' }))
   expect(await screen.findByRole('button', { name: 'Recargar' })).toBeInTheDocument()
   expect(screen.getByText('La nota cambió.')).toBeInTheDocument()
 })
 
 test('un compuesto tiene un único botón de quitar en la cabecera', async () => {
-  setupRemoval(removableItems.map(item => ({ ...item, food: 'barrita', occurrenceId: 'compound' })))
+  setupRemoval(removableItems.map((item, i) => ({ ...item, foodGroupId: i + 1, food: 'barrita', occurrenceId: 'compound' })))
   renderHoy()
-  const button = await screen.findByRole('button', { name: 'Quitar barrita' })
-  expect(button.parentElement).toHaveClass('nota-compuesto__header')
-  expect(screen.getAllByRole('button', { name: 'Quitar barrita' })).toHaveLength(1)
+  await abrirDetalle()
+  const button = screen.getByRole('button', { name: 'Más opciones de barrita' })
+  expect(button.closest('.nota-compuesto__header')).toBeInTheDocument()
+  fireEvent.click(button)
+  expect(screen.getAllByRole('menuitem', { name: 'Quitar' })).toHaveLength(1)
 })
 
 test('un compuesto resume cuatro grupos y despliega las correcciones por grupo', async () => {
@@ -811,6 +830,7 @@ test('un compuesto resume cuatro grupos y despliega las correcciones por grupo',
   setupRemoval(names.map((_, i) => ({ ...removableItems[0], portions: 1, id: 201 + i, food: 'Chivito', foodGroupId: i + 1, occurrenceId: 'chivito' })))
   mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: names.map((name, i) => ({ id: i + 1, name, abbreviation: ['PRO', 'CER', 'VER', 'GRA'][i], displayOrder: i, color: null })) })
   renderHoy()
+  await abrirDetalle()
   const button = await screen.findByRole('button', { name: 'Corregir grupos de Chivito', expanded: false })
   const section = screen.getByRole('region', { name: 'Así lo entendí' })
   expect(within(section).getAllByRole('listitem')).toHaveLength(1)
@@ -844,7 +864,8 @@ test.each([
 test('un ítem de un grupo sin nombre nunca muestra el identificador', async () => {
   setupRemoval([{ ...removableItems[0], portions: 1, foodGroupId: 987654 }])
   renderHoy()
-  expect(await screen.findByText('Grupo del plan')).toBeInTheDocument()
+  await abrirDetalle()
+  expect(screen.getByText('Grupo del plan')).toBeInTheDocument()
   expect(document.body).not.toHaveTextContent('987654')
 })
 
@@ -852,11 +873,136 @@ test('quitar la última mención enfoca el editor y conserva un borrador sucio',
   const meal = setupRemoval([removableItems[0]])
   vi.mocked(registroApi.removeItem).mockResolvedValue({ ...meal, noteVersion: 8, noteText: '', items: [] })
   renderHoy()
-  const button = await screen.findByRole('button', { name: 'Quitar leche' })
+  await abrirDetalle()
+  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de leche' }))
+  const button = screen.getByRole('menuitem', { name: 'Quitar' })
   const editor = screen.getByRole('textbox', { name: '¿Qué comiste?' })
   fireEvent.change(editor, { target: { value: 'Mi borrador' } })
   fireEvent.click(button)
   expect(await screen.findByText('Quitaste leche.')).toBeInTheDocument()
   expect(editor).toHaveValue('Mi borrador')
   expect(editor).toHaveFocus()
+})
+
+test('usa el color del grupo propio en sus migas', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: [
+    { id: 1, name: 'Grupo propio', abbreviation: 'CUS', displayOrder: 1, color: '#368C91' },
+  ] })
+  const { container } = renderHoy()
+  await screen.findAllByText('Grupo propio')
+  await waitFor(() => expect(container.querySelector('path[stroke="var(--g-turq)"]')).toBeInTheDocument())
+  expect(container.querySelector('path[stroke="var(--g-prot)"]')).not.toBeInTheDocument()
+})
+
+async function abrirDetalle() {
+  fireEvent.click(await screen.findByRole('button', { name: /Revisar lo que/ }))
+}
+
+test('el detalle empieza cerrado, se abre y conserva la corrección al plegarlo', async () => {
+  setupRemoval([{ ...removableItems[0], uncertain: true }])
+  renderHoy()
+  const toggle = await screen.findByRole('button', { name: 'Revisar lo que entendí · 1 estimados' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByRole('button', { name: 'Corregir leche' })).not.toBeInTheDocument()
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  const correct = screen.getByRole('button', { name: 'Corregir leche' })
+  expect(correct).toHaveTextContent('Corregir')
+  fireEvent.click(correct)
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
+  fireEvent.click(toggle)
+  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+  fireEvent.click(toggle)
+  expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveValue(3)
+})
+
+test('las preguntas y los alimentos sin grupo o sin reconocer se ven con el detalle cerrado', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{
+    mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche, manzana, algo raro',
+    items: [...removableItems, { ...removableItems[1], id: 103, food: 'algo raro', origin: 'UNKNOWN' }],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'PREGUNTAR' }],
+  }] })
+  renderHoy()
+  expect(await screen.findByRole('button', { name: /Revisar lo que/ })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByText(/¿Consumiste/)).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Sí' })).toBeVisible()
+  expect(screen.getByText('manzana')).toBeVisible()
+  expect(screen.getByText('algo raro')).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Corregir leche' })).not.toBeInTheDocument()
+})
+
+test.each([
+  { status: 'CASI', recorded: 1, difference: 'falta 1', label: 'Proteínas: 1 de 2, falta 1' },
+  { status: 'EN_PLAN', recorded: 2, difference: '', label: 'Proteínas: 2 de 2' },
+  { status: 'DE_MAS', recorded: 3, difference: '1 de más', label: 'Proteínas: 3 de 2, 1 de más' },
+  { status: 'CASI', recorded: 1.5, difference: 'falta 0,5', label: 'Proteínas: 1,5 de 2, falta 0,5' },
+])('la comida muestra solo la diferencia: $label', async ({ status, recorded, difference, label }) => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{
+    mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche', items: [],
+    comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status }],
+  }] })
+  renderHoy()
+  const meal = await screen.findByRole('article', { name: 'Desayuno' })
+  const row = within(meal).getByRole('img', { name: label })
+  expect(row.querySelector('.migas__count')).toHaveTextContent(difference)
+  expect(row.querySelector('.migas__count')?.textContent).toBe(difference)
+  expect(within(meal).queryByText(`${recorded} de 2`)).not.toBeInTheDocument()
+})
+
+test('el menú se abre, se cierra con Escape y devuelve el foco al botón', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue(dayConNota)
+  renderHoy()
+  const trigger = await screen.findByRole('button', { name: 'Más opciones de Desayuno' })
+  expect(trigger).toHaveTextContent('⋯')
+  expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(trigger)
+  const action = screen.getByRole('menuitem', { name: 'Borrar lo anotado' })
+  expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  expect(action).toHaveFocus()
+  fireEvent.keyDown(action, { key: 'Escape' })
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  expect(trigger).toHaveFocus()
+})
+
+
+test.each([
+  { status: 'EN_PLAN', recorded: 1.5, difference: '' },
+  { status: 'PREGUNTAR', recorded: 0, difference: '' },
+  { status: 'CASI', recorded: 1, difference: 'falta 1' },
+  { status: 'SIN_ANOTAR', recorded: 0, difference: 'falta 2' },
+  { status: 'DE_MAS', recorded: 3, difference: '1 de más' },
+])('meal migas respect $status', async ({ status, recorded, difference }) => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{
+      mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', items: [],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status }],
+    }],
+  })
+  renderHoy()
+  await abrirNota()
+  const count = String(recorded).replace('.', ',')
+  const row = screen.getByRole('img', {
+    name: `Proteínas: ${count} de 2${status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}`,
+  })
+  expect(row.querySelector('.migas__count')).toHaveTextContent(difference)
+  if (!difference) expect(row.querySelector('.migas__count')).toBeEmptyDOMElement()
+})
+
+test('a saved note with an empty comparison has no missing portions', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockGetDayRegistro.mockResolvedValue({
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', items: [], comparison: [] }],
+  })
+  renderHoy()
+  await abrirNota()
+  expect(screen.queryByText(/falta/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Proteínas: 0 de 2' })).not.toBeInTheDocument()
 })
