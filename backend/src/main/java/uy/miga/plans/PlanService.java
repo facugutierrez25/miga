@@ -319,6 +319,36 @@ public class PlanService {
 
     public record MealRef(Long id, String name) {}
 
+    @Transactional(readOnly = true)
+    public java.util.Map<LocalDate, PlanReadData> getPlansForRange(Long userId, LocalDate start, LocalDate end) {
+        var candidates = plansRepository.findForRange(userId, start, end, clock.getZone().getId());
+        var result = new java.util.LinkedHashMap<LocalDate, PlanReadData>();
+        var loaded = new java.util.HashMap<Long, PlanReadData>();
+        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
+            LocalDate day = date;
+            // Mismo orden y extremos inclusivos que findActiveOnDate; el ultimo es el mas antiguo.
+            Plan selected = candidates.stream().filter(p -> !p.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate().isAfter(day)
+                && (p.getSupersededAt() == null || !p.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate().isBefore(day)))
+                .findFirst().orElse(candidates.isEmpty() ? null : candidates.getLast());
+            if (selected != null) result.put(date, loaded.computeIfAbsent(selected.getId(), id -> readData(selected)));
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public PlanReadData getReadData(Long planId) {
+        return readData(plansRepository.findById(planId).orElseThrow(PlanNotFoundException::new));
+    }
+
+    private PlanReadData readData(Plan plan) {
+        var meals = mealRepository.findWithPortionsByPlanId(plan.getId()).stream()
+            .map(m -> new PlanReadData.MealData(m.getId(), m.getName(), m.getPortions().stream()
+                .map(p -> new MealPortionSummary(p.getFoodGroupId(), p.getPortions())).toList())).toList();
+        return new PlanReadData(plan.getId(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+            plan.getSupersededAt() == null ? null : plan.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+            plan.getModoRegistro(), plan.getMargenPorciones(), getPlanFoodGroups(plan.getId()), meals);
+    }
+
     // ── privados ──────────────────────────────────────────────────────────────
 
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {

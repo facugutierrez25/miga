@@ -30,6 +30,18 @@ class ComparisonService {
         List<PlanFoodGroupDto> groups = planService.getPlanFoodGroups(planId);
         BigDecimal margin = planService.getMargenPorciones(planId);
 
+        return compare(planPortions, groups, margin, recordedPortions);
+    }
+
+    List<GroupStatus> compare(uy.miga.plans.PlanReadData plan, Long mealId, Map<Long, BigDecimal> recordedPortions) {
+        if ("LIBRE".equals(plan.mode())) return List.of();
+        var portions = plan.meals().stream().filter(m -> m.id().equals(mealId)).findFirst()
+            .map(uy.miga.plans.PlanReadData.MealData::portions).orElse(List.of());
+        return compare(portions, plan.groups(), plan.margin(), recordedPortions);
+    }
+
+    private List<GroupStatus> compare(List<MealPortionSummary> planPortions, List<PlanFoodGroupDto> groups,
+                                      BigDecimal margin, Map<Long, BigDecimal> recordedPortions) {
         Map<Long, String> groupNames = new HashMap<>();
         Map<Long, Boolean> askIfMissing = new HashMap<>();
         Map<Long, Boolean> optional = new HashMap<>();
