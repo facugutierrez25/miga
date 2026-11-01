@@ -1,3 +1,4 @@
+import { groupColor } from '../groupColors'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
@@ -17,11 +18,6 @@ import './HoyPage.css'
 import { usePlan } from '../hooks/usePlan'
 import { useDayRegistro } from '../hooks/useDayRegistro'
 
-const ABBR_DOT: Record<string, string> = {
-  PRO: 'var(--g-prot)', CER: 'var(--g-cer)', FRU: 'var(--g-frut)',
-  LAC: 'var(--g-lac)',  GRA: 'var(--g-gras)', VER: 'var(--g-verd)',
-}
-
 interface GrupoInfo {
   name: string
   token: string
@@ -29,9 +25,9 @@ interface GrupoInfo {
 
 function buildGruposMap(foodGroups: PlanFoodGroupDto[]): Record<number, GrupoInfo> {
   return Object.fromEntries(
-    foodGroups.map(g => [g.id, {
+    foodGroups.map((g, index) => [g.id, {
       name: g.name,
-      token: ABBR_DOT[g.abbreviation] ?? 'var(--g-prot)',
+      token: groupColor(g, index),
     }])
   )
 }

@@ -860,3 +860,13 @@ test('quitar la última mención enfoca el editor y conserva un borrador sucio',
   expect(editor).toHaveValue('Mi borrador')
   expect(editor).toHaveFocus()
 })
+
+test('usa el color del grupo propio en sus migas', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: [
+    { id: 1, name: 'Grupo propio', abbreviation: 'CUS', displayOrder: 1, color: '#368C91' },
+  ] })
+  const { container } = renderHoy()
+  await screen.findAllByText('Grupo propio')
+  await waitFor(() => expect(container.querySelector('path[stroke="var(--g-turq)"]')).toBeInTheDocument())
+  expect(container.querySelector('path[stroke="var(--g-prot)"]')).not.toBeInTheDocument()
+})
