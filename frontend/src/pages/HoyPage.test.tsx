@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import HoyPage from './HoyPage'
@@ -227,6 +227,7 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
   expect(titulo).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Así lo entendí' })).not.toBeInTheDocument()
   expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir grupos de barrita' }))
   expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
 })
 
@@ -588,7 +589,7 @@ test('al guardar dice qué faltó y suma lo anotado al día', async () => {
   const textarea = await screen.findByRole('textbox', { name: '¿Qué comiste?' })
   fireEvent.change(textarea, { target: { value: 'un huevo' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-  expect(await screen.findByRole('status')).toHaveTextContent('Guardado. Faltó: Proteínas 1.')
+  expect(await screen.findByRole('status')).toHaveTextContent('Guardado. Faltó 1 porción de Proteínas.')
   expect(screen.getByText('1 de 2 porciones')).toBeInTheDocument()
   expect(screen.getAllByRole('img', { name: 'Proteínas: 1 de 2 porciones' }).length).toBeGreaterThan(0)
 })
@@ -610,7 +611,7 @@ test('las otras comidas muestran su estado en texto y se abren para anotar', asy
   })
   renderHoy()
   const fila = await screen.findByRole('button', { name: /Desayuno/, expanded: false })
-  expect(fila).toHaveTextContent('De más: Proteínas 1')
+  expect(fila).toHaveTextContent('De más: 1 porción de Proteínas')
   fireEvent.click(fila)
   expect(fila).toHaveAttribute('aria-expanded', 'true')
   expect(screen.getAllByRole('textbox', { name: '¿Qué comiste?' }).some(t => (t as HTMLTextAreaElement).value === 'dos huevos')).toBe(true)
@@ -803,6 +804,48 @@ test('un compuesto tiene un único botón de quitar en la cabecera', async () =>
   const button = await screen.findByRole('button', { name: 'Quitar barrita' })
   expect(button.parentElement).toHaveClass('nota-compuesto__header')
   expect(screen.getAllByRole('button', { name: 'Quitar barrita' })).toHaveLength(1)
+})
+
+test('un compuesto resume cuatro grupos y despliega las correcciones por grupo', async () => {
+  const names = ['Proteínas', 'Cereales', 'Verduras', 'Grasas']
+  setupRemoval(names.map((_, i) => ({ ...removableItems[0], portions: 1, id: 201 + i, food: 'Chivito', foodGroupId: i + 1, occurrenceId: 'chivito' })))
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: names.map((name, i) => ({ id: i + 1, name, abbreviation: ['PRO', 'CER', 'VER', 'GRA'][i], displayOrder: i, color: null })) })
+  renderHoy()
+  const button = await screen.findByRole('button', { name: 'Corregir grupos de Chivito', expanded: false })
+  const section = screen.getByRole('region', { name: 'Así lo entendí' })
+  expect(within(section).getAllByRole('listitem')).toHaveLength(1)
+  expect(within(section).getAllByText('Chivito', { exact: false }).length).toBeGreaterThan(0)
+  expect(screen.getByText('1 Proteínas · 1 Cereales · 1 Verduras · 1 Grasas')).toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'Grupos de Chivito' })).not.toBeInTheDocument()
+  fireEvent.click(button)
+  expect(button).toHaveAttribute('aria-expanded', 'true')
+  expect(within(screen.getByRole('list', { name: 'Grupos de Chivito' })).getAllByRole('listitem')).toHaveLength(4)
+  fireEvent.click(button)
+  expect(button).toHaveAttribute('aria-expanded', 'false')
+})
+
+test.each([
+  { names: ['Proteínas'], amounts: [1], expected: 'Faltó 1 porción de Proteínas' },
+  { names: ['Proteínas', 'Cereales'], amounts: [1, 2], expected: 'Faltó 1 porción de Proteínas y 2 de Cereales' },
+  { names: ['Proteínas', 'Cereales', 'Verduras'], amounts: [2, 1, 0.5], expected: 'Faltó 2 porciones de Proteínas, 1 de Cereales y 0,5 de Verduras' },
+  { names: [''], amounts: [2], expected: 'Faltó 2 porciones de un grupo del plan' },
+])('describe las faltas: $expected', async ({ names, amounts, expected }) => {
+  mockGetMyPlan.mockResolvedValue(planDosComidas)
+  mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{ mealId: 1, noteId: 1, noteVersion: 0, noteText: 'comida', items: [], comparison: [
+    ...names.map((name, i) => ({ foodGroupId: 9876 + i, name, expected: amounts[i], recorded: 0, status: 'CASI', dailyGoal: null })),
+    { foodGroupId: 9999, name: 'Grasas', expected: 0, recorded: 1, status: 'DE_MAS', dailyGoal: null },
+  ] }] })
+  renderHoy()
+  const row = await screen.findByRole('button', { name: /Desayuno/ })
+  expect(row).toHaveTextContent(`${expected} · De más: 1 porción de Grasas`)
+  expect(row).not.toHaveTextContent(/9876|9999/)
+})
+
+test('un ítem de un grupo sin nombre nunca muestra el identificador', async () => {
+  setupRemoval([{ ...removableItems[0], portions: 1, foodGroupId: 987654 }])
+  renderHoy()
+  expect(await screen.findByText('Grupo del plan')).toBeInTheDocument()
+  expect(document.body).not.toHaveTextContent('987654')
 })
 
 test('quitar la última mención enfoca el editor y conserva un borrador sucio', async () => {

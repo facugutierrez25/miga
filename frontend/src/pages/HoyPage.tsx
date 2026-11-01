@@ -181,7 +181,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched, onRemove, removing }
     && new Set(reparto.map(r => r.foodGroupId)).size === reparto.length
 
   const dot = info?.token ?? 'var(--muted)'
-  const label = info?.name ?? (item.foodGroupId !== null ? String(item.foodGroupId) : item.appliedRule ? null : 'Sin grupo en tu plan')
+  const label = info?.name?.trim() || (item.foodGroupId !== null ? 'Grupo del plan' : item.appliedRule ? null : 'Sin grupo en tu plan')
 
   return (
     <li className={`nota-item${item.uncertain ? ' nota-item--dudoso' : ''}`}>
@@ -310,7 +310,12 @@ function agruparPorMencion(items: EntryItemDto[]): EntryItemDto[][] {
 type MealStateKind = 'ok' | 'warn' | 'ask' | 'noted' | 'none'
 
 function describirGrupos(grupos: GroupStatusDto[], diff: (s: GroupStatusDto) => number): string {
-  return grupos.map(s => `${s.name} ${fmt(diff(s))}`).join(', ')
+  const partes = grupos.map((s, index) => {
+    const cantidad = diff(s)
+    const porciones = index === 0 ? ` ${cantidad === 1 ? 'porción' : 'porciones'}` : ''
+    return `${fmt(cantidad)}${porciones} de ${s.name?.trim() || 'un grupo del plan'}`
+  })
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}` : partes[0]
 }
 
 function mealState(mealDay: MealDayDto | undefined): { kind: MealStateKind; text: string } {
@@ -322,7 +327,7 @@ function mealState(mealDay: MealDayDto | undefined): { kind: MealStateKind; text
   const faltan = comparison.filter(s => s.status === 'CASI' || s.status === 'SIN_ANOTAR')
   const sobran = comparison.filter(s => s.status === 'DE_MAS')
   const partes = [
-    faltan.length > 0 ? `Faltó: ${describirGrupos(faltan, s => s.expected - s.recorded)}` : '',
+    faltan.length > 0 ? `Faltó ${describirGrupos(faltan, s => s.expected - s.recorded)}` : '',
     sobran.length > 0 ? `De más: ${describirGrupos(sobran, s => s.recorded - s.expected)}` : '',
   ].filter(Boolean)
   return partes.length > 0
@@ -425,6 +430,7 @@ function NotaMealSection({
   meal, drafts, mealDay, date, token, gruposMap,
   onNotaSaved, onItemPatched, onNotaBorrada, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
+  const [expandedMentions, setExpandedMentions] = useState<Set<string>>(() => new Set())
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
   const [texto, setTexto] = useState(saved?.dirty ? saved.texto : mealDay?.noteText ?? '')
@@ -710,17 +716,40 @@ function NotaMealSection({
               )
               if (mencion.length === 1) return fila(mencion[0])
               const [primero] = mencion
+              const mentionKey = primero.occurrenceId!
+              const expanded = expandedMentions.has(mentionKey)
+              const detailId = `grupos-${meal.id}-${primero.id}`
               return (
                 <li key={primero.occurrenceId} className="nota-compuesto">
                   <div className="nota-compuesto__header">
-                    <p className="nota-compuesto__titulo">
-                      {primero.food}
-                      {primero.quantity !== null && <> · {primero.quantity} {primero.unit ?? ''}</>}
-                    </p>
+                    <span className="nota-compuesto__dots" aria-hidden="true">
+                      {mencion.map(item => <span key={item.id} className="nota-item__dot"
+                        style={{ background: (item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.token : null) ?? 'var(--muted)' }} />)}
+                    </span>
+                    <div className="nota-compuesto__contenido">
+                      <p className="nota-compuesto__titulo">
+                        {primero.food}
+                        {primero.quantity !== null && <> · {fmt(primero.quantity)} {primero.unit ?? ''}</>}
+                      </p>
+                      <p className="nota-compuesto__grupos">{mencion.map(item =>
+                        `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
+                      ).join(' · ')}</p>
+                    </div>
+                    <button type="button" className="nota-item__edit" aria-label={`Corregir grupos de ${primero.food}`}
+                      aria-expanded={expanded} aria-controls={detailId} onClick={() => setExpandedMentions(previous => {
+                        const next = new Set(previous)
+                        if (next.has(mentionKey)) next.delete(mentionKey)
+                        else next.add(mentionKey)
+                        return next
+                      })}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                        <path d="M8.5 1.5a1 1 0 0 1 1.414 1.414L3.5 9H2v-1.5L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
                     <RemoveItemButton item={primero} disabled={guardando || conflict} onClick={() => handleRemove(primero)} />
                   </div>
                   {primero.appliedRule && <p className="nota-item__regla">{primero.appliedRule}</p>}
-                  <ul className="nota-items" aria-label={`Grupos de ${primero.food}`}>
+                  <ul id={detailId} hidden={!expanded} className="nota-items" aria-label={`Grupos de ${primero.food}`}>
                     {mencion.map(item => fila({ ...item, appliedRule: null }))}
                   </ul>
                 </li>

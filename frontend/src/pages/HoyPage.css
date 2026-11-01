@@ -810,3 +810,32 @@
   justify-content: space-between;
   gap: 8px;
 }
+
+.nota-compuesto__dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  max-width: 20px;
+  flex-shrink: 0;
+}
+
+.nota-compuesto__contenido {
+  flex: 1;
+  min-width: 0;
+}
+
+.nota-compuesto__grupos {
+  margin: var(--s1) 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.nota-compuesto__header {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.nota-compuesto .nota-items[hidden] {
+  display: none;
+}
