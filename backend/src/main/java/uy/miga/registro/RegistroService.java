@@ -61,6 +61,18 @@ public class RegistroService {
     @Transactional(readOnly = true)
     public boolean planHasNotes(Long planId) { return noteRepository.existsByPlanId(planId); }
 
+    // El fork ya trasladó las referencias; las reglas deben aplicarse después de la edición.
+    @Transactional
+    public void reinterpretTodayNotes(String email, Long planId) {
+        Long userId = userService.findUserIdByEmail(email);
+        LocalDate today = LocalDate.now(clock);
+        for (MealNote note : noteRepository.findByUserIdAndDate(userId, today)) {
+            if (!planId.equals(note.getPlanId()) || note.getText().isBlank()) continue;
+            note.touch();
+            saveNote(email, today, note.getMealId(), note.getText(), null, false);
+        }
+    }
+
     private final MealNoteRepository noteRepository;
     private final InterpreterService interpreter;
     private final ComparisonService comparison;
@@ -68,6 +80,7 @@ public class RegistroService {
     private final PlanService planService;
     private final ReglaService ruleService;
     private final UserService userService;
+    private final java.time.Clock clock;
 
     RegistroService(MealNoteRepository noteRepository,
                     InterpreterService interpreter,
@@ -75,7 +88,8 @@ public class RegistroService {
                     FoodEntryFacade entryFacade,
                     PlanService planService,
                     ReglaService ruleService,
-                    UserService userService) {
+                    UserService userService, java.time.Clock clock) {
+        this.clock = clock;
         this.noteRepository = noteRepository;
         this.interpreter    = interpreter;
         this.comparison     = comparison;
@@ -129,13 +143,14 @@ public class RegistroService {
             return n;
         });
 
-        Long planId = note.getPlanId() != null
+        // Una nota ya guardada se reinterpreta con su plan si la comida es de ese plan; si no, con el
+        // plan vigente de la fecha.
+        Long planId = note.getPlanId() != null && planService.getMealIds(note.getPlanId()).contains(mealId)
             ? note.getPlanId()
             : planService.getPlanIdForDate(userId, date);
 
-        if ((note.getPlanId() != null || date.equals(LocalDate.now()))
-            && !planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+        if (!planService.getMealIds(planId).contains(mealId)) {
+            throw new PlanChangedException();
         }
         if (note.getPlanId() == null) {
             note.setPlanId(planId);
@@ -526,7 +541,7 @@ public class RegistroService {
         }
         Long planId = planService.getPlanIdForDate(userId, date);
         if (!planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+            throw new PlanChangedException();
         }
         if (planService.getPlanFoodGroups(planId).stream().noneMatch(g -> g.id().equals(req.foodGroupId()))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los grupos no pertenecen a tu plan.");

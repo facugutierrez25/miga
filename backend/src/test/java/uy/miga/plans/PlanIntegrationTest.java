@@ -562,7 +562,7 @@ class PlanIntegrationTest {
         JsonNode history = objectMapper.readTree(result);
         assertThat(history.isArray()).isTrue();
         assertThat(history.size()).isEqualTo(50);
-        var expected = jdbc.queryForList("SELECT created_at::date::text FROM plans WHERE user_id = ? ORDER BY superseded_at DESC, id DESC LIMIT 50", String.class, userId);
+        var expected = jdbc.queryForList("SELECT (created_at AT TIME ZONE 'America/Montevideo')::date::text FROM plans WHERE user_id = ? ORDER BY superseded_at DESC, id DESC LIMIT 50", String.class, userId);
         for (int index = 0; index < 50; index++) {
             assertThat(history.get(index).path("createdAt").asText()).isEqualTo(expected.get(index));
         }

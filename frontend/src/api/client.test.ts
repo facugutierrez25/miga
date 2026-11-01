@@ -61,6 +61,8 @@ it('devuelve el token del login y conserva el mensaje de registro duplicado', as
 it('conserva los conflictos de notas y del plan', async () => {
   respond('{"code":"NOTE_CONFLICT","error":"La nota cambió."}', 409)
   await expect(saveNota('token', '2026-01-01', 1, 'pan', 1)).rejects.toBeInstanceOf(NoteConflictError)
+  respond('{"code":"PLAN_CHANGED","error":"Tu plan cambió."}', 409)
+  await expect(saveNota('token', '2026-01-01', 1, 'pan', 1)).rejects.toThrow('Tu plan cambió.')
   respond('{"code":"VERSION_CONFLICT"}', 409)
   await expect(saveMyPlan('token', { meals: [] })).rejects.toBeInstanceOf(PlanConflictError)
 })

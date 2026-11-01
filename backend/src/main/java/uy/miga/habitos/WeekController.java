@@ -17,8 +17,10 @@ import java.util.List;
 class WeekController {
 
     private final WeekService service;
+    private final java.time.Clock clock;
 
-    WeekController(WeekService service) {
+    WeekController(WeekService service, java.time.Clock clock) {
+        this.clock = clock;
         this.service = service;
     }
 
@@ -26,7 +28,7 @@ class WeekController {
     @GetMapping("/semana")
     WeekSummaryDto getWeek(Authentication auth,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return service.getWeek(auth.getName(), date != null ? date : LocalDate.now());
+        return service.getWeek(auth.getName(), date != null ? date : LocalDate.now(clock));
     }
 
     // GET /api/v1/habitos
@@ -58,7 +60,7 @@ class WeekController {
                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                     @RequestParam(defaultValue = "csv") String format,
                     HttpServletResponse response) throws IOException {
-        LocalDate ref = date != null ? date : LocalDate.now();
+        LocalDate ref = date != null ? date : LocalDate.now(clock);
         WeekSummaryDto week = service.getWeek(auth.getName(), ref);
         if (!List.of("csv", "xlsx").contains(format)) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato inválido.");

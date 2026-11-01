@@ -20,4 +20,11 @@ class RegistroAdvice {
             "code", "NOTE_CONFLICT",
             "error", "Esta nota cambió en otro dispositivo. Recargá para ver la versión actual."));
     }
+
+    @ExceptionHandler(PlanChangedException.class)
+    ResponseEntity<?> planChanged() {
+        return ResponseEntity.status(409).body(Map.of(
+            "code", "PLAN_CHANGED",
+            "error", "Tu plan cambió. Recargá para ver las comidas actuales."));
+    }
 }

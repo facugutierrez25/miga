@@ -19,14 +19,14 @@ interface PlansRepository extends JpaRepository<Plan, Long> {
     @Query(value = """
         SELECT * FROM plans
         WHERE user_id = :userId
-          AND created_at::date <= :date
-          AND (superseded_at IS NULL OR superseded_at::date >= :date)
-        ORDER BY created_at DESC
+          AND (created_at AT TIME ZONE :zone)::date <= :date
+          AND (superseded_at IS NULL OR (superseded_at AT TIME ZONE :zone)::date >= :date)
+        ORDER BY created_at DESC, id DESC
         LIMIT 1
         """, nativeQuery = true)
-    Optional<Plan> findActiveOnDate(@Param("userId") Long userId, @Param("date") LocalDate date);
+    Optional<Plan> findActiveOnDate(@Param("userId") Long userId, @Param("date") LocalDate date, @Param("zone") String zone);
 
-    @Query(value = "SELECT * FROM plans WHERE user_id = :userId ORDER BY created_at ASC LIMIT 1",
+    @Query(value = "SELECT * FROM plans WHERE user_id = :userId ORDER BY created_at ASC, id ASC LIMIT 1",
            nativeQuery = true)
     Optional<Plan> findOldestByUserId(@Param("userId") Long userId);
 }
