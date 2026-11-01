@@ -51,6 +51,48 @@ function fmtN(n: number): string {
   return n.toLocaleString('es-UY', { useGrouping: false, maximumFractionDigits: 20 })
 }
 
+function hasGoal(habit: HabitDto): boolean {
+  return habit.habitType !== 'SI_NO' && habit.dailyGoal != null
+}
+
+function habitProgress(habit: HabitDto, value: number): string {
+  const unit = habit.unit ? ` ${habit.unit}` : ''
+  return hasGoal(habit) && habit.period === 'DIA'
+    ? `${fmtN(value)} de ${fmtN(habit.dailyGoal!)}${unit}`
+    : `${fmtN(value)}${unit}`
+}
+
+function habitDone(habit: HabitDto, value: number): boolean {
+  if (!hasGoal(habit)) return value > 0
+  // La meta semanal se marca en el resumen, no en cada día.
+  return habit.period === 'DIA' && value >= habit.dailyGoal!
+}
+
+function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
+  const habits = week.habits.filter(h => hasGoal(h) && h.period === 'SEMANA')
+  if (habits.length === 0) return null
+  return <section className="semana-habitos" aria-label="Metas semanales">
+    <h2 className="semana-habitos__titulo">Metas semanales</h2>
+    <ul className="semana-habitos__lista">{habits.map(h => {
+      const total = week.days.reduce((sum, day) => sum + (
+        day.habitIds && !day.habitIds.includes(h.id) ? 0
+          : Number(day.habitLogs.find(log => log.habitId === h.id)?.value ?? 0)
+      ), 0)
+      const done = total >= h.dailyGoal!
+      const progress = `${fmtN(total)} de ${fmtN(h.dailyGoal!)}${h.unit ? ` ${h.unit}` : ''} esta semana`
+      return <li key={h.id} className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
+        aria-label={`${h.name}: ${progress}, ${done ? 'completado' : 'pendiente'}`}>
+        <span className="semana-habito__check" aria-hidden="true">{done && (
+          <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        )}</span>
+        <span className="semana-habito__name">{h.name}</span>
+        <span className="semana-habito__val">{progress}</span>
+        <span>{done ? 'Completado' : 'Pendiente'}</span>
+      </li>
+    })}</ul>
+  </section>
+}
+
 // Estado de cada comida: texto concreto y la miga que la representa en la tira de la semana.
 const MEAL_STATUS: Record<string, { text: string; miga: 'full' | 'half' | 'noted' | 'empty' }> = {
   EN_PLAN: { text: 'Como el plan', miga: 'full' },
@@ -140,9 +182,10 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
             {habits.map(h => {
               const log = logMap.get(h.id)
               const valor = log?.value ?? 0
-              const done = valor > 0
+              const done = habitDone(h, valor)
+              const progress = habitProgress(h, valor)
               const unidad = h.unit ? ` ${h.unit}` : ''
-              // Contadores y cantidades se corrigen con − y +; los de sí/no y los flexibles, con la casilla.
+              // Contadores y cantidades se corrigen con − y +; los flexibles son de solo lectura.
               const esContador = h.habitType !== 'SI_NO' && !h.countsFlexibleMeals
               const check = done && (
                 <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -150,10 +193,10 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
               return (
                 <li key={h.id}>
                   {esContador ? (
-                    <div className={`semana-habito${done ? ' semana-habito--ok' : ''}`}>
+                    <div role="group" aria-label={`${h.name}: ${progress}, ${fullDate(day.date)}, ${done ? 'completado' : 'pendiente'}`} className={`semana-habito${done ? ' semana-habito--ok' : ''}`}>
                       <span className="semana-habito__check" aria-hidden="true">{check}</span>
                       <span className="semana-habito__name">{h.name}</span>
-                      <span className="semana-habito__val">{fmtN(valor)}{unidad}</span>
+                      <span className="semana-habito__val">{progress}</span>
                       <span className="semana-habito__ajuste">
                         <button type="button" className="semana-habito__paso"
                           disabled={valor <= 0 || savingHabit !== null}
@@ -174,13 +217,13 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
                       disabled={h.countsFlexibleMeals || savingHabit !== null}
                       className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
                       onClick={() => void setHabit(h, done ? 0 : 1)}
-                      aria-label={`${h.name}: ${done ? 'completado' : 'pendiente'}, ${fmtN(valor)}${unidad}, ${fullDate(day.date)}`}
+                      aria-label={hasGoal(h) ? `${h.name}: ${progress}, ${fullDate(day.date)}, ${done ? 'completado' : 'pendiente'}` : `${h.name}: ${done ? 'completado' : 'pendiente'}, ${progress}, ${fullDate(day.date)}`}
                       aria-pressed={done}
                     >
                       <span className="semana-habito__check" aria-hidden="true">{check}</span>
                       <span className="semana-habito__name">{h.name}</span>
-                      {h.countsFlexibleMeals && log && (
-                        <span className="semana-habito__val">{fmtN(log.value)}{unidad}</span>
+                      {h.countsFlexibleMeals && (
+                        <span className="semana-habito__val">{progress}</span>
                       )}
                     </button>
                   )}
@@ -347,6 +390,7 @@ export default function SemanaPage() {
               <p className="semana-vacia">Todavía no hay migas esta semana: lo que anotes en Hoy aparece acá.</p>
             )}
 
+            <WeeklyHabitSummary week={week} />
             {view === 'day' ? (
               <>
                 <div className="semana-resumen">
@@ -394,7 +438,9 @@ function WeekSheet({ week, todayISO }: { week: WeekSummaryDto; todayISO: string 
         {day.date === todayISO && <span> · Hoy</span>}
       </th>
       {meals.map(name => <td className="semana-note" key={name}>{(day.meals ?? []).filter(m => m.name === name).map(m => m.noteText).filter(Boolean).join('\n') || '—'}</td>)}
-      {week.habits.map(h => <td key={h.id}>{day.habitIds && !day.habitIds.includes(h.id) ? '—' : fmtN(Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}</td>)}
+      {week.habits.map(h => <td key={h.id} aria-label={hasGoal(h) ? `${h.name}: ${day.habitIds && !day.habitIds.includes(h.id) ? 'No corresponde' : habitProgress(h, Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}, ${fullDate(day.date)}` : undefined}>
+        {day.habitIds && !day.habitIds.includes(h.id) ? '—' : habitProgress(h, Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}
+      </td>)}
     </tr>)}</tbody>
   </table></div>
 }
