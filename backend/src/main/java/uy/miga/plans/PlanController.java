@@ -5,6 +5,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/v1/my-plan")
@@ -17,8 +19,10 @@ class PlanController {
     }
 
     @GetMapping
-    PlanDto getMyPlan(Authentication auth) {
-        return planService.getMyPlan(auth.getName());
+    PlanDto getMyPlan(Authentication auth,
+                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return date == null ? planService.getMyPlan(auth.getName())
+            : planService.getMyPlanForDate(auth.getName(), date);
     }
 
     @PutMapping

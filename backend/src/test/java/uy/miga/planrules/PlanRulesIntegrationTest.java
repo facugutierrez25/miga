@@ -214,6 +214,31 @@ class PlanRulesIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from meal_portions where meal_id in (select id from meals where plan_id=?)",Integer.class,copy)).isEqualTo(3);
         addGroup("Segundo",Map.of()); assertThat(state.path("planId").asLong()).isEqualTo(copy);
     }
+    @Test void planForDateMatchesHistoricalNotesAndIsScopedToUser() throws Exception {
+        LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+        JsonNode original = request(get("/api/v1/my-plan"), null, 200);
+        long meal = meals().getFirst();
+        note(meal, yesterday, "1 manzana");
+        addGroup("New group", Map.of());
+        assertThat(meals()).doesNotContain(meal);
+        JsonNode historical = request(get("/api/v1/my-plan").param("date", yesterday.toString()), null, 200);
+        // La versión del plan viejo cambia al reemplazarlo; lo que importa son sus comidas y grupos.
+        assertThat(historical.path("meals")).isEqualTo(original.path("meals"));
+        assertThat(historical.path("foodGroups")).isEqualTo(original.path("foodGroups"));
+        List<Long> historicalMeals = new ArrayList<>();
+        historical.path("meals").forEach(m -> historicalMeals.add(m.path("id").asLong()));
+        JsonNode day = request(get("/api/v1/registro/" + yesterday), null, 200);
+        assertThat(day.path("meals")).isNotEmpty();
+        for (JsonNode entry : day.path("meals")) {
+            assertThat(historicalMeals).contains(entry.path("mealId").asLong());
+        }
+        assertThat(request(get("/api/v1/my-plan").param("date", yesterday.minusYears(1).toString()), null, 200).path("meals"))
+            .isEqualTo(original.path("meals"));
+        token = account();
+        request(get("/api/v1/my-plan").param("date", yesterday.toString()), null, 404);
+        request(get("/api/v1/my-plan"), null, 404);
+    }
+
     @Test void completeAcceptanceThroughApi() throws Exception {
         addGroup("Huevo",Map.of("clave","huevos")); addGroup("Panificados",Map.of("clave","panificados"));
         addGroup("Aceite",Map.of("preguntarSiFalta",true)); addGroup("Dulces",Map.of("opcional",true));

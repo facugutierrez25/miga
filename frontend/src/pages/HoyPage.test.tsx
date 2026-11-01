@@ -1006,3 +1006,24 @@ test('a saved note with an empty comparison has no missing portions', async () =
   expect(screen.queryByText(/falta/)).not.toBeInTheDocument()
   expect(screen.queryByRole('img', { name: 'Proteínas: 0 de 2' })).not.toBeInTheDocument()
 })
+
+
+test('past dates load their plan and show its meal note', async () => {
+  const historical = { ...planConComida, meals: [{ ...planConComida.meals[0], id: 289 }] }
+  let today: string | undefined
+  mockGetMyPlan.mockImplementation(async (_token, _signal, date) => {
+    today ??= date
+    return date === today ? planConComida : historical
+  })
+  mockGetDayRegistro.mockImplementation(async (_token, date) => ({
+    date, summary: [], meals: [{
+      mealId: 289, noteId: 1, noteVersion: 0, noteText: 'Historical note', items: [], comparison: [],
+    }],
+  }))
+  renderHoy()
+  await screen.findByRole('heading', { name: 'Desayuno' })
+  fireEvent.click(screen.getAllByRole('button', { name: /a anterior$/ })[0])
+  fireEvent.click(await screen.findByRole('button', { name: /Desayuno/ }))
+  expect(await screen.findByDisplayValue('Historical note')).toBeInTheDocument()
+  expect(mockGetMyPlan.mock.calls.some(([, , date]) => date !== today)).toBe(true)
+})
