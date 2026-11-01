@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(classes = MigaApplication.class, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
+@org.springframework.context.annotation.Import(uy.miga.SqlRequestCounter.Configuration.class)
 class WeekIntegrationTest {
 
     @Autowired private WebApplicationContext context;
@@ -68,6 +69,60 @@ class WeekIntegrationTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, PLAN_JSON)))
             .andExpect(status().isOk());
+    }
+
+    @Autowired private java.time.Clock clock;
+    @Autowired private uy.miga.plans.PlanService planService;
+    @Autowired private jakarta.persistence.EntityManager entityManager;
+
+    @Test
+    void sqlCounterIncludesJdbcTemplateAndNativeJpa() {
+        try (var count = uy.miga.SqlRequestCounter.start()) {
+            jdbc.queryForObject("SELECT 1", Integer.class);
+            entityManager.createNativeQuery("SELECT 1").getSingleResult();
+            assertThat(count.statements()).isEqualTo(2);
+        }
+    }
+
+
+    @Test
+    void sqlBudgetsForFourMealsAndSeveralDays() throws Exception {
+        token = registerAndLogin("sql-budget-" + UUID.randomUUID() + "@miga.uy");
+        var payload = objectMapper.createObjectNode();
+        var meals = payload.putArray("meals");
+        for (int i = 0; i < 4; i++) {
+            var meal = meals.addObject();
+            meal.put("name", "Meal " + i).put("displayOrder", i + 1);
+            meal.putArray("portions").addObject().put("foodGroupAbbr", "FRU").put("portions", 1);
+        }
+        mockMvc.perform(put("/api/v1/my-plan").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token, payload.toString())))
+            .andExpect(status().isOk());
+        var plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        long mealId = plan.path("meals").get(0).path("id").asLong();
+        var monday = LocalDate.now(clock).with(java.time.DayOfWeek.MONDAY);
+        for (int i = 0; i < 3; i++) {
+            try (var count = uy.miga.SqlRequestCounter.start()) {
+                mockMvc.perform(put("/api/v1/registro/" + monday.plusDays(i) + "/comidas/" + mealId + "/nota")
+                    .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"text\":\"manzana\",\"version\":null}"))
+                    .andExpect(status().isCreated());
+                assertThat(count.statements()).as("PUT note SQL").isBetween(1, 30);
+            }
+        }
+        try (var count = uy.miga.SqlRequestCounter.start()) {
+            mockMvc.perform(get("/api/v1/semana").param("date", monday.toString())
+                .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.days.length()").value(7));
+            assertThat(count.statements()).as("week SQL").isBetween(1, 15);
+        }
+        try (var count = uy.miga.SqlRequestCounter.start()) {
+            mockMvc.perform(get("/api/v1/registro/" + monday).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.meals.length()").value(4));
+            assertThat(count.statements()).as("day SQL").isBetween(1, 8);
+        }
     }
 
     @Test
@@ -250,6 +305,12 @@ class WeekIntegrationTest {
         jdbc.update("UPDATE plans SET superseded_at = ?::date WHERE id = ?", monday.plusDays(3).toString(), oldPlan);
         jdbc.update("UPDATE plans SET created_at = ?::date, modo_registro = 'LIBRE' WHERE id = ?", monday.plusDays(3).toString(), newPlan);
         long newMeal = jdbc.queryForObject("SELECT id FROM meals WHERE plan_id = ?", Long.class, newPlan);
+        var range = planService.getPlansForRange(user, monday.minusDays(7), monday.plusDays(6));
+        for (var day : range.entrySet()) {
+            assertThat(day.getValue().id()).isEqualTo(planService.getPlanIdForDate(user, day.getKey()));
+        }
+        assertThat(range.get(monday.minusDays(7)).id()).isEqualTo(oldPlan);
+
         String note = "=texto privado; con \"comillas\"\nsegunda l\u00ednea";
         jdbc.update("INSERT INTO meal_notes(user_id, fecha, meal_id, texto, plan_id) VALUES (?, ?, ?, ?, ?)",
             user, monday.plusDays(3), newMeal, note, newPlan);

@@ -15,6 +15,7 @@ interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
     void deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
         Long userId, LocalDate date, Long mealId, Long foodGroupId, String origen);
 
+    List<FoodEntry> findByUserIdAndDateBetweenOrderByIdAsc(Long userId, LocalDate start, LocalDate end);
     boolean existsByMealIdIn(List<Long> mealIds);
     List<FoodEntry> findByUserIdAndDateOrderByIdAsc(Long userId, LocalDate date);
     Optional<FoodEntry> findByIdAndUserId(Long id, Long userId);
