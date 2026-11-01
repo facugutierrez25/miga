@@ -56,6 +56,32 @@ test.each([[1, 2, false], [2, 3, true]])('meta semanal suma %s y %s', (first, se
   expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeInTheDocument()
 })
 
+test('meta semanal con decimales se cumple al llegar justo a la meta', () => {
+  renderProgress({ period: 'SEMANA', dailyGoal: 0.8, unit: null }, [0.1, 0.7])
+  expect(screen.getByRole('listitem', { name: 'Agua: 0,8 de 0,8 esta semana, completado' })).toBeInTheDocument()
+})
+
+test('meta semanal suma las versiones del mismo hábito y usa la meta más reciente', () => {
+  const data: api.WeekSummaryDto = {
+    weekStart: '2026-10-26', weekEnd: '2026-11-01',
+    habits: [
+      { id: 3, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 4, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
+      { id: 7, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 5, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
+    ],
+    days: [
+      { date: '2026-10-26', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [3], meals: [],
+        habitLogs: [{ habitId: 3, date: '2026-10-26', value: 2 }] },
+      { date: '2026-10-27', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [7], meals: [],
+        habitLogs: [{ habitId: 7, date: '2026-10-27', value: 3 }] },
+    ],
+  }
+  vi.mocked(useWeek).mockReturnValue({ data, status: 'success', error: null,
+    setData: vi.fn(), retry: vi.fn(), reload: vi.fn().mockResolvedValue(data) })
+  render(<SemanaPage />)
+  expect(screen.getAllByRole('listitem', { name: /esta semana/ })).toHaveLength(1)
+  expect(screen.getByRole('listitem', { name: 'Agua: 5 de 5 esta semana, completado' })).toBeInTheDocument()
+})
+
 test.each([[0, false], [0.5, true]])('sin meta conserva la marca con valor %s', (value, done) => {
   renderProgress({ dailyGoal: null }, [value])
   const row = screen.getByRole('group', { name: /Agua:/ })

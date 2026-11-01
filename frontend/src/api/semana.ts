@@ -10,6 +10,7 @@ export interface HabitDto {
   period: string
   countsFlexibleMeals?: boolean
   displayOrder: number
+  uid?: string
 }
 
 export interface HabitLogDto {

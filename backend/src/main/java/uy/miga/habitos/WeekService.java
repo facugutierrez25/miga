@@ -156,7 +156,7 @@ class WeekService {
 
     private HabitDto toDto(PlanHabit h) {
         return new HabitDto(h.getId(), h.getName(), h.getHabitType().name(),
-            h.getUnit(), h.getDailyGoal(), h.getStep(), h.getPeriod(), h.isCountsFlexibleMeals(), h.getDisplayOrder());
+            h.getUnit(), h.getDailyGoal(), h.getStep(), h.getPeriod(), h.isCountsFlexibleMeals(), h.getDisplayOrder(), h.getUid());
     }
 
 }

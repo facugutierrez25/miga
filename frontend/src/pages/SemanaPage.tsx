@@ -48,7 +48,12 @@ function formatRango(start: string, end: string): string {
 }
 
 function fmtN(n: number): string {
-  return n.toLocaleString('es-UY', { useGrouping: false, maximumFractionDigits: 20 })
+  return n.toLocaleString('es-UY', { useGrouping: false, maximumFractionDigits: 2 })
+}
+
+// Las metas admiten decimales: sin redondear, 0,1 + 0,7 no llega a 0,8.
+function round(n: number): number {
+  return Math.round(n * 1000) / 1000
 }
 
 function hasGoal(habit: HabitDto): boolean {
@@ -65,19 +70,28 @@ function habitProgress(habit: HabitDto, value: number): string {
 function habitDone(habit: HabitDto, value: number): boolean {
   if (!hasGoal(habit)) return value > 0
   // La meta semanal se marca en el resumen, no en cada día.
-  return habit.period === 'DIA' && value >= habit.dailyGoal!
+  return habit.period === 'DIA' && round(value) >= habit.dailyGoal!
 }
 
 function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
-  const habits = week.habits.filter(h => hasGoal(h) && h.period === 'SEMANA')
+  // Una versión nueva del plan copia el hábito con otro id y el mismo uid: se suman todas sus
+  // versiones de la semana y se usa la meta de la más reciente.
+  const versions = new Map<string, HabitDto[]>()
+  for (const h of week.habits) {
+    const key = h.uid ?? String(h.id)
+    versions.set(key, [...(versions.get(key) ?? []), h])
+  }
+  const habits = [...versions.values()]
+    .map(vs => ({ latest: vs[vs.length - 1], ids: vs.map(v => v.id) }))
+    .filter(({ latest }) => hasGoal(latest) && latest.period === 'SEMANA')
+    .map(({ latest, ids }) => ({ ...latest, ids }))
   if (habits.length === 0) return null
   return <section className="semana-habitos" aria-label="Metas semanales">
     <h2 className="semana-habitos__titulo">Metas semanales</h2>
     <ul className="semana-habitos__lista">{habits.map(h => {
-      const total = week.days.reduce((sum, day) => sum + (
-        day.habitIds && !day.habitIds.includes(h.id) ? 0
-          : Number(day.habitLogs.find(log => log.habitId === h.id)?.value ?? 0)
-      ), 0)
+      const total = round(week.days.reduce((sum, day) => sum + day.habitLogs
+        .filter(log => h.ids.includes(log.habitId) && (!day.habitIds || day.habitIds.includes(log.habitId)))
+        .reduce((daySum, log) => daySum + Number(log.value), 0), 0))
       const done = total >= h.dailyGoal!
       const progress = `${fmtN(total)} de ${fmtN(h.dailyGoal!)}${h.unit ? ` ${h.unit}` : ''} esta semana`
       return <li key={h.id} className={`semana-habito${done ? ' semana-habito--ok' : ''}`}

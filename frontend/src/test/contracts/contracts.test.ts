@@ -165,7 +165,8 @@ describe('contratos del backend', () => {
           "step": 1.5,
           "period": "DIA",
           "countsFlexibleMeals": true,
-          "displayOrder": 1
+          "displayOrder": 1,
+          "uid": "00000000-0000-0000-0000-000000000001"
         }
       ],
       "days": [
