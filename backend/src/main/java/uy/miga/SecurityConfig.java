@@ -47,9 +47,19 @@ class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
+            @Value("${app.cors.allowed-origins}") List<String> allowedOrigins,
+            @Value("${app.cors.allowed-origin-patterns:}") List<String> allowedOriginPatterns) {
+        // Un comodín total dejaría que cualquier sitio use la API desde el navegador de una persona.
+        if (allowedOrigins.stream().anyMatch(origin -> origin.contains("*"))) {
+            throw new IllegalStateException("CORS_ALLOWED_ORIGINS no admite comodines; usá CORS_ALLOWED_ORIGIN_PATTERNS.");
+        }
+        List<String> patterns = allowedOriginPatterns.stream().map(String::strip).filter(p -> !p.isEmpty()).toList();
+        if (patterns.stream().anyMatch(p -> !p.matches("https://[^*]+\\*[^*/]+"))) {
+            throw new IllegalStateException("CORS_ALLOWED_ORIGIN_PATTERNS solo admite patrones https con un comodín dentro del dominio.");
+        }
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
