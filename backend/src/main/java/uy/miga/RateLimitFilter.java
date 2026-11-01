@@ -23,7 +23,8 @@ class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
-        if ("POST".equals(req.getMethod())) {
+        if ("POST".equals(req.getMethod())
+                || ("DELETE".equals(req.getMethod()) && "/api/v1/users/me".equals(req.getRequestURI()))) {
             long retryAfter = limiter.checkIp(req.getRequestURI(), resolveIp(req));
             if (retryAfter > 0) {
                 res.setStatus(429);

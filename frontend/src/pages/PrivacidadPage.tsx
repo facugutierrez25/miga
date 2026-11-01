@@ -82,7 +82,7 @@ export default function PrivacidadPage() {
                 <li><strong>Oposición</strong>: oponerte al tratamiento de tus datos en cualquier momento.</li>
               </ul>
               <p>
-                Para ejercer cualquiera de estos derechos, escribinos a{' '}
+                Para acceso, rectificación u oposición, escribinos a{' '}
                 <a href="mailto:hola@miga.uy" className="priv-link">hola@miga.uy</a>.
               </p>
             </div>
@@ -92,10 +92,10 @@ export default function PrivacidadPage() {
             <h2 className="priv-section__title">Eliminación de cuenta</h2>
             <div className="priv-section__body">
               <p>
-                Podés solicitar la eliminación de tu cuenta y todos tus datos en cualquier momento
-                escribiéndonos a{' '}
-                <a href="mailto:hola@miga.uy" className="priv-link">hola@miga.uy</a>.
-                Procesamos la solicitud dentro de los 10 días hábiles siguientes.
+                Podés eliminar tu cuenta desde <Link to="/perfil" className="priv-link">Perfil</Link>,
+                en la sección «Eliminar mi cuenta», confirmando con tu contraseña.
+                Se eliminan tu cuenta, planes y versiones, reglas propias, notas, comidas,
+                hábitos y registros. La eliminación es inmediata y no se puede deshacer.
               </p>
             </div>
           </section>
