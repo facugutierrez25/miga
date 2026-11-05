@@ -896,3 +896,73 @@
   border: 1px solid var(--line);
   color: var(--ink);
 }
+
+/* "Cómo lo calculé": hoja inferior en celular, diálogo centrado en escritorio. */
+.regla-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--overlay, rgba(0, 0, 0, 0.45));
+}
+.regla-dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--s5) var(--s5) calc(var(--s6) + env(safe-area-inset-bottom));
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+}
+.regla-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+.regla-dialog__title { margin: 0; font-size: var(--fs-h3); }
+.regla-dialog__close {
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+.regla-dialog__item { margin: 0; font-size: var(--fs-body); }
+.regla-dialog__resultado { margin: var(--s1) 0 0; font-size: var(--fs-body); font-weight: 600; }
+.regla-dialog__label {
+  margin: var(--s4) 0 var(--s1);
+  font-size: var(--fs-cap);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.regla-dialog__regla {
+  margin: 0;
+  padding: var(--s3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+}
+.regla-dialog__ayuda { margin: var(--s4) 0 var(--s2); font-size: var(--fs-sm); color: var(--text-secondary); }
+.regla-dialog__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--s4);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+@media (min-width: 640px) {
+  .regla-overlay { align-items: center; }
+  .regla-dialog { border-radius: var(--radius-card); padding-bottom: var(--s5); }
+}

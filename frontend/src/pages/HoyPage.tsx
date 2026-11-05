@@ -1,5 +1,6 @@
 import { groupColor } from '../groupColors'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
@@ -7,6 +8,8 @@ import Brand from '../components/Brand'
 import Migas from '../components/Migas'
 import { type MigaRow } from '../components/migaSlots'
 import { useTitle } from '../hooks/useTitle'
+import { useDialogFocus } from './useDialogFocus'
+import { reglaLegible } from './reglaLegible'
 import { useAhora } from '../hooks/useAhora'
 import { type PlanFoodGroupDto, type MealDto } from '../api/plans'
 import {
@@ -140,22 +143,52 @@ function ActionsMenu({ label, actions, buttonRef, disabled = false }: {
       disabled={disabled} onClick={() => setOpen(value => !value)}>⋯</button>
     {open && <div className="nota-menu__items" ref={menuRef} id={menuId} role="menu" aria-label={label}>
       {actions.map(action => <button key={action.label} type="button" role="menuitem"
+        // Safari (iPhone) no enfoca un botón al tocarlo: sin esto el menú se cierra por blur
+        // antes del click y la opción elegida no hace nada.
+        onMouseDown={event => event.preventDefault()}
         disabled={action.disabled} onClick={() => { close(); action.onClick() }}>{action.label}</button>)}
     </div>}
   </div>
 }
 
-function ItemActions({ item, disabled, onRemove }: {
-  item: EntryItemDto; disabled: boolean; onRemove?: () => void
+function ReglaDialog({ item, resultado, onClose }: {
+  item: EntryItemDto; resultado: string | null; onClose: () => void
+}) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
+  const titleId = useId()
+  const cantidad = item.quantity !== null ? ` · ${fmt(item.quantity)} ${item.unit ?? ''}`.trimEnd() : ''
+  // Portal: las tarjetas de vidrio usan backdrop-filter, que encerraría un position: fixed.
+  return createPortal(
+    <div className="regla-overlay" onClick={onClose}>
+      <div className="regla-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        onClick={event => event.stopPropagation()}>
+        <div className="regla-dialog__header">
+          <h2 id={titleId} className="regla-dialog__title">Cómo lo calculé</h2>
+          <button type="button" className="regla-dialog__close" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+        <p className="regla-dialog__item"><strong>{item.food}</strong>{cantidad}</p>
+        {resultado && <p className="regla-dialog__resultado">= {resultado}</p>}
+        <p className="regla-dialog__label">Regla usada</p>
+        <p className="regla-dialog__regla">{reglaLegible(item.appliedRule ?? '')}</p>
+        <p className="regla-dialog__ayuda">¿Tu plan dice otra cosa?</p>
+        <Link className="regla-dialog__link" to="/mi-plan" state={{ tab: 'rules' }}>Ajustar en Mi plan</Link>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function ItemActions({ item, disabled, onRemove, resultado = null }: {
+  item: EntryItemDto; disabled: boolean; onRemove?: () => void; resultado?: string | null
 }) {
   const [showRule, setShowRule] = useState(false)
   return <>
     <ActionsMenu label={`Más opciones de ${item.food}`} actions={[
-      { label: 'Cómo lo calculé', disabled: !item.appliedRule, onClick: () => setShowRule(value => !value) },
+      { label: 'Cómo lo calculé', disabled: !item.appliedRule, onClick: () => setShowRule(true) },
       ...(onRemove && item.id > 0 && item.origin !== 'RESPUESTA'
         ? [{ label: 'Quitar', disabled, onClick: onRemove }] : []),
     ]} />
-    {showRule && <p className="nota-item__regla">{item.appliedRule}</p>}
+    {showRule && <ReglaDialog item={item} resultado={resultado} onClose={() => setShowRule(false)} />}
   </>
 }
 
@@ -264,7 +297,8 @@ function ItemRow({ item, date, token, gruposMap, onPatched, onRemove, removing }
             )}
           </>
         )}
-        <ItemActions item={item} disabled={!!removing} onRemove={onRemove} />
+        <ItemActions item={item} disabled={!!removing} onRemove={onRemove}
+          resultado={item.portions !== null ? `${fmt(item.portions)} ${item.portions === 1 ? 'porción' : 'porciones'}${label ? ` de ${label}` : ''}` : null} />
       </div>
       {item.uncertain && <p className="nota-item__regla">cantidad estimada</p>}
       {editando && !repartiendo && (
@@ -794,7 +828,10 @@ function NotaMealSection({
                       })}>
                       Corregir
                     </button>
-                    <ItemActions item={primero} disabled={guardando || conflict} onRemove={() => handleRemove(primero)} />
+                    <ItemActions item={primero} disabled={guardando || conflict} onRemove={() => handleRemove(primero)}
+                      resultado={mencion.map(item =>
+                        `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
+                      ).join(' + ')} />
                   </div>
                   <ul id={detailId} hidden={!expanded} className="nota-items" aria-label={`Grupos de ${primero.food}`}>
                     {mencion.map(item => fila(item))}

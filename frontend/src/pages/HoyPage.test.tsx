@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, fireEvent, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import HoyPage from './HoyPage'
+import { reglaLegible } from './reglaLegible'
 import * as plansApi from '../api/plans'
 import * as registroApi from '../api/registro'
 import * as AuthContext from '../auth/authTypes'
@@ -281,9 +282,42 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
 
   fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de mate' }))
   fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
-  expect(screen.getByText('mate = libre (sin porcion asignada)')).toBeInTheDocument()
+  expect(screen.getByText('mate = libre (sin porción asignada)')).toBeInTheDocument()
   expect(screen.queryByText('Sin grupo en tu plan')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Corregir mate' })).not.toBeInTheDocument()
+})
+
+test('"Cómo lo calculé" abre un pop-up con la regla legible, también en Safari', async () => {
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  mockSaveNota.mockResolvedValue({
+    noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 98, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: 'MENTION', uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
+    items: [{
+      originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
+      standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
+      uncertain: false, recognized: true, tipo: 'LIBRE',
+    }],
+  })
+  renderHoy()
+  await abrirNota()
+  fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'mate' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de mate' }))
+  const opcion = screen.getByRole('menuitem', { name: 'Cómo lo calculé' })
+  // Safari no enfoca el botón tocado: el mousedown no debe mover el foco fuera del menú.
+  expect(fireEvent.mouseDown(opcion)).toBe(false)
+  fireEvent.click(opcion)
+  const dialogo = screen.getByRole('dialog', { name: 'Cómo lo calculé' })
+  expect(dialogo).toHaveTextContent('mate = libre (sin porción asignada)')
+  expect(screen.getByRole('link', { name: 'Ajustar en Mi plan' })).toHaveAttribute('href', '/mi-plan')
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Cómo lo calculé' })).not.toBeInTheDocument()
+})
+
+test('la regla se muestra con números y acentos legibles', () => {
+  expect(reglaLegible('90.000 g de pollo = 1 porcion')).toBe('90 g de pollo = 1 porción')
+  expect(reglaLegible('arroz = 0.500 porcion (supuesto)')).toBe('arroz = 0,5 porción (supuesto)')
+  expect(reglaLegible('1 tostada = 1 panificado')).toBe('1 tostada = 1 panificado')
 })
 
 test('no duplica las menciones que ya generaron ítems', async () => {

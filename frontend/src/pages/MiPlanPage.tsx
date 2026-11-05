@@ -145,7 +145,9 @@ function PlanLoader() {
   useTitle('Mi plan | Miga')
   const { token, email } = useAuth()
   const { data, status, retry } = usePlan(token, email)
-  const [tab, setTab] = useState<Tab>('resumen')
+  // "Ajustar en Mi plan" desde Hoy abre directo la pestaña de reglas.
+  const location = useLocation()
+  const [tab, setTab] = useState<Tab>(() => (location.state as { tab?: Tab } | null)?.tab === 'rules' ? 'rules' : 'resumen')
   return <PlanEditor initialPlan={data} loading={status === 'loading'} loadError={status === 'error'} retry={retry} tab={tab} setTab={setTab} />
 }
 
