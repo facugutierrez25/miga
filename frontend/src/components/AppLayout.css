@@ -1,6 +1,10 @@
 /* ── Mobile: nav fija abajo, sin header ── */
 
 .app-layout {
+  --nav-item-height: 54px;
+  --nav-padding: 3px;
+  --nav-offset: 14px;
+  --nav-clearance: calc(var(--nav-item-height) + 2 * var(--nav-padding) + 2px + var(--nav-offset) + 16px);
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
@@ -13,17 +17,17 @@
 }
 
 .app-layout__main {
-  flex: 1;
+  flex: 1 0 auto;
   /* empuja el contenido por debajo de la status bar (notch / Dynamic Island) */
   padding-top: env(safe-area-inset-top, 0px);
   /* espacio para la barra flotante: el contenido termina por encima de ella */
-  padding-bottom: calc(var(--nav-clearance, 96px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px));
 }
 
 /* Celular: el foco y los anclajes nunca quedan tapados por la barra (WCAG 2.4.11) */
 @media (max-width: 639px) {
   :root {
-    --nav-clearance: 96px;
+    --nav-clearance: 92px;
     scroll-padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px));
   }
 }
@@ -33,9 +37,9 @@
 .app-nav {
   position: fixed;
   left: 50%;
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--nav-offset) + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  padding: 3px;
+  padding: var(--nav-padding);
   border-radius: 999px;
   background: var(--nav-glass);
   -webkit-backdrop-filter: var(--nav-blur);
@@ -58,7 +62,7 @@
 
 .nav-item {
   width: 62px;
-  height: 54px;
+  height: var(--nav-item-height);
   display: flex;
   flex-direction: column;
   align-items: center;
