@@ -33,6 +33,10 @@ app:
     # Patrones para las vistas previas de Vercel, por ejemplo https://miga-*-facugutierrez25.vercel.app
     allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}
   base-url: ${APP_BASE_URL:http://localhost:5173}
+  auth:
+    # Cookie del refresh token (ADR 0004). En local con http, Chrome y Firefox aceptan
+    # cookies Secure en localhost; para otro navegador se puede poner en false.
+    cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
   mail:
     from: ${MAIL_FROM:noreply@miga.uy}
     # Solo perfil local sin proveedor: muestra en el log el enlace de verificación.

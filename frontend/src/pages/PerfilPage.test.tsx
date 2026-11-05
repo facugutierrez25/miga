@@ -18,7 +18,7 @@ beforeEach(() => {
     firstName: null,
     login: vi.fn(),
     setFirstName: vi.fn(),
-    sessionExpired: false,
+    sessionExpired: false, restoring: false,
     logout: mockLogout,
   })
 })
@@ -83,7 +83,7 @@ test('elimina la cuenta, cierra sesión y vuelve al inicio con mensaje', async (
   vi.mocked(deleteMe).mockResolvedValueOnce(undefined)
   mockLogout.mockImplementationOnce(() => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
-      token: null, email: null, firstName: null, sessionExpired: false,
+      token: null, email: null, firstName: null, sessionExpired: false, restoring: false,
       login: vi.fn(), setFirstName: vi.fn(), logout: mockLogout,
     })
   })

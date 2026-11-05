@@ -28,6 +28,11 @@ class CorsConfigTest {
     }
 
     @Test
+    void credentialsAreAllowedForTheRefreshTokenCookie() {
+        assertThat(corsFor(List.of("https://miga.uy"), List.of()).getAllowCredentials()).isTrue();
+    }
+
+    @Test
     void wildcardsAreRejectedAtStartup() {
         assertThatThrownBy(() -> corsFor(List.of("*"), List.of()))
             .isInstanceOf(IllegalStateException.class);

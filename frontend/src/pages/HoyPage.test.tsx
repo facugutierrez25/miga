@@ -46,7 +46,7 @@ beforeEach(() => {
     firstName: 'Facu',
     login: vi.fn(),
     setFirstName: vi.fn(),
-    sessionExpired: false,
+    sessionExpired: false, restoring: false,
     logout: vi.fn(),
   })
   mockGetDayRegistro.mockResolvedValue(dayVacio)

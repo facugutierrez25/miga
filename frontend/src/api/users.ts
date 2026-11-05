@@ -5,8 +5,27 @@ export async function register(email: string, password: string): Promise<void> {
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const data = await apiRequest<{ token: string }>('/api/v1/users/login', { method: 'POST', body: { email, password }, errorMessage: 'Error al iniciar sesión. Intentá de nuevo.', errorMessages: { 401: 'Email o contraseña incorrectos.', 403: 'EMAIL_NOT_VERIFIED' } })
+  const data = await apiRequest<{ token: string }>('/api/v1/users/login', { method: 'POST', body: { email, password }, credentials: 'include', errorMessage: 'Error al iniciar sesión. Intentá de nuevo.', errorMessages: { 401: 'Email o contraseña incorrectos.', 403: 'EMAIL_NOT_VERIFIED' } })
   return data.token
+}
+
+// Restaura la sesión con el refresh token de la cookie HttpOnly. Devuelve null si no hay sesión.
+export async function refreshSession(): Promise<string | null> {
+  try {
+    const data = await apiRequest<{ token?: unknown }>('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' })
+    return data && typeof data.token === 'string' ? data.token : null
+  } catch {
+    return null
+  }
+}
+
+// Revoca el refresh token del dispositivo. Si falla, la cookie vence sola.
+export async function logoutSession(): Promise<void> {
+  try {
+    await apiRequest('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
+  } catch {
+    // Sin conexión: la sesión en memoria ya se cerró igual.
+  }
 }
 
 export async function verifyEmail(token: string): Promise<void> {

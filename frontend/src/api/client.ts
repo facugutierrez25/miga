@@ -24,6 +24,8 @@ interface RequestOptions {
   errorMessage?: string
   errorMessages?: Record<number, string>
   responseType?: 'json' | 'blob' | 'text'
+  /** Solo login, refresh y logout envían la cookie del refresh token (ADR 0004). */
+  credentials?: RequestCredentials
 }
 
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
@@ -37,6 +39,7 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
     headers,
     signal,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    ...(opts.credentials ? { credentials: opts.credentials } : {}),
   })
 
   if (res.status === 204) return undefined as T

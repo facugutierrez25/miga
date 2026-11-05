@@ -27,13 +27,16 @@ class SecurityConfig {
                                             @Value("${app.ops.api-key:}") String opsApiKey) throws Exception {
         http
             .cors(Customizer.withDefaults())
+            // Sin CSRF de Spring: la API usa Bearer. Los únicos endpoints con cookie
+            // (/auth/refresh y /auth/logout) exigen un Origin permitido y SameSite=Strict.
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/status",
                         "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness",
                         "/api/v1/users", "/api/v1/users/login",
-                        "/api/v1/auth/verify", "/api/v1/auth/resend-verification").permitAll()
+                        "/api/v1/auth/verify", "/api/v1/auth/resend-verification",
+                        "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                 // Métricas e info son operativas: solo con la clave X-Ops-Key, nunca con un JWT de paciente.
                 .requestMatchers("/actuator/**").access(new OpsKeyAuthorizationManager(opsApiKey))
                 .anyRequest().authenticated())
@@ -62,6 +65,8 @@ class SecurityConfig {
         config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        // Necesario para que el navegador envíe la cookie del refresh token desde miga.uy.
+        config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
         return source;
