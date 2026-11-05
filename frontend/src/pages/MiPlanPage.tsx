@@ -531,11 +531,11 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
 
             {tab === 'resumen' && <>          <div className="plan-summary-links">
             {([['foods', 'Tus alimentos', counts?.foods], ['habits', 'Hábitos', counts?.habits]] as const).map(([section, label, count]) =>
-              <button key={section} data-summary-target={section} onClick={() => {
+              <button key={section} data-summary-target={section} aria-label={`Ver ${label.toLocaleLowerCase()}, ${count ?? 'cargando'}`} onClick={() => {
                 summaryTrigger.current = section
                 setRulesSection(section)
                 setTab('rules')
-              }}>{label} ({count ?? '…'})</button>)}
+              }}><span>{label} ({count ?? '…'})</span><span aria-hidden="true">›</span></button>)}
           </div></>}
             {error && <p className="plan-error" role="alert">{error}</p>}
 
