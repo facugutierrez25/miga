@@ -28,6 +28,6 @@ test('un 401 al guardar Hoy vence la sesión y redirige al login vía AuthContex
   </Routes></AuthProvider></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
   await screen.findByText('Desayuno')
-  fireEvent.click(await screen.findByRole('button', { name: 'mate' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Anotar: mate' }))
   expect(await screen.findByText('Login')).toBeInTheDocument()
 })

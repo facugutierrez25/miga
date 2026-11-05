@@ -247,11 +247,11 @@ class InterpreterService {
             }
             case "LIBRE" -> {
                 portions = BigDecimal.ZERO;
-                appliedRule = rule.alimento() + " = libre (sin porcion asignada)";
+                appliedRule = rule.alimento() + " = libre (sin porción asignada)";
             }
             case "FLEXIBLE" -> {
                 portions = BigDecimal.ZERO;
-                appliedRule = rule.alimento() + " = flexible (sin porcion fija)";
+                appliedRule = rule.alimento() + " = flexible (sin porción fija)";
             }
             case "COMPUESTO" -> {
                 // Sin conversión, los componentes se escalan por la cantidad anotada, como antes de la #274.
@@ -262,7 +262,7 @@ class InterpreterService {
                     if (converted != null) {
                         portions = converted.divide(rule.cantidadPorPorcion(), 3, RoundingMode.HALF_UP);
                         appliedRule = rule.cantidadPorPorcion() + " " + rule.unidad()
-                            + " de " + rule.alimento() + " = 1 porcion (compuesto)";
+                            + " de " + rule.alimento() + " = 1 porción (compuesto)";
                     } else {
                         uncertain = true;
                         appliedRule = rule.alimento() + " (compuesto, cantidad supuesta)";
@@ -275,17 +275,17 @@ class InterpreterService {
                     if (converted != null) {
                         portions = converted.divide(rule.cantidadPorPorcion(), 3, RoundingMode.HALF_UP);
                         appliedRule = rule.cantidadPorPorcion() + " " + rule.unidad()
-                            + " de " + rule.alimento() + " = 1 porcion";
+                            + " de " + rule.alimento() + " = 1 porción";
                     } else {
                         portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
                             .setScale(3, RoundingMode.HALF_UP);
                         uncertain = true;
-                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " porcion (supuesto)";
+                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " " + uy.miga.reglas.RuleText.portionUnit(rule.porcionPorDefecto()) + " (supuesto)";
                     }
                 } else {
                     portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
                         .setScale(3, RoundingMode.HALF_UP);
-                    appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " porcion";
+                    appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " " + uy.miga.reglas.RuleText.portionUnit(rule.porcionPorDefecto());
                 }
             }
         }
@@ -294,7 +294,7 @@ class InterpreterService {
             originalText, rule.alimento(),
             unit == null && ("NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo()))
                 ? portions : BigDecimal.valueOf(qty),
-            unit != null ? unit : "porcion",
+            unit != null ? unit : uy.miga.reglas.RuleText.portionUnit(portions),
             rule.foodGroupId(), rule.standardGroupKey(),
             portions, appliedRule, uncertain, rule.id(),
             "COMPUESTO".equals(rule.tipo()) ? rule.componentes() : null,

@@ -348,7 +348,12 @@
 }
 
 .semana-comida__estado--full { color: var(--ok); }
-.semana-comida__estado--half { color: var(--warn); }
+.semana-comida__estado--half {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--s1);
+}
 .semana-comida__estado--noted,
 .semana-comida__estado--empty { color: var(--text-secondary); }
 

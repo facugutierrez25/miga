@@ -1,3 +1,5 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi, test, expect, afterEach } from 'vitest'
@@ -55,4 +57,11 @@ test('navega a Perfil al hacer clic', () => {
   fireEvent.click(screen.getByRole('link', { name: /perfil/i }))
   expect(screen.getByRole('link', { name: /perfil/i })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: /hoy/i })).not.toHaveAttribute('aria-current')
+})
+
+test('reserva espacio móvil según las dimensiones de la barra y lo libera en escritorio', async () => {
+  const css = readFileSync('src/components/AppLayout.css', 'utf8')
+  expect(css).toContain('padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px))')
+  expect(css).toContain('--nav-clearance: calc(var(--nav-item-height)')
+  expect(css).toMatch(/@media \(min-width: 640px\)[\s\S]*padding-bottom: 0/)
 })
