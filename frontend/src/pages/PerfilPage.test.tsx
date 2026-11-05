@@ -72,6 +72,7 @@ test('cerrar sesión llama a logout', () => {
 test('contraseña incorrecta muestra el error y mantiene la sesión', async () => {
   vi.mocked(deleteMe).mockRejectedValueOnce(new Error('Contraseña incorrecta. No se eliminó tu cuenta.'))
   renderPerfil()
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta…' }))
   fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'incorrecta' } })
   fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta definitivamente' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Contraseña incorrecta')
@@ -93,9 +94,24 @@ test('elimina la cuenta, cierra sesión y vuelve al inicio con mensaje', async (
       <Route path="/" element={<LandingPage />} />
     </Routes>
   </MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta…' }))
   fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'correcta' } })
   fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta definitivamente' }))
   await waitFor(() => expect(deleteMe).toHaveBeenCalledWith('tok', 'correcta'))
   expect(await screen.findByRole('status')).toHaveTextContent('Tu cuenta y todos tus datos fueron eliminados')
   expect(mockLogout).toHaveBeenCalledTimes(1)
+})
+
+test('la eliminación está plegada y después de cerrar sesión', () => {
+  renderPerfil()
+  const toggle = screen.getByRole('button', { name: 'Eliminar mi cuenta…' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cerrar sesión' }).compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByLabelText('Contraseña actual')).toBeInTheDocument()
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument()
 })

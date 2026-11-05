@@ -19,6 +19,7 @@ export default function PerfilPage() {
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
 
+  const [deletionOpen, setDeletionOpen] = useState(false)
   const [password, setPassword] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deletionError, setDeletionError] = useState('')
@@ -80,8 +81,18 @@ export default function PerfilPage() {
           </div>
         </div>
 
+        <button disabled={deleting} className="btn-cerrar-sesion" onClick={cerrarSesion}>
+          Cerrar sesión
+        </button>
+
         <section className="perfil-card account-deletion" aria-labelledby="delete-account-title">
-          <h2 id="delete-account-title">Eliminar mi cuenta</h2>
+          <h2 id="delete-account-title"><button type="button" className="btn-cerrar-sesion"
+            aria-expanded={deletionOpen} aria-controls="delete-account-panel" disabled={deleting}
+            onClick={() => { setDeletionOpen(!deletionOpen); setPassword(''); setDeletionError('') }}>
+            Eliminar mi cuenta…
+          </button></h2>
+          {deletionOpen && <div id="delete-account-panel">
+
           <p id="delete-account-description">
             Se borrarán tu cuenta, todos tus planes y versiones, reglas propias, notas,
             registros de comidas, hábitos y sus registros. No se puede deshacer.
@@ -99,11 +110,10 @@ export default function PerfilPage() {
               {deleting ? 'Eliminando cuenta…' : 'Eliminar mi cuenta definitivamente'}
             </button>
           </form>
+          </div>}
         </section>
 
-        <button disabled={deleting} className="btn-cerrar-sesion" onClick={cerrarSesion}>
-          Cerrar sesión
-        </button>
+
       </div>
     </div>
   )
