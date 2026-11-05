@@ -113,7 +113,7 @@ test('planilla muestra la meta diaria con su unidad y fecha accesible', () => {
 test('Por día muestra cada comida, estado y nota; el contador flexible no se edita', () => {
   render(<SemanaPage />)
   expect(screen.getByText('Desayuno')).toBeInTheDocument()
-  expect(screen.getByText(/Registrada/)).toBeInTheDocument()
+  expect(screen.getByText(/Anotada/)).toBeInTheDocument()
   expect(screen.getByText('=pan y café')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Flexibles: completado, 2, lunes, 26 de octubre de 2026/ })).toBeDisabled()
 })

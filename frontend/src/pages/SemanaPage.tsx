@@ -1,3 +1,4 @@
+import { mealStatus } from '../lib/mealStatus'
 import { useRef, useState } from 'react'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
@@ -106,20 +107,6 @@ function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
   </section>
 }
 
-// Estado de cada comida: texto concreto y la miga que la representa en la tira de la semana.
-const MEAL_STATUS: Record<string, { text: string; miga: 'full' | 'half' | 'noted' | 'empty' }> = {
-  EN_PLAN: { text: 'Como el plan', miga: 'full' },
-  CASI: { text: 'Faltó algo', miga: 'half' },
-  DE_MAS: { text: 'De más', miga: 'half' },
-  PREGUNTAR: { text: 'Por confirmar', miga: 'half' },
-  REGISTRADA: { text: 'Registrada', miga: 'noted' },
-  SIN_ANOTAR: { text: 'Sin anotar', miga: 'empty' },
-}
-
-function mealStatus(status: string) {
-  return MEAL_STATUS[status] ?? { text: status, miga: 'empty' as const }
-}
-
 function resumenDia(day: WeekDayDto, futuro: boolean): string {
   if (futuro) return 'todavía no'
   const meals = day.meals ?? []
@@ -176,11 +163,11 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
       {meals.length > 0 && (
         <ul className="semana-comidas">
           {meals.map(meal => {
-            const estado = mealStatus(meal.status)
+            const estado = mealStatus(meal)
             return (
               <li key={meal.mealId} className="semana-comida">
                 <span className="semana-comida__nombre">{meal.name}</span>
-                <span className={`semana-comida__estado semana-comida__estado--${estado.miga}`}>{estado.text}</span>
+                <span className={`semana-comida__estado semana-comida__estado--${estado.miga}`}>{estado.label}</span>
                 {meal.noteText && <p className="semana-comida__nota">{meal.noteText}</p>}
               </li>
             )
@@ -279,7 +266,7 @@ function WeekStrip({ week, todayISO, selected, onSelect }: {
           >
             <span className="semana-tira__migas" aria-hidden="true">
               {(day.meals ?? []).map(meal => (
-                <i key={meal.mealId} className={`semana-miga semana-miga--${futuro ? 'futuro' : mealStatus(meal.status).miga}`} />
+                <i key={meal.mealId} className={`semana-miga semana-miga--${futuro ? 'futuro' : mealStatus(meal).miga}`} />
               ))}
             </span>
           </button>
