@@ -260,6 +260,19 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   }
 
 
+  const [previousLocation, setPreviousLocation] = useState(location)
+  if (previousLocation.key !== location.key) {
+    setPreviousLocation(location)
+    if (previousLocation.pathname === location.pathname) {
+      setComidas(savedPlan ? planALocal(savedPlan) : [])
+      setRulesDirty(false)
+      setDiscard(false)
+      setError(null)
+      setConflicto(false)
+      setTab('resumen')
+    }
+  }
+
   // Una edición de reglas puede crear una versión nueva del plan con otros ids de
   // grupos: se recargan las comidas para no confirmar porciones con ids viejos.
   const handleRulesChanged = useCallback((dto: PlanRules) => {
@@ -374,6 +387,8 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
         <div className="mi-plan-header__meta">
           <Brand size={20} />
         </div>
+        {tab !== 'resumen' && <button type="button" className="mi-plan-back"
+          disabled={confirmando || rulesBusy} onClick={cancelEditing}>‹ Mi plan</button>}
         <h1 className="mi-plan-header__title">Tu plan</h1>
       </header>
 
@@ -385,15 +400,9 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
 
         </>}
         {tab === 'comidas' && <>
-          <button disabled={confirmando} onClick={cancelEditing}>Cancelar</button>
           <button disabled={hasChanges} onClick={() => { setRulesSection('groups'); setTab('rules') }}>Grupos</button>
           {hasChanges && <p>Guardá o descartá los cambios de comidas antes de editar grupos.</p>}
         </>}
-        {tab === 'rules' && <button disabled={confirmando || rulesBusy} onClick={() => {
-          if (rulesDirty) setDiscard(true)
-          else if (rulesSection === 'groups') { setTab('comidas'); requestAnimationFrame(() => document.querySelector<HTMLElement>('.btn-agregar')?.focus()) }
-          else returnToSummary()
-        }}>Volver</button>}
           {discard && <div role="alert">
             <p>Tenés cambios sin guardar. ¿Querés descartarlos?</p>
             <button disabled={confirmando || rulesBusy} onClick={() => {
