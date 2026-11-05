@@ -336,7 +336,7 @@ class InterpreterServiceTest {
             var item = interpreter.interpret(text, List.of(compound)).getFirst();
             assertThat(item.portions()).isEqualTo(new BigDecimal("1.333"));
             assertThat(item.uncertain()).isFalse();
-            assertThat(item.appliedRule()).isEqualTo("150 g de Tarta = 1 porcion (compuesto)");
+            assertThat(item.appliedRule()).isEqualTo("150 g de Tarta = 1 porción (compuesto)");
         }
         var assumed = interpreter.interpret("2 ml de tarta", List.of(compound)).getFirst();
         assertThat(assumed.portions()).isEqualTo(new BigDecimal("2.000"));
@@ -375,7 +375,7 @@ class InterpreterServiceTest {
     @Test void missingMeasureDoesNotInventGrams() {
         var item = interpreter.interpret("pollo", List.of(normal(1L, "pollo", 1L,
             new BigDecimal("90"), "g"))).getFirst();
-        assertThat(item.unit()).isEqualTo("porcion");
+        assertThat(item.unit()).isEqualTo("porción");
         assertThat(item.portions()).isEqualByComparingTo("1");
         assertThat(item.uncertain()).isTrue();
     }
