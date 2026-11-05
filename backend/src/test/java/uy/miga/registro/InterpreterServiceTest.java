@@ -349,15 +349,41 @@ class InterpreterServiceTest {
         assertThat(interpreter.interpret("1 tarta", List.of(compound)).getFirst().portions()).isEqualTo(new BigDecimal("1.000"));
     }
 
-    @Test void compoundWithoutMentionUnitUsesDefaultPortions() {
+    @Test void compoundWithoutMentionUnitMarksEstimate() {
         for (boolean measured : List.of(true, false)) {
             var compound = rule(1L, "chivito", List.of(), "COMPUESTO", null, null,
                 measured ? new BigDecimal("150") : null, measured ? "g" : null, BigDecimal.ONE,
                 List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
             var item = interpreter.interpret("2 chivitos", List.of(compound)).getFirst();
             assertThat(item.portions()).isEqualTo(new BigDecimal("2.000"));
-            assertThat(item.uncertain()).isFalse();
+            assertThat(item.uncertain()).isTrue();
         }
     }
 
+
+    @Test void personalPluralWinsOverGlobalSynonym() {
+        var personal = new FoodRuleDto(2L, "USUARIO", 31L, 7L, "Mandarina", List.of(),
+            "NORMAL", null, 1L, List.of(), new BigDecimal("2"), "UNIDAD", BigDecimal.ONE);
+        var global = rule(1L, "mandarina", List.of("mandarinas"), "NORMAL", 1L, null,
+            new BigDecimal("2"), "unidad", new BigDecimal("2"), null);
+        var item = interpreter.interpret("2 mandarinas", List.of(global, personal)).getFirst();
+        assertThat(item.ruleId()).isEqualTo(2L);
+        assertThat(item.quantity()).isEqualByComparingTo("2");
+        assertThat(item.portions()).isEqualByComparingTo("1");
+        assertThat(item.uncertain()).isFalse();
+    }
+    @Test void missingMeasureDoesNotInventGrams() {
+        var item = interpreter.interpret("pollo", List.of(normal(1L, "pollo", 1L,
+            new BigDecimal("90"), "g"))).getFirst();
+        assertThat(item.unit()).isEqualTo("porcion");
+        assertThat(item.portions()).isEqualByComparingTo("1");
+        assertThat(item.uncertain()).isTrue();
+    }
+    @Test void explicitPiecesUseServingSize() {
+        var item = interpreter.interpret("2 galletas", List.of(normal(1L, "galleta", 1L,
+            new BigDecimal("2"), "UNIDAD"))).getFirst();
+        assertThat(item.quantity()).isEqualByComparingTo("2");
+        assertThat(item.portions()).isEqualByComparingTo("1");
+        assertThat(item.uncertain()).isFalse();
+    }
 }

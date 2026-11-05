@@ -42,4 +42,15 @@ class FoodEntryFacadeTest {
             1L, date, 2L, 3L, "RESPUESTA");
         verifyNoMoreInteractions(repository);
     }
+
+    @Test void correctionReplacesStaleRuleExplanation() {
+        var entry = new FoodEntry(1L, "user", 2L, date, "Mandarina", 2.0, "u", 3L);
+        entry.setAppliedRule("mandarina = 2 porciones");
+        entry.setSupuesto(true);
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(entry));
+        facade.correctEntry(1L, 2.0, "u", null, BigDecimal.ONE);
+        assertThat(entry.getAppliedRule()).isEqualTo("Corrección del usuario: 1 porciones");
+        assertThat(entry.getSupuesto()).isFalse();
+        assertThat(entry.getOrigen()).isEqualTo("USUARIO");
+    }
 }

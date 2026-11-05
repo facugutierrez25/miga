@@ -30,11 +30,11 @@ El módulo `planrules` orquesta las operaciones usando solo APIs públicas de `p
 
 ### Concurrencia
 
-La versión (`@Version`) del plan actúa como revisión de toda su configuración. Cada mutación envía la versión esperada; si no coincide o el plan ya no está vigente, se responde 409 `VERSION_CONFLICT`. Cada mutación incrementa la versión del plan. El bloqueo del plan vigente serializa las ediciones y todos los caminos de escritura de registros: notas, altas manuales, respuestas a grupos faltantes, correcciones con o sin regla, borrados, confirmaciones de consumo y registros de hábitos. Los identificadores se validan después de tomar el bloqueo contra la versión correspondiente; una nota nueva de hoy rechaza comidas de versiones anteriores con 409 `VERSION_CONFLICT`. Las notas existentes validan la comida contra su propio `plan_id`. Las versiones nuevas tienen una revisión mayor que la anterior.
+La versión (`@Version`) del plan actúa como revisión de toda su configuración. Cada mutación envía la versión esperada; si no coincide o el plan ya no está vigente, se responde 409 `VERSION_CONFLICT`. Cada mutación efectiva incrementa la versión del plan. Guardar grupos, reglas, hábitos o su orden sin cambios conserva la versión y no crea una copia histórica, incluso si el plan ya tiene registros. La comprobación se realiza después de validar la revisión y la pertenencia del recurso, antes de copiar o reinterpretar notas. El bloqueo del plan vigente serializa las ediciones y todos los caminos de escritura de registros: notas, altas manuales, respuestas a grupos faltantes, correcciones con o sin regla, borrados, confirmaciones de consumo y registros de hábitos. Los identificadores se validan después de tomar el bloqueo contra la versión correspondiente; una nota nueva de hoy rechaza comidas de versiones anteriores con 409 `VERSION_CONFLICT`. Las notas existentes validan la comida contra su propio `plan_id`. Las versiones nuevas tienen una revisión mayor que la anterior.
 
 ### Lo que se guarda en cada ítem
 
-Cada ítem interpretado guarda el texto de la regla aplicada (`applied_rule`) y un `occurrence_id` común a los componentes de una misma mención de un alimento compuesto. Los ítems anteriores a este cambio quedan sin regla visible; no se reconstruyen con reglas actuales. Al borrar un grupo sin referencias de configuración se desvinculan los ítems de la versión editable, conservando sus porciones y la regla aplicada.
+Cada ítem interpretado guarda el texto de la regla aplicada (`applied_rule`) y un `occurrence_id` común a los componentes de una misma mención de un alimento compuesto. Una corrección manual reemplaza la explicación anterior por las porciones corregidas y deja de marcar el ítem como estimado; conserva el texto original de la nota como referencia. Los ítems anteriores a este cambio quedan sin regla visible; no se reconstruyen con reglas actuales. Al borrar un grupo sin referencias de configuración se desvinculan los ítems de la versión editable, conservando sus porciones y la regla aplicada.
 
 ## Consecuencias
 
@@ -45,3 +45,9 @@ Cada ítem interpretado guarda el texto de la regla aplicada (`applied_rule`) y 
 - Una corrección normal guardada como regla expresa la cantidad por porción (`cantidad / porciones`, con tres decimales) y usa porción por defecto 1; exige porciones mayores a cero. Al actualizar esa regla se conservan sus sinónimos, unidos sin duplicados normalizados a los nuevos. Crear o renombrar una regla exige un nombre único normalizado dentro de la versión del usuario.
 - Volver a guardar una nota la reinterpreta entera y descarta sus correcciones; para conservar una corrección se guarda como regla.
 - Fuera de alcance: fusionar versiones del plan y edición retroactiva de días pasados.
+
+### Cantidades y selección de reglas
+
+Las coincidencias por nombre, sinónimo o plural respetan el alcance USUARIO > PLAN > GLOBAL. La búsqueda aproximada se usa solo si no existe una coincidencia de esas clases.
+
+Un número explícito sin unidad (por ejemplo, «2 mandarinas») se interpreta como unidades cuando la regla cuenta piezas y se divide por su cantidad por porción. Sin una medida compatible no se inventan gramos ni tazas: se registra una estimación en porciones, marcada como tal. La explicación de los compuestos incluye la cantidad y unidad de referencia. Estos cambios afectan a interpretaciones nuevas; no recalculan los registros históricos.

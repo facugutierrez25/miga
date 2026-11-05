@@ -49,11 +49,16 @@ class PlanRulesService {
                 .map(c -> new PlanRulesDto.ComponentDto(uids.get(c.foodGroupId()), c.porciones())).toList(), r.overridesRuleUid(), RuleText.describe(r, names));
     }
     private PlanRulesDto mutate(String email, Long version, Consumer<PlanRef> validate, java.util.function.BiConsumer<Long, Long> change) {
+        return mutate(email, version, validate, cur -> false, change);
+    }
+    private PlanRulesDto mutate(String email, Long version, Consumer<PlanRef> validate,
+            java.util.function.Predicate<PlanRef> unchanged, java.util.function.BiConsumer<Long, Long> change) {
         Long user = users.findUserIdByEmail(email);
         plans.lockCurrentPlan(user);
         PlanRef cur = plans.currentPlanRef(user);
         if (!Objects.equals(cur.version(), version)) throw new PlanVersionConflictException();
         validate.accept(cur);
+        if (unchanged.test(cur)) return aggregate(user);
         boolean used = notes.planHasNotes(cur.id()) || entries.hasEntriesForMeals(plans.getMealIds(cur.id())) || habits.planHasLogs(cur.id());
         Long editable = used ? plans.forkCurrentPlan(user) : cur.id();
         change.accept(user, editable);
@@ -63,13 +68,17 @@ class PlanRulesService {
     }
     PlanRulesDto group(String email, UUID uid, Requests.Group req) {
         return mutate(email, req.planVersion(), cur -> { if (uid != null) plans.findGroupIdByUid(cur.id(), uid); },
+            cur -> uid != null && plans.getPlanFoodGroups(cur.id()).stream().filter(g -> g.uid().equals(uid))
+                .anyMatch(g -> new GroupInput(req.name().strip(), req.abbreviation() == null || req.abbreviation().isBlank() ? g.abbreviation() : req.abbreviation(), req.clave(), req.color() == null ? g.color() : req.color(), Boolean.TRUE.equals(req.preguntarSiFalta()), Boolean.TRUE.equals(req.opcional()))
+                    .equals(new GroupInput(g.name(), g.abbreviation(), g.clave(), g.color(), g.preguntarSiFalta(), g.opcional()))),
             (user, id) -> { if (uid == null) plans.createGroup(id, req.input()); else plans.updateGroup(id, uid, req.input()); });
     }
     PlanRulesDto order(String email, Requests.Order req) {
         return mutate(email, req.planVersion(), cur -> {
             var all = plans.getPlanFoodGroups(cur.id()).stream().map(PlanFoodGroupDto::uid).collect(Collectors.toSet());
             if (req.uids().size() != all.size() || !all.equals(new HashSet<>(req.uids()))) throw new IllegalArgumentException("Indicá todos los grupos del plan una sola vez.");
-        }, (user, id) -> plans.reorderGroups(id, req.uids()));
+        }, cur -> plans.getPlanFoodGroups(cur.id()).stream().map(PlanFoodGroupDto::uid).toList().equals(req.uids()),
+            (user, id) -> plans.reorderGroups(id, req.uids()));
     }
     PlanRulesDto deleteGroup(String email, UUID uid, Long version) {
         return mutate(email, version, cur -> plans.findGroupIdByUid(cur.id(), uid), (user, id) -> {
@@ -92,6 +101,8 @@ class PlanRulesService {
     PlanRulesDto rule(String email, UUID uid, Requests.Rule req) {
         Long user = users.findUserIdByEmail(email);
         return mutate(email, req.planVersion(), cur -> { input(cur.id(), req); if (uid != null) requireUserRule(user, cur.id(), uid); },
+            cur -> uid != null && aggregate(user).alimentos().stream().filter(r -> r.uid().equals(uid))
+                .anyMatch(r -> sameRule(r, req)),
             (u, id) -> { if (uid == null) rules.createUserRule(u, id, input(id, req)); else rules.updateUserRule(u, id, uid, input(id, req)); });
     }
     PlanRulesDto deleteRule(String email, UUID uid, Long version) {
@@ -100,11 +111,28 @@ class PlanRulesService {
     }
     PlanRulesDto habit(String email, UUID uid, Requests.Habit req) {
         return mutate(email, req.planVersion(), cur -> { if (uid != null) requireHabit(cur.id(), uid); },
+            cur -> uid != null && habits.listHabits(cur.id()).stream().filter(h -> h.uid().equals(uid))
+                .anyMatch(h -> h.name().equals(req.name().strip()) && h.habitType().equals(req.habitType())
+                    && Objects.equals(h.unit(), req.unit()) && decimalEquals(h.goal(), req.goal())
+                    && h.period().equals(req.period()) && decimalEquals(h.step(), req.step() == null ? java.math.BigDecimal.ONE : req.step())
+                    && h.countsFlexibleMeals() == Boolean.TRUE.equals(req.countsFlexibleMeals())),
             (u, id) -> { if (uid == null) habits.createHabit(id, req.input()); else habits.updateHabit(id, uid, req.input()); });
     }
     private void requireHabit(Long id, UUID uid) { if (habits.listHabits(id).stream().noneMatch(h -> h.uid().equals(uid))) throw missing(); }
     PlanRulesDto deleteHabit(String email, UUID uid, Long version) {
         return mutate(email, version, cur -> requireHabit(cur.id(), uid), (u, id) -> habits.removeHabit(id, uid));
+    }
+    private static boolean decimalEquals(java.math.BigDecimal a, java.math.BigDecimal b) {
+        return a == null ? b == null : b != null && a.compareTo(b) == 0;
+    }
+    private static boolean sameRule(PlanRulesDto.RuleDto r, Requests.Rule in) {
+        return r.alimento().equals(in.alimento().strip()) && Objects.equals(r.tipo(), in.tipo())
+            && Objects.equals(r.sinonimos() == null ? List.of() : r.sinonimos(), in.sinonimos() == null ? List.of() : in.sinonimos())
+            && Objects.equals(r.groupUid(), in.groupUid()) && Objects.equals(r.unidad(), in.unidad())
+            && decimalEquals(r.cantidadPorPorcion(), in.cantidadPorPorcion())
+            && decimalEquals(r.porcionPorDefecto(), in.porcionPorDefecto() == null ? java.math.BigDecimal.ONE : in.porcionPorDefecto())
+            && Objects.equals(r.componentes().stream().map(c -> new Requests.Component(c.groupUid(), c.porciones())).toList(), in.componentes() == null ? List.of() : in.componentes())
+            && Objects.equals(r.overridesRuleUid(), in.overridesRuleUid());
     }
     private ResponseStatusException missing() { return new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el recurso en tu plan."); }
     @Transactional(readOnly=true)
