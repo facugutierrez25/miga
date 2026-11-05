@@ -44,3 +44,9 @@ test('una nota vacía prevalece sobre la comparación y los códigos antiguos ti
   })
   expect(mealStatus({ noteText: 'pan', status: 'DESCONOCIDO' }).label).toBe('Anotada')
 })
+
+test('respeta el estado calculado por el backend aunque la comida no tenga nota', () => {
+  expect(mealStatus({ noteText: null, status: 'EN_PLAN' }).label).toBe('Como el plan')
+  expect(mealStatus({ noteText: null, status: 'CASI' }).label).toBe('Faltó algo')
+  expect(mealStatus({ noteText: null }).label).toBe('Sin anotar')
+})

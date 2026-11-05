@@ -38,9 +38,11 @@ function describeGroups(groups: GroupStatusDto[], diff: (s: GroupStatusDto) => n
 }
 
 export function mealStatus(mealDay: { noteText: string | null; comparison?: GroupStatusDto[]; status?: string } | undefined): MealStatus {
-  if (!mealDay?.noteText) return statusFromCode('SIN_ANOTAR')
+  if (!mealDay) return statusFromCode('SIN_ANOTAR')
   const comparison = mealDay.comparison
-  if (!comparison) return statusFromCode(mealDay.status ?? 'REGISTRADA')
+  // Semana manda el estado ya calculado, que puede existir aunque la comida no tenga nota.
+  if (!comparison) return statusFromCode(mealDay.status ?? (mealDay.noteText ? 'REGISTRADA' : 'SIN_ANOTAR'))
+  if (!mealDay.noteText) return statusFromCode('SIN_ANOTAR')
   if (comparison.some(s => s.status === 'PREGUNTAR')) return statusFromCode('PREGUNTAR')
   if (comparison.length === 0) return statusFromCode('REGISTRADA')
   // El backend ya aplica el margen del plan: solo CASI y SIN_ANOTAR faltan, solo DE_MAS sobra.
