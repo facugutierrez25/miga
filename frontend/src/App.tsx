@@ -15,7 +15,8 @@ import VerificarEmailPage from './pages/VerificarEmailPage'
 import ScrollToTop from './components/ScrollToTop'
 
 function AuthLayout() {
-  const { token } = useAuth()
+  const { token, restoring } = useAuth()
+  if (!token && restoring) return <main className="app-restoring" aria-busy="true" aria-label="Abriendo tu sesión" />
   if (!token) return <Navigate to="/" replace />
   return <AppLayout />
 }

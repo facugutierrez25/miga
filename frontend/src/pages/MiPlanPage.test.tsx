@@ -30,7 +30,7 @@ const planConGrupos = {
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(),
-    sessionExpired: false, logout: vi.fn() })
+    sessionExpired: false, restoring: false, logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
   vi.mocked(rulesApi.getPlanRules).mockResolvedValue({ planId: 1, planVersion: 0, modoRegistro: 'LIBRE', grupos: [], alimentos: [], habitos: [] })
 

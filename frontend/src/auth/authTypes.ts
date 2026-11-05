@@ -5,6 +5,8 @@ export interface AuthContextValue {
   email: string | null
   firstName: string | null
   sessionExpired: boolean
+  /** true mientras se intenta restaurar la sesión guardada al abrir la app. */
+  restoring: boolean
   login: (token: string, firstName: string | null) => void
   setFirstName: (name: string) => void
   logout: () => void
