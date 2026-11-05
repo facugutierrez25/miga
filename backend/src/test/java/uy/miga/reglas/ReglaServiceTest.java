@@ -47,7 +47,7 @@ class ReglaServiceTest {
         FoodRule r=rule("USUARIO","barrita"); r.setTipo("COMPUESTO"); r.setComponentes(List.of(new Componente(3L,null,0.5),new Componente(4L,null,1)));
         when(repository.findApplicable(1L,2L)).thenReturn(List.of(r));
         assertThat(RuleText.describe(service.findApplicable(1L,2L).getFirst(),Map.of(3L,"Proteínas",4L,"Cereales")))
-            .isEqualTo("1 barrita = 0,5 Proteínas + 1 Cereales");
+            .isEqualTo("1 barrita = 0,5 porciones de Proteínas + 1 porción de Cereales");
     }
     @Test
     void upsertMatchesNormalizedNameAndPreservesIdentityAndOverride() {
@@ -183,7 +183,7 @@ class ReglaServiceTest {
             assertThat(result.cantidadPorPorcion()).isEqualTo(measured ? new BigDecimal("150") : null);
             assertThat(result.unidad()).isEqualTo(measured ? "g" : null);
             assertThat(RuleText.describe(result, Map.of(3L, "Cereales", 4L, "Verduras")))
-                .isEqualTo("1 Tarta" + (measured ? " (150 g)" : "") + " = 1 Cereales + 1 Verduras");
+                .isEqualTo("1 Tarta" + (measured ? " (150 g)" : "") + " = 1 porción de Cereales + 1 porción de Verduras");
         }
     }
 

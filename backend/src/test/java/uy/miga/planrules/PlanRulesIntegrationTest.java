@@ -256,7 +256,7 @@ class PlanRulesIntegrationTest {
             components.add(Map.of("groupUid",group(name).path("uid").asText(),"porciones",1)); groupIds.add(group(name).path("id").asLong());
         }
         state=request(post(BASE+"alimentos"),body(Map.of("alimento","barrita","tipo","COMPUESTO","componentes",components)),201);
-        assertThat(state.path("alimentos").get(0).path("textoRegla").asText()).isEqualTo("1 barrita = 1 Proteínas + 1 Cereales + 1 Grasas");
+        assertThat(state.path("alimentos").get(0).path("textoRegla").asText()).isEqualTo("1 barrita = 1 porción de Proteínas + 1 porción de Cereales + 1 porción de Grasas");
         var ids=meals(); String[] texts={"1 barrita","media barrita","2 barritas"}; double[] portions={1,0.5,2};
         for(int i=0;i<3;i++) note(ids.get(i),LocalDate.now(clock),texts[i]);
         JsonNode day=request(get("/api/v1/registro/"+LocalDate.now(clock)),null,200);
