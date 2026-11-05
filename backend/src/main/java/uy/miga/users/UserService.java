@@ -13,23 +13,21 @@ public class UserService {
 
     private final UsersRepository repository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
     private final VerificationService verificationService;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     UserService(UsersRepository repository, PasswordEncoder passwordEncoder,
-                JwtService jwtService, VerificationService verificationService,
+                VerificationService verificationService,
                 org.springframework.context.ApplicationEventPublisher events, org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.events = events;
         this.jdbc = jdbc;
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
         this.verificationService = verificationService;
     }
 
-    String login(String email, String password) {
+    User authenticate(String email, String password) {
         User user = repository.findByEmail(email)
             .orElseThrow(InvalidCredentialsException::new);
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
@@ -38,7 +36,7 @@ public class UserService {
         if (!user.isEmailVerified()) {
             throw new EmailNotVerifiedException();
         }
-        return jwtService.generateToken(user);
+        return user;
     }
 
     public Long findUserIdByEmail(String email) {

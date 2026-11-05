@@ -70,6 +70,8 @@ export APP_BASE_URL=https://<dominio-frontend>
 export MAIL_FROM=noreply@<dominio>
 export RESEND_API_KEY=<clave>
 export OPS_API_KEY=<clave-operativa-larga-y-aleatoria>
+# El frontend debe llamar al backend desde el mismo sitio (por ejemplo api.miga.uy
+# para miga.uy) o la cookie del refresh token no se envía (ADR 0004).
 
 # Iniciar
 java -jar miga-backend.jar
