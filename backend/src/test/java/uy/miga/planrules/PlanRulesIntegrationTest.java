@@ -149,6 +149,10 @@ class PlanRulesIntegrationTest {
         token=owner; state=ownerState;
         long revision=state.path("planVersion").asLong();
         state=request(put(BASE+resource+"/"+uid),body(values),200);
+        assertThat(state.path("planVersion").asLong()).isEqualTo(revision);
+        Map<String,Object> changedValues = new HashMap<>(values);
+        changedValues.put(resource.equals("alimentos") ? "alimento" : "name", "Modificado");
+        state=request(put(BASE+resource+"/"+uid),body(changedValues),200);
         assertThat(state.path("planVersion").asLong()).isGreaterThan(revision);
         state=request(delete(BASE+resource+"/"+uid).param("planVersion",state.path("planVersion").asText()),null,200);
         for(JsonNode remaining:state.path(array)) assertThat(remaining.path("uid").asText()).isNotEqualTo(uid);
@@ -589,7 +593,7 @@ class PlanRulesIntegrationTest {
         state = request(get(BASE + "reglas"), null, 200);
         JsonNode rule = state.path("alimentos").get(0);
         assertThat(rule.path("cantidadPorPorcion").asDouble()).isEqualTo(0.667);
-        assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1.5);
+        assertThat(rule.path("porcionPorDefecto").asDouble()).isEqualTo(1);
         assertThat(rule.path("sinonimos").get(0).asText()).isEqualTo("yogurt");
         for (String text : List.of("2 yogur prueba u", "2 yogurt u", "2 yogur prueba")) {
             JsonNode reinterpreted = note(meal, LocalDate.now(clock), text);
@@ -598,4 +602,27 @@ class PlanRulesIntegrationTest {
         }
     }
 
+
+    @ParameterizedTest @ValueSource(strings={"grupos", "alimentos", "habitos"})
+    void savingUnchangedConfigurationOnUsedPlanKeepsHistoryAndEntries(String resource) throws Exception {
+        Map<String,Object> values = switch(resource) {
+            case "grupos" -> Map.of("name", "Sin cambios");
+            case "alimentos" -> Map.of("alimento", "Sin cambios", "tipo", "NORMAL", "groupUid", group("Proteínas").path("uid").asText());
+            default -> Map.of("name", "Sin cambios", "habitType", "CONTADOR", "period", "SEMANA");
+        };
+        state = request(post(BASE + resource), body(values), 201);
+        String array = resource.equals("alimentos") ? "alimentos" : resource;
+        String uid = state.path(array).get(state.path(array).size() - 1).path("uid").asText();
+        long meal = meals().getFirst();
+        note(meal, LocalDate.now(clock), "pollo");
+        long planId = state.path("planId").asLong();
+        long version = state.path("planVersion").asLong();
+        long count = jdbc.queryForObject("select count(*) from plans", Long.class);
+        JsonNode dayBefore = request(get("/api/v1/registro/" + LocalDate.now(clock)), null, 200);
+        state = request(put(BASE + resource + "/" + uid), body(values), 200);
+        assertThat(state.path("planId").asLong()).isEqualTo(planId);
+        assertThat(state.path("planVersion").asLong()).isEqualTo(version);
+        assertThat(jdbc.queryForObject("select count(*) from plans", Long.class)).isEqualTo(count);
+        assertThat(request(get("/api/v1/registro/" + LocalDate.now(clock)), null, 200)).isEqualTo(dayBefore);
+    }
 }

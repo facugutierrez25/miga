@@ -312,7 +312,9 @@ public class RegistroService {
         if (!"COMPUESTO".equals(rule.tipo())) {
             return rule.alcance().equals("GLOBAL") ? item.appliedRule() : RuleText.describe(rule, groupNames);
         }
-        return "1 " + rule.alimento() + " = " + rule.componentes().stream()
+        return (rule.cantidadPorPorcion() != null
+            ? rule.cantidadPorPorcion().stripTrailingZeros().toPlainString().replace('.', ',') + " " + rule.unidad() + " de "
+            : "1 ") + rule.alimento() + " = " + rule.componentes().stream()
             .map(c -> {
                 Long groupId = c.foodGroupId() != null ? c.foodGroupId() : resolveGroupId(c.standardGroupKey(), planId);
                 String name = groupId == null ? c.standardGroupKey() : groupNames.getOrDefault(groupId, c.standardGroupKey());
@@ -498,7 +500,7 @@ public class RegistroService {
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
                     groupId, quantity.divide(portions, 3, RoundingMode.HALF_UP),
                     req.unit() != null ? req.unit() : entry.unit(),
-                    portions.divide(quantity, 3, RoundingMode.HALF_UP), List.of(), null));
+                    BigDecimal.ONE, List.of(), null));
             }
         }
 

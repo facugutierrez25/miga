@@ -103,6 +103,8 @@ public class FoodEntryFacade {
             if (unit != null) e.setUnit(unit.strip());
             if (foodGroupId != null) e.setFoodGroupId(foodGroupId);
             if (portions != null) e.setPorciones(portions);
+            e.setAppliedRule("Corrección del usuario: " + e.getPorciones() + " porciones");
+            e.setSupuesto(false);
             e.setOrigen("USUARIO");
             repository.save(e);
         });

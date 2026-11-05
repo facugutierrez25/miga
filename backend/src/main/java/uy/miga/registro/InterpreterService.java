@@ -103,9 +103,11 @@ class InterpreterService {
         double rawQty = 1.0;
         String remaining = segment;
         String detectedUnit = null;
+        boolean explicitQuantity = false;
 
         Matcher m = QUANTITY_PREFIX.matcher(segment);
         if (m.find()) {
+            explicitQuantity = true;
             rawQty = parseQuantity(m.group(1));
             remaining = segment.substring(m.end()).strip();
         } else {
@@ -114,6 +116,7 @@ class InterpreterService {
                 rawQty = Double.parseDouble(m2.group(1).replace(",", "."));
                 String unitToken = m2.group(2).toLowerCase();
                 if (UNIT_CANONICAL.containsKey(unitToken)) {
+                    explicitQuantity = true;
                     detectedUnit = UNIT_CANONICAL.get(unitToken);
                     remaining = segment.substring(m2.end()).strip();
                 }
@@ -160,10 +163,34 @@ class InterpreterService {
         FoodRuleDto rule = findRule(foodName, rules);
         if (rule == null) return InterpretedItem.unrecognized(segment);
 
-        return computePortions(segment, rawQty, detectedUnit, rule);
+        // Un número sin unidad cuenta piezas solo cuando la regla también cuenta piezas.
+        // Sin medida no se inventan gramos ni tazas: se registra una estimación en porciones.
+        boolean assumed = !explicitQuantity;
+        if (detectedUnit == null) {
+            if (explicitQuantity && "u".equals(canonical(rule.unidad()))) {
+                detectedUnit = "u";
+            } else {
+                assumed = true;
+            }
+        }
+        InterpretedItem item = computePortions(segment, rawQty, detectedUnit, rule);
+        return new InterpretedItem(item.originalText(), item.foodName(), item.quantity(), item.unit(),
+            item.foodGroupId(), item.standardGroupKey(), item.portions(), item.appliedRule(),
+            (("NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo())) && assumed) || item.uncertain(), item.ruleId(), item.components(), item.tipo());
     }
 
     FoodRuleDto findRule(String name, List<FoodRuleDto> rules) {
+        // Respetar el alcance también para sinónimos y plurales. Una coincidencia
+        // aproximada personal no debe ocultar una coincidencia exacta global.
+        for (String scope : List.of("USUARIO", "PLAN", "GLOBAL")) {
+            FoodRuleDto match = findRuleWithin(name, rules.stream()
+                .filter(r -> scope.equals(r.alcance())).toList(), false);
+            if (match != null) return match;
+        }
+        return findRuleWithin(name, rules, true);
+    }
+
+    private FoodRuleDto findRuleWithin(String name, List<FoodRuleDto> rules, boolean fuzzy) {
         // 1. Exact match on food name
         for (FoodRuleDto r : rules) {
             if (normalize(r.alimento()).equals(name)) return r;
@@ -185,7 +212,7 @@ class InterpreterService {
                         if (normalize(s).equals(stem)) return r;
             }
         }
-        if (name.length() < 4 || name.length() > 100) return null;
+        if (!fuzzy || name.length() < 4 || name.length() > 100) return null;
         List<FoodRuleDto> candidates = new ArrayList<>();
         int bestDist = 3;
         for (FoodRuleDto r : rules) {
@@ -265,8 +292,9 @@ class InterpreterService {
 
         return new InterpretedItem(
             originalText, rule.alimento(),
-            BigDecimal.valueOf(qty),
-            unit != null ? unit : (rule.unidad() != null ? rule.unidad() : "u"),
+            unit == null && ("NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo()))
+                ? portions : BigDecimal.valueOf(qty),
+            unit != null ? unit : "porcion",
             rule.foodGroupId(), rule.standardGroupKey(),
             portions, appliedRule, uncertain, rule.id(),
             "COMPUESTO".equals(rule.tipo()) ? rule.componentes() : null,
