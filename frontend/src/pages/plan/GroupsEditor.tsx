@@ -84,6 +84,7 @@ export default function GroupsEditor({ token, plan, mutate, onDirtyChange, meals
   return (
     <section aria-label="Grupos" onKeyDown={e => { if (e.key === 'Escape') { closeEditor(); setOrdering(false) } }}>
       <button type="button" aria-pressed={ordering} onClick={() => setOrdering(!ordering)}>{ordering ? 'Listo' : 'Ordenar'}</button>
+      {groups.length === 0 && <p>Todavía no tenés grupos. Agrupan los alimentos para organizar las porciones de tus comidas. Tocá Agregar grupo para crear uno.</p>}
       <ol className="rules-list">
         {groups.map((group, index) => (
           <li className="rules-card" key={group.uid}>

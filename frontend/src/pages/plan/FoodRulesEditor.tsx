@@ -61,6 +61,7 @@ export default function FoodRulesEditor(props: EditorProps) {
         <input value={query} onChange={(e) => setQuery(e.target.value)} />
       </label>
       <h3>En tu plan</h3>
+      {plan.alimentos.length === 0 && <p>Todavía no tenés alimentos en tu plan. Acá podés indicar sus porciones y equivalencias. Usá Agregar alimento o buscá uno en el catálogo para ajustarlo.</p>}
       {plan.alimentos
         .filter((rule) =>
           (editing !== 'new' && editing?.uid === rule.uid) || [rule.alimento, ...rule.sinonimos].some((s) =>

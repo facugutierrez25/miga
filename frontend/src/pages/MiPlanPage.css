@@ -1041,3 +1041,20 @@
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+.mi-plan-back {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  background: transparent;
+  border: 0;
+  color: var(--primary);
+  font-weight: 600;
+}
+.mi-plan-back:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

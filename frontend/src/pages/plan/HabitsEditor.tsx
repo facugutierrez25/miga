@@ -41,6 +41,7 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange }: Edi
 
   return (
     <section aria-label="Hábitos" onKeyDown={e => { if (e.key === 'Escape') closeEditor() }}>
+      {plan.habitos.length === 0 && <p>Todavía no tenés hábitos. Sirven para registrar acciones y metas de tu día o semana. Tocá Agregar hábito para crear uno.</p>}
       {plan.habitos.map((habit) => (
         <article className="rules-card" key={habit.uid}>
           <button type="button" className="rules-item" aria-label={`Editar ${habit.name}`} onClick={() => openEditor(habit)}><strong>{habit.name}</strong>
