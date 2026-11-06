@@ -1053,3 +1053,10 @@
 @keyframes hoy-scrim-in { from { opacity: 0; } }
 @keyframes hoy-sheet-in { from { transform: translateY(24px); opacity: 0; } }
 @keyframes hoy-dialog-in { from { transform: scale(0.96); opacity: 0; } }
+
+/* El detalle de interpretación se abre en una hoja, con espacio para corregir cada alimento. */
+.entendido-overlay[hidden] { display: none; }
+.entendido-dialog { max-width: 640px; overscroll-behavior: contain; }
+.entendido-dialog .nota-entendido { display: flex; flex-direction: column; gap: var(--s3); }
+.entendido-dialog .nota-items { gap: var(--s3); }
+.entendido-dialog .nota-entendido__resumen { margin: 0; }

@@ -229,10 +229,9 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: '1 barrita' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-  const titulo = await screen.findByRole('heading', { name: 'Así lo entendí' })
-  expect(titulo).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Así lo entendí' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: /^Así lo entendí/ })).toHaveAttribute('aria-haspopup', 'dialog')
   await abrirDetalle()
+  expect(screen.getByRole('dialog', { name: 'Así lo entendí' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Más opciones de barrita' }))
   fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
   expect(screen.getAllByText(reglaBarrita)).toHaveLength(1)
@@ -257,7 +256,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
 
   await abrirDetalle()
   expect(screen.getByText(/cantidad estimada/)).toBeInTheDocument()
-  if (screen.getByRole('button', { name: /Revisar lo que/ }).getAttribute('aria-expanded') === 'false') await abrirDetalle()
+  if (screen.getByRole('button', { name: /^Así lo entendí/ }).getAttribute('aria-expanded') === 'false') await abrirDetalle()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
   fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
@@ -285,6 +284,7 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'mate' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
+  await abrirDetalle()
   fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de mate' }))
   fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
   expect(screen.getByText('mate = libre (sin porción asignada)')).toBeInTheDocument()
@@ -307,6 +307,7 @@ test('"Cómo lo calculé" abre un pop-up con la regla legible, también en Safar
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'mate' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
+  await abrirDetalle()
   fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de mate' }))
   const opcion = screen.getByRole('menuitem', { name: 'Cómo lo calculé' })
   // Safari no enfoca el botón tocado: el mousedown no debe mover el foco fuera del menú.
@@ -341,7 +342,7 @@ test('no duplica las menciones que ya generaron ítems', async () => {
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: '1 barrita' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-  await screen.findByRole('heading', { name: 'Así lo entendí' })
+  await screen.findByRole('button', { name: /^Así lo entendí/ })
   expect(screen.queryByText('barrita (compuesto)')).not.toBeInTheDocument()
   await abrirDetalle()
   fireEvent.click(screen.getByRole('button', { name: 'Más opciones de barrita' }))
@@ -604,7 +605,7 @@ test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', as
   renderHoy()
   await abrirNota()
 
-  if (screen.getByRole('button', { name: /Revisar lo que/ }).getAttribute('aria-expanded') === 'false') await abrirDetalle()
+  if (screen.getByRole('button', { name: /^Así lo entendí/ }).getAttribute('aria-expanded') === 'false') await abrirDetalle()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveFocus()
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
@@ -839,6 +840,7 @@ test('quitar usa la versión, actualiza texto y lista, anuncia y enfoca el títu
   const meal = setupRemoval()
   vi.mocked(registroApi.removeItem).mockResolvedValue({ ...meal, noteVersion: 8, noteText: 'leche', items: [removableItems[0]] })
   renderHoy()
+  await abrirDetalle()
   fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de manzana' }))
   fireEvent.click(screen.getByRole('menuitem', { name: 'Quitar' }))
   await waitFor(() => expect(registroApi.removeItem).toHaveBeenCalledWith('tok', expect.any(String), 102, 7))
@@ -852,6 +854,7 @@ test('quitar con conflicto ofrece Recargar', async () => {
   setupRemoval()
   vi.mocked(registroApi.removeItem).mockRejectedValue(new registroApi.NoteConflictError('La nota cambió.'))
   renderHoy()
+  await abrirDetalle()
   fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de manzana' }))
   fireEvent.click(screen.getByRole('menuitem', { name: 'Quitar' }))
   expect(await screen.findByRole('button', { name: 'Recargar' })).toBeInTheDocument()
@@ -905,6 +908,7 @@ test.each([
   expect(row).toHaveAccessibleName(`Desayuno: ${expected} · De más: 1 porción de Grasas`)
   expect(row).not.toHaveTextContent(/9876|9999/)
   fireEvent.click(row)
+  await abrirDetalle()
   expect(await screen.findByText(new RegExp(`Entendí:.*${expected}`))).toBeVisible()
 })
 
@@ -942,13 +946,15 @@ test('usa el color del grupo propio en sus migas', async () => {
 })
 
 async function abrirDetalle() {
-  fireEvent.click(await screen.findByRole('button', { name: /Revisar lo que/ }))
+  if (!screen.queryByRole('dialog', { name: 'Así lo entendí' })) {
+    fireEvent.click(await screen.findByRole('button', { name: /^Así lo entendí/ }))
+  }
 }
 
-test('el detalle empieza cerrado, se abre y conserva la corrección al plegarlo', async () => {
+test('el popup empieza cerrado y conserva la corrección al cerrarlo y volver a abrirlo', async () => {
   setupRemoval([{ ...removableItems[0], uncertain: true }])
   renderHoy()
-  const toggle = await screen.findByRole('button', { name: 'Revisar lo que entendí · 1 estimados' })
+  const toggle = await screen.findByRole('button', { name: 'Así lo entendí · 1 estimados' })
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
   expect(screen.queryByRole('button', { name: 'Corregir leche' })).not.toBeInTheDocument()
   fireEvent.click(toggle)
@@ -957,13 +963,13 @@ test('el detalle empieza cerrado, se abre y conserva la corrección al plegarlo'
   expect(correct).toHaveTextContent('Corregir')
   fireEvent.click(correct)
   fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
-  fireEvent.click(toggle)
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar Así lo entendí' }))
   expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   fireEvent.click(toggle)
   expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveValue(3)
 })
 
-test('las preguntas y los alimentos sin grupo o sin reconocer se ven con el detalle cerrado', async () => {
+test('las preguntas quedan en Hoy y los alimentos sin grupo se muestran en el popup', async () => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{
     mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche, manzana, algo raro',
@@ -971,12 +977,15 @@ test('las preguntas y los alimentos sin grupo o sin reconocer se ven con el deta
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'PREGUNTAR' }],
   }] })
   renderHoy()
-  expect(await screen.findByRole('button', { name: /Revisar lo que/ })).toHaveAttribute('aria-expanded', 'false')
+  expect(await screen.findByRole('button', { name: /^Así lo entendí/ })).toHaveAttribute('aria-expanded', 'false')
   expect(screen.getByText(/¿Consumiste/)).toBeVisible()
   expect(screen.getByRole('button', { name: 'Sí' })).toBeVisible()
+  expect(screen.getByText('manzana')).not.toBeVisible()
+  expect(screen.getByText('algo raro')).not.toBeVisible()
+  await abrirDetalle()
   expect(screen.getByText('manzana')).toBeVisible()
   expect(screen.getByText('algo raro')).toBeVisible()
-  expect(screen.queryByRole('button', { name: 'Corregir leche' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Corregir leche' })).toBeVisible()
 })
 
 test.each([
@@ -1087,6 +1096,7 @@ test('cómo lo calculé muestra cada cosa escrita con su tipo de regla y aclara 
     { id: 105, food: 'algo raro', quantity: null, unit: null, foodGroupId: null, portions: null, origin: 'UNKNOWN', uncertain: false, occurrenceId: 'raro' },
   ])
   renderHoy()
+  await abrirDetalle()
   fireEvent.click(await screen.findByRole('button', { name: 'Cómo lo calculé' }))
   const dialog = screen.getByRole('dialog', { name: 'Cómo lo calculé' })
   expect(dialog).toHaveTextContent('no cambia el plan de tu nutri')
@@ -1095,5 +1105,52 @@ test('cómo lo calculé muestra cada cosa escrita con su tipo de regla y aclara 
   expect(within(dialog).getByText('Comida flexible')).toBeInTheDocument()
   expect(within(dialog).getByText('Sin regla')).toBeInTheDocument()
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog', { name: 'Cómo lo calculé' })).not.toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: 'Así lo entendí' })).toBeInTheDocument()
+})
+
+
+test('el popup contiene el foco, cierra con Escape y lo devuelve al botón', async () => {
+  setupRemoval([removableItems[0]])
+  renderHoy()
+  const trigger = await screen.findByRole('button', { name: /^Así lo entendí/ })
+  expect(screen.queryByRole('dialog', { name: 'Así lo entendí' })).not.toBeInTheDocument()
+  fireEvent.click(trigger)
+  const dialog = screen.getByRole('dialog', { name: 'Así lo entendí' })
+  const close = within(dialog).getByRole('button', { name: 'Cerrar Así lo entendí' })
+  expect(close).toHaveFocus()
+  expect(document.body.style.overflow).toBe('hidden')
+  const buttons = within(dialog).getAllByRole('button')
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+  expect(buttons[buttons.length - 1]).toHaveFocus()
+  fireEvent.keyDown(document, { key: 'Tab' })
+  expect(close).toHaveFocus()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Así lo entendí' })).not.toBeInTheDocument()
+  expect(document.body.style.overflow).not.toBe('hidden')
+  expect(trigger).toHaveFocus()
+})
+
+test('Escape cierra solo la regla superpuesta y mantiene abierto Así lo entendí', async () => {
+  setupRemoval([{ ...removableItems[0], appliedRule: '1 u de leche = 1 porcion' }])
+  renderHoy()
+  await abrirDetalle()
+  fireEvent.click(screen.getByRole('button', { name: 'Cómo lo calculé' }))
+  expect(screen.getByRole('dialog', { name: 'Cómo lo calculé' })).toBeInTheDocument()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Cómo lo calculé' })).not.toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: 'Así lo entendí' })).toBeInTheDocument()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Así lo entendí' })).not.toBeInTheDocument()
+})
+
+test('el popup cierra al tocar el fondo pero no al tocar su contenido', async () => {
+  setupRemoval([removableItems[0]])
+  renderHoy()
+  await abrirDetalle()
+  const dialog = screen.getByRole('dialog', { name: 'Así lo entendí' })
+  fireEvent.click(within(dialog).getByText('leche', { exact: true }))
+  expect(dialog).toBeVisible()
+  fireEvent.click(dialog.parentElement!)
+  expect(dialog).not.toBeVisible()
 })
