@@ -26,7 +26,7 @@ function pips(rows: MigaRow[]): Pip[] {
   return rows.flatMap(row => migaSlots(row.done, row.total).map(slot => ({ color: row.color, ...slot })))
 }
 
-function celdas(lista: Pip[]): (Pip | null)[] {
+function celdas<T>(lista: T[]): (T | null)[] {
   const n = lista.length
   if (n > 9) return Array.from({ length: 12 }, (_, i) => lista[i] ?? null)
   const pos = DADO[n] ?? []
@@ -58,23 +58,28 @@ function sumar(rows: MigaRow[], campo: 'done' | 'total'): number {
 export default function FichaComida({ nombre, rows }: { nombre: string; rows: MigaRow[] }) {
   const ref = useRef<HTMLDivElement>(null)
   const lista = pips(rows)
-  const llenos = lista.filter(p => p.filled > 0).length
-  const anterior = useRef<number | null>(null)
+  // Qué posiciones de la mitad "Anotaste" están llenas: al anotar se animan solo las que se suman.
+  const firma = lista.map(p => (p.filled > 0 ? 1 : 0)).join('')
+  const anterior = useRef<string | null>(null)
 
   // Al anotar, solo aparecen las porciones nuevas de esta comida, una tras otra. Al cargar la
   // pantalla no se anima nada, y con movimiento reducido el estado ya está dibujado.
   useGSAP(() => {
     const previo = anterior.current
-    anterior.current = llenos
-    if (previo === null || llenos <= previo || !ref.current || typeof window.matchMedia !== 'function') return
-    const nuevos = Array.from(ref.current.querySelectorAll('.ficha__mitad--anotado .ficha__pip--on')).slice(previo)
+    anterior.current = firma
+    if (previo === null || !ref.current || typeof window.matchMedia !== 'function') return
+    const sumadas = new Set([...firma].flatMap((v, i) => (v === '1' && previo[i] !== '1' ? [i] : [])))
+    if (sumadas.size === 0) return
+    const pips = Array.from(ref.current.querySelectorAll('.ficha__mitad--anotado .ficha__pip, .ficha__mitad--anotado .ficha__vacio'))
+    const orden = celdas(lista.map((_, i) => i))
+    const nuevos = pips.filter((_, k) => { const i = orden[k]; return i !== null && sumadas.has(i) })
     const mm = gsap.matchMedia()
     mm.add('(prefers-reduced-motion: no-preference)', () => {
       gsap.fromTo(nuevos, { scale: 0.25, autoAlpha: 0 },
         { scale: 1, autoAlpha: 1, duration: 0.5, ease: 'back.out(1.6)', stagger: 0.06, transformOrigin: '50% 50%' })
     })
     return () => mm.revert()
-  }, { dependencies: [llenos], scope: ref })
+  }, { dependencies: [firma], scope: ref })
 
   if (lista.length > MAX_PORCIONES_FICHA) return <Migas rows={rows} differencesOnly />
 

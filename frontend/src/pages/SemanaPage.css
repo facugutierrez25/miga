@@ -694,8 +694,22 @@
 }
 
 .semana-sheet th[scope="row"] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--surface);
+  box-shadow: inset -1px 0 0 var(--line);
+}
+
+.semana-sheet tr:has(th[aria-current="date"]) th[scope="row"] {
+  box-shadow: inset 3px 0 0 var(--accent), inset -1px 0 0 var(--line);
+}
+
+.semana-sheet__hoy {
   font-weight: 500;
-  min-width: 140px;
+  color: var(--text-secondary);
 }
 
 .semana-note {
@@ -708,6 +722,11 @@
   .semana-header,
   .semana-body {
     max-width: 720px;
+  }
+
+  /* En escritorio el logo ya está en la barra lateral */
+  .semana-header__top {
+    display: none;
   }
 
   .semana-header {

@@ -491,6 +491,13 @@ export default function SemanaPage() {
   )
 }
 
+// En la planilla la fecha va corta ("Lun 2") para que entren las comidas; el nombre accesible es la fecha completa.
+function fechaCorta(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  const dia = d.toLocaleDateString('es-UY', { weekday: 'short' }).replace(/\./g, '')
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${d.getDate()}`
+}
+
 function WeekSheet({ week, todayISO }: { week: WeekSummaryDto; todayISO: string }) {
   const meals = [...new Set(week.days.flatMap(day => (day.meals ?? []).map(meal => meal.name)))]
   return <div className="semana-sheet"><table>
@@ -498,9 +505,9 @@ function WeekSheet({ week, todayISO }: { week: WeekSummaryDto; todayISO: string 
     <thead><tr><th scope="col">Fecha</th>{meals.map(name => <th scope="col" key={name}>{name}</th>)}
       {week.habits.map(h => <th scope="col" key={h.id}>{h.name}</th>)}</tr></thead>
     <tbody>{week.days.map(day => <tr key={day.date}>
-      <th scope="row" aria-current={day.date === todayISO ? 'date' : undefined}>
-        <time dateTime={day.date}>{fullDate(day.date)}</time>
-        {day.date === todayISO && <span> · Hoy</span>}
+      <th scope="row" aria-current={day.date === todayISO ? 'date' : undefined} aria-label={`${fullDate(day.date)}${day.date === todayISO ? ', hoy' : ''}`}>
+        <time dateTime={day.date}>{fechaCorta(day.date)}</time>
+        {day.date === todayISO && <span className="semana-sheet__hoy"> · Hoy</span>}
       </th>
       {meals.map(name => <td className="semana-note" key={name}>{(day.meals ?? []).filter(m => m.name === name).map(m => m.noteText).filter(Boolean).join('\n') || '—'}</td>)}
       {week.habits.map(h => <td key={h.id} aria-label={hasGoal(h) ? `${h.name}: ${day.habitIds && !day.habitIds.includes(h.id) ? 'No corresponde' : habitProgress(h, Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}, ${fullDate(day.date)}` : undefined}>
