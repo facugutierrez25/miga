@@ -738,3 +738,6 @@
     line-height: 32px;
   }
 }
+
+.semana-miga--flexible { background: var(--accent); border-color: var(--ink); }
+.semana-comida__estado--flexible { color: var(--on-accent-soft); background: var(--accent-soft); border-radius: var(--radius-sm); padding: var(--s1); }
