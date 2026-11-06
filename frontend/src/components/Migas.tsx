@@ -1,4 +1,4 @@
-import { formatPortions, migaSlots, migasLabel, type MigaRow } from './migaSlots'
+import { formatPortions, migaDifference, migaDifferenceLabel, migaSlots, migasLabel, type MigaRow } from './migaSlots'
 import './Migas.css'
 
 // Cada porción del plan es una miga: llena si se comió, contorno si falta y medio círculo
@@ -23,9 +23,8 @@ export default function Migas({ rows, differencesOnly = false }: { rows: MigaRow
     <div className="migas">
       {rows.map(row => {
         const count = `${formatPortions(row.done)} de ${formatPortions(row.total)}`
-        const difference = (row.status === 'CASI' || row.status === 'SIN_ANOTAR') ? `falta ${formatPortions(row.total - row.done)}`
-          : row.status === 'DE_MAS' ? `${formatPortions(row.done - row.total)} de más` : ''
-        const label = differencesOnly ? `${row.name}: ${count}${row.status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}` : migasLabel(row)
+        const difference = migaDifference(row)
+        const label = differencesOnly ? migaDifferenceLabel(row) : migasLabel(row)
         return <div key={row.id} className="migas__row" role="img" aria-label={label}>
           <span className="migas__name" aria-hidden="true">{row.name}</span>
           <span className="migas__dots" aria-hidden="true">
