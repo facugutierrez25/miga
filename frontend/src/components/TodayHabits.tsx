@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/authTypes'
 import { useWeek } from '../hooks/useWeek'
-import { logHabit, type HabitDto, type WeekSummaryDto } from '../api/semana'
+import { logHabit, type HabitDto } from '../api/semana'
 import './TodayHabits.css'
 
 function fullDate(date: string) { return new Date(date + 'T12:00:00').toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }
@@ -30,41 +30,6 @@ function habitDone(habit: HabitDto, value: number): boolean {
   // La meta semanal se marca en el resumen, no en cada día.
   return habit.period === 'DIA' && round(value) >= habit.dailyGoal!
 }
-
-
-function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
-  // Una versión nueva del plan copia el hábito con otro id y el mismo uid: se suman todas sus
-  // versiones de la semana y se usa la meta de la más reciente.
-  const versions = new Map<string, HabitDto[]>()
-  for (const h of week.habits) {
-    const key = h.uid ?? String(h.id)
-    versions.set(key, [...(versions.get(key) ?? []), h])
-  }
-  const habits = [...versions.values()]
-    .map(vs => ({ latest: vs[vs.length - 1], ids: vs.map(v => v.id) }))
-    .filter(({ latest }) => hasGoal(latest) && latest.period === 'SEMANA')
-    .map(({ latest, ids }) => ({ ...latest, ids }))
-  if (habits.length === 0) return null
-  return <section className="hoy-habitos" aria-label="Metas semanales">
-    <h2 className="hoy-habitos__titulo">Metas semanales</h2>
-    <ul className="hoy-habitos__lista">{habits.map(h => {
-      const total = round(week.days.reduce((sum, day) => sum + day.habitLogs
-        .filter(log => h.ids.includes(log.habitId) && (!day.habitIds || day.habitIds.includes(log.habitId)))
-        .reduce((daySum, log) => daySum + Number(log.value), 0), 0))
-      const done = total >= h.dailyGoal!
-      const progress = `${fmtN(total)} de ${fmtN(h.dailyGoal!)}${h.unit ? ` ${h.unit}` : ''} esta semana`
-      return <li key={h.id} className={`hoy-habito${done ? ' hoy-habito--ok' : ''}`}
-        aria-label={`${h.name}: ${progress}, ${done ? 'completado' : 'pendiente'}`}>
-        <span className="hoy-habito__check" aria-hidden="true">{done && (
-          <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        )}</span>
-        <span className="hoy-habito__name">{h.name}</span>
-        <span className="hoy-habito__val">{progress}</span>
-      </li>
-    })}</ul>
-  </section>
-}
-
 
 
 export default function TodayHabits({ date, revision }: { date: string; revision?: unknown }) {
@@ -165,6 +130,5 @@ export default function TodayHabits({ date, revision }: { date: string; revision
 
       {habitError && <p className="hoy-habit-error" role="alert">{habitError}</p>}
 
-    {week && <WeeklyHabitSummary week={week} />}
   </section>
 }

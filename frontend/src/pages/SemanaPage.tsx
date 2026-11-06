@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
-import { exportWeek, type WeekDayDto, type WeekSummaryDto } from '../api/semana'
+import { exportWeek, type HabitDto, type WeekDayDto, type WeekSummaryDto } from '../api/semana'
 import './SemanaPage.css'
 import { useWeek } from '../hooks/useWeek'
 import { useAhora } from '../hooks/useAhora'
@@ -53,6 +53,49 @@ function formatRango(start: string, end: string): string {
 function fmtN(n: number): string {
   return n.toLocaleString('es-UY', { useGrouping: false, maximumFractionDigits: 2 })
 }
+
+function round(n: number): number {
+  return Math.round(n * 1000) / 1000
+}
+
+function hasGoal(habit: HabitDto): boolean {
+  return habit.habitType !== 'SI_NO' && habit.dailyGoal != null
+}
+
+function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
+  // Una versión nueva del plan copia el hábito con otro id y el mismo uid: se suman todas sus
+  // versiones de la semana y se usa la meta de la más reciente.
+  const versions = new Map<string, HabitDto[]>()
+  for (const h of week.habits) {
+    const key = h.uid ?? String(h.id)
+    versions.set(key, [...(versions.get(key) ?? []), h])
+  }
+  const habits = [...versions.values()]
+    .map(vs => ({ latest: vs[vs.length - 1], ids: vs.map(v => v.id) }))
+    .filter(({ latest }) => hasGoal(latest) && latest.period === 'SEMANA')
+    .map(({ latest, ids }) => ({ ...latest, ids }))
+  if (habits.length === 0) return null
+  return <section className="semana-habitos" aria-label="Metas semanales">
+    <h2 className="semana-habitos__titulo">Metas semanales</h2>
+    <ul className="semana-habitos__lista">{habits.map(h => {
+      const total = round(week.days.reduce((sum, day) => sum + day.habitLogs
+        .filter(log => h.ids.includes(log.habitId) && (!day.habitIds || day.habitIds.includes(log.habitId)))
+        .reduce((daySum, log) => daySum + Number(log.value), 0), 0))
+      const done = total >= h.dailyGoal!
+      const progress = `${fmtN(total)} de ${fmtN(h.dailyGoal!)}${h.unit ? ` ${h.unit}` : ''} esta semana`
+      return <li key={h.id} className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
+        aria-label={`${h.name}: ${progress}, ${done ? 'completado' : 'pendiente'}`}>
+        <span className="semana-habito__check" aria-hidden="true">{done && (
+          <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        )}</span>
+        <span className="semana-habito__name">{h.name}</span>
+        <span className="semana-habito__val">{progress}</span>
+      </li>
+    })}</ul>
+  </section>
+}
+
+
 
 function resumenDia(day: WeekDayDto, futuro: boolean): string {
   if (futuro) return 'todavía no'
@@ -322,6 +365,7 @@ export default function SemanaPage() {
                 )}
               </>
             ) : <WeekSheet week={week} todayISO={hoy} />}
+            <WeeklyHabitSummary week={week} />
           </>
         )}
         {exportOpen && week && (
