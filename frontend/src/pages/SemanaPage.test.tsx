@@ -165,3 +165,63 @@ test('PDF muestra un error y permite volver a intentar la descarga', async () =>
   fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
   await waitFor(() => expect(exportWeek).toHaveBeenCalledTimes(2))
 })
+
+function renderProgress(habit: Partial<api.HabitDto>, values: number[]) {
+  const data: api.WeekSummaryDto = {
+    weekStart: '2026-10-26', weekEnd: '2026-11-01',
+    habits: [{ id: 3, name: 'Agua', habitType: 'CANTIDAD', dailyGoal: 2,
+      unit: 'lt', step: 0.5, period: 'DIA', displayOrder: 1, ...habit }],
+    days: values.map((value, i) => ({ date: `2026-10-${26 + i}`, hasData: true,
+      totalRecorded: 0, totalGoal: 0, habitIds: [3], meals: [],
+      habitLogs: [{ habitId: 3, date: `2026-10-${26 + i}`, value }] })),
+  }
+  vi.mocked(useWeek).mockReturnValue({ data, status: 'success', error: null,
+    setData: vi.fn(), retry: vi.fn(), reload: vi.fn().mockResolvedValue(data) })
+  render(<SemanaPage />)
+}
+
+
+test.each([[1, 2, false], [2, 3, true]])('meta semanal suma %s y %s', (first, second, done) => {
+  renderProgress({ period: 'SEMANA', dailyGoal: 5, unit: null }, [first, second])
+  const summary = screen.getByRole('listitem', { name: `Agua: ${first + second} de 5 esta semana, ${done ? 'completado' : 'pendiente'}` })
+  expect(summary.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
+
+})
+
+test('meta semanal con decimales se cumple al llegar justo a la meta', () => {
+  renderProgress({ period: 'SEMANA', dailyGoal: 0.8, unit: null }, [0.1, 0.7])
+  expect(screen.getByRole('listitem', { name: 'Agua: 0,8 de 0,8 esta semana, completado' })).toBeInTheDocument()
+})
+
+test('meta semanal suma las versiones del mismo hábito y usa la meta más reciente', () => {
+  const data: api.WeekSummaryDto = {
+    weekStart: '2026-10-26', weekEnd: '2026-11-01',
+    habits: [
+      { id: 3, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 4, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
+      { id: 7, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 5, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
+    ],
+    days: [
+      { date: '2026-10-26', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [3], meals: [],
+        habitLogs: [{ habitId: 3, date: '2026-10-26', value: 2 }] },
+      { date: '2026-10-27', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [7], meals: [],
+        habitLogs: [{ habitId: 7, date: '2026-10-27', value: 3 }] },
+    ],
+  }
+  vi.mocked(useWeek).mockReturnValue({ data, status: 'success', error: null,
+    setData: vi.fn(), retry: vi.fn(), reload: vi.fn().mockResolvedValue(data) })
+  render(<SemanaPage />)
+  expect(screen.getAllByRole('listitem', { name: /esta semana/ })).toHaveLength(1)
+  expect(screen.getByRole('listitem', { name: 'Agua: 5 de 5 esta semana, completado' })).toBeInTheDocument()
+})
+
+
+
+test('Metas semanales permanece visible tanto en Tarjeta como en Planilla', () => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  const data = { ...base.data!, habits: base.data!.habits.map(h => ({ ...h, period: 'SEMANA', dailyGoal: 5 })) }
+  vi.mocked(useWeek).mockReturnValue({ ...base, data })
+  render(<SemanaPage />)
+  expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeVisible()
+})

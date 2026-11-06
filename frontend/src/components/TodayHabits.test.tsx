@@ -47,40 +47,6 @@ test.each([['CANTIDAD', 1.5, false], ['CANTIDAD', 2, true], ['CONTADOR', 3, true
   }
 )
 
-test.each([[1, 2, false], [2, 3, true]])('meta semanal suma %s y %s', (first, second, done) => {
-  renderProgress({ period: 'SEMANA', dailyGoal: 5, unit: null }, [first, second])
-  const summary = screen.getByRole('listitem', { name: `Agua: ${first + second} de 5 esta semana, ${done ? 'completado' : 'pendiente'}` })
-  expect(summary.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
-  expect(screen.getByRole('group', { name: new RegExp(`Agua: ${first}, lunes`) })).not.toHaveClass('hoy-habito--ok')
-
-})
-
-test('meta semanal con decimales se cumple al llegar justo a la meta', () => {
-  renderProgress({ period: 'SEMANA', dailyGoal: 0.8, unit: null }, [0.1, 0.7])
-  expect(screen.getByRole('listitem', { name: 'Agua: 0,8 de 0,8 esta semana, completado' })).toBeInTheDocument()
-})
-
-test('meta semanal suma las versiones del mismo hábito y usa la meta más reciente', () => {
-  const data: api.WeekSummaryDto = {
-    weekStart: '2026-10-26', weekEnd: '2026-11-01',
-    habits: [
-      { id: 3, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 4, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
-      { id: 7, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 5, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
-    ],
-    days: [
-      { date: '2026-10-26', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [3], meals: [],
-        habitLogs: [{ habitId: 3, date: '2026-10-26', value: 2 }] },
-      { date: '2026-10-27', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [7], meals: [],
-        habitLogs: [{ habitId: 7, date: '2026-10-27', value: 3 }] },
-    ],
-  }
-  vi.mocked(useWeek).mockReturnValue({ data, status: 'success', error: null,
-    setData: vi.fn(), retry: vi.fn(), reload: vi.fn().mockResolvedValue(data) })
-  render(<TodayHabits date="2026-10-26" />)
-  expect(screen.getAllByRole('listitem', { name: /esta semana/ })).toHaveLength(1)
-  expect(screen.getByRole('listitem', { name: 'Agua: 5 de 5 esta semana, completado' })).toBeInTheDocument()
-})
-
 test.each([[0, false], [0.5, true]])('sin meta conserva la marca con valor %s', (value, done) => {
   renderProgress({ dailyGoal: null }, [value])
   const row = screen.getByRole('group', { name: /Agua:/ })
@@ -120,4 +86,12 @@ test('un contador se puede bajar si se sumó de más', async () => {
   expect(screen.getByText('500 ml')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /Restar 250 ml de Agua, lunes, 26 de octubre de 2026/ }))
   await waitFor(() => expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 250))
+})
+
+
+test('Hoy permite anotar el hábito semanal sin mostrar el resumen de Metas semanales', () => {
+  renderProgress({ period: 'SEMANA', dailyGoal: 5, unit: null }, [2, 3])
+  expect(screen.getByRole('group', { name: /Agua: 2, lunes/ })).not.toHaveClass('hoy-habito--ok')
+  expect(screen.queryByRole('region', { name: 'Metas semanales' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Sumar 0,5 a Agua/ })).toBeEnabled()
 })

@@ -4,7 +4,7 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
 
 // Ciclo de foco de un diálogo modal: al abrir enfoca el primer control, Tab y Shift+Tab
 // quedan dentro del diálogo, Escape lo cierra y al cerrar el foco vuelve al disparador.
-export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
+export function useDialogFocus<T extends HTMLElement>(onClose: () => void, active = true) {
   const dialogRef = useRef<T>(null)
   const closeRef = useRef(onClose)
 
@@ -13,12 +13,15 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
   }, [onClose])
 
   useEffect(() => {
+    if (!active) return
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const dialog = dialogRef.current
     dialog?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
 
     function onKeyDown(e: KeyboardEvent) {
       if (!dialog) return
+      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')
+      if (dialogs.length > 0 && dialogs[dialogs.length - 1] !== dialog) return
       if (e.key === 'Escape') {
         e.preventDefault()
         closeRef.current()
@@ -43,7 +46,7 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
       document.removeEventListener('keydown', onKeyDown)
       trigger?.focus()
     }
-  }, [])
+  }, [active])
 
   return dialogRef
 }
