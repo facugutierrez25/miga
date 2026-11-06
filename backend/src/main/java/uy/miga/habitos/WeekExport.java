@@ -73,7 +73,7 @@ final class WeekExport {
             ? week.days().stream().flatMap(d -> d.meals().stream()).map(WeekMealData::name).distinct().toList()
             : List.<String>of();
         var groupNames = porciones ? data.groupNames() : List.<String>of();
-        var habits = habitos ? week.habits() : List.<HabitDto>of();
+        var habits = habitos ? habitColumns(week.habits()) : List.<HabitColumn>of();
 
         List<List<String>> rows = new ArrayList<>();
         List<String> header = new ArrayList<>(List.of("Fecha"));
@@ -93,13 +93,29 @@ final class WeekExport {
                 row.add(value == null ? "" : number(value));
             }
             for (var habit : habits) {
-                row.add(day.habitLogs().stream().filter(l -> l.habitId().equals(habit.id()))
-                    .map(l -> number(l.value()))
-                    .findFirst().orElse(day.habitIds().contains(habit.id()) ? "0" : ""));
+                Long activeId = habit.ids().stream().filter(day.habitIds()::contains)
+                    .reduce((previous, current) -> current).orElse(null);
+                row.add(activeId == null ? "" : day.habitLogs().stream()
+                    .filter(log -> log.habitId().equals(activeId)).map(log -> number(log.value()))
+                    .findFirst().orElse("0"));
             }
             rows.add(row);
         }
         return rows;
+    }
+
+    private record HabitColumn(String name, List<Long> ids) {}
+
+    // Como las comidas, un hábito ocupa una columna aunque el plan tenga varias versiones.
+    // El uid identifica el hábito; cada día conserva el id de la versión vigente para sus registros.
+    private static List<HabitColumn> habitColumns(List<HabitDto> habits) {
+        Map<Object, List<HabitDto>> versions = new java.util.LinkedHashMap<>();
+        for (var habit : habits) {
+            Object key = habit.uid() != null ? habit.uid() : habit.id();
+            versions.computeIfAbsent(key, ignored -> new ArrayList<>()).add(habit);
+        }
+        return versions.values().stream().map(values -> new HabitColumn(
+            values.getLast().name(), values.stream().map(HabitDto::id).distinct().toList())).toList();
     }
 
     static List<List<String>> sinReglaGrid(Data data) {

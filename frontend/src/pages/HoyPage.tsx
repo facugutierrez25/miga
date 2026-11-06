@@ -155,6 +155,35 @@ function ActionsMenu({ label, actions, buttonRef, disabled = false }: {
   </div>
 }
 
+function UnderstoodDialog({ open, onClose, headingRef, mealId, children }: {
+  open: boolean; onClose: () => void; headingRef: React.RefObject<HTMLHeadingElement | null>
+  mealId: number | undefined; children: React.ReactNode
+}) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose, open)
+  useEffect(() => {
+    if (!open) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [open])
+
+  // Se conserva el contenido al cerrar para no perder una corrección todavía sin guardar.
+  return createPortal(
+    <div className="regla-overlay entendido-overlay" hidden={!open} onClick={onClose}>
+      <div className="regla-dialog entendido-dialog" id={`entendido-dialog-${mealId}`}
+        ref={dialogRef} role="dialog" aria-modal={open ? true : undefined}
+        aria-labelledby={`entendido-${mealId}`} inert={!open}
+        onClick={event => event.stopPropagation()}>
+        <div className="regla-dialog__header">
+          <h2 ref={headingRef} tabIndex={-1} id={`entendido-${mealId}`} className="regla-dialog__title">Así lo entendí</h2>
+          <button type="button" className="regla-dialog__close" onClick={onClose} aria-label="Cerrar Así lo entendí">✕</button>
+        </div>
+        {children}
+      </div>
+    </div>, document.body,
+  )
+}
+
 function ReglaDialog({ item, resultado, onClose }: {
   item: EntryItemDto; resultado: string | null; onClose: () => void
 }) {
@@ -618,6 +647,7 @@ function NotaMealSection({
       if (!dirty.current) setTexto(updated.noteText ?? '')
       setConflict(false)
       foco.current = updated.items.length ? 'understood' : 'textarea'
+      if (updated.items.length === 0) setDetailOpen(false)
       onNotaSaved({ noteId: updated.noteId!, version: updated.noteVersion!, text: updated.noteText ?? '',
         date, mealId: updated.mealId, items: [], entries: updated.items, comparison: updated.comparison }, updated.mealId)
       setGuardado(`Quitaste ${item.food}.`)
@@ -699,6 +729,31 @@ function NotaMealSection({
     }
   }
 
+  const feedback = (<>
+      <p className="nota-guardado" role="status">{guardado}</p>
+      {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
+      {conflict && (
+        <button type="button" className="nota-btn-recargar" disabled={guardando}
+          onClick={async () => {
+            setGuardando(true)
+            try {
+              // Recargar desde el aviso es aceptar la versión actual como base del borrador.
+              const day = await onReload()
+              baseVersion.current = day.meals.find(m => m.mealId === meal.id)?.noteVersion ?? null
+              setConflict(false)
+              setError(null)
+            } catch {
+              setError('No se pudo recargar. Intentá de nuevo.')
+            } finally {
+              setGuardando(false)
+            }
+          }}>
+          Recargar
+        </button>
+      )}
+
+  </>)
+
   const textareaId = `nota-${meal.id}`
 
   return (
@@ -770,27 +825,7 @@ function NotaMealSection({
         </div>
       )}
 
-      <p className="nota-guardado" role="status">{guardado}</p>
-      {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
-      {conflict && (
-        <button type="button" className="nota-btn-recargar" disabled={guardando}
-          onClick={async () => {
-            setGuardando(true)
-            try {
-              // Recargar desde el aviso es aceptar la versión actual como base del borrador.
-              const day = await onReload()
-              baseVersion.current = day.meals.find(m => m.mealId === meal.id)?.noteVersion ?? null
-              setConflict(false)
-              setError(null)
-            } catch {
-              setError('No se pudo recargar. Intentá de nuevo.')
-            } finally {
-              setGuardando(false)
-            }
-          }}>
-          Recargar
-        </button>
-      )}
+      {!detailOpen && feedback}
 
       {preguntas.map(p => (
         <div key={p.foodGroupId} className="nota-pregunta">
@@ -805,85 +840,91 @@ function NotaMealSection({
       ))}
 
       {(hasNote || items.length > 0) && (
-        <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
-          <h3 ref={understoodRef} tabIndex={-1} id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
-          <p className="nota-entendido__resumen">
-            Entendí: {understoodSummary || 'sin alimentos reconocidos'}.
-            {' '}{mealStatus(mealDay).text}.
-          </p>
-          <div className="nota-entendido__acciones">
-            <button type="button" className="nota-revisar" aria-expanded={detailOpen}
-              aria-controls={`entendido-detalle-${meal.id}`} onClick={() => setDetailOpen(value => !value)}>
-              Revisar lo que entendí{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
-            </button>
-            {items.some(item => item.appliedRule || item.origin === 'UNKNOWN') && (
-              <button type="button" className="nota-link" onClick={() => setReglasOpen(true)}>Cómo lo calculé</button>
-            )}
-          </div>
-          {reglasOpen && <ReglasSheet items={items} gruposMap={gruposMap} onClose={() => setReglasOpen(false)} />}
-          <ul className="nota-items">
-            {items.filter(item => item.foodGroupId === null || item.origin === 'UNKNOWN').map(item => <ItemRow
-              key={item.id} item={item} date={date} token={token} gruposMap={gruposMap}
-              onRemove={() => handleRemove(item)} removing={guardando || conflict}
-              onPatched={result => onItemPatched(meal.id!, result)} />)}
-          </ul>
-          <ul className="nota-items" id={`entendido-detalle-${meal.id}`} hidden={!detailOpen}>
-            {agruparPorMencion(items.filter(item => item.foodGroupId !== null && item.origin !== 'UNKNOWN')).map(mencion => {
-              const fila = (item: EntryItemDto) => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  onRemove={mencion.length === 1 ? () => handleRemove(item) : undefined}
-                  removing={guardando || conflict}
-                  date={date}
-                  token={token}
-                  gruposMap={gruposMap}
-                  onPatched={result => onItemPatched(meal.id!, result)}
-                />
-              )
-              if (mencion.length === 1) return fila(mencion[0])
-              const [primero] = mencion
-              const mentionKey = primero.occurrenceId!
-              const expanded = expandedMentions.has(mentionKey)
-              const detailId = `grupos-${meal.id}-${primero.id}`
-              return (
-                <li key={primero.occurrenceId} className="nota-compuesto">
-                  <div className="nota-compuesto__header">
-                    <span className="nota-compuesto__dots" aria-hidden="true">
-                      {mencion.map(item => <span key={item.id} className="nota-item__dot"
-                        style={{ background: (item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.token : null) ?? 'var(--muted)' }} />)}
-                    </span>
-                    <div className="nota-compuesto__contenido">
-                      <p className="nota-compuesto__titulo">
-                        {primero.food}
-                        {primero.quantity !== null && <> · {fmt(primero.quantity)} {displayUnit(primero.unit, primero.quantity)}</>}
-                      </p>
-                      <p className="nota-compuesto__grupos">{mencion.map(item =>
-                        `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
-                      ).join(' · ')}</p>
-                    </div>
-                    <button type="button" className="nota-item__edit" aria-label={`Corregir grupos de ${primero.food}`}
-                      aria-expanded={expanded} aria-controls={detailId} onClick={() => setExpandedMentions(previous => {
-                        const next = new Set(previous)
-                        if (next.has(mentionKey)) next.delete(mentionKey)
-                        else next.add(mentionKey)
-                        return next
-                      })}>
-                      Corregir
-                    </button>
-                    <ItemActions item={primero} disabled={guardando || conflict} onRemove={() => handleRemove(primero)}
-                      resultado={mencion.map(item =>
-                        `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
-                      ).join(' + ')} />
-                  </div>
-                  <ul id={detailId} hidden={!expanded} className="nota-items" aria-label={`Grupos de ${primero.food}`}>
-                    {mencion.map(item => fila(item))}
-                  </ul>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+        <>
+          <button type="button" className="nota-revisar" aria-haspopup="dialog"
+            aria-expanded={detailOpen} aria-controls={`entendido-dialog-${meal.id}`}
+            onClick={event => { event.currentTarget.focus(); setDetailOpen(true) }}>
+            Así lo entendí{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
+          </button>
+          <UnderstoodDialog open={detailOpen} onClose={() => setDetailOpen(false)}
+            headingRef={understoodRef} mealId={meal.id}>
+            <section className="nota-entendido" aria-labelledby={`entendido-${meal.id}`}>
+              {detailOpen && feedback}
+              <p className="nota-entendido__resumen">
+                Entendí: {understoodSummary || 'sin alimentos reconocidos'}.
+                {' '}{mealStatus(mealDay).text}.
+              </p>
+              <div className="nota-entendido__acciones">
+                {items.some(item => item.appliedRule || item.origin === 'UNKNOWN') && (
+                  <button type="button" className="nota-link" onClick={() => setReglasOpen(true)}>Cómo lo calculé</button>
+                )}
+              </div>
+              {reglasOpen && <ReglasSheet items={items} gruposMap={gruposMap} onClose={() => setReglasOpen(false)} />}
+              <ul className="nota-items">
+                {items.filter(item => item.foodGroupId === null || item.origin === 'UNKNOWN').map(item => <ItemRow
+                  key={item.id} item={item} date={date} token={token} gruposMap={gruposMap}
+                  onRemove={() => handleRemove(item)} removing={guardando || conflict}
+                  onPatched={result => onItemPatched(meal.id!, result)} />)}
+              </ul>
+              <ul className="nota-items" id={`entendido-detalle-${meal.id}`}>
+                {agruparPorMencion(items.filter(item => item.foodGroupId !== null && item.origin !== 'UNKNOWN')).map(mencion => {
+                  const fila = (item: EntryItemDto) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      onRemove={mencion.length === 1 ? () => handleRemove(item) : undefined}
+                      removing={guardando || conflict}
+                      date={date}
+                      token={token}
+                      gruposMap={gruposMap}
+                      onPatched={result => onItemPatched(meal.id!, result)}
+                    />
+                  )
+                  if (mencion.length === 1) return fila(mencion[0])
+                  const [primero] = mencion
+                  const mentionKey = primero.occurrenceId!
+                  const expanded = expandedMentions.has(mentionKey)
+                  const detailId = `grupos-${meal.id}-${primero.id}`
+                  return (
+                    <li key={primero.occurrenceId} className="nota-compuesto">
+                      <div className="nota-compuesto__header">
+                        <span className="nota-compuesto__dots" aria-hidden="true">
+                          {mencion.map(item => <span key={item.id} className="nota-item__dot"
+                            style={{ background: (item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.token : null) ?? 'var(--muted)' }} />)}
+                        </span>
+                        <div className="nota-compuesto__contenido">
+                          <p className="nota-compuesto__titulo">
+                            {primero.food}
+                            {primero.quantity !== null && <> · {fmt(primero.quantity)} {displayUnit(primero.unit, primero.quantity)}</>}
+                          </p>
+                          <p className="nota-compuesto__grupos">{mencion.map(item =>
+                            `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
+                          ).join(' · ')}</p>
+                        </div>
+                        <button type="button" className="nota-item__edit" aria-label={`Corregir grupos de ${primero.food}`}
+                          aria-expanded={expanded} aria-controls={detailId} onClick={() => setExpandedMentions(previous => {
+                            const next = new Set(previous)
+                            if (next.has(mentionKey)) next.delete(mentionKey)
+                            else next.add(mentionKey)
+                            return next
+                          })}>
+                          Corregir
+                        </button>
+                        <ItemActions item={primero} disabled={guardando || conflict} onRemove={() => handleRemove(primero)}
+                          resultado={mencion.map(item =>
+                            `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
+                          ).join(' + ')} />
+                      </div>
+                      <ul id={detailId} hidden={!expanded} className="nota-items" aria-label={`Grupos de ${primero.food}`}>
+                        {mencion.map(item => fila(item))}
+                      </ul>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          </UnderstoodDialog>
+        </>
       )}
     </div>
   )

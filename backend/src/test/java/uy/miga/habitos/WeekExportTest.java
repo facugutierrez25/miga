@@ -218,4 +218,69 @@ class WeekExportTest {
         assertThat(WeekExport.period(WeekExport.Data.of(crossMonth))).isEqualTo("26 de octubre al 1 de noviembre 2026");
         assertThat(WeekExport.title(WeekExport.Data.of(week))).isEqualTo("Tu semana");
     }
+
+    private static WeekSummaryDto weekWithHabitVersions() {
+        var date = LocalDate.of(2026, 11, 2);
+        var water = java.util.UUID.randomUUID();
+        var fruit = java.util.UUID.randomUUID();
+        return new WeekSummaryDto(date, date.plusDays(3), List.of(
+            new HabitDto(1L, "Agua anterior", "CONTADOR", "vasos", BigDecimal.TEN, BigDecimal.ONE, "DIA", false, (short) 1, water),
+            new HabitDto(2L, "Fruta", "CONTADOR", "unidades", BigDecimal.TEN, BigDecimal.ONE, "DIA", false, (short) 2, fruit),
+            new HabitDto(3L, "Agua", "CONTADOR", "vasos", BigDecimal.TEN, BigDecimal.ONE, "DIA", false, (short) 1, water)),
+            List.of(
+                new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO,
+                    List.of(new HabitLogDto(1L, date, new BigDecimal("2")), new HabitLogDto(2L, date, BigDecimal.ONE)),
+                    List.of(), List.of(1L, 2L)),
+                new WeekDayDto(date.plusDays(1), true, BigDecimal.ZERO, BigDecimal.ZERO,
+                    List.of(new HabitLogDto(3L, date.plusDays(1), new BigDecimal("3.5")),
+                        new HabitLogDto(1L, date.plusDays(1), new BigDecimal("99"))), List.of(), List.of(3L, 2L)),
+                new WeekDayDto(date.plusDays(2), false, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), List.of(), List.of(3L, 2L)),
+                new WeekDayDto(date.plusDays(3), false, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), List.of(), List.of())));
+    }
+
+    @Test
+    void oneColumnPerHabitAcrossPlanVersionsPreservesEachDaysValues() {
+        var grid = WeekExport.grid(weekWithHabitVersions());
+        assertThat(grid.get(0)).containsExactly("Fecha", "Agua", "Fruta");
+        assertThat(grid.get(1)).containsExactly("2026-11-02", "2", "1");
+        assertThat(grid.get(2)).containsExactly("2026-11-03", "3,5", "0");
+        assertThat(grid.get(3)).containsExactly("2026-11-04", "0", "0");
+        assertThat(grid.get(4)).containsExactly("2026-11-05", "", "");
+    }
+
+    @Test
+    void excelCsvAndPdfDoNotRepeatTheHabitsOfPreviousPlanVersions() throws Exception {
+        var week = weekWithHabitVersions();
+        var csv = WeekExport.csv(week);
+        assertThat(csv).contains("\"Fecha\";\"Agua\";\"Fruta\"").doesNotContain("Agua anterior", "99");
+        var out = new ByteArrayOutputStream();
+        WeekExport.writeXlsx(week, out);
+        try (var workbook = new ReadableWorkbook(new ByteArrayInputStream(out.toByteArray()))) {
+            var rows = workbook.getFirstSheet().read();
+            assertThat(rows.get(5).getCellCount()).isEqualTo(3);
+            assertThat(rows.get(5).getCellText(1)).isEqualTo("Agua");
+            assertThat(rows.get(6).getCellText(1)).isEqualTo("2");
+            assertThat(rows.get(7).getCellText(1)).isEqualTo("3,5");
+        }
+        out.reset();
+        WeekExport.writePdf(WeekExport.Data.of(week), out);
+        try (var reader = new com.lowagie.text.pdf.PdfReader(out.toByteArray())) {
+            var text = new com.lowagie.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1);
+            assertThat(text).contains("Agua", "Fruta", "3,5").doesNotContain("Agua anterior", "99");
+            assertThat(text.indexOf("Agua")).isEqualTo(text.lastIndexOf("Agua"));
+        }
+    }
+
+    @Test
+    void separateHabitsWithTheSameNameAreNotMerged() {
+        var date = LocalDate.of(2026, 11, 2);
+        var week = new WeekSummaryDto(date, date, List.of(
+            new HabitDto(1L, "Agua", "CONTADOR", "vasos", BigDecimal.ONE, BigDecimal.ONE, "DIA", false, (short) 1, java.util.UUID.randomUUID()),
+            new HabitDto(2L, "Agua", "CONTADOR", "litros", BigDecimal.ONE, BigDecimal.ONE, "DIA", false, (short) 2, java.util.UUID.randomUUID())),
+            List.of(new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO,
+                List.of(new HabitLogDto(1L, date, BigDecimal.TEN), new HabitLogDto(2L, date, BigDecimal.ONE)),
+                List.of(), List.of(1L, 2L))));
+        assertThat(WeekExport.grid(week).get(0)).containsExactly("Fecha", "Agua", "Agua");
+        assertThat(WeekExport.grid(week).get(1)).containsExactly("2026-11-02", "10", "1");
+    }
 }
