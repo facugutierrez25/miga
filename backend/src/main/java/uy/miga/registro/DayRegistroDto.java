@@ -29,7 +29,11 @@ record DayRegistroDto(
         Boolean uncertain,
         String originalText,
         String appliedRule,
-        java.util.UUID occurrenceId
+        java.util.UUID occurrenceId,
+        // NORMAL, COMPUESTO, LIBRE, FLEXIBLE, NO_CUENTA o PREGUNTAR
+        String ruleType,
+        // PLAN, CATALOGO o USUARIO
+        String ruleSource
     ) {}
 
     record DailySummaryDto(

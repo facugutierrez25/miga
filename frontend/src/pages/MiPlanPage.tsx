@@ -1,3 +1,4 @@
+import { MAX_PORCIONES_FICHA } from '../components/migaSlots'
 import { groupColor } from '../groupColors'
 import { useContext, useCallback, useEffect, useRef, useState } from 'react'
 import { useDialogFocus } from './useDialogFocus'
@@ -30,6 +31,11 @@ interface ComidaLocal {
   hora: string
   porciones: Porciones
   minimizada: boolean
+}
+
+// Cada porción es una miga de la ficha (media porción también ocupa una): el plan admite hasta 12.
+function migasDeComida(porciones: Porciones): number {
+  return Object.values(porciones).reduce((total, p) => total + Math.ceil(p ?? 0), 0)
 }
 
 function porcionesVacias(grupos: PlanFoodGroupDto[]): Porciones {
@@ -312,7 +318,9 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       if (j !== i) return c
       const nuevo = Math.round(((c.porciones[grupoId] ?? 0) + delta) * 10) / 10
       if (nuevo < 0 || nuevo > 10) return c
-      return { ...c, porciones: { ...c.porciones, [grupoId]: nuevo } }
+      const porciones = { ...c.porciones, [grupoId]: nuevo }
+      if (delta > 0 && migasDeComida(porciones) > MAX_PORCIONES_FICHA) return c
+      return { ...c, porciones }
     }))
   }
 
@@ -495,8 +503,12 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                       onChange={e => actualizarHora(i, e.target.value)}
                     />
                   </div>
+                  <p className="porcion-tope" aria-live="polite">
+                    {migasDeComida(comida.porciones)} de {MAX_PORCIONES_FICHA} porciones: una comida tiene hasta {MAX_PORCIONES_FICHA}.
+                  </p>
                   {grupos.map((g, index) => {
                     const dot = groupColor(g, index)
+                    const lleno = migasDeComida({ ...comida.porciones, [g.id]: (comida.porciones[g.id] ?? 0) + 0.5 }) > MAX_PORCIONES_FICHA
                     return (
                       <div key={g.id} className="porcion-row">
                         <span className="porcion-row__dot" style={{ background: dot }} />
@@ -512,7 +524,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
                           <button
                             className="stepper-btn"
                             onClick={() => actualizarPorcion(i, g.id, 0.5)}
-                            disabled={(comida.porciones[g.id] ?? 0) >= 10}
+                            disabled={(comida.porciones[g.id] ?? 0) >= 10 || lleno}
                             aria-label={`Aumentar ${g.name}`}
                           >+</button>
                         </div>

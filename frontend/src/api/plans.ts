@@ -28,6 +28,8 @@ export interface MealDto {
   suggestedTime?: string
   displayOrder: number
   portions: MealPortionDto[]
+  // Días ISO en que toca la comida (1 = lunes … 7 = domingo); null o vacío = todos los días.
+  weekdays?: number[] | null
 }
 
 export interface MealSaveDto {
@@ -35,6 +37,12 @@ export interface MealSaveDto {
   suggestedTime?: string
   displayOrder: number
   portions: MealPortionInput[]
+  weekdays?: number[] | null
+}
+
+// Indica si una comida toca un día ISO de la semana.
+export function mealAppliesOn(meal: Pick<MealDto, 'weekdays'>, weekday: number): boolean {
+  return !meal.weekdays || meal.weekdays.length === 0 || meal.weekdays.includes(weekday)
 }
 
 export interface PlanDto {

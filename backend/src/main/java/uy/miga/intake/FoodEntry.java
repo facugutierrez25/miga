@@ -64,6 +64,13 @@ class FoodEntry {
     @Column(name = "occurrence_id")
     private java.util.UUID occurrenceId;
 
+    // Tipo y origen de la regla aplicada (V36).
+    @Column(name = "rule_type", length = 12)
+    private String ruleType;
+
+    @Column(name = "rule_source", length = 10)
+    private String ruleSource;
+
     FoodEntry() {}
 
     FoodEntry(Long userId, String userEmail, Long mealId, LocalDate date,
@@ -96,6 +103,8 @@ class FoodEntry {
     BigDecimal getPorciones(){ return porciones; }
     String getAppliedRule()  { return appliedRule; }
     java.util.UUID getOccurrenceId() { return occurrenceId; }
+    String getRuleType()     { return ruleType; }
+    String getRuleSource()   { return ruleSource; }
 
     void setMealId(Long mealId)                    { this.mealId = mealId; }
     void setQuantity(Double quantity)              { this.quantity = quantity; }
@@ -109,4 +118,6 @@ class FoodEntry {
     void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
     void setAppliedRule(String appliedRule)   { this.appliedRule = appliedRule; }
     void setOccurrenceId(java.util.UUID id)   { this.occurrenceId = id; }
+    void setRuleType(String ruleType)         { this.ruleType = ruleType; }
+    void setRuleSource(String ruleSource)     { this.ruleSource = ruleSource; }
 }

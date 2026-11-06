@@ -1,70 +1,88 @@
 /* Tokens de la guía de estilo (docs/diseno/guia-de-estilo.md) */
 :root {
   color-scheme: light;
-  /* Papel, tinta y una sola familia de neutros */
-  --bg: #F6F6F3; --surface: #FFFFFF; --surface-2: #EEEEEA;
-  --ink: #16201F; --muted: #5A6462; --muted-2: #646E6C;
-  --text-secondary: #5A6462; --control-border: #858D8B;
-  --primary: #0E6E6B; --on-primary: #FFFFFF; --primary-soft: #E7F1F0;
-  --accent: #F6C344; --accent-soft: #FCEFC7; --on-accent-soft: #5C4300;
-  --line: #E3E4DF; --line-soft: #ECECE8; --border: #D6D8D3; --control: #858D8B;
-  --ok: #2F7A4F; --warn: #9A461B; --warn-soft: #FBECE4; --miga-empty: #858D8B;
-  --g-prot: #C0704A; --g-cer: #A8822E; --g-frut: #B5627A;
-  --g-lac: #4F86B8; --g-gras: #8070B0; --g-verd: #4E8F6A;
+  /* Papel salvia, tinta negra; el oliva queda para el logo y el amarillo marca "ahora" */
+  --bg: #F2F1EA; --surface: #FBFAF5; --surface-2: #E8E6DA; --surface-3: #DEDBCB;
+  --ink: #040200; --muted: #5E5A2E; --muted-2: #6B6850;
+  --text-secondary: #5E5A2E; --control-border: #857F62;
+  --primary: #040200; --on-primary: #F2F1EA; --primary-soft: #E8E6DA; --primary-hover: #2A2820;
+  --brand: #7C773F;
+  --accent: #F6C344; --on-accent: #3A2A00; --accent-soft: #FBEBB8; --on-accent-soft: #5C4300;
+  --line: #E2E0D3; --line-soft: #ECEAE0; --border: #D9D6C8; --control: #857F62;
+  --ok: #2F6B45; --warn: #A9431B; --warn-soft: #F8E6DB; --miga-empty: #857F62;
+  --g-prot: #C8553D; --g-cer: #9A7420; --g-frut: #B04A72;
+  --g-lac: #3F7FB5; --g-gras: #6F63B8; --g-verd: #2E8B6E;
   --g-turq: #368C91; --g-tierra: #95715D; --g-indigo: #6675A0; --g-coral: #AD5860;
-  --t-prot: #F4E7E0; --t-cer: #F4EEDD; --t-frut: #F4E4EA;
-  --t-lac: #E3ECF5; --t-gras: #ECE9F4; --t-verd: #E2EEE6;
-  --error: #B42318; --error-bg: #FEF3F2;
-  /* Forma: tarjetas de 12 px, controles de 10 px; la píldora queda para los chips */
-  --radius-card: 12px; --radius-control: 10px; --radius-sm: 8px; --radius-pill: 10px; --radius-chip: 999px;
-  --shadow-float: 0 4px 16px rgba(16, 32, 31, 0.10);
-  /* Las superficies son sólidas: el único vidrio es la barra de navegación */
-  --nav-glass: rgba(255, 255, 255, 0.72);
-  --nav-blur: blur(18px) saturate(160%);
+  --t-prot: #F6E3DD; --t-cer: #F1E9D6; --t-frut: #F4E2EA;
+  --t-lac: #E1EBF4; --t-gras: #E8E5F4; --t-verd: #DCEDE6;
+  --error: #B42318; --error-bg: #FDEDEB;
+  --shadow-tint: 40, 38, 20;
+  --shadow-card: 0 1px 2px rgba(40, 38, 20, 0.06), 0 6px 18px -6px rgba(40, 38, 20, 0.12);
+  --shadow-float: 0 1px 2px rgba(40, 38, 20, 0.08), 0 10px 30px -8px rgba(40, 38, 20, 0.24);
+  --nav-glass: rgba(251, 250, 245, 0.86);
+  --scrim: rgba(4, 2, 0, 0.32);
+  /* Forma: tarjetas de 16 px, controles de 12 px; la píldora queda para chips y etiquetas */
+  --radius-card: 16px; --radius-control: 12px; --radius-sm: 8px; --radius-pill: 12px; --radius-chip: 999px;
+  --nav-blur: blur(16px) saturate(150%);
+  /* Movimiento (transitions.dev): una sola curva para lo que abre, cierra o se desplaza */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-quick: 150ms; --dur-fast: 250ms; --dur-medium: 350ms; --dur-slow: 400ms;
   /* Espaciado en escala de 4 y 8 */
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
   /* Tipografía en proporción 1,2 */
-  --fs-cap: 12px; --fs-sm: 14px; --fs-body: 16px; --fs-h3: 19px; --fs-h1: 24px; --fs-num: 28px;
+  --fs-cap: 12px; --fs-sm: 14px; --fs-body: 16px; --fs-h3: 19px; --fs-h1: 28px; --fs-num: 28px;
   --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
-  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-body: 'Onest', system-ui, sans-serif;
 }
 
-/* Oscuro: por preferencia del sistema (salvo que el usuario elija claro) o por elección explícita.
-   Gris casi negro neutro: la elevación se marca con superficies más claras, no con color. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #111111; --surface: #1A1A1A; --surface-2: #262626;
-    --ink: #EDEDEA; --muted: #A6A6A1; --muted-2: #8F8F8A;
-    --text-secondary: #A6A6A1; --control-border: #7A7A75;
-    --primary: #4DB8B2; --on-primary: #0B1F1E; --primary-soft: #18302F;
+    /* Oscuro neutro: grises casi negros, sin verde; la elevación se marca con grises más claros */
+    --bg: #121212; --surface: #1C1C1C; --surface-2: #262626; --surface-3: #303030;
+    --ink: #F3EFE6; --muted: #ADA89D; --muted-2: #9A968B;
+    --text-secondary: #ADA89D; --control-border: #8A867C;
+    --primary: #F3EFE6; --on-primary: #121212; --primary-soft: #262626; --primary-hover: #FFFFFF;
+    --brand: #F3EFE6;
     --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
-    --line: #2C2C2C; --line-soft: #222222; --border: #333333; --control: #7A7A75;
-    --ok: #7CC79A; --warn: #F2AD85; --warn-soft: #38271F; --miga-empty: #7A7A75;
-    --g-cer: #C9A24A;
+    --line: #2C2C2C; --line-soft: #222222; --border: #333333; --control: #8A867C;
+    --ok: #7CC79A; --warn: #F4A57E; --warn-soft: #38271F; --miga-empty: #8A867C;
+    --g-prot: #E6707B; --g-cer: #E3B04F; --g-frut: #E07AA0;
+    --g-lac: #6FA8DA; --g-gras: #9C91E0; --g-verd: #7CC277;
+    --g-turq: #5FB3B8; --g-tierra: #C49A82; --g-indigo: #96A3CC; --g-coral: #D88990;
     --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
     --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
     --error: #F97066; --error-bg: #3A1C1A;
-    --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.45);
-    --nav-glass: rgba(30, 30, 30, 0.72);
+    --shadow-tint: 0, 0, 0;
+    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -8px rgba(0, 0, 0, 0.8);
+    --nav-glass: rgba(28, 28, 28, 0.82);
+    --scrim: rgba(0, 0, 0, 0.55);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #111111; --surface: #1A1A1A; --surface-2: #262626;
-  --ink: #EDEDEA; --muted: #A6A6A1; --muted-2: #8F8F8A;
-  --text-secondary: #A6A6A1; --control-border: #7A7A75;
-  --primary: #4DB8B2; --on-primary: #0B1F1E; --primary-soft: #18302F;
+  /* Oscuro neutro: grises casi negros, sin verde; la elevación se marca con grises más claros */
+  --bg: #121212; --surface: #1C1C1C; --surface-2: #262626; --surface-3: #303030;
+  --ink: #F3EFE6; --muted: #ADA89D; --muted-2: #9A968B;
+  --text-secondary: #ADA89D; --control-border: #8A867C;
+  --primary: #F3EFE6; --on-primary: #121212; --primary-soft: #262626; --primary-hover: #FFFFFF;
+  --brand: #F3EFE6;
   --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
-  --line: #2C2C2C; --line-soft: #222222; --border: #333333; --control: #7A7A75;
-  --ok: #7CC79A; --warn: #F2AD85; --warn-soft: #38271F; --miga-empty: #7A7A75;
-  --g-cer: #C9A24A;
+  --line: #2C2C2C; --line-soft: #222222; --border: #333333; --control: #8A867C;
+  --ok: #7CC79A; --warn: #F4A57E; --warn-soft: #38271F; --miga-empty: #8A867C;
+  --g-prot: #E6707B; --g-cer: #E3B04F; --g-frut: #E07AA0;
+  --g-lac: #6FA8DA; --g-gras: #9C91E0; --g-verd: #7CC277;
+  --g-turq: #5FB3B8; --g-tierra: #C49A82; --g-indigo: #96A3CC; --g-coral: #D88990;
   --t-prot: #3A2A24; --t-cer: #38321F; --t-frut: #3A2630;
   --t-lac: #1F3045; --t-gras: #2C2840; --t-verd: #203329;
   --error: #F97066; --error-bg: #3A1C1A;
-  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.45);
-  --nav-glass: rgba(30, 30, 30, 0.72);
+  --shadow-tint: 0, 0, 0;
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -8px rgba(0, 0, 0, 0.8);
+  --nav-glass: rgba(28, 28, 28, 0.82);
+  --scrim: rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -106,7 +124,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Bricolage solo para el logo y el título de cada pantalla; el resto de los títulos en DM Sans */
+/* Bricolage solo para el logo y el título de cada pantalla; el resto de los títulos en Onest */
 h1 {
   font-family: var(--font-display);
   font-weight: 700;
@@ -138,7 +156,7 @@ h2, h3 {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1;
-  color: var(--primary);
+  color: var(--brand);
 }
 
 .brand-i {

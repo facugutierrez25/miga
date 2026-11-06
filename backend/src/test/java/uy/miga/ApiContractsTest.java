@@ -49,6 +49,8 @@ class ApiContractsTest {
             case "habitType" -> "CANTIDAD";
             case "period" -> "DIA";
             case "status" -> "OK";
+            case "ruleType" -> "NORMAL";
+            case "ruleSource" -> "PLAN";
             default -> "Sintético";
         };
         if (cls == UUID.class) return UUID.fromString("00000000-0000-0000-0000-000000000001");

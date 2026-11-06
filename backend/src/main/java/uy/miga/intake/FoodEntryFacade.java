@@ -26,7 +26,8 @@ public class FoodEntryFacade {
                                 String food, Double quantity, String unit,
                                 Long foodGroupId, Long mealNoteId,
                                 String originalText, Boolean uncertain,
-                                BigDecimal portions, String appliedRule, UUID occurrenceId) {
+                                BigDecimal portions, String appliedRule, UUID occurrenceId,
+                                String ruleType, String ruleSource) {
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
         entry.setMealNoteId(mealNoteId);
         entry.setTextoOriginal(originalText);
@@ -35,6 +36,8 @@ public class FoodEntryFacade {
         entry.setPorciones(portions);
         entry.setAppliedRule(appliedRule);
         entry.setOccurrenceId(occurrenceId);
+        entry.setRuleType(ruleType);
+        entry.setRuleSource(ruleSource);
         return repository.save(entry).getId();
     }
 
@@ -42,9 +45,10 @@ public class FoodEntryFacade {
     public Long createMentionEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                    String food, Double quantity, String unit, Long mealNoteId,
                                    String originalText, Boolean uncertain, String appliedRule,
-                                   UUID occurrenceId, boolean recognized) {
+                                   UUID occurrenceId, boolean recognized, String ruleType, String ruleSource) {
         Long id = createNoteEntry(userId, userEmail, mealId, date, food, quantity, unit,
-            null, mealNoteId, originalText, uncertain, null, appliedRule, occurrenceId);
+            null, mealNoteId, originalText, uncertain, null, appliedRule, occurrenceId,
+            recognized ? ruleType : null, recognized ? ruleSource : null);
         repository.findById(id).orElseThrow().setOrigen(recognized ? "MENTION" : "UNKNOWN");
         return id;
     }
@@ -106,6 +110,8 @@ public class FoodEntryFacade {
             e.setAppliedRule("Corrección del usuario: " + e.getPorciones() + " " + uy.miga.reglas.RuleText.portionUnit(e.getPorciones()));
             e.setSupuesto(false);
             e.setOrigen("USUARIO");
+            e.setRuleType("NORMAL");
+            e.setRuleSource("USUARIO");
             repository.save(e);
         });
     }
@@ -123,6 +129,8 @@ public class FoodEntryFacade {
             entry.setOccurrenceId(source.getOccurrenceId());
             entry.setConsumed(source.isConsumed());
             entry.setOrigen("USUARIO");
+            entry.setRuleType("COMPUESTO");
+            entry.setRuleSource("USUARIO");
             entry.setSupuesto(false);
             entry.setPorciones(portions);
             ids.add(repository.save(entry).getId());
@@ -136,6 +144,7 @@ public class FoodEntryFacade {
                                 String food, Long foodGroupId) {
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
         entry.setOrigen("USUARIO");
+        entry.setRuleSource("USUARIO");
         entry.setPorciones(BigDecimal.ONE);
         return repository.save(entry).getId();
     }
@@ -147,6 +156,9 @@ public class FoodEntryFacade {
             userId, date, mealId, foodGroupId, "RESPUESTA")) return;
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
         entry.setOrigen("RESPUESTA");
+        // La respuesta viene de un grupo del plan marcado para preguntar si falta.
+        entry.setRuleType("PREGUNTAR");
+        entry.setRuleSource("PLAN");
         entry.setPorciones(BigDecimal.ONE);
         repository.save(entry);
     }
@@ -174,13 +186,15 @@ public class FoodEntryFacade {
             e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
             e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
             e.getOrigen(), e.getSupuesto(), e.getPorciones(),
-            e.getDate(), e.getTextoOriginal(), e.getAppliedRule(), e.getOccurrenceId());
+            e.getDate(), e.getTextoOriginal(), e.getAppliedRule(), e.getOccurrenceId(),
+            e.getRuleType(), e.getRuleSource());
     }
 
     public record EntryData(
         Long id, Long mealId, String food, Double quantity, String unit,
         Long foodGroupId, boolean consumed, Long mealNoteId,
         String origin, Boolean uncertain, BigDecimal portions,
-        LocalDate date, String originalText, String appliedRule, UUID occurrenceId
+        LocalDate date, String originalText, String appliedRule, UUID occurrenceId,
+        String ruleType, String ruleSource
     ) {}
 }

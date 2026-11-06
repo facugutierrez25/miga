@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, test, expect, afterEach } from 'vitest'
-import userEvent from '@testing-library/user-event'
 import SemanaPage from './SemanaPage'
 import * as api from '../api/semana'
 import { useWeek } from '../hooks/useWeek'
@@ -25,119 +24,30 @@ vi.mock('../hooks/useWeek', () => ({ useWeek: vi.fn(() => ({
   }
 })) }))
 
-function renderProgress(habit: Partial<api.HabitDto>, values: number[]) {
-  const data: api.WeekSummaryDto = {
-    weekStart: '2026-10-26', weekEnd: '2026-11-01',
-    habits: [{ id: 3, name: 'Agua', habitType: 'CANTIDAD', dailyGoal: 2,
-      unit: 'lt', step: 0.5, period: 'DIA', displayOrder: 1, ...habit }],
-    days: values.map((value, i) => ({ date: `2026-10-${26 + i}`, hasData: true,
-      totalRecorded: 0, totalGoal: 0, habitIds: [3], meals: [],
-      habitLogs: [{ habitId: 3, date: `2026-10-${26 + i}`, value }] })),
-  }
-  vi.mocked(useWeek).mockReturnValue({ data, status: 'success', error: null,
-    setData: vi.fn(), retry: vi.fn(), reload: vi.fn().mockResolvedValue(data) })
-  render(<SemanaPage />)
-}
-
-test.each([['CANTIDAD', 1.5, false], ['CANTIDAD', 2, true], ['CONTADOR', 3, true]])(
-  'meta diaria de %s con valor %s: cumplido %s', (habitType, value, done) => {
-    renderProgress({ habitType }, [value])
-    const row = screen.getByRole('group', { name: new RegExp(`Agua: ${String(value).replace('.', ',')} de 2 lt, lunes`) })
-    expect(row.classList.contains('semana-habito--ok')).toBe(done)
-    expect(row.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
-  }
-)
-
-test.each([[1, 2, false], [2, 3, true]])('meta semanal suma %s y %s', (first, second, done) => {
-  renderProgress({ period: 'SEMANA', dailyGoal: 5, unit: null }, [first, second])
-  const summary = screen.getByRole('listitem', { name: `Agua: ${first + second} de 5 esta semana, ${done ? 'completado' : 'pendiente'}` })
-  expect(summary.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
-  expect(screen.getByRole('group', { name: new RegExp(`Agua: ${first}, lunes`) })).not.toHaveClass('semana-habito--ok')
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
-  expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeInTheDocument()
-})
-
-test('meta semanal con decimales se cumple al llegar justo a la meta', () => {
-  renderProgress({ period: 'SEMANA', dailyGoal: 0.8, unit: null }, [0.1, 0.7])
-  expect(screen.getByRole('listitem', { name: 'Agua: 0,8 de 0,8 esta semana, completado' })).toBeInTheDocument()
-})
-
-test('meta semanal suma las versiones del mismo hábito y usa la meta más reciente', () => {
-  const data: api.WeekSummaryDto = {
-    weekStart: '2026-10-26', weekEnd: '2026-11-01',
-    habits: [
-      { id: 3, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 4, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
-      { id: 7, uid: 'agua', name: 'Agua', habitType: 'CONTADOR', dailyGoal: 5, unit: null, step: 1, period: 'SEMANA', displayOrder: 1 },
-    ],
-    days: [
-      { date: '2026-10-26', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [3], meals: [],
-        habitLogs: [{ habitId: 3, date: '2026-10-26', value: 2 }] },
-      { date: '2026-10-27', hasData: true, totalRecorded: 0, totalGoal: 0, habitIds: [7], meals: [],
-        habitLogs: [{ habitId: 7, date: '2026-10-27', value: 3 }] },
-    ],
-  }
-  vi.mocked(useWeek).mockReturnValue({ data, status: 'success', error: null,
-    setData: vi.fn(), retry: vi.fn(), reload: vi.fn().mockResolvedValue(data) })
-  render(<SemanaPage />)
-  expect(screen.getAllByRole('listitem', { name: /esta semana/ })).toHaveLength(1)
-  expect(screen.getByRole('listitem', { name: 'Agua: 5 de 5 esta semana, completado' })).toBeInTheDocument()
-})
-
-test.each([[0, false], [0.5, true]])('sin meta conserva la marca con valor %s', (value, done) => {
-  renderProgress({ dailyGoal: null }, [value])
-  const row = screen.getByRole('group', { name: /Agua:/ })
-  expect(row).toHaveAccessibleName(new RegExp(`${String(value).replace('.', ',')} lt`))
-  expect(row.classList.contains('semana-habito--ok')).toBe(done)
-})
-
-test('flexibles muestra el progreso sin permitir edición', () => {
-  renderProgress({ habitType: 'CONTADOR', countsFlexibleMeals: true }, [1.5])
-  expect(screen.getByRole('button', { name: /Agua: 1,5 de 2 lt, lunes/ })).toBeDisabled()
-  expect(screen.queryByRole('button', { name: /Sumar/ })).not.toBeInTheDocument()
-})
-
-test('sí/no conserva su comportamiento aunque tenga una meta configurada', () => {
-  renderProgress({ habitType: 'SI_NO', dailyGoal: 5, period: 'SEMANA', unit: null }, [1])
-  expect(screen.getByRole('button', { name: /Agua: completado, 1, lunes/ })).toHaveAttribute('aria-pressed', 'true')
-  expect(screen.queryByRole('region', { name: 'Metas semanales' })).not.toBeInTheDocument()
-})
-
-test('planilla muestra la meta diaria con su unidad y fecha accesible', () => {
-  renderProgress({}, [1.5])
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
-  expect(screen.getByRole('cell', { name: /Agua: 1,5 de 2 lt, lunes/ })).toHaveTextContent('1,5 de 2 lt')
-})
-
 test('Por día muestra cada comida, estado y nota; el contador flexible no se edita', () => {
-  render(<SemanaPage />)
-  expect(screen.getByText('Desayuno')).toBeInTheDocument()
-  expect(screen.getByText(/Anotada/)).toBeInTheDocument()
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-comida__nombre')).toHaveTextContent('Desayuno')
+  expect(container.querySelector('.semana-comida__estado')).toHaveTextContent('Anotada')
   expect(screen.getByText('=pan y café')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /Flexibles: completado, 2, lunes, 26 de octubre de 2026/ })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: /Flexibles:/ })).not.toBeInTheDocument()
+  expect(screen.queryByText('Agua')).not.toBeInTheDocument()
 })
 
-test('abrir el menú con Enter lleva el foco a la primera opción y las flechas navegan', async () => {
-  const user = userEvent.setup()
+test('Tarjeta y Planilla se eligen con un control segmentado', () => {
   render(<SemanaPage />)
-  screen.getByRole('button', { name: 'Más opciones de la semana' }).focus()
-  await user.keyboard('{Enter}')
-  await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Descargar CSV' })).toHaveFocus())
-  await user.keyboard('{ArrowDown}')
-  expect(screen.getByRole('menuitem', { name: 'Descargar Excel (XLSX)' })).toHaveFocus()
-  await user.keyboard('{Escape}')
-  expect(screen.getByRole('button', { name: 'Más opciones de la semana' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Tarjeta' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  expect(screen.getByRole('button', { name: 'Planilla' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('table')).toBeInTheDocument()
 })
 
 test('Planilla muestra la grilla con el texto escrito y los hábitos', () => {
   render(<SemanaPage />)
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
   expect(screen.getByRole('table')).toBeInTheDocument()
   expect(screen.getByRole('columnheader', { name: 'Desayuno' })).toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '=pan y café' })).toBeInTheDocument()
-  expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument()
+  expect(screen.queryByRole('columnheader', { name: 'Agua' })).not.toBeInTheDocument()
 })
 
 test('identifica el día actual y su fecha completa en ambas vistas', () => {
@@ -146,24 +56,9 @@ test('identifica el día actual y su fecha completa en ambas vistas', () => {
   expect(screen.getByRole('heading', { name: 'lunes, 26 de octubre de 2026' }).closest('article'))
     .toHaveAttribute('aria-current', 'date')
   expect(screen.getByText('Hoy')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
   expect(screen.getByRole('rowheader', { name: /lunes, 26 de octubre de 2026/ }))
     .toHaveAttribute('aria-current', 'date')
-})
-
-test('anuncia un error al registrar un hábito y permite reintentar', async () => {
-  const logHabit = vi.spyOn(api, 'logHabit')
-    .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce({ habitId: 2, date: '2026-10-26', value: 750 })
-  render(<SemanaPage />)
-  const button = screen.getByRole('button', { name: /Sumar 250 ml a Agua, lunes, 26 de octubre de 2026/ })
-  fireEvent.click(button)
-  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo registrar el hábito')
-  expect(button).toBeEnabled()
-  fireEvent.click(button)
-  expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 750)
-  await waitFor(() => expect(button).toBeEnabled())
 })
 
 test('la tira de la semana anuncia cada día con su resumen y marca el elegido', () => {
@@ -171,33 +66,34 @@ test('la tira de la semana anuncia cada día con su resumen y marca el elegido',
   const dia = screen.getByRole('button', { name: /lunes, 26 de octubre de 2026, hoy: 0 de 1 comidas como el plan, 1 anotadas/ })
   expect(dia).toHaveAttribute('aria-pressed', 'true')
   expect(dia).toHaveAttribute('aria-current', 'date')
-  expect(screen.getByText('Esta semana: 0 de 1 comidas como el plan')).toBeInTheDocument()
+  expect(screen.getByText('comidas como el plan esta semana').parentElement).toHaveTextContent('0 de 1comidas como el plan esta semana')
 })
 
-test('un contador se puede bajar si se sumó de más', async () => {
-  const logHabit = vi.spyOn(api, 'logHabit').mockResolvedValue({ habitId: 2, date: '2026-10-26', value: 250 })
+test('Exportar abre una hoja con Excel y PDF, sin CSV ni link, y cierra con Escape devolviendo el foco', async () => {
+  const exportWeek = vi.spyOn(api, 'exportWeek').mockResolvedValue()
   render(<SemanaPage />)
-  expect(screen.getByText('500 ml')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /Restar 250 ml de Agua, lunes, 26 de octubre de 2026/ }))
-  await waitFor(() => expect(logHabit).toHaveBeenLastCalledWith('tok', 2, '2026-10-26', 250))
-})
-
-
-test('el menú ofrece descargas y Planilla, Escape cierra y devuelve el foco', () => {
-  render(<SemanaPage />)
-  const trigger = screen.getByRole('button', { name: 'Más opciones de la semana' })
-  expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
-  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  const trigger = screen.getByRole('button', { name: 'Exportar' })
+  trigger.focus()
   fireEvent.click(trigger)
-  expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('menuitem', { name: 'Descargar CSV' })).toBeInTheDocument()
-  const excel = screen.getByRole('menuitem', { name: 'Descargar Excel (XLSX)' })
-  expect(screen.getByRole('menuitem', { name: 'Planilla' })).toBeInTheDocument()
-  excel.focus()
-  fireEvent.keyDown(excel, { key: 'Escape' })
-  expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  expect(trigger).toHaveFocus()
-  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  const dialog = screen.getByRole('dialog', { name: 'Exportar para tu nutri' })
+  expect(dialog).toHaveTextContent('Miga no lo comparte con nadie')
+  expect(screen.queryByText(/CSV/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeInTheDocument()
+  fireEvent.keyDown(dialog, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await waitFor(() => expect(trigger).toHaveFocus())
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar planilla de Excel' }))
+  await waitFor(() => expect(exportWeek).toHaveBeenCalledWith('tok', '2026-10-26', 'xlsx'))
+})
+
+test('la tarjeta pone un guion cuando el plan de ese día no tiene esa comida', () => {
+  const data = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26').data!
+  const otroDia = { ...data.days[0], date: '2026-10-27', meals: [{ mealId: 11, name: 'Pre entreno', status: 'SIN_ANOTAR', noteText: null }] }
+  vi.mocked(useWeek).mockReturnValue({ ...defaultUseWeek('tok', 'user@miga.uy', '2026-10-26'), data: { ...data, days: [data.days[0], otroDia] } })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelectorAll('.semana-tarjeta .semana-miga--no-aplica')).toHaveLength(2)
+  expect(screen.getByText('No toca ese día')).toBeInTheDocument()
 })
 
 test.each(['CASI', 'DE_MAS', 'PREGUNTAR'])('media miga de %s usa la marca sin acento', status => {
@@ -211,4 +107,61 @@ test.each(['CASI', 'DE_MAS', 'PREGUNTAR'])('media miga de %s usa la marca sin ac
   expect(half.className).not.toMatch(/accent|amarill/)
   expect(half.getAttribute('style') ?? '').not.toMatch(/accent|#f6c344/i)
 
+})
+
+
+test('la tarjeta de develop destaca la comida flexible con el acento, aunque coincida con el plan', () => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  const data = { ...base.data!, days: base.data!.days.map(day => ({ ...day,
+    meals: day.meals?.map(meal => ({ ...meal, status: 'EN_PLAN', flexibleCount: 1 })) })) }
+  vi.mocked(useWeek).mockReturnValue({ ...base, data })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-tarjeta__celda .semana-miga--flexible')).toBeInTheDocument()
+  expect(container.querySelector('.semana-comida__estado--flexible')).toHaveTextContent('Flexible')
+})
+
+
+test.each([false, true])('sin hábito flexible vigente ese día no destaca la comida (otro día: %s)', otherDay => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  const day = { ...base.data!.days[0], habitIds: [2],
+    meals: [{ mealId: 10, name: 'Desayuno', status: 'EN_PLAN', noteText: 'pan', flexibleCount: 1 }] }
+  const data = { ...base.data!, days: otherDay ? [day, { ...day, date: '2026-10-27', habitIds: [1, 2] }] : [day] }
+  vi.mocked(useWeek).mockReturnValue({ ...base, data })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-tarjeta__celda .semana-miga--flexible')).not.toBeInTheDocument()
+  expect(container.querySelector('.semana-comida__estado--flexible')).not.toBeInTheDocument()
+  expect(container.querySelector('.semana-comida__estado--full')).toHaveTextContent('Como el plan')
+  expect(container.querySelector('.semana-leyenda .semana-miga--noted')).not.toBeInTheDocument()
+  expect(Boolean(container.querySelector('.semana-leyenda .semana-miga--flexible'))).toBe(otherDay)
+})
+
+test('sin hábito configurado no muestra la referencia flexible', () => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  vi.mocked(useWeek).mockReturnValue({ ...base, data: { ...base.data!, habits: [] } })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-leyenda .semana-miga--flexible')).not.toBeInTheDocument()
+  expect(container.querySelector('.semana-leyenda .semana-miga--noted')).not.toBeInTheDocument()
+})
+
+
+test('PDF descarga el documento generado sin imprimir ni cambiar la vista', async () => {
+  const exportWeek = vi.spyOn(api, 'exportWeek').mockResolvedValue()
+  const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+  render(<SemanaPage />)
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+  await waitFor(() => expect(exportWeek).toHaveBeenCalledWith('tok', '2026-10-26', 'pdf'))
+  expect(print).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Tarjeta' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('PDF muestra un error y permite volver a intentar la descarga', async () => {
+  const exportWeek = vi.spyOn(api, 'exportWeek').mockRejectedValueOnce(new Error('offline')).mockResolvedValue()
+  render(<SemanaPage />)
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo exportar')
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+  await waitFor(() => expect(exportWeek).toHaveBeenCalledTimes(2))
 })

@@ -48,19 +48,22 @@ class RegistroServiceTest {
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));
         when(notes.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         boolean recognized = !"UNKNOWN".equals(type);
+        when(rules.findApplicable(20L, 1L)).thenReturn(List.of(new uy.miga.reglas.FoodRuleDto(5L, "GLOBAL", null, null,
+            "mate", List.of(), recognized ? type : "NORMAL", null, null, null, null, null, BigDecimal.ZERO)));
         InterpretedItem mention = recognized
             ? new InterpretedItem("mate", "mate", BigDecimal.ONE, "u", null, null,
-                BigDecimal.ZERO, "free", false, null, null, type)
+                BigDecimal.ZERO, "free", false, 5L, null, type)
             : InterpretedItem.unrecognized("mate");
         when(interpreter.interpret(eq("mate"), anyList())).thenReturn(List.of(mention));
 
         service.saveNote("user", today, 10L, "mate");
 
         verify(entries).createMentionEntry(eq(1L), eq("user"), eq(10L), eq(today), eq("mate"),
-            eq(1.0), eq("u"), isNull(), eq("mate"), eq(false), isNull(),
-            any(java.util.UUID.class), eq(recognized));
+            eq(1.0), eq("u"), isNull(), eq("mate"), eq(false), recognized ? eq("free") : isNull(),
+            any(java.util.UUID.class), eq(recognized),
+            recognized ? eq(type) : isNull(), recognized ? eq("CATALOGO") : isNull());
         verify(entries, never()).createNoteEntry(any(), any(), any(), any(), any(), any(),
-            any(), any(), any(), any(), any(), any(), any(), any());
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -188,7 +191,7 @@ class RegistroServiceTest {
     private void entryWithPortions(BigDecimal portions) {
         when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
             3L, 11L, "yogur", 2.0, "u", 7L, false, null, "USUARIO", false,
-            portions, today, null, "snapshot", null));
+            portions, today, null, "snapshot", null, "NORMAL", "USUARIO"));
         when(plans.getMealIds(20L)).thenReturn(List.of(11L));
     }
 
@@ -223,5 +226,90 @@ class RegistroServiceTest {
         assertThatThrownBy(() -> service.saveNote("user", today, 10L, "a".repeat(2001), 1L))
             .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
         verifyNoInteractions(notes, entries, rules);
+    }
+
+    @Test
+    void ruleSourceMapsScopeToOrigin() {
+        assertThat(RegistroService.sourceOf("GLOBAL")).isEqualTo("CATALOGO");
+        assertThat(RegistroService.sourceOf("PLAN")).isEqualTo("PLAN");
+        assertThat(RegistroService.sourceOf("USUARIO")).isEqualTo("USUARIO");
+        assertThat(RegistroService.sourceOf(null)).isNull();
+        var personal = new uy.miga.reglas.FoodRuleDto(8L, "USUARIO", 20L, 1L, "pan", List.of(), "NORMAL",
+            null, 7L, null, null, null, BigDecimal.ONE);
+        var item = new InterpretedItem("pan", "pan", BigDecimal.ONE, "u", 7L, null,
+            BigDecimal.ONE, "pan = 1 porción", false, 8L, null, "NORMAL");
+        assertThat(RegistroService.ruleSource(item, List.of(personal))).isEqualTo("USUARIO");
+        assertThat(RegistroService.ruleSource(InterpretedItem.unrecognized("x"), List.of(personal))).isNull();
+    }
+
+    @Test
+    void recognizedItemPersistsRuleTypeAndPlanSource() {
+        InterpreterService interpreter = mock(InterpreterService.class);
+        RegistroService service = new RegistroService(notes, interpreter,
+            mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
+        when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
+        when(plans.getMealIds(20L)).thenReturn(List.of(10L));
+        when(notes.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(rules.findApplicable(20L, 1L)).thenReturn(List.of(new uy.miga.reglas.FoodRuleDto(6L, "PLAN", 20L, null,
+            "yogur", List.of(), "NORMAL", null, 7L, null, null, null, BigDecimal.ONE)));
+        when(interpreter.interpret(eq("yogur"), anyList())).thenReturn(List.of(new InterpretedItem("yogur", "yogur",
+            BigDecimal.ONE, "u", 7L, null, BigDecimal.ONE, "yogur = 1 porción", false, 6L, null, "NORMAL")));
+
+        service.saveNote("user", today, 10L, "yogur");
+
+        verify(entries).createNoteEntry(eq(1L), eq("user"), eq(10L), eq(today), eq("yogur"), eq(1.0), eq("u"),
+            eq(7L), any(), eq("yogur"), eq(false), eq(BigDecimal.ONE), any(), any(java.util.UUID.class),
+            eq("NORMAL"), eq("PLAN"));
+    }
+
+    @Test
+    void sinReglaListsOnlyUnknownMentionsWithMealName() {
+        LocalDate monday = LocalDate.of(2026, 11, 2);
+        when(entries.findByUserIdAndDateRange(1L, monday, monday.plusDays(6))).thenReturn(List.of(
+            new FoodEntryFacade.EntryData(2L, 11L, "chivito", 1.0, "u", null, false, 9L, "UNKNOWN", false,
+                null, monday.plusDays(1), "chivito al pan", null, null, null, null),
+            new FoodEntryFacade.EntryData(1L, 10L, "yogur", 1.0, "u", 7L, false, 8L, "REGLA", false,
+                BigDecimal.ONE, monday, "yogur", null, null, "NORMAL", "PLAN"),
+            new FoodEntryFacade.EntryData(3L, 10L, "torta frita", 1.0, "u", null, false, 8L, "UNKNOWN", false,
+                null, monday, null, null, null, null, null)));
+        when(plans.getMealNames(any())).thenReturn(java.util.Map.of(10L, "Desayuno", 11L, "Almuerzo"));
+
+        var result = service.getSinRegla("user", monday, monday.plusDays(6));
+
+        assertThat(result).containsExactly(
+            new SinReglaDto("torta frita", monday, "Desayuno"),
+            new SinReglaDto("chivito al pan", monday.plusDays(1), "Almuerzo"));
+    }
+
+    @Test
+    void sinReglaRejectsInvertedOrTooLongRanges() {
+        LocalDate day = LocalDate.of(2026, 11, 2);
+        for (var range : List.of(List.of(day, day.minusDays(1)), List.of(day, day.plusDays(400)))) {
+            assertThatThrownBy(() -> service.getSinRegla("user", range.get(0), range.get(1)))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                    e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        }
+        verifyNoInteractions(entries);
+    }
+
+    @Test
+    void weekOmitsMealsThatDoNotApplyThatDayUnlessSomethingWasNoted() {
+        LocalDate tuesday = LocalDate.of(2026, 11, 3);
+        var plan = new uy.miga.plans.PlanReadData(20L, tuesday.minusDays(7), null, "PORCIONES", new BigDecimal("0.5"),
+            List.of(), List.of(
+                new uy.miga.plans.PlanReadData.MealData(10L, "Desayuno", List.of()),
+                new uy.miga.plans.PlanReadData.MealData(11L, "Pre entreno", List.of(), List.of(1, 3)),
+                new uy.miga.plans.PlanReadData.MealData(12L, "Colación", List.of(), List.of(1))));
+        MealNote note = new MealNote();
+        note.setMealId(12L);
+        note.setDate(tuesday);
+        note.setText("banana");
+        note.setPlanId(20L);
+        when(notes.findByUserIdAndDateBetween(1L, tuesday, tuesday)).thenReturn(List.of(note));
+
+        var meals = service.getWeekMealsForRange(1L, tuesday, tuesday,
+            new java.util.LinkedHashMap<>(java.util.Map.of(tuesday, plan)), List.of()).get(tuesday);
+
+        assertThat(meals).extracting(WeekMealData::name).containsExactly("Desayuno", "Colación");
     }
 }

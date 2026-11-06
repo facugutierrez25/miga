@@ -7,6 +7,9 @@ export interface MigaRow {
   status?: string
 }
 
+// Un plan admite hasta 12 porciones por comida: es lo que entra en la ficha de dominó.
+export const MAX_PORCIONES_FICHA = 12
+
 export function formatPortions(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace('.', ',')
 }
@@ -24,4 +27,15 @@ export function migaSlots(done: number, total: number): { capacity: number; fill
 export function migasLabel(row: MigaRow): string {
   const extra = row.done > row.total ? `, ${formatPortions(row.done - row.total)} de más` : ''
   return `${row.name}: ${formatPortions(row.done)} de ${formatPortions(row.total)} porciones${extra}`
+}
+
+// Lo que falta o sobra en una comida, según el estado que calcula el backend con el margen del plan.
+export function migaDifference(row: MigaRow): string {
+  return (row.status === 'CASI' || row.status === 'SIN_ANOTAR') ? `falta ${formatPortions(row.total - row.done)}`
+    : row.status === 'DE_MAS' ? `${formatPortions(row.done - row.total)} de más` : ''
+}
+
+export function migaDifferenceLabel(row: MigaRow): string {
+  const difference = migaDifference(row)
+  return `${row.name}: ${formatPortions(row.done)} de ${formatPortions(row.total)}${row.status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}`
 }

@@ -18,7 +18,8 @@
     "portions" : [ {
       "foodGroupId" : 1,
       "portions" : 1.5
-    } ]
+    } ],
+    "weekdays" : [ 1 ]
   } ],
   "version" : 1,
   "createdAt" : "2026-01-05"

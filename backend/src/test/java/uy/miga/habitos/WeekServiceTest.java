@@ -43,6 +43,30 @@ class WeekServiceTest {
     }
 
     @Test
+    void dayGoalOnlyCountsMealsThatApplyThatWeekday() {
+        var users = mock(UserService.class);
+        var plans = mock(PlanService.class);
+        var service = new WeekService(mock(PlanHabitRepository.class), mock(HabitLogRepository.class),
+            mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.RegistroService.class));
+        LocalDate monday = LocalDate.of(2026, 11, 2);
+        when(users.findUserIdByEmail("user")).thenReturn(1L);
+        var plan = new uy.miga.plans.PlanReadData(10L, monday, null, "PORCIONES", new BigDecimal("0.5"),
+            java.util.List.of(), java.util.List.of(
+                new uy.miga.plans.PlanReadData.MealData(100L, "Desayuno",
+                    java.util.List.of(new uy.miga.plans.MealPortionSummary(5L, new BigDecimal("2")))),
+                new uy.miga.plans.PlanReadData.MealData(101L, "Pre entreno",
+                    java.util.List.of(new uy.miga.plans.MealPortionSummary(5L, BigDecimal.ONE)), java.util.List.of(1, 3, 5))));
+        var plansByDate = new java.util.LinkedHashMap<LocalDate, uy.miga.plans.PlanReadData>();
+        for (int i = 0; i < 7; i++) plansByDate.put(monday.plusDays(i), plan);
+        when(plans.getPlansForRange(1L, monday, monday.plusDays(6))).thenReturn(plansByDate);
+
+        var week = service.getWeek("user", monday);
+
+        assertThat(week.days()).extracting(WeekDayDto::totalGoal).map(BigDecimal::intValue)
+            .containsExactly(3, 2, 3, 2, 3, 2, 2);
+    }
+
+    @Test
     void habitLogLocksBeforeReadingHabitAndRejectsOldPlan() {
         PlanHabitRepository habits = mock(PlanHabitRepository.class);
         HabitLogRepository logs = mock(HabitLogRepository.class);
@@ -79,5 +103,21 @@ class WeekServiceTest {
                     e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
         }
         verifyNoInteractions(logs);
+    }
+
+    @Test
+    void exportUsesTheAuthenticatedUsersSavedName() {
+        var users = mock(UserService.class);
+        var plans = mock(PlanService.class);
+        var entries = mock(FoodEntryFacade.class);
+        var service = new WeekService(mock(PlanHabitRepository.class), mock(HabitLogRepository.class),
+            entries, plans, users, mock(uy.miga.registro.RegistroService.class));
+        var start = LocalDate.of(2026, 11, 2);
+        when(users.findUserIdByEmail("facundo@miga.uy")).thenReturn(42L);
+        when(users.findFirstNameByEmail("facundo@miga.uy")).thenReturn("Facundo");
+        var data = service.getExportData("facundo@miga.uy", start, start.plusDays(6), java.util.Set.of("texto"));
+        assertThat(data.userName()).isEqualTo("Facundo");
+        verify(users).findFirstNameByEmail("facundo@miga.uy");
+        verify(plans).getPlansForRange(42L, start, start.plusDays(6));
     }
 }

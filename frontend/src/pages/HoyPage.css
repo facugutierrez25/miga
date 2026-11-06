@@ -19,7 +19,8 @@
 .hoy-header__titulo,
 .hoy-desktop-saludo__titulo {
   font-size: var(--fs-h1);
-  line-height: 28px;
+  line-height: 32px;
+  text-wrap: balance;
   margin-top: var(--s2);
   color: var(--ink);
 }
@@ -124,7 +125,7 @@
 
 .hoy-sin-plan {
   background: var(--surface);
-  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-card);
   padding: var(--s5) var(--s4);
   display: flex;
@@ -170,12 +171,12 @@
 
 .hoy-ahora {
   background: var(--surface);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-card);
-  padding: var(--s3);
+  border-radius: 20px;
+  padding: var(--s4);
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
+  gap: 14px;
+  box-shadow: var(--shadow-card);
 }
 
 .hoy-ahora__head {
@@ -185,31 +186,26 @@
 }
 
 .hoy-ahora__nombre {
-  flex: 1;
-  font-size: var(--fs-body);
-  line-height: 20px;
+  font-size: var(--fs-h3);
+  line-height: 24px;
+  font-weight: 600;
 }
 
-/* La miga amarilla marca la comida de ahora */
+/* El amarillo del logo marca la comida de ahora, siempre con la palabra */
 .hoy-ahora__etiqueta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--fs-cap);
-  line-height: 16px;
-  font-weight: 600;
-  color: var(--on-accent-soft);
-}
-
-.hoy-ahora__etiqueta::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-chip);
   background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-cap);
+  font-weight: 700;
 }
 
 .hoy-ahora__hora {
+  margin-left: auto;
   font-size: var(--fs-sm);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
@@ -219,7 +215,7 @@
 
 .hoy-dia {
   background: var(--surface);
-  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-card);
   padding: 0 var(--s3);
 }
@@ -283,15 +279,16 @@
 }
 
 .hoy-resto__titulo {
-  font-size: var(--fs-sm);
-  line-height: 20px;
-  color: var(--text-secondary);
+  font-size: var(--fs-h3);
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .hoy-filas {
   list-style: none;
   background: var(--surface);
-  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-card);
 }
 
@@ -411,22 +408,35 @@
   overflow-wrap: anywhere;
   text-align: left;
   min-height: 44px;
-  padding: 0 var(--s3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  background: var(--surface);
+  padding: 0 14px 0 var(--s3);
+  border: none;
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
   color: var(--ink);
   font-size: var(--fs-sm);
+  font-weight: 500;
   cursor: pointer;
+  transition-property: background-color, scale;
+  transition-duration: var(--dur-quick);
+  transition-timing-function: var(--ease-out);
 }
 
 .nota-sugerencia:hover {
-  border-color: var(--control-border);
+  background: var(--surface-3);
+}
+
+.nota-sugerencia:active,
+.nota-btn-guardar:active,
+.nota-pregunta__si:active,
+.nota-pregunta__no:active {
+  scale: 0.96;
 }
 
 .nota-textarea {
   width: 100%;
-  min-height: 64px;
+  min-height: 76px;
+  caret-color: var(--ink);
+  transition: border-color var(--dur-quick) ease-out, box-shadow var(--dur-quick) ease-out;
   padding: var(--s2) var(--s3);
   border: 1px solid var(--control-border);
   border-radius: var(--radius-control);
@@ -453,7 +463,7 @@
 
 .nota-btn-guardar,
 .nota-btn-recargar {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--s4);
   border: none;
   border-radius: var(--radius-control);
@@ -462,6 +472,17 @@
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition-property: background-color, scale;
+  transition-duration: var(--dur-quick);
+  transition-timing-function: var(--ease-out);
+}
+
+.nota-btn-guardar {
+  flex: 1;
+}
+
+.nota-btn-guardar:not(:disabled):hover {
+  background: var(--primary-hover);
 }
 
 .nota-btn-recargar {
@@ -923,17 +944,20 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: var(--overlay, rgba(0, 0, 0, 0.45));
+  background: var(--scrim);
+  animation: hoy-scrim-in var(--dur-slow) var(--ease-out);
 }
 .regla-dialog {
   width: 100%;
   max-width: 420px;
+  max-height: 86dvh;
+  overflow-y: auto;
   padding: var(--s5) var(--s5) calc(var(--s6) + env(safe-area-inset-bottom));
-  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  border-radius: 24px 24px 0 0;
   background: var(--surface);
-  border: 1px solid var(--line);
   box-shadow: var(--shadow-float);
   color: var(--ink);
+  animation: hoy-sheet-in var(--dur-slow) var(--ease-out);
 }
 .regla-dialog__header {
   display: flex;
@@ -956,10 +980,9 @@
 .regla-dialog__resultado { margin: var(--s1) 0 0; font-size: var(--fs-body); font-weight: 600; }
 .regla-dialog__label {
   margin: var(--s4) 0 var(--s1);
-  font-size: var(--fs-cap);
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
 }
 .regla-dialog__regla {
   margin: 0;
@@ -975,14 +998,14 @@
   min-height: 44px;
   padding: 0 var(--s4);
   border-radius: var(--radius-control);
-  border: 1px solid var(--line);
-  color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  color: var(--ink);
   font-weight: 600;
   text-decoration: none;
 }
 @media (min-width: 640px) {
   .regla-overlay { align-items: center; }
-  .regla-dialog { border-radius: var(--radius-card); padding-bottom: var(--s5); }
+  .regla-dialog { border-radius: 20px; padding-bottom: var(--s5); animation-name: hoy-dialog-in; }
 }
 
 /* El texto puede crecer sin achicar las acciones táctiles. */
@@ -992,3 +1015,35 @@
 .nota-menu {
   flex-shrink: 0;
 }
+
+/* ── Cómo lo calculé (toda la comida) ── */
+.nota-entendido__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+}
+.nota-link {
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.regla-dialog__ayuda--arriba { margin-top: 0; text-wrap: pretty; }
+.regla-lista { list-style: none; margin: 0 0 var(--s4); }
+.regla-lista__item { padding: var(--s3) 0; border-top: 1px solid var(--line); }
+.regla-lista__alimento { margin: 0; overflow-wrap: anywhere; }
+.regla-lista__tipo { margin: 2px 0 0; font-size: var(--fs-sm); font-weight: 600; }
+.regla-lista__regla { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* La hoja sube al abrirse (transitions.dev: panel reveal); al cerrar se va sin demora. */
+@keyframes hoy-scrim-in { from { opacity: 0; } }
+@keyframes hoy-sheet-in { from { transform: translateY(24px); opacity: 0; } }
+@keyframes hoy-dialog-in { from { transform: scale(0.96); opacity: 0; } }
