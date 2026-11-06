@@ -93,9 +93,10 @@ test('muestra primero la comida de ahora y el resto en el orden del plan', async
   renderHoy()
   // Sin horarios, la comida de ahora es la última del plan; el resto sigue el orden del plan.
   await waitFor(() => expect(screen.getByRole('heading', { name: 'Cena', level: 2 })).toBeInTheDocument())
-  const resto = screen.getByRole('list')
-  const nombres = Array.from(resto.querySelectorAll('.hoy-fila__nombre')).map(n => n.textContent)
+  const antes = screen.getByRole('region', { name: 'Antes' })
+  const nombres = Array.from(antes.querySelectorAll('.hoy-fila__nombre')).map(n => n.textContent)
   expect(nombres).toEqual(['Desayuno', 'Almuerzo'])
+  expect(screen.queryByRole('region', { name: 'Después' })).not.toBeInTheDocument()
 })
 
 test('muestra la hora sugerida cuando está presente', async () => {
@@ -980,7 +981,7 @@ test.each([
   { status: 'EN_PLAN', recorded: 2, difference: '', label: 'Proteínas: 2 de 2' },
   { status: 'DE_MAS', recorded: 3, difference: '1 de más', label: 'Proteínas: 3 de 2, 1 de más' },
   { status: 'CASI', recorded: 1.5, difference: 'falta 0,5', label: 'Proteínas: 1,5 de 2, falta 0,5' },
-])('la comida muestra solo la diferencia: $label', async ({ status, recorded, difference, label }) => {
+])('la ficha de la comida de ahora dice cada grupo con su diferencia: $label', async ({ status, recorded, label }) => {
   mockGetMyPlan.mockResolvedValue(planConComida)
   mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{
     mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche', items: [],
@@ -988,10 +989,8 @@ test.each([
   }] })
   renderHoy()
   const meal = await screen.findByRole('article', { name: 'Desayuno' })
-  const row = within(meal).getByRole('img', { name: label })
-  expect(row.querySelector('.migas__count')).toHaveTextContent(difference)
-  expect(row.querySelector('.migas__count')?.textContent).toBe(difference)
-  expect(within(meal).queryByText(`${recorded} de 2`)).not.toBeInTheDocument()
+  expect(within(meal).getByRole('img', { name: label })).toHaveTextContent(`Proteínas ${String(recorded).replace('.', ',')} de 2`)
+  expect(within(meal).getByRole('img', { name: `Desayuno: el plan pide 2 porciones, anotaste ${String(recorded).replace('.', ',')}` })).toBeInTheDocument()
 })
 
 test('el menú se abre, se cierra con Escape y devuelve el foco al botón', async () => {
@@ -1031,11 +1030,9 @@ test.each([
   renderHoy()
   await abrirNota()
   const count = String(recorded).replace('.', ',')
-  const row = screen.getByRole('img', {
+  expect(screen.getByRole('img', {
     name: `Proteínas: ${count} de 2${status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}`,
-  })
-  expect(row.querySelector('.migas__count')).toHaveTextContent(difference)
-  if (!difference) expect(row.querySelector('.migas__count')).toBeEmptyDOMElement()
+  })).toBeInTheDocument()
 })
 
 test('a saved note with an empty comparison has no missing portions', async () => {
@@ -1078,4 +1075,22 @@ test('el detalle se envuelve sin recortes y conserva acciones de 44 px', () => {
   expect(css).toContain('overflow-wrap: anywhere')
   expect(css).toMatch(/\.nota-item__edit,[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
   expect(css).toMatch(/\.nota-menu__trigger, \.nota-revisar[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
+})
+
+test('cómo lo calculé muestra cada cosa escrita con su tipo de regla y aclara que corregir no cambia el plan', async () => {
+  setupRemoval([
+    { ...removableItems[0], appliedRule: '1.000 u de leche = 1 porcion' },
+    { id: 104, food: 'pizza', quantity: 1, unit: 'u', foodGroupId: null, portions: 0, origin: 'REGLA', uncertain: false, occurrenceId: 'pizza', appliedRule: 'pizza = flexible (sin porción fija)' },
+    { id: 105, food: 'algo raro', quantity: null, unit: null, foodGroupId: null, portions: null, origin: 'UNKNOWN', uncertain: false, occurrenceId: 'raro' },
+  ])
+  renderHoy()
+  fireEvent.click(await screen.findByRole('button', { name: 'Cómo lo calculé' }))
+  const dialog = screen.getByRole('dialog', { name: 'Cómo lo calculé' })
+  expect(dialog).toHaveTextContent('no cambia el plan de tu nutri')
+  expect(within(dialog).getByText('Por porción · 1 porción de Proteínas')).toBeInTheDocument()
+  expect(within(dialog).getByText('1 u de leche = 1 porción')).toBeInTheDocument()
+  expect(within(dialog).getByText('Comida flexible')).toBeInTheDocument()
+  expect(within(dialog).getByText('Sin regla')).toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })

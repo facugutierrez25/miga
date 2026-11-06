@@ -1,81 +1,89 @@
 # Guía de estilo — Miga
 
-Estilo: **natural, cercano y de calidad**. Papel liso, tinta legible, verde para lo que se toca
-y el amarillo del logo para marcar dónde estás. Funciona en modo claro y oscuro.
+Estilo: **natural, cercano y de calidad**. Papel salvia, tinta negra, oliva para el logo y el
+amarillo del punto de la i para marcar dónde estás. Funciona en modo claro y oscuro.
 
 ## Principios
 
-1. **Poco texto y concreto.** Frases cortas y humanas que dicen el dato ("Faltó 1 cereal"), no evaluaciones vagas ("Casi").
-2. **El color nunca va solo.** Todo dato con color (grupo de alimentos, estado) lleva también número o texto.
-3. **Sin decoración.** Nada de orbes, auras, degradés, vidrio en tarjetas, brillos, sombras de color, emojis, etiquetas en mayúsculas sobre los títulos ni tarjetas con borde de color a un costado.
-4. **Una sola acción principal por pantalla**, en color primario. El resto, botones secundarios.
-5. **Lo urgente primero.** Cada pantalla abre con lo que la persona tiene que hacer ahora; lo demás se resume o se despliega.
-6. **Pensado para el celular:** zonas táctiles de 44 px como mínimo y navegación inferior.
-7. **Tono:** voseo uruguayo, directo, como un amigo ordenado. Nada de jerga técnica, eslóganes ni frases motivacionales.
+1. **Anotar primero.** La comida de ahora y su campo están siempre a la vista. Nada del rediseño suma pasos para anotar.
+2. **Poco texto y concreto.** Frases cortas y humanas que dicen el dato ("Faltó 1 verdura"), no evaluaciones vagas.
+3. **El color nunca va solo.** Todo dato con color (grupo, estado) lleva también número o texto.
+4. **Mostrar cómo se entendió, nunca juzgar.** Toda devolución se puede abrir para ver la regla que la produjo.
+5. **Sin decoración.** Nada de orbes, degradés de adorno, vidrio en tarjetas, emojis, etiquetas en mayúsculas sobre los títulos ni tarjetas con borde de color a un costado.
+6. **Una sola acción principal por pantalla**, en negro (claro) o crema (oscuro). El resto, botones secundarios.
+7. **Pensado para el celular:** zonas táctiles de 44 px como mínimo y navegación inferior.
+8. **Tono:** voseo uruguayo, directo, como un amigo ordenado. Nada de jerga técnica, eslóganes ni frases motivacionales.
 
-## Concepto miga
+## Concepto: migas y ficha de dominó
 
-Cumplir el plan es juntar cosas chicas: una porción, una comida, un día. **Cada porción del plan es una miga**, el punto de la i del logo llevado a toda la app. Se avanza miga a miga.
+Cumplir el plan es juntar cosas chicas. **Cada porción del plan es una miga**, un círculo liso del color de su grupo.
 
-| Miga | Significado |
+**La ficha.** La comida de ahora se muestra como una ficha de dominó: a la izquierda las porciones que pide el plan, a la derecha las que se anotaron. Si las dos mitades coinciden, la comida va como el plan. El clavo del medio es el punto amarillo del logo.
+
+| Ficha | Regla |
 | --- | --- |
-| Círculo lleno del color del grupo | Una porción que se comió |
-| Contorno del color del grupo | Una porción que falta |
-| Medio círculo | Media porción (lleno si se comió, contorno si falta) |
-| Miga amarilla (`--accent`) | La del logo, la única que no es comida: marca "ahora" (la comida actual) y "hoy" |
-| Miga verde en la semana | Una comida como el plan; media miga si faltó algo; contorno si no se anotó; contorno punteado si el día no llegó |
+| Hasta 9 porciones | Se dibujan como un dado (patrón de 1 a 9 en una grilla de 3 × 3) |
+| De 10 a 12 porciones | Grilla de 4 × 3, en el orden de los grupos |
+| Más de 12 | No pasa: Mi plan no deja guardar más de 12 porciones por comida. Si un plan viejo las tuviera, se muestran filas por grupo |
+| Media porción | Medio círculo, lleno o en contorno |
+
+Debajo de la ficha, una línea por grupo con su número ("Verduras 1 de 2"); cada línea tiene su nombre accesible con la diferencia ("Verduras: 1 de 2, falta 1").
+
+**La tarjeta de la semana.** Semana es una tarjeta de sellos: una fila por comida del plan, una columna por día y una miga por comida.
+
+| Miga en la semana | Significado |
+| --- | --- |
+| Llena en tinta | Como el plan |
+| Mitad llena | Faltó o sobró algo, o queda una pregunta |
+| Llena en gris | Anotada sin comparación (plan libre) |
+| Contorno | Sin anotar |
+| Contorno punteado | El día todavía no llegó |
+| Guion corto | El plan de ese día no tiene esa comida |
 
 Reglas:
 
-- **La miga es siempre un círculo liso**, como el punto del logo: sin formas irregulares, pan dibujado, texturas, bordes de refuerzo, sombras ni brillos.
-- **"Porción" sigue siendo la palabra.** La miga es cómo se ve una porción; los datos dicen "porciones", como el plan de la nutricionista. La app nunca cambia el lenguaje ni el contenido del plan.
-- **Siempre con su número o palabra al lado** ("2 de 5") y con un nombre accesible por fila ("Proteínas: 2 de 5 porciones"); los SVG de las migas van ocultos al lector de pantalla.
-- **Al anotar** se rellenan solo las migas de esa comida y un texto dice qué se sumó y qué faltó. Sin animaciones de festejo.
-- **La palabra "miga" se usa con medida:** landing, día vacío y estados vacíos. No en cada pantalla.
-- **El punto final amarillo** aparece solo en el saludo de Hoy y en el titular de la landing, como firma de la marca.
-- **La navegación no lleva migas:** la pestaña activa se marca con color, negrita y fondo suave.
+- **La miga es siempre un círculo liso**: sin texturas, pan dibujado, sombras ni brillos.
+- **"Porción" sigue siendo la palabra.** La miga es cómo se ve; los datos dicen "porciones", como el plan de la nutricionista.
+- **La palabra "miga" se usa con medida:** landing, día vacío y estados vacíos.
+- **El punto final amarillo** aparece solo en el saludo de Hoy y en el titular de la landing.
 
 ## Tokens de color
 
-Se definen como variables CSS en `frontend/src/index.css` y cambian según el tema. Nunca usar hex sueltos en los componentes.
+Se definen como variables CSS en `frontend/src/index.css`. Nunca usar hex sueltos en los componentes.
 
 | Token | Uso | Claro | Oscuro |
 | --- | --- | --- | --- |
-| `--bg` | Fondo de la app (papel) | `#F6F6F3` | `#111111` |
-| `--surface` | Tarjetas, listas, barras | `#FFFFFF` | `#1A1A1A` |
-| `--surface-2` | Fondo de controles segmentados, avisos, pistas de progreso | `#EEEEEA` | `#262626` |
-| `--ink` | Texto principal | `#16201F` | `#EDEDEA` |
-| `--muted` / `--text-secondary` | Texto secundario | `#5A6462` | `#A6A6A1` |
-| `--muted-2` | Íconos e información terciaria | `#646E6C` | `#8F8F8A` |
-| `--primary` | Acción principal, enlaces, selección, navegación activa | `#0E6E6B` | `#4DB8B2` |
-| `--on-primary` | Texto sobre `--primary` | `#FFFFFF` | `#0B1F1E` |
-| `--primary-soft` | Fondo de ítem seleccionado | `#E7F1F0` | `#18302F` |
-| `--accent` | Punto del logo y miga de "ahora" / "hoy" | `#F6C344` | `#F6C344` |
-| `--accent-soft` / `--on-accent-soft` | Etiqueta "Ahora" | `#FCEFC7` / `#5C4300` | `#3A3218` / `#F6D27A` |
-| `--line` / `--line-soft` | Bordes de tarjetas y divisores | `#E3E4DF` / `#ECECE8` | `#2C2C2C` / `#222222` |
-| `--control-border` | Bordes de campos (3:1) | `#858D8B` | `#7A7A75` |
-| `--miga-empty` | Contorno de miga sin anotar en la semana | `#858D8B` | `#7A7A75` |
-| `--ok` | Texto de estado "Como el plan" | `#2F7A4F` | `#7CC79A` |
-| `--warn` / `--warn-soft` | Texto y fondo suave de avisos de falta, exceso o por confirmar en Hoy y Semana | `#9A461B` / `#FBECE4` | `#F2AD85` / `#38271F` |
-| `--error` / `--error-bg` | Errores | `#B42318` / `#FEF3F2` | `#F97066` / `#3A1C1A` |
+| `--bg` | Fondo de la app | `#F2F1EA` | `#121212` |
+| `--surface` | Tarjetas, listas, hojas | `#FBFAF5` | `#1C1C1C` |
+| `--surface-2` / `--surface-3` | Ficha, chips, controles segmentados / su hover | `#E8E6DA` / `#DEDBCB` | `#262626` / `#303030` |
+| `--ink` | Texto principal y migas de la semana | `#040200` | `#F3EFE6` |
+| `--muted` / `--text-secondary` | Texto secundario | `#5E5A2E` | `#ADA89D` |
+| `--primary` / `--on-primary` | Acción principal | `#040200` / `#F2F1EA` | `#F3EFE6` / `#121212` |
+| `--brand` | Logo | `#7C773F` | `#F3EFE6` |
+| `--accent` / `--on-accent` | "Ahora", "Hoy", clavo de la ficha, punto del logo | `#F6C344` / `#3A2A00` | igual |
+| `--line` | Divisores | `#E2E0D3` | `#2C2C2C` |
+| `--control-border` / `--miga-empty` | Bordes de campos y migas vacías (3:1) | `#857F62` | `#8A867C` |
+| `--ok` | "Como el plan" | `#2F6B45` | `#7CC79A` |
+| `--warn` / `--warn-soft` | Faltantes y excesos | `#A9431B` / `#F8E6DB` | `#F4A57E` / `#38271F` |
+| `--error` / `--error-bg` | Errores | `#B42318` / `#FDEDEB` | `#F97066` / `#3A1C1A` |
 
-- Los avisos usan `--warn` sobre `--warn-soft`, con contraste AA de al menos 4,5:1 en ambos temas. Llevan texto que describe el estado. `--accent` y `--on-accent-soft` se reservan para las marcas de "Ahora" y "Hoy" y la identidad del logo.
-- El oscuro es gris casi negro neutro: la elevación se marca con superficies más claras, no con verde.
-- El amarillo nunca es color de texto ni fondo grande. Como siempre acompaña a una palabra ("Ahora", "Hoy"), no depende de su contraste.
-- Contrastes verificados contra `--bg`, `--surface` y `--surface-2`: texto ≥ 4,5:1, migas y bordes de control ≥ 3:1.
+- **El oscuro es neutro:** grises casi negros, sin verde. La elevación se marca con grises más claros, no con color.
+- **El amarillo nunca es color de texto** y siempre acompaña a una palabra ("Ahora", "Hoy"). Lleva `--on-accent` encima, nunca blanco.
+- **Se evita juntar naranja y verde.** El oliva queda solo para el logo.
+- Contrastes verificados: texto ≥ 4,5:1 y migas, bordes de control e indicadores ≥ 3:1, en ambos temas.
 
 ### Grupos de alimentos
 
-| Grupo | Color claro | Color oscuro | Tinte claro | Tinte oscuro |
-| --- | --- | --- | --- | --- |
-| Proteínas | `#C0704A` | `#C0704A` | `#F4E7E0` | `#3A2A24` |
-| Cereales | `#A8822E` | `#C9A24A` | `#F4EEDD` | `#38321F` |
-| Frutas | `#B5627A` | `#B5627A` | `#F4E4EA` | `#3A2630` |
-| Lácteos | `#4F86B8` | `#4F86B8` | `#E3ECF5` | `#1F3045` |
-| Grasas | `#8070B0` | `#8070B0` | `#ECE9F4` | `#2C2840` |
-| Verduras | `#4E8F6A` | `#4E8F6A` | `#E2EEE6` | `#203329` |
+| Grupo | Claro | Oscuro |
+| --- | --- | --- |
+| Proteínas | `#C8553D` | `#E6707B` |
+| Cereales | `#9A7420` | `#E3B04F` |
+| Frutas | `#B04A72` | `#E07AA0` |
+| Lácteos | `#3F7FB5` | `#6FA8DA` |
+| Grasas | `#6F63B8` | `#9C91E0` |
+| Verduras | `#2E8B6E` | `#7CC277` |
 
-El color del grupo se usa en las migas y en el punto de los chips. Los chips llevan el tinte de fondo y el texto en `--ink`.
+Los colores de grupo se usan en migas y puntos, **nunca como color de texto**: el texto va en tinta, con un punto del color al lado. Los grupos guardan su color como el hex de la paleta original (`GROUP_PALETTE`) y la app lo traduce al token del tema, así que cambiar la paleta no toca los datos.
 
 ### Tema
 
@@ -84,85 +92,68 @@ El color del grupo se usa en las migas y en el punto de los chips. Los chips lle
 
 ## Superficies
 
-- **Todo es sólido:** tarjetas `--surface` con borde de 1 px `--line` y sin sombra.
-- **El único vidrio es la barra de navegación inferior**, porque el contenido pasa por debajo: `--nav-glass` + `backdrop-filter: var(--nav-blur)`. Con `prefers-reduced-transparency` o sin soporte de `backdrop-filter`, pasa a sólido.
-- **Sombra** (`--shadow-float`) solo en lo que flota: la barra inferior, diálogos y menús.
-- Agrupar con espacio antes que con tarjetas; una tarjeta se justifica para algo que se acciona por sí mismo. Las listas van en una sola superficie con divisores.
+- **Tarjetas sin borde, con sombra suave** (`--shadow-card`): una de 1 px y una difusa. En oscuro la sombra pasa a un filo de 1 px más claro.
+- **Lo que flota** (navegación inferior, hojas, menús) usa `--shadow-float`.
+- **El único vidrio es la barra de navegación inferior.** Con `prefers-reduced-transparency` pasa a sólido.
+- Agrupar con espacio antes que con tarjetas. Las listas van en una sola superficie con divisores.
 
 ## Tipografía
 
 | Rol | Familia | Tamaño / interlineado | Peso |
 | --- | --- | --- | --- |
-| Logo | Bricolage Grotesque | según contexto, `letter-spacing: -0.02em` | 700 |
-| Título de pantalla (`h1`) | Bricolage Grotesque | 24 / 28 px, `letter-spacing: -0.01em` | 700 |
-| Número destacado | Bricolage Grotesque | 28 / 32 px | 700 |
-| Título de sección | DM Sans | 19 / 24 px | 600 |
-| Título de tarjeta o fila | DM Sans | 16 / 20 px | 600 |
-| Texto y botones | DM Sans | 16 / 24 px (botones 15 px) | 400 / 600 |
-| Secundario y migas | DM Sans | 14 / 20 px | 400–500 |
-| Chips | DM Sans | 13 / 18 px | 500 |
-| Mínimo (etiquetas de navegación, días de la semana) | DM Sans | 12 / 16 px | 500–600 |
+| Logo | Bricolage Grotesque | según contexto | 700–800 |
+| Título de pantalla (`h1`) | Bricolage Grotesque | 28 / 32 px | 700 |
+| Número destacado | Bricolage Grotesque | 44 / 44 px | 700 |
+| Título de sección | Onest | 19 / 24 px | 600 |
+| Texto y botones | Onest | 16 / 24 px (botones 15 px) | 400 / 600 |
+| Secundario | Onest | 14 / 20 px | 400–500 |
+| Mínimo | Onest | 12 / 16 px | 600 |
 
-- Escala en proporción 1,2 (`--fs-cap`, `--fs-sm`, `--fs-body`, `--fs-h3`, `--fs-h1`, `--fs-num`).
-- Sin etiquetas en mayúsculas ni letras apretadas. Sin IBM Plex, Inter, Roboto, Arial ni serifas.
+- Números que cambian, con `font-variant-numeric: tabular-nums`.
+- Títulos con `text-wrap: balance`; párrafos con `text-wrap: pretty`.
 - Inputs siempre a 16 px para que el celular no haga zoom.
 
 ## Forma y espaciado
 
 | Elemento | Radio |
 | --- | --- |
-| Tarjetas, listas, barra de navegación (en píldora) | 12 px (la barra, 999 px) |
-| Botones, campos, controles segmentados | 10 px |
-| Chips de grupo | 999 px |
-| Migas | círculo |
+| Tarjeta de la comida de ahora | 20 px |
+| Tarjetas y listas | 16 px |
+| Botones, campos, controles segmentados | 12 px |
+| Hojas inferiores | 24 px arriba |
+| Chips y etiquetas | 999 px |
 
-- Escala de 4 y 8 px (`--s1` a `--s6`): 4, 8, 12, 16, 24, 32.
-- **Lo de afuera ≥ lo de adentro:** el espacio entre tarjetas es mayor o igual que su relleno.
-- Tarjetas: relleno de 12 px y 8 px entre elementos internos. Margen de pantalla en celular: 16 px.
+- Escala de 4 y 8 px (`--s1` a `--s6`).
+- Botón principal de 48 px de alto.
 
-## Componentes
+## Movimiento
 
-**Logo.** "miga" en minúscula, Bricolage Grotesque 700. El punto de la "i" es un círculo `--accent` liso: se escribe con "ı" (sin punto) y el círculo encima. Sobre fondo claro, en `--primary`.
+Solo se mueve lo que cambió por algo que hiciste. Anotar nunca espera a una animación.
 
-**Ícono de la app.** Cuadrado `--primary` con radio 24 px, una "m" blanca y un punto `--accent` arriba a la derecha. Archivos en `frontend/public/`.
+| Momento | Qué se mueve | Tiempo y curva | Cómo |
+| --- | --- | --- | --- |
+| Anotar una comida | Aparecen solo las porciones nuevas de la ficha, una tras otra | 500 ms, cada 60 ms, `back.out` | GSAP con `useGSAP` en `FichaComida` |
+| Abrir una hoja | Sube 24 px y aparece | 400 ms, `--ease-out` | CSS |
+| Cambiar de día o de vista | La franja o la pastilla se desliza | 250 ms ida y vuelta | CSS |
+| Tocar un botón | Se achica a 0,96 | 150 ms | CSS |
+| Cambiar de pantalla | Nada | — | — |
 
-**Migas (`Migas`).** Fila por grupo: nombre (80 px), migas de 12 px con 4 px de separación y "2 de 5" alineado a la derecha. Si se comió de más, todas llenas y el texto lo dice ("6 de 5").
+- Tokens: `--ease-out`, `--dur-quick` (150), `--dur-fast` (250), `--dur-medium` (350), `--dur-slow` (400).
+- Al cargar la pantalla no se anima nada. Con `prefers-reduced-motion` no corre nada: el estado ya está dibujado.
 
-**Botón primario.** Alto 44 px, fondo `--primary` plano, texto `--on-primary`, DM Sans 15 px / 600, radio 10 px.
-
-**Botón secundario.** Alto 44 px, fondo `--surface`, borde `--line`, texto `--ink`, radio 10 px.
-
-**Campo.** Borde 1 px `--control-border`, radio 10 px, fondo `--surface`. Etiqueta visible o, si el diseño no la muestra, oculta solo visualmente (nunca solo placeholder).
-
-**Etiqueta "Ahora".** Miga amarilla de 8 px + texto 12 px / 600 en `--on-accent-soft`.
-
-**Control segmentado.** Fondo `--surface-2`, opción activa en `--surface` con sombra de 1 px. Usa `aria-pressed`.
-
-**Navegación inferior.** Píldora compacta centrada, separada 14 px del borde inferior; pestañas de 62 × 54 px con ícono de línea de 22 px y etiqueta de 12 px. Activa: color `--primary`, negrita y fondo `--surface-2`, con `aria-current="page"`. El contenido de la página deja espacio inferior para que nunca quede tapado (WCAG 2.4.11).
-
-**Íconos.** De línea, trazo 1,6–1,8, puntas redondeadas, sin emoji. Decorativos con `aria-hidden="true"`; los botones solo-ícono llevan `aria-label`.
-
-## Interacción y accesibilidad
-
-- Contraste mínimo 4,5:1 para texto (3:1 desde 24 px) y 3:1 para migas, bordes de control e indicadores, verificado en ambos temas.
-- Foco visible: `outline: 2px solid var(--primary); outline-offset: 2px` con `:focus-visible`. Ningún elemento con foco puede quedar tapado por la barra inferior.
-- Movimiento: solo transiciones de estado de unos 150 ms (tocar, desplegar, guardar). Sin animaciones de entrada, flotantes ni de festejo. Respetar `prefers-reduced-motion`.
-- Zonas táctiles de 44 × 44 px como mínimo, con al menos 8 px entre ellas.
-- Tablas anchas dentro de un contenedor con `overflow-x: auto`.
-
-## Pantallas de referencia
+## Pantallas
 
 | Pantalla | Puntos clave |
 | --- | --- |
-| **Hoy** | Saludo con punto final amarillo. Primero la comida de ahora con sus migas, el campo para anotar, Guardar y Dictar. Después "Tu día por grupo" desplegable con migas por grupo. Al final, las comidas anteriores como filas con su estado en texto. Día vacío: una frase explica las migas. |
-| **Mi plan** | Comidas en una sola superficie con filas; editar y borrar como botones de 44 px sin recuadro; "Agregar comida" como última fila y "Confirmar plan" al final. |
-| **Semana** | Tira de 7 días con una miga por comida (sale del plan de cada día) y la miga amarilla en hoy. Debajo, el detalle del día elegido y los hábitos como casillas. Descarga en un solo botón. |
-| **Landing** | Titular "Tu plan, miga a miga." con punto amarillo. El plan en papel traducido a migas. Textos concretos sobre porciones, intercambios y datos de salud. |
+| **Hoy** | Saludo con punto final amarillo. La comida de ahora con la etiqueta "Ahora", su ficha, el campo, "Lo de siempre", Guardar y Dictar. "Así lo entendí" con "Cómo lo calculé", que abre una hoja con cada cosa escrita, el tipo de regla y el resultado. Después, "Tu día por grupo", y las comidas en "Después" y "Antes", con su hora. |
+| **Semana** | Botón "Exportar" junto al título. Número grande de comidas como el plan. Control segmentado Tarjeta / Planilla. La tarjeta de sellos con la franja del día elegido; debajo, el detalle del día y los hábitos. |
+| **Exportar** | Solo Excel y PDF (PDF por la impresión del navegador). Se descarga en el celular y la persona lo manda: no hay links ni fecha de consulta guardada. |
+| **Mi plan** | Hasta 12 porciones por comida, con el contador visible al editar. Las correcciones que hace la persona son reglas suyas: no cambian el plan de su nutricionista. |
 
 ## Implementación
 
 Los tokens viven en `frontend/src/index.css`. Las fuentes se cargan en `frontend/index.html`:
 
 ```html
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 ```

@@ -8,6 +8,7 @@ import { useAuth } from '../auth/authTypes'
 import DictationButton from '../components/DictationButton'
 import Brand from '../components/Brand'
 import Migas from '../components/Migas'
+import FichaComida from '../components/FichaComida'
 import { type MigaRow } from '../components/migaSlots'
 import { useTitle } from '../hooks/useTitle'
 import { useDialogFocus } from './useDialogFocus'
@@ -174,6 +175,63 @@ function ReglaDialog({ item, resultado, onClose }: {
         <p className="regla-dialog__regla">{reglaLegible(item.appliedRule ?? '')}</p>
         <p className="regla-dialog__ayuda">¿Tu plan dice otra cosa?</p>
         <Link className="regla-dialog__link" to="/mi-plan" state={{ tab: 'rules' }}>Ajustar en Mi plan</Link>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+// Tipo de regla en palabras, a partir del texto que arma el intérprete.
+function tipoDeRegla(item: EntryItemDto): string {
+  const regla = item.appliedRule ?? ''
+  if (item.origin === 'RESPUESTA') return 'Lo respondiste vos'
+  if (!regla || item.origin === 'UNKNOWN' || item.origin === 'MENTION') return 'Sin regla'
+  if (regla.includes('= no cuenta')) return 'No cuenta'
+  if (regla.includes('= libre')) return 'Libre'
+  if (regla.includes('= flexible')) return 'Comida flexible'
+  if (regla.includes('compuesto')) return 'Compuesto'
+  if (regla.includes('supuest')) return 'Cantidad supuesta'
+  return 'Por porción'
+}
+
+// "Cómo lo calculé" de toda la comida: cada cosa escrita, el tipo de regla y el resultado.
+function ReglasSheet({ items, gruposMap, onClose }: {
+  items: EntryItemDto[]; gruposMap: Record<number, GrupoInfo>; onClose: () => void
+}) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
+  const titleId = useId()
+  return createPortal(
+    <div className="regla-overlay" onClick={onClose}>
+      <div className="regla-dialog regla-dialog--lista" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        onClick={event => event.stopPropagation()}>
+        <div className="regla-dialog__header">
+          <h2 id={titleId} className="regla-dialog__title">Cómo lo calculé</h2>
+          <button type="button" className="regla-dialog__close" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+        <p className="regla-dialog__ayuda regla-dialog__ayuda--arriba">
+          Cada cosa que escribiste y la regla que usé. Si algo no está bien, tocá Corregir en esa fila:
+          la corrección queda como regla tuya en Mi plan y no cambia el plan de tu nutri.
+        </p>
+        <ul className="regla-lista">
+          {agruparPorMencion(items).map(mencion => {
+            const [primero] = mencion
+            const cantidad = primero.quantity !== null ? ` · ${fmt(primero.quantity)} ${displayUnit(primero.unit, primero.quantity)}`.trimEnd() : ''
+            const resultado = mencion
+              .filter(item => item.portions !== null && item.foodGroupId !== null)
+              .map(item => `${fmt(item.portions!)} ${item.portions === 1 ? 'porción' : 'porciones'} de ${gruposMap[item.foodGroupId!]?.name ?? 'un grupo del plan'}`)
+              .join(' + ')
+            return (
+              <li key={primero.occurrenceId ?? primero.id} className="regla-lista__item">
+                <p className="regla-lista__alimento"><strong>{primero.food}</strong>{cantidad}</p>
+                <p className="regla-lista__tipo">{tipoDeRegla(primero)}{resultado && <> · {resultado}</>}</p>
+                <p className="regla-lista__regla">
+                  {primero.appliedRule ? reglaLegible(primero.appliedRule) : 'No está en tu plan ni en el catálogo: queda anotado tal cual para tu nutri.'}
+                </p>
+              </li>
+            )
+          })}
+        </ul>
+        <Link className="regla-dialog__link" to="/mi-plan" state={{ tab: 'rules' }}>Ver todas las reglas en Mi plan</Link>
       </div>
     </div>,
     document.body,
@@ -473,6 +531,7 @@ function NotaMealSection({
   onNotaSaved, onItemPatched, onNotaBorrada, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
   const [detailOpen, setDetailOpen] = useState(false)
+  const [reglasOpen, setReglasOpen] = useState(false)
   const [expandedMentions, setExpandedMentions] = useState<Set<string>>(() => new Set())
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
@@ -751,10 +810,16 @@ function NotaMealSection({
             Entendí: {understoodSummary || 'sin alimentos reconocidos'}.
             {' '}{mealStatus(mealDay).text}.
           </p>
-          <button type="button" className="nota-revisar" aria-expanded={detailOpen}
-            aria-controls={`entendido-detalle-${meal.id}`} onClick={() => setDetailOpen(value => !value)}>
-            Revisar lo que entendí{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
-          </button>
+          <div className="nota-entendido__acciones">
+            <button type="button" className="nota-revisar" aria-expanded={detailOpen}
+              aria-controls={`entendido-detalle-${meal.id}`} onClick={() => setDetailOpen(value => !value)}>
+              Revisar lo que entendí{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
+            </button>
+            {items.some(item => item.appliedRule || item.origin === 'UNKNOWN') && (
+              <button type="button" className="nota-link" onClick={() => setReglasOpen(true)}>Cómo lo calculé</button>
+            )}
+          </div>
+          {reglasOpen && <ReglasSheet items={items} gruposMap={gruposMap} onClose={() => setReglasOpen(false)} />}
           <ul className="nota-items">
             {items.filter(item => item.foodGroupId === null || item.origin === 'UNKNOWN').map(item => <ItemRow
               key={item.id} item={item} date={date} token={token} gruposMap={gruposMap}
@@ -904,11 +969,14 @@ interface MealProps {
   onRespuestaGuardada: (mealId: number) => void
 }
 
-function MealDetail(props: MealProps) {
-  const { meal, mealDay, fecha, token, gruposMap } = props
+function MealDetail(props: MealProps & { ficha?: boolean }) {
+  const { meal, mealDay, fecha, token, gruposMap, ficha = false } = props
+  const rows = mealMigas(meal, mealDay, gruposMap)
   return (
     <>
-      <Migas rows={mealMigas(meal, mealDay, gruposMap)} differencesOnly />
+      {ficha && rows.length > 0
+        ? <FichaComida nombre={meal.name} rows={rows} />
+        : <Migas rows={rows} differencesOnly />}
       {meal.id !== undefined && (
         <NotaMealSection
           key={fecha}
@@ -935,11 +1003,11 @@ function MealAhora(props: MealProps) {
   return (
     <article className="hoy-ahora" aria-labelledby={headingId}>
       <div className="hoy-ahora__head">
-        <h2 id={headingId} className="hoy-ahora__nombre">{meal.name}</h2>
         <span className="hoy-ahora__etiqueta">Ahora</span>
+        <h2 id={headingId} className="hoy-ahora__nombre">{meal.name}</h2>
         {meal.suggestedTime && <span className="hoy-ahora__hora">{meal.suggestedTime.slice(0, 5)}</span>}
       </div>
-      <MealDetail {...props} />
+      <MealDetail {...props} ficha />
     </article>
   )
 }
@@ -1080,7 +1148,9 @@ function HoyContent() {
   const { total, done, porGrupo } = calcResumenDeDay(dayRegistro, meals, gruposMap)
   const sinAnotar = !dayRegistro?.meals.some(m => m.noteText)
   const ahoraMeal = ahoraIdx >= 0 ? meals[ahoraIdx] : null
-  const restoMeals = meals.filter((_, i) => i !== ahoraIdx)
+  // Con la comida de ahora en el medio, lo anterior queda en "Antes" y lo que falta en "Después".
+  const antesMeals = ahoraIdx >= 0 ? meals.slice(0, ahoraIdx) : []
+  const despuesMeals = ahoraIdx >= 0 ? meals.slice(ahoraIdx + 1) : meals
 
   const titulo = esHoy ? (
     <>{nombre ? `${saludo(ahora)}, ${nombre}` : saludo(ahora)}<span className="punto-miga">.</span></>
@@ -1199,13 +1269,14 @@ function HoyContent() {
               </details>
             )}
 
-            {restoMeals.length > 0 && (
-              <section className="hoy-resto" aria-labelledby="hoy-resto-titulo">
-                <h2 id="hoy-resto-titulo" className="hoy-resto__titulo">
-                  {ahoraMeal ? 'Resto del día' : 'Comidas'}
-                </h2>
+            {[
+              { key: 'despues', titulo: ahoraMeal ? 'Después' : 'Comidas', lista: despuesMeals },
+              { key: 'antes', titulo: 'Antes', lista: antesMeals },
+            ].filter(seccion => seccion.lista.length > 0).map(seccion => (
+              <section key={seccion.key} className="hoy-resto" aria-labelledby={`hoy-${seccion.key}-titulo`}>
+                <h2 id={`hoy-${seccion.key}-titulo`} className="hoy-resto__titulo">{seccion.titulo}</h2>
                 <ul className="hoy-filas">
-                  {restoMeals.map(meal => (
+                  {seccion.lista.map(meal => (
                     <MealRow
                       key={`${fecha}-${meal.id ?? meal.name}`}
                       meal={meal}
@@ -1215,7 +1286,7 @@ function HoyContent() {
                   ))}
                 </ul>
               </section>
-            )}
+            ))}
           </>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { mealStatus } from '../lib/mealStatus'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
@@ -7,6 +8,7 @@ import { exportWeek, logHabit, type HabitDto, type HabitLogDto, type WeekDayDto,
 import './SemanaPage.css'
 import { useWeek } from '../hooks/useWeek'
 import { useAhora } from '../hooks/useAhora'
+import { useDialogFocus } from './useDialogFocus'
 
 function fullDate(iso: string): string {
   return new Date(iso + 'T12:00:00').toLocaleDateString('es-UY', {
@@ -243,36 +245,96 @@ function DayDetail({ day, habits, token, todayISO, onLogUpdated }: DayDetailProp
   )
 }
 
-function WeekStrip({ week, todayISO, selected, onSelect }: {
+const DIA_CORTO = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+
+// Tarjeta de sellos de la semana: una fila por comida del plan y una columna por día. Cada
+// comida es una miga; si el plan de ese día no tiene esa comida, la celda lleva un guion.
+function WeekCard({ week, todayISO, selected, onSelect }: {
   week: WeekSummaryDto
   todayISO: string
   selected: string
   onSelect: (date: string) => void
 }) {
+  const nombres = [...new Set(week.days.flatMap(day => (day.meals ?? []).map(meal => meal.name)))]
+  const columnas = week.days.length
+  const elegido = week.days.findIndex(day => day.date === selected)
+  const hayNoAplica = week.days.some(day => nombres.some(nombre => !(day.meals ?? []).some(m => m.name === nombre)))
   return (
-    <div className="semana-tira" role="group" aria-label="Días de la semana">
-      {week.days.map(day => {
-        const futuro = day.date > todayISO
-        const isToday = day.date === todayISO
-        return (
-          <button
-            key={day.date}
-            type="button"
-            className={['semana-tira__dia', isToday ? 'semana-tira__dia--hoy' : '', futuro ? 'semana-tira__dia--futuro' : ''].filter(Boolean).join(' ')}
-            aria-pressed={day.date === selected}
-            aria-current={isToday ? 'date' : undefined}
-            aria-label={`${fullDate(day.date)}${isToday ? ', hoy' : ''}: ${resumenDia(day, futuro)}`}
-            onClick={() => onSelect(day.date)}
-          >
-            <span className="semana-tira__migas" aria-hidden="true">
-              {(day.meals ?? []).map(meal => (
-                <i key={meal.mealId} className={`semana-miga semana-miga--${futuro ? 'futuro' : mealStatus(meal).miga}`} />
-              ))}
-            </span>
-          </button>
-        )
-      })}
-    </div>
+    <>
+      <section className="semana-tarjeta" aria-label="Tarjeta de la semana">
+        <div className="semana-tarjeta__grid" style={{ gridTemplateColumns: `76px repeat(${columnas}, minmax(0, 1fr))` }}>
+          {elegido >= 0 && <span className="semana-tarjeta__banda" aria-hidden="true"
+            style={{ width: `calc((100% - 76px) / ${columnas})`, transform: `translateX(calc(76px + ${elegido} * 100%))` }} />}
+          <span aria-hidden="true" />
+          <div className="semana-tira" role="group" aria-label="Días de la semana">
+            {week.days.map(day => {
+              const futuro = day.date > todayISO
+              const isToday = day.date === todayISO
+              const d = new Date(day.date + 'T12:00:00')
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  className={['semana-tira__dia', isToday ? 'semana-tira__dia--hoy' : '', futuro ? 'semana-tira__dia--futuro' : ''].filter(Boolean).join(' ')}
+                  aria-pressed={day.date === selected}
+                  aria-current={isToday ? 'date' : undefined}
+                  aria-label={`${fullDate(day.date)}${isToday ? ', hoy' : ''}: ${resumenDia(day, futuro)}`}
+                  onClick={() => onSelect(day.date)}
+                >
+                  <span className="semana-tira__letra" aria-hidden="true">{DIA_CORTO[d.getDay()]}</span>
+                  <span className="semana-tira__num" aria-hidden="true">{d.getDate()}</span>
+                </button>
+              )
+            })}
+          </div>
+          <span className="semana-tarjeta__sep" aria-hidden="true" />
+          {nombres.map(nombre => (
+            <div key={nombre} className="semana-tarjeta__fila" aria-hidden="true">
+              <span className="semana-tarjeta__comida">{nombre}</span>
+              {week.days.map(day => {
+                const meal = (day.meals ?? []).find(m => m.name === nombre)
+                const clase = !meal ? 'no-aplica' : day.date > todayISO ? 'futuro' : mealStatus(meal).miga
+                return <span key={day.date} className="semana-tarjeta__celda"><i className={`semana-miga semana-miga--${clase}`} /></span>
+              })}
+            </div>
+          ))}
+        </div>
+      </section>
+      <ul className="semana-leyenda" aria-hidden="true">
+        <li><i className="semana-miga semana-miga--full" />Como el plan</li>
+        <li><i className="semana-miga semana-miga--half" />Faltó o sobró algo</li>
+        <li><i className="semana-miga semana-miga--noted" />Anotada</li>
+        <li><i className="semana-miga semana-miga--empty" />Sin anotar</li>
+        <li><i className="semana-miga semana-miga--futuro" />Todavía no</li>
+        {hayNoAplica && <li><i className="semana-miga semana-miga--no-aplica" />No toca ese día</li>}
+      </ul>
+    </>
+  )
+}
+
+// Exportar es solo descargar: el archivo queda en el celular y la persona lo manda a su nutri.
+function ExportDialog({ rango, onExcel, onPdf, onClose }: {
+  rango: string; onExcel: () => void; onPdf: () => void; onClose: () => void
+}) {
+  const ref = useDialogFocus<HTMLDivElement>(onClose)
+  return createPortal(
+    <div className="semana-overlay" onClick={onClose}>
+      <div className="semana-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby="exportar-titulo"
+        onClick={event => event.stopPropagation()}>
+        <div className="semana-dialog__header">
+          <h2 id="exportar-titulo">Exportar para tu nutri</h2>
+          <button type="button" className="semana-dialog__cerrar" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+        <p className="semana-dialog__texto">
+          La semana del {rango}, con lo que escribiste en cada comida, cómo quedó y tus hábitos.
+          Se descarga en tu celular y lo mandás vos: Miga no lo comparte con nadie.
+        </p>
+        <button type="button" className="semana-dialog__principal" onClick={onExcel}>Descargar planilla de Excel</button>
+        <button type="button" className="semana-dialog__secundario" onClick={onPdf}>Guardar como PDF</button>
+        <p className="semana-dialog__nota">PDF abre la impresión del navegador: elegí «Guardar como PDF».</p>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -280,13 +342,7 @@ export default function SemanaPage() {
   useTitle('Semana | Miga')
   const { token, email } = useAuth()
   const [view, setView] = useState<'day' | 'sheet'>('day')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuButton = useRef<HTMLButtonElement>(null)
-  const menu = useRef<HTMLDivElement>(null)
-  function closeMenu() {
-    setMenuOpen(false)
-    menuButton.current?.focus()
-  }
+  const [exportOpen, setExportOpen] = useState(false)
   const [exportError, setExportError] = useState('')
   const [refDate, setRefDate] = useState(() => mondayOf(toISO(new Date())))
   const { data: week, setData: setWeek, status, retry } = useWeek(token, email, refDate)
@@ -295,11 +351,19 @@ export default function SemanaPage() {
   const hoy = toISO(useAhora())
   const [seleccion, setSeleccion] = useState<{ weekStart: string; date: string } | null>(null)
 
-  async function download(format: 'csv' | 'xlsx') {
+  async function download() {
     if (!token || !week) return
+    setExportOpen(false)
     setExportError('')
-    try { await exportWeek(token, week.weekStart, format) }
+    try { await exportWeek(token, week.weekStart, 'xlsx') }
     catch { setExportError('No se pudo exportar la semana. Probá de nuevo.') }
+  }
+
+  // El PDF sale de la planilla: se muestra y se abre la impresión del navegador.
+  function imprimir() {
+    setExportOpen(false)
+    setView('sheet')
+    window.setTimeout(() => window.print(), 50)
   }
 
   function handleLogUpdated(log: HabitLogDto) {
@@ -334,46 +398,16 @@ export default function SemanaPage() {
       <div className="semana-header">
         <div className="semana-header__top">
           <Brand size={20} />
+        </div>
+        <div className="semana-header__titulo">
+          <h1 className="semana-title" tabIndex={-1}>Semana</h1>
           {week && token && (
-            <div className="semana-descargar" onKeyDown={event => {
-              if (event.key === 'Escape') { event.preventDefault(); closeMenu() }
-            }} onBlur={event => {
-              if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
-            }}>
-              <button type="button" ref={menuButton} className="semana-descargar__btn"
-                aria-label="Más opciones de la semana" aria-haspopup="menu" aria-expanded={menuOpen}
-                aria-controls="semana-opciones" onClick={() => {
-                  // Al abrir (con clic, Enter o Espacio) el foco pasa a la primera opción, como en un menú.
-                  const opening = !menuOpen
-                  setMenuOpen(opening)
-                  if (opening) requestAnimationFrame(() => menu.current?.querySelector('button')?.focus())
-                }}
-                onKeyDown={event => {
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault()
-                    setMenuOpen(true)
-                    requestAnimationFrame(() => menu.current?.querySelector('button')?.focus())
-                  }
-                }}>⋯</button>
-              {menuOpen && <div id="semana-opciones" ref={menu} role="menu" aria-label="Opciones de la semana"
-                className="semana-descargar__menu" onKeyDown={event => {
-                  const items = Array.from(event.currentTarget.querySelectorAll('button'))
-                  const index = items.indexOf(document.activeElement as HTMLButtonElement)
-                  const next = event.key === 'ArrowDown' ? (index + 1) % items.length
-                    : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length
-                    : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : null
-                  if (next !== null) { event.preventDefault(); items[next]?.focus() }
-                }}>
-                <button type="button" role="menuitem" onClick={() => { closeMenu(); void download('csv') }}>Descargar CSV</button>
-                <button type="button" role="menuitem" onClick={() => { closeMenu(); void download('xlsx') }}>Descargar Excel (XLSX)</button>
-                <button type="button" role="menuitem" onClick={() => { setView(view === 'day' ? 'sheet' : 'day'); closeMenu() }}>
-                  {view === 'day' ? 'Planilla' : 'Por día'}
-                </button>
-              </div>}
-            </div>
+            <button type="button" className="semana-exportar" onClick={() => setExportOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              Exportar
+            </button>
           )}
         </div>
-        <h1 className="semana-title" tabIndex={-1}>Semana</h1>
         <div className="semana-nav">
           <button
             className="semana-nav__btn"
@@ -415,20 +449,23 @@ export default function SemanaPage() {
 
             {comidasPasadas.length > 0 && (
               <p className="semana-resumen__texto">
-                Esta semana: {comidasEnPlan} de {comidasPasadas.length} comidas como el plan
+                <span className="semana-resumen__num">{comidasEnPlan}<small> de {comidasPasadas.length}</small></span>
+                <span>comidas como el plan esta semana</span>
               </p>
             )}
-            <WeeklyHabitSummary week={week} />
+            <div className="semana-seg" role="group" aria-label="Vista de la semana">
+              <span className="semana-seg__pastilla" aria-hidden="true" style={{ transform: view === 'day' ? 'translateX(0)' : 'translateX(100%)' }} />
+              <button type="button" aria-pressed={view === 'day'} onClick={() => setView('day')}>Tarjeta</button>
+              <button type="button" aria-pressed={view === 'sheet'} onClick={() => setView('sheet')}>Planilla</button>
+            </div>
             {view === 'day' ? (
               <>
-                <div className="semana-resumen">
-                  <WeekStrip
-                    week={week}
-                    todayISO={hoy}
-                    selected={selectedDate ?? ''}
-                    onSelect={date => setSeleccion({ weekStart: week.weekStart, date })}
-                  />
-                </div>
+                <WeekCard
+                  week={week}
+                  todayISO={hoy}
+                  selected={selectedDate ?? ''}
+                  onSelect={date => setSeleccion({ weekStart: week.weekStart, date })}
+                />
                 {selectedDay && (
                   <DayDetail
                     key={selectedDay.date}
@@ -441,12 +478,24 @@ export default function SemanaPage() {
                 )}
               </>
             ) : <WeekSheet week={week} todayISO={hoy} />}
+            <WeeklyHabitSummary week={week} />
           </>
+        )}
+        {exportOpen && week && (
+          <ExportDialog rango={formatRango(week.weekStart, week.weekEnd)} onExcel={() => void download()}
+            onPdf={imprimir} onClose={() => setExportOpen(false)} />
         )}
 
       </div>
     </div>
   )
+}
+
+// En la planilla la fecha va corta ("Lun 2") para que entren las comidas; el nombre accesible es la fecha completa.
+function fechaCorta(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  const dia = d.toLocaleDateString('es-UY', { weekday: 'short' }).replace(/\./g, '')
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${d.getDate()}`
 }
 
 function WeekSheet({ week, todayISO }: { week: WeekSummaryDto; todayISO: string }) {
@@ -456,9 +505,9 @@ function WeekSheet({ week, todayISO }: { week: WeekSummaryDto; todayISO: string 
     <thead><tr><th scope="col">Fecha</th>{meals.map(name => <th scope="col" key={name}>{name}</th>)}
       {week.habits.map(h => <th scope="col" key={h.id}>{h.name}</th>)}</tr></thead>
     <tbody>{week.days.map(day => <tr key={day.date}>
-      <th scope="row" aria-current={day.date === todayISO ? 'date' : undefined}>
-        <time dateTime={day.date}>{fullDate(day.date)}</time>
-        {day.date === todayISO && <span> · Hoy</span>}
+      <th scope="row" aria-current={day.date === todayISO ? 'date' : undefined} aria-label={`${fullDate(day.date)}${day.date === todayISO ? ', hoy' : ''}`}>
+        <time dateTime={day.date}>{fechaCorta(day.date)}</time>
+        {day.date === todayISO && <span className="semana-sheet__hoy"> · Hoy</span>}
       </th>
       {meals.map(name => <td className="semana-note" key={name}>{(day.meals ?? []).filter(m => m.name === name).map(m => m.noteText).filter(Boolean).join('\n') || '—'}</td>)}
       {week.habits.map(h => <td key={h.id} aria-label={hasGoal(h) ? `${h.name}: ${day.habitIds && !day.habitIds.includes(h.id) ? 'No corresponde' : habitProgress(h, Number(day.habitLogs.find(l => l.habitId === h.id)?.value ?? 0))}, ${fullDate(day.date)}` : undefined}>

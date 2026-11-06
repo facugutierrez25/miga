@@ -39,10 +39,36 @@ class WeekService {
 
     @Transactional(readOnly = true)
     WeekSummaryDto getWeek(String email, LocalDate refDate) {
-        Long userId = userService.findUserIdByEmail(email);
         LocalDate weekStart = refDate.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = weekStart.plusDays(6);
+        return buildRange(userService.findUserIdByEmail(email), weekStart, weekStart.plusDays(6)).summary();
+    }
 
+    // Datos para exportar un rango: la planilla, las porciones por grupo de cada día y lo no reconocido.
+    @Transactional(readOnly = true)
+    WeekExport.Data getExportData(String email, LocalDate from, LocalDate to, java.util.Set<String> incluir) {
+        Long userId = userService.findUserIdByEmail(email);
+        RangeData range = buildRange(userId, from, to);
+        List<String> groupNames = new ArrayList<>();
+        Map<Long, String> groupById = new java.util.HashMap<>();
+        range.plans().values().stream().distinct().forEach(plan -> plan.groups().forEach(g -> {
+            groupById.put(g.id(), g.name());
+            if (!groupNames.contains(g.name())) groupNames.add(g.name());
+        }));
+        Map<LocalDate, Map<String, BigDecimal>> portions = new java.util.HashMap<>();
+        for (var e : range.entries()) {
+            if (e.foodGroupId() == null || e.portions() == null || !groupById.containsKey(e.foodGroupId())) continue;
+            portions.computeIfAbsent(e.date(), d -> new java.util.HashMap<>())
+                .merge(groupById.get(e.foodGroupId()), e.portions(), BigDecimal::add);
+        }
+        var sinRegla = incluir.contains(WeekExport.SIN_REGLA)
+            ? registroService.getSinRegla(userId, from, to) : List.<uy.miga.registro.SinReglaDto>of();
+        return new WeekExport.Data(range.summary(), incluir, groupNames, portions, sinRegla);
+    }
+
+    private record RangeData(WeekSummaryDto summary, Map<LocalDate, uy.miga.plans.PlanReadData> plans,
+                             List<FoodEntryFacade.EntryData> entries) {}
+
+    private RangeData buildRange(Long userId, LocalDate weekStart, LocalDate weekEnd) {
         Map<Long, HabitDto> weekHabits = new java.util.LinkedHashMap<>();
         List<HabitLog> weekLogs = logRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
         Map<LocalDate, List<HabitLog>> logsByDate = weekLogs.stream()
@@ -55,7 +81,8 @@ class WeekService {
         Map<Long, List<PlanHabit>> habitsByPlan = new java.util.HashMap<>();
 
         List<WeekDayDto> days = new ArrayList<>();
-        for (int i = 0; i < 7; i++) {
+        long length = java.time.temporal.ChronoUnit.DAYS.between(weekStart, weekEnd) + 1;
+        for (int i = 0; i < length; i++) {
             LocalDate day = weekStart.plusDays(i);
             List<FoodEntryFacade.EntryData> entries = entriesByDate.getOrDefault(day, List.of());
             boolean hasData = !entries.isEmpty();
@@ -81,12 +108,13 @@ class WeekService {
                         .ifPresent(l -> habitLogs.add(new HabitLogDto(habit.getId(), day, l.getValue())));
                 }
             }
-            BigDecimal totalGoal = plan == null ? BigDecimal.ZERO : plan.totalGoal();
+            BigDecimal totalGoal = plan == null ? BigDecimal.ZERO : plan.totalGoal(day.getDayOfWeek());
             days.add(new WeekDayDto(day, hasData || meals.stream().anyMatch(m -> m.noteText() != null && !m.noteText().isBlank()),
                 totalRecorded, totalGoal, habitLogs, meals, dayHabits.stream().map(PlanHabit::getId).toList()));
         }
 
-        return new WeekSummaryDto(weekStart, weekEnd, List.copyOf(weekHabits.values()), days);
+        return new RangeData(new WeekSummaryDto(weekStart, weekEnd, List.copyOf(weekHabits.values()), days),
+            plansByDate, weekEntries);
     }
 
     @Transactional(readOnly = true)

@@ -195,6 +195,7 @@ public class PlanService {
             meal.setName(mealDto.name());
             meal.setSuggestedTime(mealDto.suggestedTime());
             meal.setDisplayOrder(mealDto.displayOrder());
+            meal.setWeekdays(Weekdays.toMask(mealDto.weekdays()));
             for (MealPortionInput input : mealDto.portions()) {
                 Long groupId = abbrToId.get(input.foodGroupAbbr());
                 if (groupId == null) throw new InvalidPortionsException();
@@ -226,6 +227,7 @@ public class PlanService {
             MealSaveDto nm = newMeals.get(i);
             if (!cm.getName().equals(nm.name())) return true;
             if (!java.util.Objects.equals(cm.getSuggestedTime(), nm.suggestedTime())) return true;
+            if (!java.util.Objects.equals(cm.getWeekdays(), Weekdays.toMask(nm.weekdays()))) return true;
 
             var currentPortions = cm.getPortions().stream()
                 .sorted(java.util.Comparator.comparing(p -> idToAbbr.getOrDefault(p.getFoodGroupId(), "")))
@@ -261,7 +263,8 @@ public class PlanService {
             var portions = meal.getPortions().stream()
                 .map(p -> new MealPortionDto(p.getFoodGroupId(), p.getPortions()))
                 .toList();
-            return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions);
+            return new MealDto(meal.getId(), meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(), portions,
+                Weekdays.toList(meal.getWeekdays()));
         }).toList();
         return new PlanDto(groups, meals, plan.getVersion(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate());
     }
@@ -327,6 +330,12 @@ public class PlanService {
     public record MealRef(Long id, String name) {}
 
     @Transactional(readOnly = true)
+    public Map<Long, String> getMealNames(java.util.Collection<Long> mealIds) {
+        if (mealIds.isEmpty()) return Map.of();
+        return mealRepository.findAllById(mealIds).stream().collect(Collectors.toMap(Meal::getId, Meal::getName));
+    }
+
+    @Transactional(readOnly = true)
     public java.util.Map<LocalDate, PlanReadData> getPlansForRange(Long userId, LocalDate start, LocalDate end) {
         var candidates = plansRepository.findForRange(userId, start, end, clock.getZone().getId());
         var result = new java.util.LinkedHashMap<LocalDate, PlanReadData>();
@@ -350,7 +359,8 @@ public class PlanService {
     private PlanReadData readData(Plan plan) {
         var meals = mealRepository.findWithPortionsByPlanId(plan.getId()).stream()
             .map(m -> new PlanReadData.MealData(m.getId(), m.getName(), m.getPortions().stream()
-                .map(p -> new MealPortionSummary(p.getFoodGroupId(), p.getPortions())).toList())).toList();
+                .map(p -> new MealPortionSummary(p.getFoodGroupId(), p.getPortions())).toList(),
+                Weekdays.toList(m.getWeekdays()))).toList();
         return new PlanReadData(plan.getId(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
             plan.getSupersededAt() == null ? null : plan.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
             plan.getModoRegistro(), plan.getMargenPorciones(), getPlanFoodGroups(plan.getId()), meals);
@@ -391,7 +401,8 @@ public class PlanService {
         Map<Long, String> abbreviations = old.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getId, PlanFoodGroup::getAbbreviation));
         var meals = old.getMeals().stream().map(m -> new MealSaveDto(m.getName(), m.getSuggestedTime(), m.getDisplayOrder(),
-            m.getPortions().stream().map(portion -> new MealPortionInput(abbreviations.get(portion.getFoodGroupId()), portion.getPortions())).toList())).toList();
+            m.getPortions().stream().map(portion -> new MealPortionInput(abbreviations.get(portion.getFoodGroupId()), portion.getPortions())).toList(),
+            Weekdays.toList(m.getWeekdays()))).toList();
         buildMeals(copy, new PlanSaveDto(meals, null), copy.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getAbbreviation, PlanFoodGroup::getId)));
         plansRepository.flush();

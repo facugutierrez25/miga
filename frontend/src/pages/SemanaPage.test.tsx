@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, test, expect, afterEach } from 'vitest'
-import userEvent from '@testing-library/user-event'
 import SemanaPage from './SemanaPage'
 import * as api from '../api/semana'
 import { useWeek } from '../hooks/useWeek'
@@ -53,8 +52,7 @@ test.each([[1, 2, false], [2, 3, true]])('meta semanal suma %s y %s', (first, se
   const summary = screen.getByRole('listitem', { name: `Agua: ${first + second} de 5 esta semana, ${done ? 'completado' : 'pendiente'}` })
   expect(summary.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
   expect(screen.getByRole('group', { name: new RegExp(`Agua: ${first}, lunes`) })).not.toHaveClass('semana-habito--ok')
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
   expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeInTheDocument()
 })
 
@@ -105,35 +103,29 @@ test('sí/no conserva su comportamiento aunque tenga una meta configurada', () =
 
 test('planilla muestra la meta diaria con su unidad y fecha accesible', () => {
   renderProgress({}, [1.5])
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
   expect(screen.getByRole('cell', { name: /Agua: 1,5 de 2 lt, lunes/ })).toHaveTextContent('1,5 de 2 lt')
 })
 
 test('Por día muestra cada comida, estado y nota; el contador flexible no se edita', () => {
-  render(<SemanaPage />)
-  expect(screen.getByText('Desayuno')).toBeInTheDocument()
-  expect(screen.getByText(/Anotada/)).toBeInTheDocument()
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-comida__nombre')).toHaveTextContent('Desayuno')
+  expect(container.querySelector('.semana-comida__estado')).toHaveTextContent('Anotada')
   expect(screen.getByText('=pan y café')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Flexibles: completado, 2, lunes, 26 de octubre de 2026/ })).toBeDisabled()
 })
 
-test('abrir el menú con Enter lleva el foco a la primera opción y las flechas navegan', async () => {
-  const user = userEvent.setup()
+test('Tarjeta y Planilla se eligen con un control segmentado', () => {
   render(<SemanaPage />)
-  screen.getByRole('button', { name: 'Más opciones de la semana' }).focus()
-  await user.keyboard('{Enter}')
-  await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Descargar CSV' })).toHaveFocus())
-  await user.keyboard('{ArrowDown}')
-  expect(screen.getByRole('menuitem', { name: 'Descargar Excel (XLSX)' })).toHaveFocus()
-  await user.keyboard('{Escape}')
-  expect(screen.getByRole('button', { name: 'Más opciones de la semana' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Tarjeta' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  expect(screen.getByRole('button', { name: 'Planilla' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('table')).toBeInTheDocument()
 })
 
 test('Planilla muestra la grilla con el texto escrito y los hábitos', () => {
   render(<SemanaPage />)
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
   expect(screen.getByRole('table')).toBeInTheDocument()
   expect(screen.getByRole('columnheader', { name: 'Desayuno' })).toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '=pan y café' })).toBeInTheDocument()
@@ -146,8 +138,7 @@ test('identifica el día actual y su fecha completa en ambas vistas', () => {
   expect(screen.getByRole('heading', { name: 'lunes, 26 de octubre de 2026' }).closest('article'))
     .toHaveAttribute('aria-current', 'date')
   expect(screen.getByText('Hoy')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de la semana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
   expect(screen.getByRole('rowheader', { name: /lunes, 26 de octubre de 2026/ }))
     .toHaveAttribute('aria-current', 'date')
 })
@@ -171,7 +162,7 @@ test('la tira de la semana anuncia cada día con su resumen y marca el elegido',
   const dia = screen.getByRole('button', { name: /lunes, 26 de octubre de 2026, hoy: 0 de 1 comidas como el plan, 1 anotadas/ })
   expect(dia).toHaveAttribute('aria-pressed', 'true')
   expect(dia).toHaveAttribute('aria-current', 'date')
-  expect(screen.getByText('Esta semana: 0 de 1 comidas como el plan')).toBeInTheDocument()
+  expect(screen.getByText('comidas como el plan esta semana').parentElement).toHaveTextContent('0 de 1comidas como el plan esta semana')
 })
 
 test('un contador se puede bajar si se sumó de más', async () => {
@@ -183,21 +174,31 @@ test('un contador se puede bajar si se sumó de más', async () => {
 })
 
 
-test('el menú ofrece descargas y Planilla, Escape cierra y devuelve el foco', () => {
+test('Exportar abre una hoja con Excel y PDF, sin CSV ni link, y cierra con Escape devolviendo el foco', async () => {
+  const exportWeek = vi.spyOn(api, 'exportWeek').mockResolvedValue()
   render(<SemanaPage />)
-  const trigger = screen.getByRole('button', { name: 'Más opciones de la semana' })
-  expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
-  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  const trigger = screen.getByRole('button', { name: 'Exportar' })
+  trigger.focus()
   fireEvent.click(trigger)
-  expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('menuitem', { name: 'Descargar CSV' })).toBeInTheDocument()
-  const excel = screen.getByRole('menuitem', { name: 'Descargar Excel (XLSX)' })
-  expect(screen.getByRole('menuitem', { name: 'Planilla' })).toBeInTheDocument()
-  excel.focus()
-  fireEvent.keyDown(excel, { key: 'Escape' })
-  expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  expect(trigger).toHaveFocus()
-  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  const dialog = screen.getByRole('dialog', { name: 'Exportar para tu nutri' })
+  expect(dialog).toHaveTextContent('Miga no lo comparte con nadie')
+  expect(screen.queryByText(/CSV/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Guardar como PDF' })).toBeInTheDocument()
+  fireEvent.keyDown(dialog, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await waitFor(() => expect(trigger).toHaveFocus())
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar planilla de Excel' }))
+  await waitFor(() => expect(exportWeek).toHaveBeenCalledWith('tok', '2026-10-26', 'xlsx'))
+})
+
+test('la tarjeta pone un guion cuando el plan de ese día no tiene esa comida', () => {
+  const data = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26').data!
+  const otroDia = { ...data.days[0], date: '2026-10-27', meals: [{ mealId: 11, name: 'Pre entreno', status: 'SIN_ANOTAR', noteText: null }] }
+  vi.mocked(useWeek).mockReturnValue({ ...defaultUseWeek('tok', 'user@miga.uy', '2026-10-26'), data: { ...data, days: [data.days[0], otroDia] } })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelectorAll('.semana-tarjeta .semana-miga--no-aplica')).toHaveLength(2)
+  expect(screen.getByText('No toca ese día')).toBeInTheDocument()
 })
 
 test.each(['CASI', 'DE_MAS', 'PREGUNTAR'])('media miga de %s usa la marca sin acento', status => {

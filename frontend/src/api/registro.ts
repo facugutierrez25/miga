@@ -33,6 +33,12 @@ export interface NoteInterpretationDto {
   comparison: GroupStatusDto[]
 }
 
+// Tipo de la regla que se aplicó a un ítem.
+export type RuleType = 'NORMAL' | 'COMPUESTO' | 'LIBRE' | 'FLEXIBLE' | 'NO_CUENTA' | 'PREGUNTAR'
+
+// De dónde salió esa regla: el plan, el catálogo base o una corrección guardada por la persona.
+export type RuleSource = 'PLAN' | 'CATALOGO' | 'USUARIO'
+
 export interface EntryItemDto {
   id: number
   food: string
@@ -45,6 +51,8 @@ export interface EntryItemDto {
   originalText?: string | null
   appliedRule?: string | null
   occurrenceId?: string | null
+  ruleType?: RuleType | null
+  ruleSource?: RuleSource | null
 }
 
 export interface DailySummaryDto {
@@ -86,6 +94,13 @@ export interface PatchItemRequest {
 export interface PatchItemResultDto {
   replacedItemIds: number[]
   items: EntryItemDto[]
+}
+
+// Lo que la persona escribió y no se reconoció.
+export interface SinReglaDto {
+  texto: string
+  fecha: string
+  comida: string
 }
 
 export interface RespuestaRequest {
@@ -169,6 +184,17 @@ export async function getSugerencias(
     if (err instanceof ApiError) return []
     throw err
   }
+}
+
+// Lo anotado entre dos fechas (YYYY-MM-DD, inclusive) que ninguna regla reconoció.
+export async function getSinRegla(
+  token: string,
+  desde: string,
+  hasta: string,
+  signal?: AbortSignal,
+): Promise<SinReglaDto[]> {
+  const query = `desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`
+  return apiRequest(`/api/v1/registro/sin-regla?${query}`, { errorMessage: 'Error al cargar lo que no se reconoció.', token, signal })
 }
 
 export async function removeItem(

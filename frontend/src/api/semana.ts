@@ -56,15 +56,39 @@ export async function logHabit(
   return apiRequest(`/api/v1/habitos/${habitId}/log?date=${date}`, { errorMessage: 'Error al registrar el hábito.', token, method: 'PUT', body: { value } })
 }
 
-export async function exportWeek(token: string, weekStart: string, format: 'csv' | 'xlsx' = 'csv'): Promise<void> {
-  const blob = await apiRequest<Blob>(`/api/v1/semana/export?date=${weekStart}&format=${format}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
-  if (!blob) return
+function download(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `semana-${weekStart}.${format}`
+  a.download = fileName
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export async function exportWeek(token: string, weekStart: string, format: 'csv' | 'xlsx' = 'csv'): Promise<void> {
+  const blob = await apiRequest<Blob>(`/api/v1/semana/export?date=${weekStart}&format=${format}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
+  if (!blob) return
+  download(blob, `semana-${weekStart}.${format}`)
+}
+
+export type ExportFormat = 'xlsx' | 'pdf'
+
+// Secciones de la exportación: lo escrito, porciones y estado de cada comida, hábitos y lo no reconocido.
+export type ExportSection = 'texto' | 'porciones' | 'habitos' | 'sinregla'
+
+// Descarga la planilla de un rango de fechas (YYYY-MM-DD, inclusive), una fila por día.
+export async function exportRange(
+  token: string,
+  from: string,
+  to: string,
+  format: ExportFormat,
+  incluir: ExportSection[],
+): Promise<void> {
+  const params = new URLSearchParams({ from, to, format })
+  if (incluir.length > 0) params.set('incluir', incluir.join(','))
+  const blob = await apiRequest<Blob>(`/api/v1/semana/export?${params.toString()}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
+  if (!blob) return
+  download(blob, `miga-${from}_${to}.${format}`)
 }
 
 export function exportWeekCsv(token: string, weekStart: string): Promise<void> {

@@ -395,3 +395,17 @@ test.each([false, true])('tocar Mi plan vuelve al resumen con borrador %s', asyn
   expect(screen.getByText('Desayuno')).toBeInTheDocument()
   expect(screen.queryByLabelText('Nombre de la comida')).not.toBeInTheDocument()
 })
+
+test('una comida admite hasta 12 porciones: al llegar, no deja sumar más', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  fireEvent.click(await screen.findByText('Agregar comida'))
+  const sumar = (nombre: string, veces: number) => {
+    for (let k = 0; k < veces; k++) fireEvent.click(screen.getAllByRole('button', { name: `Aumentar ${nombre}` }).at(-1)!)
+  }
+  sumar('Proteínas', 12)
+  sumar('Cereales', 12)
+  expect(screen.getAllByText(/de 12 porciones: una comida tiene hasta 12/).at(-1)).toHaveTextContent('12 de 12 porciones')
+  expect(screen.getAllByRole('button', { name: 'Aumentar Verduras' }).at(-1)).toBeDisabled()
+})

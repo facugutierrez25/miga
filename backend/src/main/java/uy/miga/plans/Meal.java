@@ -26,6 +26,10 @@ class Meal {
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
+    // Máscara de días en que toca la comida (ver Weekdays); null = todos los días.
+    @Column(name = "weekdays")
+    private Short weekdays;
+
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MealPortion> portions = new ArrayList<>();
 
@@ -35,6 +39,8 @@ class Meal {
     LocalTime getSuggestedTime() { return suggestedTime; }
     int getDisplayOrder() { return displayOrder; }
     List<MealPortion> getPortions() { return portions; }
+    Short getWeekdays() { return weekdays; }
+    void setWeekdays(Short weekdays) { this.weekdays = weekdays; }
 
     void setPlan(Plan plan) { this.plan = plan; }
     void setName(String name) { this.name = name; }

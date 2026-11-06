@@ -61,6 +61,7 @@ class FoodEntryService {
 
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
         entry.setOrigen("USUARIO");
+        entry.setRuleSource("USUARIO");
         entry.setPorciones(porciones);
         return toDto(repository.save(entry));
     }
