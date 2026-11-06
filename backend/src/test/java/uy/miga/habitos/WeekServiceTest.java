@@ -104,4 +104,20 @@ class WeekServiceTest {
         }
         verifyNoInteractions(logs);
     }
+
+    @Test
+    void exportUsesTheAuthenticatedUsersSavedName() {
+        var users = mock(UserService.class);
+        var plans = mock(PlanService.class);
+        var entries = mock(FoodEntryFacade.class);
+        var service = new WeekService(mock(PlanHabitRepository.class), mock(HabitLogRepository.class),
+            entries, plans, users, mock(uy.miga.registro.RegistroService.class));
+        var start = LocalDate.of(2026, 11, 2);
+        when(users.findUserIdByEmail("facundo@miga.uy")).thenReturn(42L);
+        when(users.findFirstNameByEmail("facundo@miga.uy")).thenReturn("Facundo");
+        var data = service.getExportData("facundo@miga.uy", start, start.plusDays(6), java.util.Set.of("texto"));
+        assertThat(data.userName()).isEqualTo("Facundo");
+        verify(users).findFirstNameByEmail("facundo@miga.uy");
+        verify(plans).getPlansForRange(42L, start, start.plusDays(6));
+    }
 }

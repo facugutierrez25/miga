@@ -473,14 +473,6 @@
 }
 @keyframes semana-dialog-in { from { transform: scale(0.96); opacity: 0; } }
 
-/* Al imprimir (Guardar como PDF) queda solo la planilla con su título y rango */
-@media print {
-  .app-nav, .semana-header__top, .semana-exportar, .semana-nav__btn, .semana-seg,
-  .semana-resumen__texto, .semana-habitos, .semana-overlay { display: none !important; }
-  .semana-sheet { overflow: visible; box-shadow: none; }
-  .semana-sheet table { font-size: 11px; }
-}
-
 /* ── Detalle del día elegido ── */
 
 .semana-dia {
@@ -738,3 +730,6 @@
     line-height: 32px;
   }
 }
+
+.semana-miga--flexible { background: var(--accent); border-color: var(--ink); }
+.semana-comida__estado--flexible { color: var(--on-accent-soft); background: var(--accent-soft); border-radius: var(--radius-sm); padding: var(--s1); }

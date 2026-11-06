@@ -9,6 +9,8 @@ import * as plansApi from '../api/plans'
 import * as registroApi from '../api/registro'
 import * as AuthContext from '../auth/authTypes'
 
+vi.mock('../api/semana', () => ({ getWeek: vi.fn().mockResolvedValue({ habits: [], days: [] }) }))
+
 vi.mock('../api/plans')
 vi.mock('../api/registro', async importOriginal => {
   const actual = await importOriginal<typeof import('../api/registro')>()
@@ -502,6 +504,7 @@ test('lo de siempre guarda en un toque, bloquea doble envío y permite editar de
   expect(screen.queryByText(/Según tu plan/)).not.toBeInTheDocument()
   const suggestion = await screen.findByRole('button', { name: 'Anotar: leche con pan' })
   expect(screen.getByRole('heading', { name: 'Lo de siempre' })).toBeVisible()
+  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' }).compareDocumentPosition(suggestion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(suggestion.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   fireEvent.click(suggestion)
   fireEvent.click(suggestion)

@@ -45,6 +45,10 @@ public class UserService {
             .orElseThrow();
     }
 
+    public String findFirstNameByEmail(String email) {
+        return repository.findByEmail(email).orElseThrow().getFirstName();
+    }
+
     UserProfileResponse getProfile(String email) {
         User user = repository.findByEmail(email).orElseThrow();
         return new UserProfileResponse(user.getEmail(), user.getFirstName(), user.getLastName(), user.getBirthDate());

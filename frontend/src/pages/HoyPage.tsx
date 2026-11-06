@@ -21,6 +21,7 @@ import {
   type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
 import './HoyPage.css'
+import TodayHabits from '../components/TodayHabits'
 import { usePlan } from '../hooks/usePlan'
 import { useDayRegistro } from '../hooks/useDayRegistro'
 
@@ -702,6 +703,20 @@ function NotaMealSection({
 
   return (
     <div className="nota-body">
+      <label className="nota-label" htmlFor={textareaId}>¿Qué comiste?</label>
+      <textarea
+        id={textareaId}
+        ref={textareaRef}
+        className="nota-textarea"
+        maxLength={2000}
+        placeholder="Por ejemplo: tarta de zapallitos y ensalada"
+        value={texto}
+        onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
+        rows={2}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `nota-error-${meal.id}` : undefined}
+      />
+
       {!cargandoSug && sugerencias.length > 0 && !hasNote && (
         <section className="nota-sugerencias" aria-labelledby={`sugerencias-${meal.id}`}>
           <h3 id={`sugerencias-${meal.id}`} className="nota-sugerencias__titulo">Lo de siempre</h3>
@@ -720,20 +735,6 @@ function NotaMealSection({
           ))}
         </section>
       )}
-
-      <label className="nota-label" htmlFor={textareaId}>¿Qué comiste?</label>
-      <textarea
-        id={textareaId}
-        ref={textareaRef}
-        className="nota-textarea"
-        maxLength={2000}
-        placeholder="Por ejemplo: tarta de zapallitos y ensalada"
-        value={texto}
-        onChange={e => { const value = e.target.value; editarBorrador(() => value) }}
-        rows={2}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `nota-error-${meal.id}` : undefined}
-      />
 
       <div className="nota-acciones">
         <button
@@ -1245,6 +1246,8 @@ function HoyContent() {
                 {...mealProps}
               />
             )}
+
+            <TodayHabits key={fecha} date={fecha} revision={dayRegistro} />
 
             {total > 0 && (
               <details
