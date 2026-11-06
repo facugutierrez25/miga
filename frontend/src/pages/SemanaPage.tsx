@@ -200,8 +200,8 @@ function ExportDialog({ rango, onExcel, onPdf, onClose }: {
           Se descarga en tu celular y lo mandás vos: Miga no lo comparte con nadie.
         </p>
         <button type="button" className="semana-dialog__principal" onClick={onExcel}>Descargar planilla de Excel</button>
-        <button type="button" className="semana-dialog__secundario" onClick={onPdf}>Guardar como PDF</button>
-        <p className="semana-dialog__nota">PDF abre la impresión del navegador: elegí «Guardar como PDF».</p>
+        <button type="button" className="semana-dialog__secundario" onClick={onPdf}>Descargar PDF</button>
+        <p className="semana-dialog__nota">PDF abre la impresión del navegador: elegí «Descargar PDF».</p>
       </div>
     </div>,
     document.body,
@@ -221,19 +221,12 @@ export default function SemanaPage() {
   const hoy = toISO(useAhora())
   const [seleccion, setSeleccion] = useState<{ weekStart: string; date: string } | null>(null)
 
-  async function download() {
+  async function download(format: 'xlsx' | 'pdf') {
     if (!token || !week) return
     setExportOpen(false)
     setExportError('')
-    try { await exportWeek(token, week.weekStart, 'xlsx') }
+    try { await exportWeek(token, week.weekStart, format) }
     catch { setExportError('No se pudo exportar la semana. Probá de nuevo.') }
-  }
-
-  // El PDF sale de la planilla: se muestra y se abre la impresión del navegador.
-  function imprimir() {
-    setExportOpen(false)
-    setView('sheet')
-    window.setTimeout(() => window.print(), 50)
   }
 
   const isCurrentWeek = week ? week.weekStart <= hoy && hoy <= week.weekEnd : false
@@ -332,8 +325,8 @@ export default function SemanaPage() {
           </>
         )}
         {exportOpen && week && (
-          <ExportDialog rango={formatRango(week.weekStart, week.weekEnd)} onExcel={() => void download()}
-            onPdf={imprimir} onClose={() => setExportOpen(false)} />
+          <ExportDialog rango={formatRango(week.weekStart, week.weekEnd)} onExcel={() => void download('xlsx')}
+            onPdf={() => void download('pdf')} onClose={() => setExportOpen(false)} />
         )}
 
       </div>

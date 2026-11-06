@@ -326,7 +326,7 @@ class WeekIntegrationTest {
         byte[] xlsx = mockMvc.perform(get("/api/v1/semana/export").param("date", monday.toString()).param("format", "xlsx")
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         try (var workbook = new org.dhatim.fastexcel.reader.ReadableWorkbook(new java.io.ByteArrayInputStream(xlsx))) {
-            assertThat(workbook.getFirstSheet().read().get(4).getCellText(2)).isEqualTo("'" + note);
+            assertThat(workbook.getFirstSheet().read().get(9).getCellText(2)).isEqualTo("'" + note);
         }
         String other = registerAndLogin("isolation-" + UUID.randomUUID() + "@miga.uy");
         String otherWeek = mockMvc.perform(get("/api/v1/semana").param("date", monday.toString())
@@ -337,7 +337,7 @@ class WeekIntegrationTest {
                 .header("Authorization", "Bearer " + other)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
             if (format.equals("csv")) assertThat(new String(bytes, java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("texto privado", "Almuerzo");
             else try (var workbook = new org.dhatim.fastexcel.reader.ReadableWorkbook(new java.io.ByteArrayInputStream(bytes))) {
-                assertThat(workbook.getFirstSheet().read().getFirst().getCellCount()).isEqualTo(1);
+                assertThat(workbook.getFirstSheet().read().get(5).getCellText(0)).isEqualTo("Fecha");
             }
         }
     }

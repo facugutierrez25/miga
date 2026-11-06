@@ -62,7 +62,7 @@ class WeekService {
         }
         var sinRegla = incluir.contains(WeekExport.SIN_REGLA)
             ? registroService.getSinRegla(userId, from, to) : List.<uy.miga.registro.SinReglaDto>of();
-        return new WeekExport.Data(range.summary(), incluir, groupNames, portions, sinRegla);
+        return new WeekExport.Data(range.summary(), incluir, groupNames, portions, sinRegla, userService.findFirstNameByEmail(email));
     }
 
     private record RangeData(WeekSummaryDto summary, Map<LocalDate, uy.miga.plans.PlanReadData> plans,

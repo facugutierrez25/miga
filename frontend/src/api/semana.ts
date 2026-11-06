@@ -65,7 +65,7 @@ function download(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url)
 }
 
-export async function exportWeek(token: string, weekStart: string, format: 'csv' | 'xlsx' = 'csv'): Promise<void> {
+export async function exportWeek(token: string, weekStart: string, format: 'csv' | 'xlsx' | 'pdf' = 'csv'): Promise<void> {
   const blob = await apiRequest<Blob>(`/api/v1/semana/export?date=${weekStart}&format=${format}`, { errorMessage: 'Error al exportar.', token, responseType: 'blob' })
   if (!blob) return
   download(blob, `semana-${weekStart}.${format}`)

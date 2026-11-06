@@ -2,7 +2,6 @@ package uy.miga.habitos;
 
 import com.lowagie.text.Document;
 import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
@@ -38,7 +37,11 @@ final class WeekExport {
     static final Set<String> POR_DEFECTO = Set.of(TEXTO, HABITOS);
 
     record Data(WeekSummaryDto week, Set<String> incluir, List<String> groupNames,
-                Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla) {
+                Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla, String userName) {
+        Data(WeekSummaryDto week, Set<String> incluir, List<String> groupNames,
+             Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla) {
+            this(week, incluir, groupNames, portions, sinRegla, null);
+        }
         static Data of(WeekSummaryDto week) {
             return new Data(week, POR_DEFECTO, List.of(), Map.of(), List.of());
         }
@@ -164,36 +167,120 @@ final class WeekExport {
         writeXlsx(Data.of(week), out);
     }
 
+    // Paleta clara de la app: papel salvia, tinta, oliva y acento amarillo.
+    private static final String PAPER = "F2F1EA";
+    private static final String SURFACE = "FBFAF5";
+    private static final String INK = "040200";
+    private static final String MUTED = "5E5A2E";
+    private static final String BRAND = "7C773F";
+    private static final String ACCENT = "F6C344";
+    private static final String LINE = "E2E0D3";
+    private static final String SITE = "https://miga.uy";
+    private static final int TABLE_ROW = 5;
+
     static void writeXlsx(Data data, OutputStream out) throws IOException {
         try (Workbook workbook = new Workbook(out, "Miga", "1.0")) {
-            writeSheet(workbook.newWorksheet("Planilla"), grid(data));
-            if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data));
+            writeSheet(workbook.newWorksheet("Planilla"), grid(data), data, title(data));
+            if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data), data, "Sin regla");
         }
     }
 
-    private static void writeSheet(org.dhatim.fastexcel.Worksheet sheet, List<List<String>> rows) {
+    static String title(Data data) {
+        boolean week = java.time.temporal.ChronoUnit.DAYS.between(data.week().weekStart(), data.week().weekEnd()) == 6;
+        String name = data.userName() == null ? "" : data.userName().replaceAll("[\\r\\n]+", " ").strip();
+        return name.isEmpty() ? week ? "Tu semana" : "Tu registro" : (week ? "Semana de " : "Registro de ") + name;
+    }
+
+    static String period(Data data) {
+        var start = data.week().weekStart();
+        var end = data.week().weekEnd();
+        var locale = Locale.forLanguageTag("es-UY");
+        var full = java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", locale);
+        if (start.equals(end)) return start.format(full);
+        if (start.getYear() != end.getYear()) return start.format(full) + " al " + end.format(full);
+        if (start.getMonth() == end.getMonth()) return start.getDayOfMonth() + " al " + end.format(full);
+        return start.format(java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM", locale)) + " al " + end.format(full);
+    }
+
+    private static void writeSheet(org.dhatim.fastexcel.Worksheet sheet, List<List<String>> rows,
+                                   Data data, String title) {
+        int lastCol = Math.max(1, rows.getFirst().size() - 1);
+        sheet.hideGridLines();
+        sheet.range(0, 0, TABLE_ROW + rows.size(), lastCol).style()
+            .fontName("Onest").fontSize(11).fontColor(INK).fillColor(SURFACE).set();
+        sheet.range(0, 0, 3, lastCol).style().fillColor(PAPER).set();
+        sheet.value(0, 0, "miga");
+        sheet.range(0, 0, 0, lastCol).style().merge().fontName("Onest").fontSize(26).fontColor(BRAND).bold()
+            .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "medium")
+            .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, ACCENT).set();
+        sheet.rowHeight(0, 44);
+        sheet.value(1, 0, title);
+        sheet.range(1, 0, 1, lastCol).style().merge().fontName("Onest").fontSize(16).bold().set();
+        sheet.rowHeight(1, 30);
+        sheet.value(2, 0, period(data));
+        sheet.range(2, 0, 2, lastCol).style().merge().fontName("Onest").fontColor(MUTED).set();
+        sheet.hyperlink(3, 0, org.dhatim.fastexcel.HyperLink.external(SITE, "Registrado con Miga"));
+        sheet.range(3, 0, 3, lastCol).style().merge().fontName("Onest").fontColor(BRAND).underlined().set();
+        sheet.rowHeight(3, 26);
+        for (int c = 0; c <= lastCol; c++) sheet.width(c, c == 0 ? 17 : 29);
         for (int r = 0; r < rows.size(); r++) {
-            for (int c = 0; c < rows.get(r).size(); c++) sheet.value(r, c, safe(rows.get(r).get(c)));
+            int row = TABLE_ROW + r;
+            for (int c = 0; c < rows.get(r).size(); c++) sheet.value(row, c, safe(rows.get(r).get(c)));
+            var style = sheet.range(row, 0, row, lastCol).style().fontName("Onest").wrapText(true).verticalAlignment("top");
+            if (r == 0) {
+                style.fillColor(BRAND).fontColor(SURFACE).bold();
+                sheet.rowHeight(row, 32);
+            } else {
+                style.fillColor(r % 2 == 0 ? PAPER : SURFACE)
+                    .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "thin")
+                    .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, LINE);
+                int lines = rows.get(r).stream().mapToInt(value -> value.lines()
+                    .mapToInt(line -> Math.max(1, (line.length() + 26) / 27)).sum()).max().orElse(1);
+                sheet.rowHeight(row, Math.min(409, Math.max(48, 16 * lines + 16)));
+            }
+            style.set();
+        }
+        sheet.freezePane(1, TABLE_ROW + 1);
+        sheet.pageOrientation("landscape");
+        sheet.paperSize(org.dhatim.fastexcel.PaperSize.A4_PAPER);
+        sheet.fitToWidth((short) 1);
+        sheet.fitToHeight((short) 0);
+        sheet.repeatRows(0, TABLE_ROW);
+        sheet.footer("Registrado con Miga · miga.uy", org.dhatim.fastexcel.Position.LEFT);
+        sheet.footer("Página &P de &N", org.dhatim.fastexcel.Position.RIGHT);
+    }
+
+    private static java.awt.Color color(String hex) {
+        return java.awt.Color.decode("#" + hex);
+    }
+
+    private static byte[] resource(String name) throws IOException {
+        try (var stream = WeekExport.class.getResourceAsStream("/export/" + name)) {
+            if (stream == null) throw new IOException("Falta el recurso de exportación: " + name);
+            return stream.readAllBytes();
         }
     }
 
     static void writePdf(Data data, OutputStream out) throws IOException {
-        Document document = new Document(PageSize.A4.rotate(), 24, 24, 24, 24);
+        // Columnas completas, texto seleccionable y filas que continúan en la página siguiente.
+        // Para planes muy anchos se repite Fecha en bloques, sin reducir la letra a un tamaño ilegible.
+        Document document = new Document(grid(data).getFirst().size() > 8 ? PageSize.A3.rotate() : PageSize.A4.rotate(),
+            28, 28, 78, 40);
         try {
-            PdfWriter.getInstance(document, out);
+            var face = com.lowagie.text.pdf.BaseFont.createFont("Onest.ttf", com.lowagie.text.pdf.BaseFont.IDENTITY_H,
+                true, false, resource("Onest.ttf"), null);
+            Font head = new Font(face, 9, Font.BOLD, color(SURFACE));
+            Font body = new Font(face, 9, Font.NORMAL, color(INK));
+            PdfWriter writer = PdfWriter.getInstance(document, out);
+            writer.setPageEvent(new ExportPage(data, face));
+            document.addTitle(title(data) + " · Miga · " + period(data));
+            document.addAuthor("Miga");
+            document.addCreator("Miga · " + SITE);
             document.open();
-            Font title = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
-            Font head = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8);
-            Font body = FontFactory.getFont(FontFactory.HELVETICA, 8);
-            document.add(new Paragraph("Miga · " + data.week().weekStart() + " a " + data.week().weekEnd(), title));
-            document.add(new Paragraph(" ", body));
-            document.add(table(grid(data), head, body));
+            addTables(document, grid(data), head, body, title(data));
             if (withSinRegla(data)) {
-                document.add(new Paragraph(" ", body));
-                document.add(new Paragraph("Sin regla", title));
-                document.add(new Paragraph(" ", body));
-                if (data.sinRegla().isEmpty()) document.add(new Paragraph("No hubo nada sin reconocer.", body));
-                else document.add(table(sinReglaGrid(data), head, body));
+                document.newPage();
+                addTables(document, sinReglaGrid(data), head, body, "Sin regla");
             }
         } catch (Exception e) {
             throw e instanceof IOException io ? io : new IOException("No se pudo generar el PDF.", e);
@@ -202,17 +289,102 @@ final class WeekExport {
         }
     }
 
+    private static void addTables(Document document, List<List<String>> rows, Font head, Font body,
+                                  String title) throws com.lowagie.text.DocumentException {
+        int columns = rows.getFirst().size();
+        int blockSize = document.getPageSize().getWidth() > 1000 ? 12 : 7;
+        for (int start = 1; start < Math.max(2, columns); start += blockSize) {
+            if (start > 1) document.newPage();
+            int end = Math.min(columns, start + blockSize);
+            List<List<String>> block = new ArrayList<>();
+            for (var row : rows) {
+                List<String> cells = new ArrayList<>(List.of(row.getFirst()));
+                cells.addAll(row.subList(Math.min(start, row.size()), end));
+                block.add(cells);
+            }
+            var heading = new Paragraph(title + (columns > blockSize + 1 ? " · columnas " + start + "–" + (end - 1) : ""),
+                new Font(body.getBaseFont(), 13, Font.BOLD, color(INK)));
+            heading.setSpacingAfter(12);
+            document.add(heading);
+            document.add(table(block, head, body));
+        }
+    }
+
     private static PdfPTable table(List<List<String>> rows, Font head, Font body) {
-        PdfPTable table = new PdfPTable(rows.getFirst().size());
+        int columns = rows.getFirst().size();
+        PdfPTable table = new PdfPTable(columns);
         table.setWidthPercentage(100);
+        float[] widths = new float[columns];
+        java.util.Arrays.fill(widths, 1);
+        widths[0] = 0.85f;
+        table.setWidths(widths);
         table.setHeaderRows(1);
+        table.setSplitRows(true);
+        table.setSplitLate(false);
         for (int r = 0; r < rows.size(); r++) {
             for (String value : rows.get(r)) {
-                PdfPCell cell = new PdfPCell(new Phrase(value, r == 0 ? head : body));
-                cell.setPadding(4);
+                PdfPCell cell = new PdfPCell(new Phrase(value.isEmpty() ? "—" : value, r == 0 ? head : body));
+                cell.setPadding(8);
+                cell.setLeading(0, 1.4f);
+                cell.setVerticalAlignment(com.lowagie.text.Element.ALIGN_TOP);
+                cell.setBackgroundColor(color(r == 0 ? BRAND : r % 2 == 0 ? PAPER : SURFACE));
+                cell.setBorder(com.lowagie.text.Rectangle.BOTTOM);
+                cell.setBorderWidth(0.5f);
+                cell.setBorderColor(color(LINE));
                 table.addCell(cell);
             }
         }
         return table;
+    }
+
+    private static final class ExportPage extends com.lowagie.text.pdf.PdfPageEventHelper {
+        private final Data data;
+        private final com.lowagie.text.pdf.BaseFont face;
+        private final com.lowagie.text.Image logo;
+
+        ExportPage(Data data, com.lowagie.text.pdf.BaseFont face) throws IOException {
+            this.data = data;
+            this.face = face;
+            this.logo = com.lowagie.text.Image.getInstance(resource("miga-logo.png"));
+            logo.scaleAbsolute(32, 32);
+        }
+
+        @Override
+        public void onEndPage(PdfWriter writer, Document document) {
+            var canvas = writer.getDirectContent();
+            float width = document.getPageSize().getWidth();
+            float height = document.getPageSize().getHeight();
+            var under = writer.getDirectContentUnder();
+            under.setColorFill(color(PAPER));
+            under.rectangle(0, 0, width, height);
+            under.fill();
+            try {
+                logo.setAbsolutePosition(document.left(), height - 58);
+                canvas.addImage(logo);
+            } catch (com.lowagie.text.DocumentException e) {
+                throw new IllegalStateException("No se pudo dibujar el logo de Miga.", e);
+            }
+            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_LEFT,
+                new Phrase("miga", new Font(face, 22, Font.BOLD, color(BRAND))), document.left() + 42, height - 43, 0);
+            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
+                new Phrase(period(data), new Font(face, 10, Font.NORMAL, color(MUTED))), document.right(), height - 43, 0);
+            canvas.setColorStroke(color(ACCENT));
+            canvas.setLineWidth(2);
+            canvas.moveTo(document.left(), height - 66);
+            canvas.lineTo(document.right(), height - 66);
+            canvas.stroke();
+            float y = 19;
+            var footer = new Phrase("Registrado con Miga · miga.uy", new Font(face, 9, Font.NORMAL, color(BRAND)));
+            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_LEFT,
+                footer, document.left(), y, 0);
+            var link = com.lowagie.text.pdf.PdfAnnotation.createLink(writer,
+                new com.lowagie.text.Rectangle(document.left(), y - 2, document.left() + 180, y + 11),
+                com.lowagie.text.pdf.PdfAnnotation.HIGHLIGHT_INVERT, new com.lowagie.text.pdf.PdfAction(SITE));
+            link.setBorder(new com.lowagie.text.pdf.PdfBorderArray(0, 0, 0));
+            writer.addAnnotation(link);
+            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
+                new Phrase("Página " + writer.getPageNumber(), new Font(face, 9, Font.NORMAL, color(MUTED))),
+                document.right(), y, 0);
+        }
     }
 }

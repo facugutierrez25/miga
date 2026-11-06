@@ -78,7 +78,7 @@ test('Exportar abre una hoja con Excel y PDF, sin CSV ni link, y cierra con Esca
   const dialog = screen.getByRole('dialog', { name: 'Exportar para tu nutri' })
   expect(dialog).toHaveTextContent('Miga no lo comparte con nadie')
   expect(screen.queryByText(/CSV/)).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Guardar como PDF' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeInTheDocument()
   fireEvent.keyDown(dialog, { key: 'Escape' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   await waitFor(() => expect(trigger).toHaveFocus())
@@ -141,4 +141,27 @@ test('sin hábito configurado no muestra la referencia flexible', () => {
   const { container } = render(<SemanaPage />)
   expect(container.querySelector('.semana-leyenda .semana-miga--flexible')).not.toBeInTheDocument()
   expect(container.querySelector('.semana-leyenda .semana-miga--noted')).not.toBeInTheDocument()
+})
+
+
+test('PDF descarga el documento generado sin imprimir ni cambiar la vista', async () => {
+  const exportWeek = vi.spyOn(api, 'exportWeek').mockResolvedValue()
+  const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+  render(<SemanaPage />)
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+  await waitFor(() => expect(exportWeek).toHaveBeenCalledWith('tok', '2026-10-26', 'pdf'))
+  expect(print).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Tarjeta' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('PDF muestra un error y permite volver a intentar la descarga', async () => {
+  const exportWeek = vi.spyOn(api, 'exportWeek').mockRejectedValueOnce(new Error('offline')).mockResolvedValue()
+  render(<SemanaPage />)
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo exportar')
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+  await waitFor(() => expect(exportWeek).toHaveBeenCalledTimes(2))
 })
