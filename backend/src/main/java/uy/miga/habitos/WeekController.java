@@ -10,7 +10,10 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -54,27 +57,62 @@ class WeekController {
         return service.logHabit(auth.getName(), id, date, req.value());
     }
 
-    // GET /api/v1/semana/export?date=YYYY-MM-DD&format=csv
+    // GET /api/v1/semana/export?from=YYYY-MM-DD&to=YYYY-MM-DD&format=xlsx|pdf|csv&incluir=texto,porciones,habitos,sinregla
+    // Sigue aceptando date= (semana que contiene la fecha) para no romper clientes anteriores.
     @GetMapping("/semana/export")
     void exportWeek(Authentication auth,
                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                     @RequestParam(defaultValue = "csv") String format,
+                    @RequestParam(required = false) String incluir,
                     HttpServletResponse response) throws IOException {
-        LocalDate ref = date != null ? date : LocalDate.now(clock);
-        WeekSummaryDto week = service.getWeek(auth.getName(), ref);
-        if (!List.of("csv", "xlsx").contains(format)) {
-            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato inválido.");
+        if (!List.of("csv", "xlsx", "pdf").contains(format)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato inválido.");
         }
-        response.setHeader("Content-Disposition", "attachment; filename=\"semana-" + week.weekStart() + "." + format + "\"");
-        if ("xlsx".equals(format)) {
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            WeekExport.writeXlsx(week, response.getOutputStream());
+        Set<String> sections;
+        try {
+            sections = WeekExport.parseIncluir(incluir);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí qué incluir: texto, porciones, habitos o sinregla.");
+        }
+        LocalDate start;
+        LocalDate end;
+        String fileName;
+        if (from != null || to != null) {
+            if (from == null || to == null || to.isBefore(from)
+                || ChronoUnit.DAYS.between(from, to) >= MAX_EXPORT_DAYS) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Elegí un rango de hasta " + MAX_EXPORT_DAYS + " días.");
+            }
+            start = from;
+            end = to;
+            fileName = "miga-" + from + "_" + to;
         } else {
-            response.setContentType("text/csv");
-            response.setCharacterEncoding("UTF-8");
-            response.getWriter().write(WeekExport.csv(week));
+            start = (date != null ? date : LocalDate.now(clock)).with(java.time.DayOfWeek.MONDAY);
+            end = start.plusDays(6);
+            fileName = "semana-" + start;
+        }
+        WeekExport.Data data = service.getExportData(auth.getName(), start, end, sections);
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "." + format + "\"");
+        switch (format) {
+            case "xlsx" -> {
+                response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                WeekExport.writeXlsx(data, response.getOutputStream());
+            }
+            case "pdf" -> {
+                response.setContentType("application/pdf");
+                WeekExport.writePdf(data, response.getOutputStream());
+            }
+            default -> {
+                response.setContentType("text/csv");
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write(WeekExport.csv(data));
+            }
         }
     }
+
+    static final int MAX_EXPORT_DAYS = 366;
 
     record LogValueRequest(
         @jakarta.validation.constraints.NotNull(message = "Ingresá un valor.")

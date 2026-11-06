@@ -31,7 +31,9 @@ describe('contratos del backend', () => {
               "uncertain": true,
               "originalText": "Sintético",
               "appliedRule": "Sintético",
-              "occurrenceId": "00000000-0000-0000-0000-000000000001"
+              "occurrenceId": "00000000-0000-0000-0000-000000000001",
+              "ruleType": "NORMAL",
+              "ruleSource": "PLAN"
             }
           ],
           "comparison": [
@@ -83,7 +85,8 @@ describe('contratos del backend', () => {
               "foodGroupId": 1,
               "portions": 1.5
             }
-          ]
+          ],
+          "weekdays": [1]
         }
       ],
       "version": 1,

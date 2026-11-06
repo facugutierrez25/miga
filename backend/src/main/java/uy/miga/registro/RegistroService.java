@@ -44,7 +44,12 @@ public class RegistroService {
             var day = buildDay(date, plan, entriesByDate.getOrDefault(date, List.of()), notes);
             var names = plan.meals().stream().collect(Collectors.toMap(uy.miga.plans.PlanReadData.MealData::id,
                 uy.miga.plans.PlanReadData.MealData::name));
-            result.put(date, day.meals().stream().map(meal -> {
+            var applies = plan.meals().stream().collect(Collectors.toMap(uy.miga.plans.PlanReadData.MealData::id,
+                m -> m.appliesOn(date.getDayOfWeek())));
+            // Una comida que no toca ese día se omite, salvo que ya tenga algo anotado.
+            result.put(date, day.meals().stream().filter(meal -> applies.getOrDefault(meal.mealId(), true)
+                || (byMeal.get(meal.mealId()) != null && !byMeal.get(meal.mealId()).getText().isBlank())
+                || !meal.items().isEmpty()).map(meal -> {
                 var note = byMeal.get(meal.mealId());
                 long flexible = 0;
                 if (note != null && !note.getText().isBlank()) {
@@ -192,10 +197,13 @@ public class RegistroService {
         for (InterpretedItem mention : items) {
             UUID occurrenceId = UUID.randomUUID();
             String ruleText = describeRule(mention, rules, planId, groupNames);
+            String ruleType = mention.recognized() ? mention.tipo() : null;
+            String ruleSource = ruleSource(mention, rules);
             if (!mention.recognized() || Set.of("LIBRE", "FLEXIBLE", "NO_CUENTA").contains(mention.tipo())) {
                 entryFacade.createMentionEntry(userId, userEmail, mealId, date, mention.foodName(),
                     mention.quantity().doubleValue(), mention.unit(), saved.getId(), mention.originalText(),
-                    mention.recognized() && mention.uncertain(), ruleText, occurrenceId, mention.recognized());
+                    mention.recognized() && mention.uncertain(), ruleText, occurrenceId, mention.recognized(),
+                    ruleType, ruleSource);
                 continue;
             }
             for (InterpretedItem item : expandCompound(List.of(mention), rules, planId)) {
@@ -211,7 +219,9 @@ public class RegistroService {
                     item.uncertain(),
                     item.portions(),
                     ruleText,
-                    occurrenceId
+                    occurrenceId,
+                    ruleType,
+                    ruleSource
                 );
             }
         }
@@ -326,7 +336,25 @@ public class RegistroService {
     private DayRegistroDto.EntryItemDto toEntryItemDto(FoodEntryFacade.EntryData e) {
         return new DayRegistroDto.EntryItemDto(
             e.id(), e.food(), e.quantity(), e.unit(), e.foodGroupId(), e.portions(), e.origin(),
-            e.uncertain(), e.originalText(), e.appliedRule(), e.occurrenceId());
+            e.uncertain(), e.originalText(), e.appliedRule(), e.occurrenceId(),
+            e.ruleType(), e.ruleSource() != null ? e.ruleSource() : ("USUARIO".equals(e.origin()) ? "USUARIO" : null));
+    }
+
+    // De dónde salió la regla aplicada: catálogo base, plan o corrección guardada por la persona.
+    static String ruleSource(InterpretedItem item, List<FoodRuleDto> rules) {
+        if (!item.recognized() || item.ruleId() == null) return null;
+        return rules.stream().filter(r -> item.ruleId().equals(r.id())).findFirst()
+            .map(r -> sourceOf(r.alcance())).orElse(null);
+    }
+
+    static String sourceOf(String alcance) {
+        if (alcance == null) return null;
+        return switch (alcance) {
+            case "GLOBAL" -> "CATALOGO";
+            case "PLAN" -> "PLAN";
+            case "USUARIO" -> "USUARIO";
+            default -> null;
+        };
     }
 
     private String getType(InterpretedItem item, List<FoodRuleDto> rules) {
@@ -584,6 +612,37 @@ public class RegistroService {
         } catch (uy.miga.plans.PlanNotFoundException ignored) {
             // Un registro histórico puede existir sin plan vigente.
             return null;
+        }
+    }
+
+    static final int MAX_RANGE_DAYS = 366;
+
+    // Lo que la persona escribió y no se reconoció en el rango, en orden de fecha.
+    @Transactional(readOnly = true)
+    public List<SinReglaDto> getSinRegla(Long userId, LocalDate desde, LocalDate hasta) {
+        validateRange(desde, hasta);
+        var unknown = entryFacade.findByUserIdAndDateRange(userId, desde, hasta).stream()
+            .filter(e -> "UNKNOWN".equals(e.origin()))
+            .sorted(Comparator.comparing(FoodEntryFacade.EntryData::date))
+            .toList();
+        if (unknown.isEmpty()) return List.of();
+        Map<Long, String> names = planService.getMealNames(
+            unknown.stream().map(FoodEntryFacade.EntryData::mealId).collect(Collectors.toSet()));
+        return unknown.stream().map(e -> new SinReglaDto(
+            e.originalText() != null && !e.originalText().isBlank() ? e.originalText() : e.food(),
+            e.date(), names.getOrDefault(e.mealId(), ""))).toList();
+    }
+
+    @Transactional(readOnly = true)
+    List<SinReglaDto> getSinRegla(String userEmail, LocalDate desde, LocalDate hasta) {
+        validateRange(desde, hasta);
+        return getSinRegla(userService.findUserIdByEmail(userEmail), desde, hasta);
+    }
+
+    private static void validateRange(LocalDate desde, LocalDate hasta) {
+        if (desde == null || hasta == null || hasta.isBefore(desde)
+            || java.time.temporal.ChronoUnit.DAYS.between(desde, hasta) >= MAX_RANGE_DAYS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un rango de hasta " + MAX_RANGE_DAYS + " días.");
         }
     }
 

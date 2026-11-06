@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest, ApiError } from './client'
 import { login, register } from './users'
-import { saveNota, NoteConflictError } from './registro'
+import { saveNota, NoteConflictError, getSinRegla } from './registro'
 import { saveMyPlan, PlanConflictError } from './plans'
 import { deleteGroup, PlanRulesError } from './planRules'
-import { exportWeekCsv } from './semana'
+import { exportWeekCsv, exportRange } from './semana'
 
 function respond(body: string | null, status = 200) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(body, { status })))
@@ -82,4 +82,19 @@ it('exporta el CSV como blob sin intentar leer JSON', async () => {
   await expect(createObjectURL.mock.calls[0][0].text()).resolves.toBe('fecha,total\n2026-01-01,2')
   expect(click).toHaveBeenCalledOnce()
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:csv')
+})
+it('exporta un rango con formato y secciones elegidas', async () => {
+  const fetchMock = vi.fn().mockImplementation(async () => new Response('%PDF-', { status: 200 }))
+  vi.stubGlobal('fetch', fetchMock)
+  vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL: vi.fn().mockReturnValue('blob:pdf'), revokeObjectURL: vi.fn() }))
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  await exportRange('token', '2026-11-02', '2026-11-15', 'pdf', ['texto', 'sinregla'])
+  expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/semana/export?from=2026-11-02&to=2026-11-15&format=pdf&incluir=texto%2Csinregla')
+  expect(click).toHaveBeenCalledOnce()
+})
+it('pide lo que no se reconoció en un rango', async () => {
+  const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+  vi.stubGlobal('fetch', fetchMock)
+  await expect(getSinRegla('token', '2026-11-02', '2026-11-08')).resolves.toEqual([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }])
+  expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/registro/sin-regla?desde=2026-11-02&hasta=2026-11-08')
 })

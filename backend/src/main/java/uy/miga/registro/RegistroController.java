@@ -106,6 +106,14 @@ class RegistroController {
         return service.getSugerencias(auth.getName(), mealId);
     }
 
+    // GET  /api/v1/registro/sin-regla?desde=&hasta= — lo anotado que no se reconoció en el rango
+    @GetMapping("/sin-regla")
+    List<SinReglaDto> getSinRegla(Authentication auth,
+                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        return service.getSinRegla(auth.getName(), desde, hasta);
+    }
+
     record DeleteNoteResponse(Long version) {}
 
     record NoteRequest(@NotBlank @Size(max = 2_000, message = "La nota admite hasta 2000 caracteres.") String text, Long version) {}
