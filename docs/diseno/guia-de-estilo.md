@@ -55,9 +55,11 @@ Se definen como variables CSS en `frontend/src/index.css` y cambian según el te
 | `--line` / `--line-soft` | Bordes de tarjetas y divisores | `#E3E4DF` / `#ECECE8` | `#2C2C2C` / `#222222` |
 | `--control-border` | Bordes de campos (3:1) | `#858D8B` | `#7A7A75` |
 | `--miga-empty` | Contorno de miga sin anotar en la semana | `#858D8B` | `#7A7A75` |
-| `--ok` / `--warn` | Texto de estado "como el plan" / "faltó" | `#2F7A4F` / `#8A5A00` | `#7CC79A` / `#F0C46A` |
+| `--ok` | Texto de estado "Como el plan" | `#2F7A4F` | `#7CC79A` |
+| `--warn` / `--warn-soft` | Texto y fondo suave de avisos de falta, exceso o por confirmar en Hoy y Semana | `#9A461B` / `#FBECE4` | `#F2AD85` / `#38271F` |
 | `--error` / `--error-bg` | Errores | `#B42318` / `#FEF3F2` | `#F97066` / `#3A1C1A` |
 
+- Los avisos usan `--warn` sobre `--warn-soft`, con contraste AA de al menos 4,5:1 en ambos temas. Llevan texto que describe el estado. `--accent` y `--on-accent-soft` se reservan para las marcas de "Ahora" y "Hoy" y la identidad del logo.
 - El oscuro es gris casi negro neutro: la elevación se marca con superficies más claras, no con verde.
 - El amarillo nunca es color de texto ni fondo grande. Como siempre acompaña a una palabra ("Ahora", "Hoy"), no depende de su contraste.
 - Contrastes verificados contra `--bg`, `--surface` y `--surface-2`: texto ≥ 4,5:1, migas y bordes de control ≥ 3:1.

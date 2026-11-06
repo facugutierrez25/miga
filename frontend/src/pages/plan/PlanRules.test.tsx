@@ -440,3 +440,16 @@ test('Más opciones y la ayuda de tipos se despliegan a pedido', async () => {
   expect(help).toHaveAttribute('aria-expanded', 'true')
   expect(document.getElementById(help.getAttribute('aria-describedby')!)).toHaveTextContent('Suma a varios grupos')
 })
+
+test('grupos y hábitos vacíos explican su uso y permiten agregar', async () => {
+  vi.mocked(api.getPlanRules).mockResolvedValue({ ...plan, grupos: [], habitos: [] })
+  render(<PlanRulesSection token="tok" />)
+  expect(await screen.findByText(/Todavía no tenés grupos/)).toHaveTextContent('Agregar grupo')
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar grupo' }))
+  expect(screen.getByLabelText('Nombre del grupo')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  expect(screen.getByText(/Todavía no tenés hábitos/)).toHaveTextContent('Agregar hábito')
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar hábito' }))
+  expect(screen.getByLabelText('Nombre del hábito')).toBeInTheDocument()
+})

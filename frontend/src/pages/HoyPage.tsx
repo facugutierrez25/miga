@@ -1,3 +1,5 @@
+import { mealStatus, type MealStateKind } from '../lib/mealStatus'
+import { displayUnit } from '../lib/displayUnit'
 import { groupColor } from '../groupColors'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -15,7 +17,7 @@ import { type PlanFoodGroupDto, type MealDto } from '../api/plans'
 import {
   NoteConflictError, saveNota, deleteNota, removeItem, patchItem, saveRespuesta, getSugerencias,
   type DayRegistroDto, type DailySummaryDto, type MealDayDto, type EntryItemDto,
-  type GroupStatusDto, type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
+  type NoteInterpretationDto, type PatchItemResultDto, type PatchItemRequest,
 } from '../api/registro'
 import './HoyPage.css'
 import { usePlan } from '../hooks/usePlan'
@@ -156,7 +158,7 @@ function ReglaDialog({ item, resultado, onClose }: {
 }) {
   const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
   const titleId = useId()
-  const cantidad = item.quantity !== null ? ` · ${fmt(item.quantity)} ${item.unit ?? ''}`.trimEnd() : ''
+  const cantidad = item.quantity !== null ? ` · ${fmt(item.quantity)} ${displayUnit(item.unit, item.quantity)}`.trimEnd() : ''
   // Portal: las tarjetas de vidrio usan backdrop-filter, que encerraría un position: fixed.
   return createPortal(
     <div className="regla-overlay" onClick={onClose}>
@@ -274,7 +276,7 @@ function ItemRow({ item, date, token, gruposMap, onPatched, onRemove, removing }
               autoFocus
               aria-label={`Cantidad de ${item.food}`}
             />
-            <span className="nota-item__unit">{item.unit ?? ''}</span>
+            <span className="nota-item__unit">{displayUnit(item.unit, Number(qty))}</span>
             <button type="button" className="nota-item__save" aria-label="Guardar cantidad"
               disabled={saving || !(Number(qty) > 0)}
               onClick={() => enviar({ quantity: Number(qty), unit: item.unit })}>✓</button>
@@ -284,11 +286,11 @@ function ItemRow({ item, date, token, gruposMap, onPatched, onRemove, removing }
         ) : (
           <>
             {item.quantity !== null && (
-              <span className="nota-item__qty">{item.quantity} {item.unit ?? ''}</span>
+              <span className="nota-item__qty">{item.quantity} {displayUnit(item.unit, item.quantity)}</span>
             )}
             {label && <span className="nota-item__grupo">{label}</span>}
             {item.portions !== null && (
-              <span className="nota-item__porciones">{fmt(item.portions)} p.</span>
+              <span className="nota-item__porciones">{fmt(item.portions)} {displayUnit('p.', item.portions)}</span>
             )}
             {editable && (
               <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => setEditando(true)} aria-label={`Corregir ${item.food}`}>
@@ -374,34 +376,6 @@ function agruparPorMencion(items: EntryItemDto[]): EntryItemDto[][] {
 
 // ── Estado de una comida en texto concreto ────────────────────────────────
 
-type MealStateKind = 'ok' | 'warn' | 'ask' | 'noted' | 'none'
-
-function describirGrupos(grupos: GroupStatusDto[], diff: (s: GroupStatusDto) => number): string {
-  const partes = grupos.map((s, index) => {
-    const cantidad = diff(s)
-    const porciones = index === 0 ? ` ${cantidad === 1 ? 'porción' : 'porciones'}` : ''
-    return `${fmt(cantidad)}${porciones} de ${s.name?.trim() || 'un grupo del plan'}`
-  })
-  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}` : partes[0]
-}
-
-function mealState(mealDay: MealDayDto | undefined): { kind: MealStateKind; text: string } {
-  if (!mealDay?.noteText) return { kind: 'none', text: 'Sin anotar' }
-  const comparison = mealDay.comparison
-  if (comparison.some(s => s.status === 'PREGUNTAR')) return { kind: 'ask', text: 'Por confirmar' }
-  if (comparison.length === 0) return { kind: 'noted', text: 'Anotada' }
-  // El backend ya aplica el margen del plan: solo CASI y SIN_ANOTAR faltan, solo DE_MAS sobra.
-  const faltan = comparison.filter(s => s.status === 'CASI' || s.status === 'SIN_ANOTAR')
-  const sobran = comparison.filter(s => s.status === 'DE_MAS')
-  const partes = [
-    faltan.length > 0 ? `Faltó ${describirGrupos(faltan, s => s.expected - s.recorded)}` : '',
-    sobran.length > 0 ? `De más: ${describirGrupos(sobran, s => s.recorded - s.expected)}` : '',
-  ].filter(Boolean)
-  return partes.length > 0
-    ? { kind: 'warn', text: partes.join(' · ') }
-    : { kind: 'ok', text: 'Como el plan' }
-}
-
 function MealStateIcon({ kind }: { kind: MealStateKind }) {
   if (kind === 'ok') {
     return (
@@ -434,11 +408,11 @@ function MealStateIcon({ kind }: { kind: MealStateKind }) {
 }
 
 function MealState({ mealDay }: { mealDay: MealDayDto | undefined }) {
-  const { kind, text } = mealState(mealDay)
+  const { kind, label } = mealStatus(mealDay)
   return (
     <span className={`hoy-estado hoy-estado--${kind}`}>
       <MealStateIcon kind={kind} />
-      {text}
+      {label}
     </span>
   )
 }
@@ -642,9 +616,8 @@ function NotaMealSection({
       baseVersion.current = interp.version
       setConflict(false)
       onNotaSaved(interp, meal.id)
-      const estado = mealState({
-        mealId: meal.id, noteId: interp.noteId, noteVersion: interp.version,
-        noteText: interp.text, items: interp.entries, comparison: interp.comparison,
+      const estado = mealStatus({
+        noteText: interp.text, comparison: interp.comparison,
       })
       setGuardado(`Guardado. ${estado.text}.`)
     } catch (err) {
@@ -671,18 +644,22 @@ function NotaMealSection({
   return (
     <div className="nota-body">
       {!cargandoSug && sugerencias.length > 0 && !hasNote && (
-        <div className="nota-sugerencias" aria-label="Lo de siempre">
+        <section className="nota-sugerencias" aria-labelledby={`sugerencias-${meal.id}`}>
+          <h3 id={`sugerencias-${meal.id}`} className="nota-sugerencias__titulo">Lo de siempre</h3>
           {sugerencias.map((s, i) => (
             <button
               key={i}
               className="nota-sugerencia"
+              type="button"
+              aria-label={`Anotar: ${s}`}
               disabled={guardando || conflict}
               onClick={() => void handleGuardar(s)}
             >
-              {s}
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+              <span>{s}</span>
             </button>
           ))}
-        </div>
+        </section>
       )}
 
       <label className="nota-label" htmlFor={textareaId}>¿Qué comiste?</label>
@@ -772,7 +749,7 @@ function NotaMealSection({
           <h3 ref={understoodRef} tabIndex={-1} id={`entendido-${meal.id}`} className="nota-entendido__titulo">Así lo entendí</h3>
           <p className="nota-entendido__resumen">
             Entendí: {understoodSummary || 'sin alimentos reconocidos'}.
-            {' '}{mealState(mealDay).text}.
+            {' '}{mealStatus(mealDay).text}.
           </p>
           <button type="button" className="nota-revisar" aria-expanded={detailOpen}
             aria-controls={`entendido-detalle-${meal.id}`} onClick={() => setDetailOpen(value => !value)}>
@@ -813,7 +790,7 @@ function NotaMealSection({
                     <div className="nota-compuesto__contenido">
                       <p className="nota-compuesto__titulo">
                         {primero.food}
-                        {primero.quantity !== null && <> · {fmt(primero.quantity)} {primero.unit ?? ''}</>}
+                        {primero.quantity !== null && <> · {fmt(primero.quantity)} {displayUnit(primero.unit, primero.quantity)}</>}
                       </p>
                       <p className="nota-compuesto__grupos">{mencion.map(item =>
                         `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? gruposMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
@@ -979,6 +956,7 @@ function MealRow(props: MealProps) {
           className="hoy-fila__btn"
           aria-expanded={abierta}
           aria-controls={detalleId}
+          aria-label={`${meal.name}${meal.suggestedTime ? `, ${meal.suggestedTime.slice(0, 5)}` : ''}: ${mealStatus(mealDay).text}`}
           onClick={() => setAbierta(a => !a)}
         >
           <span className="hoy-fila__nombre">{meal.name}</span>

@@ -363,7 +363,12 @@
 
 .hoy-estado--ok { color: var(--ok); }
 .hoy-estado--warn,
-.hoy-estado--ask { color: var(--warn); }
+.hoy-estado--ask {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--s1);
+}
 .hoy-estado--noted,
 .hoy-estado--none { color: var(--text-secondary); }
 
@@ -387,7 +392,24 @@
   gap: var(--s2);
 }
 
+.nota-sugerencias__titulo {
+  flex-basis: 100%;
+  font-size: var(--fs-sm);
+}
+
+.nota-sugerencia svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 .nota-sugerencia {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
   min-height: 44px;
   padding: 0 var(--s3);
   border: 1px solid var(--line);
@@ -614,9 +636,7 @@
   font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .nota-item__qty,
@@ -624,21 +644,18 @@
 .nota-item__grupo {
   font-size: var(--fs-cap);
   color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.nota-item__grupo {
-  max-width: 88px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .nota-item__porciones {
   font-size: var(--fs-cap);
   font-weight: 600;
   color: var(--ink);
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
 
@@ -691,6 +708,7 @@
 
 
 .nota-compuesto__titulo {
+  overflow-wrap: anywhere;
   margin-top: var(--s1);
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -806,6 +824,7 @@
 
 .nota-compuesto__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -825,6 +844,7 @@
 }
 
 .nota-compuesto__grupos {
+  overflow-wrap: anywhere;
   margin: var(--s1) 0;
   font-size: var(--fs-sm);
   color: var(--text-secondary);
@@ -832,6 +852,7 @@
 
 .nota-compuesto__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
 }
@@ -883,10 +904,7 @@
 .nota-entendido__resumen {
   font-size: var(--fs-sm);
   margin: var(--s2) 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .nota-item__linea > .nota-item__regla { flex-basis: 100%; }
 .nota-item__edit { padding: 0 var(--s2); }
@@ -965,4 +983,12 @@
 @media (min-width: 640px) {
   .regla-overlay { align-items: center; }
   .regla-dialog { border-radius: var(--radius-card); padding-bottom: var(--s5); }
+}
+
+/* El texto puede crecer sin achicar las acciones táctiles. */
+.nota-item__edit,
+.nota-item__save,
+.nota-item__cancel,
+.nota-menu {
+  flex-shrink: 0;
 }

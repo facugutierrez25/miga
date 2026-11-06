@@ -202,7 +202,7 @@ test('el detalle del plan enfoca su primer control, cierra con Escape y devuelve
 test('abre Tus alimentos desde el resumen y recarga las comidas al cambiar reglas', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Tus alimentos (0)' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Ver tus alimentos, 0' }))
   await screen.findByRole('button', { name: 'Agregar alimento' })
   await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
 })
@@ -227,11 +227,11 @@ test('cancelar con cambios pide aviso inline y descarta el borrador', async () =
   edit.focus()
   fireEvent.click(edit)
   fireEvent.change(await screen.findByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
   expect(screen.getByRole('alert')).toHaveTextContent('cambios sin guardar')
   fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
   expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
   fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }))
   expect(screen.getByText('Desayuno')).toBeInTheDocument()
   expect(mockSaveMyPlan).not.toHaveBeenCalled()
@@ -262,7 +262,7 @@ test('resumen muestra fecha, hora, porciones y color del grupo sin controles de 
   expect(screen.getByText('Proteínas').closest('.porcion-chip')).toHaveStyle({ '--chip-dot': 'var(--g-frut)' })
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Eliminar comida' })).not.toBeInTheDocument()
-  expect(await screen.findByRole('button', { name: 'Hábitos (0)' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Ver hábitos, 0' })).toBeInTheDocument()
 })
 
 test('un conflicto conserva el borrador y permite recargar la versión actual', async () => {
@@ -285,14 +285,14 @@ test('un conflicto conserva el borrador y permite recargar la versión actual', 
 test('back protects a modified food draft and discard returns to summary', async () => {
   mockGetMyPlan.mockResolvedValue(planConGrupos)
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Tus alimentos (0)' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Ver tus alimentos, 0' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Agregar alimento' }))
   fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Manzana' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
   expect(screen.getByRole('alert')).toHaveTextContent('cambios sin guardar')
   fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
   expect(screen.getByDisplayValue('Manzana')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
   fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }))
   expect(screen.getByRole('button', { name: 'Editar plan' })).toBeInTheDocument()
 })
@@ -304,14 +304,14 @@ test('pending save disables cancellation and failure keeps the draft open', asyn
   render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
   fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
   fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-  expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '‹ Mi plan' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Descartar cambios' })).toBeDisabled()
   rejectSave(new Error('network'))
   await screen.findByText(/No se pudo guardar el plan/)
   expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: '‹ Mi plan' })).toBeEnabled()
 })
 
 test('navigation and browser unload protect meal drafts', async () => {
@@ -332,9 +332,11 @@ test('navigation and browser unload protect meal drafts', async () => {
   await act(async () => { await router.navigate(-1) })
   fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }, { timeout: 3000 }))
   expect(await screen.findByText('Other page', {}, { timeout: 3000 })).toBeInTheDocument()
-  const cleanUnload = new Event('beforeunload', { cancelable: true })
-  window.dispatchEvent(cleanUnload)
-  expect(cleanUnload.defaultPrevented).toBe(false)
+  await waitFor(() => {
+    const cleanUnload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(cleanUnload)
+    expect(cleanUnload.defaultPrevented).toBe(false)
+  })
 })
 
 test('a navigation blocked during a save continues once the save succeeds', async () => {
@@ -353,4 +355,43 @@ test('a navigation blocked during a save continues once the save succeeds', asyn
   expect(await screen.findByRole('alert', { name: 'Cambios sin guardar' })).toBeInTheDocument()
   resolveSave(planConGrupos)
   expect(await screen.findByText('Other page')).toBeInTheDocument()
+})
+
+test('los accesos del resumen anuncian su destino y cantidad', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  const alimentos = await screen.findByRole('button', { name: 'Ver tus alimentos, 0' })
+  expect(alimentos.querySelector('[aria-hidden="true"]')).toHaveTextContent('›')
+  expect(screen.getByRole('button', { name: 'Ver hábitos, 0' })).toBeInTheDocument()
+  fireEvent.click(alimentos)
+  expect(await screen.findByRole('region', { name: 'Alimentos' })).toBeInTheDocument()
+})
+
+test('volver está en el encabezado y alimentos explica cómo agregar', async () => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  render(<MemoryRouter><MiPlanPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Ver tus alimentos, 0' }))
+  expect(screen.getByRole('button', { name: '‹ Mi plan' }).closest('header')).toBeInTheDocument()
+  expect(await screen.findByText(/Todavía no tenés alimentos/)).toHaveTextContent('Agregar alimento')
+})
+
+test.each([false, true])('tocar Mi plan vuelve al resumen con borrador %s', async dirty => {
+  mockGetMyPlan.mockResolvedValue(planConGrupos)
+  const router = createMemoryRouter([
+    { path: '/mi-plan', element: <><Link to="/mi-plan">Mi plan</Link><MiPlanPage /></> },
+  ], { initialEntries: ['/mi-plan'] })
+  render(<RouterProvider router={router} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
+  if (dirty) fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
+  fireEvent.click(screen.getByRole('link', { name: 'Mi plan' }))
+  if (dirty) {
+    expect(await screen.findByRole('alert', { name: 'Cambios sin guardar' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
+    expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Mi plan' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }))
+  }
+  expect(await screen.findByRole('button', { name: 'Editar plan' })).toBeInTheDocument()
+  expect(screen.getByText('Desayuno')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Nombre de la comida')).not.toBeInTheDocument()
 })

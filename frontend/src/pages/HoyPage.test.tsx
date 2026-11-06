@@ -1,3 +1,5 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs'
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
@@ -497,7 +499,9 @@ test('lo de siempre guarda en un toque, bloquea doble envío y permite editar de
   renderHoy()
   await abrirNota()
   expect(screen.queryByText(/Según tu plan/)).not.toBeInTheDocument()
-  const suggestion = await screen.findByRole('button', { name: 'leche con pan' })
+  const suggestion = await screen.findByRole('button', { name: 'Anotar: leche con pan' })
+  expect(screen.getByRole('heading', { name: 'Lo de siempre' })).toBeVisible()
+  expect(suggestion.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   fireEvent.click(suggestion)
   fireEvent.click(suggestion)
   expect(suggestion).toBeDisabled()
@@ -517,7 +521,7 @@ test('un error al guardar una sugerencia conserva el borrador y permite reintent
     text: 'mate', date: dayVacio.date, mealId: 1, items: [], entries: [], comparison: [] })
   renderHoy()
   await abrirNota()
-  fireEvent.click(await screen.findByRole('button', { name: 'mate' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Anotar: mate' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar')
   expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('mate')
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
@@ -656,7 +660,8 @@ test('las otras comidas muestran su estado en texto y se abren para anotar', asy
   })
   renderHoy()
   const fila = await screen.findByRole('button', { name: /Desayuno/, expanded: false })
-  expect(fila).toHaveTextContent('De más: 1 porción de Proteínas')
+  expect(fila).toHaveTextContent('De más')
+  expect(fila).toHaveAccessibleName('Desayuno: De más: 1 porción de Proteínas')
   fireEvent.click(fila)
   expect(fila).toHaveAttribute('aria-expanded', 'true')
   expect(screen.getAllByRole('textbox', { name: '¿Qué comiste?' }).some(t => (t as HTMLTextAreaElement).value === 'dos huevos')).toBe(true)
@@ -891,8 +896,12 @@ test.each([
   ] }] })
   renderHoy()
   const row = await screen.findByRole('button', { name: /Desayuno/ })
-  expect(row).toHaveTextContent(`${expected} · De más: 1 porción de Grasas`)
+  expect(row).toHaveTextContent('Faltó y de más')
+  expect(row).not.toHaveTextContent(expected)
+  expect(row).toHaveAccessibleName(`Desayuno: ${expected} · De más: 1 porción de Grasas`)
   expect(row).not.toHaveTextContent(/9876|9999/)
+  fireEvent.click(row)
+  expect(await screen.findByText(new RegExp(`Entendí:.*${expected}`))).toBeVisible()
 })
 
 test('un ítem de un grupo sin nombre nunca muestra el identificador', async () => {
@@ -1060,4 +1069,13 @@ test('past dates load their plan and show its meal note', async () => {
   fireEvent.click(await screen.findByRole('button', { name: /Desayuno/ }))
   expect(await screen.findByDisplayValue('Historical note')).toBeInTheDocument()
   expect(mockGetMyPlan.mock.calls.some(([, , date]) => date !== today)).toBe(true)
+})
+
+test('el detalle se envuelve sin recortes y conserva acciones de 44 px', () => {
+  const css = readFileSync('src/pages/HoyPage.css', 'utf8')
+  expect(css).not.toContain('text-overflow: ellipsis')
+  expect(css).not.toContain('-webkit-line-clamp')
+  expect(css).toContain('overflow-wrap: anywhere')
+  expect(css).toMatch(/\.nota-item__edit,[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
+  expect(css).toMatch(/\.nota-menu__trigger, \.nota-revisar[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
 })
