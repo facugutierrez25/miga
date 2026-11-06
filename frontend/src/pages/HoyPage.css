@@ -652,7 +652,7 @@
 }
 
 .nota-item__food {
-  flex: 1;
+  flex: 1 0 calc(100% - 16px);
   min-width: 0;
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -663,6 +663,7 @@
 .nota-item__qty,
 .nota-item__unit,
 .nota-item__grupo {
+  flex-shrink: 0;
   font-size: var(--fs-cap);
   color: var(--text-secondary);
   min-width: 0;
@@ -671,6 +672,7 @@
 }
 
 .nota-item__porciones {
+  flex-shrink: 0;
   font-size: var(--fs-cap);
   font-weight: 600;
   color: var(--ink);
@@ -689,6 +691,7 @@
 .nota-item__edit,
 .nota-item__save,
 .nota-item__cancel {
+  flex-shrink: 0;
   min-width: 44px;
   min-height: 44px;
   display: grid;
@@ -712,6 +715,7 @@
 }
 
 .nota-item__qty-input {
+  flex-shrink: 0;
   width: 64px;
   min-height: 36px;
   padding: 0 var(--s2);
@@ -860,7 +864,7 @@
 }
 
 .nota-compuesto__contenido {
-  flex: 1;
+  flex: 1 0 calc(100% - 28px);
   min-width: 0;
 }
 
@@ -929,7 +933,9 @@
 }
 .nota-item__linea > .nota-item__regla { flex-basis: 100%; }
 .nota-item__edit { padding: 0 var(--s2); }
+/* El nombre ocupa una línea propia; los datos y controles envuelven como unidades. */
 .nota-item__linea { flex-wrap: wrap; gap: var(--s2); }
+.nota-item__linea > .nota-menu { flex-shrink: 0; margin-left: auto; }
 .nota-btn-recargar, .nota-reparto .nota-reparto__principal {
   background: var(--surface);
   border: 1px solid var(--line);
