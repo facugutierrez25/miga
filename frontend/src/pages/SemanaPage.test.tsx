@@ -119,3 +119,26 @@ test('la tarjeta de develop destaca la comida flexible con el acento, aunque coi
   expect(container.querySelector('.semana-tarjeta__celda .semana-miga--flexible')).toBeInTheDocument()
   expect(container.querySelector('.semana-comida__estado--flexible')).toHaveTextContent('Flexible')
 })
+
+
+test.each([false, true])('sin hábito flexible vigente ese día no destaca la comida (otro día: %s)', otherDay => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  const day = { ...base.data!.days[0], habitIds: [2],
+    meals: [{ mealId: 10, name: 'Desayuno', status: 'EN_PLAN', noteText: 'pan', flexibleCount: 1 }] }
+  const data = { ...base.data!, days: otherDay ? [day, { ...day, date: '2026-10-27', habitIds: [1, 2] }] : [day] }
+  vi.mocked(useWeek).mockReturnValue({ ...base, data })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-tarjeta__celda .semana-miga--flexible')).not.toBeInTheDocument()
+  expect(container.querySelector('.semana-comida__estado--flexible')).not.toBeInTheDocument()
+  expect(container.querySelector('.semana-comida__estado--full')).toHaveTextContent('Como el plan')
+  expect(container.querySelector('.semana-leyenda .semana-miga--noted')).not.toBeInTheDocument()
+  expect(Boolean(container.querySelector('.semana-leyenda .semana-miga--flexible'))).toBe(otherDay)
+})
+
+test('sin hábito configurado no muestra la referencia flexible', () => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  vi.mocked(useWeek).mockReturnValue({ ...base, data: { ...base.data!, habits: [] } })
+  const { container } = render(<SemanaPage />)
+  expect(container.querySelector('.semana-leyenda .semana-miga--flexible')).not.toBeInTheDocument()
+  expect(container.querySelector('.semana-leyenda .semana-miga--noted')).not.toBeInTheDocument()
+})

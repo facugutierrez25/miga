@@ -63,12 +63,18 @@ function resumenDia(day: WeekDayDto, futuro: boolean): string {
   return `${enPlan} de ${meals.length} comidas como el plan, ${anotadas} anotadas`
 }
 
+function hasFlexibleHabit(week: WeekSummaryDto, day: WeekDayDto): boolean {
+  return week.habits.some(habit => habit.countsFlexibleMeals
+    && (!day.habitIds || day.habitIds.includes(habit.id)))
+}
+
 interface DayDetailProps {
   day: WeekDayDto
   todayISO: string
+  flexibleEnabled: boolean
 }
 
-function DayDetail({ day, todayISO }: DayDetailProps) {
+function DayDetail({ day, todayISO, flexibleEnabled }: DayDetailProps) {
   const d = new Date(day.date + 'T12:00:00')
   const isToday = day.date === todayISO
   const recorded = Number(day.totalRecorded)
@@ -90,7 +96,7 @@ function DayDetail({ day, todayISO }: DayDetailProps) {
       {meals.length > 0 && (
         <ul className="semana-comidas">
           {meals.map(meal => {
-            const estado = (meal.flexibleCount ?? 0) > 0 ? { label: 'Flexible', miga: 'flexible' } : mealStatus(meal)
+            const estado = flexibleEnabled && (meal.flexibleCount ?? 0) > 0 ? { label: 'Flexible', miga: 'flexible' } : mealStatus(meal)
             return (
               <li key={meal.mealId} className="semana-comida">
                 <span className="semana-comida__nombre">{meal.name}</span>
@@ -157,7 +163,7 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
               <span className="semana-tarjeta__comida">{nombre}</span>
               {week.days.map(day => {
                 const meal = (day.meals ?? []).find(m => m.name === nombre)
-                const clase = !meal ? 'no-aplica' : day.date > todayISO ? 'futuro' : (meal.flexibleCount ?? 0) > 0 ? 'flexible' : mealStatus(meal).miga
+                const clase = !meal ? 'no-aplica' : day.date > todayISO ? 'futuro' : hasFlexibleHabit(week, day) && (meal.flexibleCount ?? 0) > 0 ? 'flexible' : mealStatus(meal).miga
                 return <span key={day.date} className="semana-tarjeta__celda"><i className={`semana-miga semana-miga--${clase}`} /></span>
               })}
             </div>
@@ -167,8 +173,7 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
       <ul className="semana-leyenda" aria-hidden="true">
         <li><i className="semana-miga semana-miga--full" />Como el plan</li>
         <li><i className="semana-miga semana-miga--half" />Faltó o sobró algo</li>
-        <li><i className="semana-miga semana-miga--flexible" />Flexible</li>
-        <li><i className="semana-miga semana-miga--noted" />Anotada</li>
+        {week.days.some(day => hasFlexibleHabit(week, day)) && <li><i className="semana-miga semana-miga--flexible" />Flexible</li>}
         <li><i className="semana-miga semana-miga--empty" />Sin anotar</li>
         <li><i className="semana-miga semana-miga--futuro" />Todavía no</li>
         {hayNoAplica && <li><i className="semana-miga semana-miga--no-aplica" />No toca ese día</li>}
@@ -318,6 +323,7 @@ export default function SemanaPage() {
                   <DayDetail
                     key={selectedDay.date}
                     day={selectedDay}
+                    flexibleEnabled={hasFlexibleHabit(week, selectedDay)}
                     todayISO={hoy}
                   />
                 )}
