@@ -126,17 +126,19 @@ class WeekExportTest {
         var out = new ByteArrayOutputStream();
         WeekExport.writeXlsx(rangeData(java.util.Set.of("texto", "sinregla")), out);
         var xml = xmlEntries(out.toByteArray());
+        assertThat(xml.get("xl/drawings/miga1.xml")).contains("Logo oficial de Miga", "rIdLogo");
+        assertThat(xml.get("xl/drawings/miga2.xml")).contains("Logo oficial de Miga", "rIdLogo");
+        assertThat(xml.get("xl/drawings/_rels/miga1.xml.rels")).contains("../media/miga-wordmark.png");
         assertThat(xml.get("xl/styles.xml")).contains("F2F1EA", "7C773F", "F6C344", "wrapText=\"true\"");
         for (int sheet = 1; sheet <= 2; sheet++) {
             assertThat(xml.get("xl/worksheets/sheet" + sheet + ".xml"))
-                .contains("orientation=\"landscape\"", "fitToWidth=\"1\"", "state=\"frozen\"", "<hyperlink ");
+                .contains("orientation=\"landscape\"", "fitToWidth=\"1\"", "state=\"frozen\"", "<hyperlink ", "<drawing r:id=\"rIdMigaLogo\"");
             assertThat(xml.get("xl/worksheets/_rels/sheet" + sheet + ".xml.rels"))
                 .contains("https://miga.uy", "TargetMode=\"External\"");
         }
         try (var workbook = new ReadableWorkbook(new ByteArrayInputStream(out.toByteArray()))) {
             for (var sheet : workbook.getSheets().toList()) {
                 var rows = sheet.read();
-                assertThat(rows.get(0).getCellText(0)).isEqualTo("miga");
                 assertThat(rows.get(2).getCellText(0)).isEqualTo("2 al 3 de noviembre 2026");
                 assertThat(rows.get(3).getCellText(0)).isEqualTo("Registrado con Miga");
                 assertThat(rows.get(5).getCellText(0)).isEqualTo("Fecha");

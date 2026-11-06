@@ -179,9 +179,16 @@ final class WeekExport {
     private static final int TABLE_ROW = 5;
 
     static void writeXlsx(Data data, OutputStream out) throws IOException {
-        try (Workbook workbook = new Workbook(out, "Miga", "1.0")) {
-            writeSheet(workbook.newWorksheet("Planilla"), grid(data), data, title(data));
-            if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data), data, "Sin regla");
+        var file = java.nio.file.Files.createTempFile("miga-export-", ".xlsx");
+        try {
+            try (var stream = java.nio.file.Files.newOutputStream(file);
+                 Workbook workbook = new Workbook(stream, "Miga", "1.0")) {
+                writeSheet(workbook.newWorksheet("Planilla"), grid(data), data, title(data));
+                if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data), data, "Sin regla");
+            }
+            ExportLogo.addToWorkbook(file, out, withSinRegla(data) ? 2 : 1, resource("miga-wordmark.png"));
+        } finally {
+            java.nio.file.Files.deleteIfExists(file);
         }
     }
 
@@ -209,7 +216,6 @@ final class WeekExport {
         sheet.range(0, 0, TABLE_ROW + rows.size(), lastCol).style()
             .fontName("Onest").fontSize(11).fontColor(INK).fillColor(SURFACE).set();
         sheet.range(0, 0, 3, lastCol).style().fillColor(PAPER).set();
-        sheet.value(0, 0, "miga");
         sheet.range(0, 0, 0, lastCol).style().merge().fontName("Onest").fontSize(26).fontColor(BRAND).bold()
             .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "medium")
             .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, ACCENT).set();
@@ -345,8 +351,8 @@ final class WeekExport {
         ExportPage(Data data, com.lowagie.text.pdf.BaseFont face) throws IOException {
             this.data = data;
             this.face = face;
-            this.logo = com.lowagie.text.Image.getInstance(resource("miga-logo.png"));
-            logo.scaleAbsolute(32, 32);
+            this.logo = com.lowagie.text.Image.getInstance(resource("miga-wordmark.png"));
+            logo.scaleToFit(84, 36);
         }
 
         @Override
@@ -364,8 +370,6 @@ final class WeekExport {
             } catch (com.lowagie.text.DocumentException e) {
                 throw new IllegalStateException("No se pudo dibujar el logo de Miga.", e);
             }
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_LEFT,
-                new Phrase("miga", new Font(face, 22, Font.BOLD, color(BRAND))), document.left() + 42, height - 43, 0);
             com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
                 new Phrase(period(data), new Font(face, 10, Font.NORMAL, color(MUTED))), document.right(), height - 43, 0);
             canvas.setColorStroke(color(ACCENT));
