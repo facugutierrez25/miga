@@ -72,7 +72,7 @@ class InterpreterServiceTest {
                 return rule(1L, input.alimento(), input.sinonimos(), input.tipo(), input.foodGroupId(), null,
                     input.cantidadPorPorcion(), input.unidad(), input.porcionPorDefecto(), input.componentes());
             });
-        var service = new RegistroService(mock(MealNoteRepository.class), interpreter,
+        var service = RegistroTestServices.create(mock(MealNoteRepository.class), interpreter,
             mock(ComparisonService.class), entries, plans, rules, users, Clock.systemUTC());
         service.resolveItem("user", date, 3L, new ResolveItemRequest(ResolveItemRequest.Kind.GROUPS, null,
             List.of(new ResolveItemRequest.GroupPortion(7L, new BigDecimal("2"))), true));
