@@ -211,3 +211,21 @@ export async function removeItem(
     throw err
   }
 }
+
+export interface ResolveItemRequest {
+  kind: 'SAME_AS' | 'GROUPS' | 'FLEXIBLE' | 'NOT_COUNTED'
+  ruleUid?: string
+  groups?: { foodGroupId: number; portions: number }[]
+  remember: boolean
+}
+
+export interface ResolveUndoDto { occurrenceId: string; ruleUid: string | null }
+export interface ResolveItemResultDto extends PatchItemResultDto { undo: ResolveUndoDto }
+
+export function resolveItem(token: string, date: string, itemId: number, body: ResolveItemRequest): Promise<ResolveItemResultDto> {
+  return apiRequest(`/api/v1/registro/${date}/items/${itemId}/resolve`, { token, method: 'POST', body, errorMessage: 'No se pudo guardar.' })
+}
+
+export function undoResolveItem(token: string, date: string, body: ResolveUndoDto): Promise<PatchItemResultDto> {
+  return apiRequest(`/api/v1/registro/${date}/items/resolve/undo`, { token, method: 'POST', body, errorMessage: 'No se pudo deshacer.' })
+}
