@@ -5,6 +5,7 @@ import {
   type CatalogItem,
   type FoodRule,
 } from '../../api/planRules'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import type { EditorProps } from './GroupsEditor'
 
 export default function CatalogSearch({
@@ -20,18 +21,18 @@ export default function CatalogSearch({
   const error = failure.query === query ? failure.message : ''
   const [loadingQuery, setLoadingQuery] = useState<string | null>(null)
   const loading = loadingQuery === query && query.trim().length >= 2
+  const debouncedQuery = useDebouncedValue(query)
   useEffect(() => {
+    if (query !== debouncedQuery) return
     let active = true
-    const timer = setTimeout(() => {
-      if (query.trim().length < 2) {
-        setResponse({ query, items: [] })
-        return
-      }
+    if (query.trim().length < 2) return
+    Promise.resolve().then(() => {
+      if (!active) return
       setLoadingQuery(query)
       setFailure({ query, message: '' })
-      searchCatalog(token, query.trim())
+      return searchCatalog(token, query.trim())
         .then((data) => {
-          if (active) setResponse({ query, items: data })
+          if (active && data) setResponse({ query, items: data })
         })
         .catch(() => {
           if (active) setFailure({ query, message: 'No se pudo buscar. Intentá de nuevo.' })
@@ -39,13 +40,12 @@ export default function CatalogSearch({
         .finally(() => {
           if (active) setLoadingQuery(null)
         })
-    }, 300)
+    })
 
     return () => {
       active = false
-      clearTimeout(timer)
     }
-  }, [token, query])
+  }, [token, query, debouncedQuery])
 
   async function adjust(item: CatalogItem, row: HTMLElement | null) {
     const next = await mutate(() => adjustFromCatalog(token, item.uid, plan.planVersion))

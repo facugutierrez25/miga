@@ -28,7 +28,71 @@ interface RequestOptions {
   credentials?: RequestCredentials
 }
 
+const GET_CACHE_TTL_MS = 30_000
+const responseCache = new Map<string, { value: unknown; expiresAt: number }>()
+const inFlight = new Map<string, Promise<unknown>>()
+let cacheGeneration = 0
+let cacheToken: string | null = null
+
+function clearRequestCache() {
+  responseCache.clear()
+  inFlight.clear()
+  cacheGeneration++
+}
+
+function withCallerSignal<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise
+  if (signal.aborted) return Promise.reject(signal.reason ?? new DOMException('Solicitud cancelada.', 'AbortError'))
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason ?? new DOMException('Solicitud cancelada.', 'AbortError'))
+    signal.addEventListener('abort', abort, { once: true })
+    promise.then(value => {
+      signal.removeEventListener('abort', abort)
+      if (!signal.aborted) resolve(value)
+    }, error => {
+      signal.removeEventListener('abort', abort)
+      reject(error)
+    })
+  })
+}
+
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  const token = opts.token ?? null
+  if (cacheToken !== token) {
+    clearRequestCache()
+    cacheToken = token
+  }
+  if ((opts.method ?? 'GET').toUpperCase() !== 'GET') {
+    clearRequestCache()
+    try {
+      return await performRequest<T>(path, opts)
+    } finally {
+      clearRequestCache()
+    }
+  }
+  if (opts.signal?.aborted) throw opts.signal.reason ?? new DOMException('Solicitud cancelada.', 'AbortError')
+  const key = JSON.stringify([path, token, opts.responseType ?? 'json', opts.credentials,
+    opts.body, opts.errorMessage, opts.errorMessages])
+  const cached = responseCache.get(key)
+  if (cached && cached.expiresAt > Date.now()) return withCallerSignal(Promise.resolve(cached.value as T), opts.signal)
+  responseCache.delete(key)
+  let pending = inFlight.get(key)
+  if (!pending) {
+    const generation = cacheGeneration
+    pending = performRequest<T>(path, { ...opts, signal: undefined }).then(value => {
+      if (generation === cacheGeneration) {
+        responseCache.set(key, { value, expiresAt: Date.now() + GET_CACHE_TTL_MS })
+      }
+      return value
+    }).finally(() => {
+      if (inFlight.get(key) === pending) inFlight.delete(key)
+    })
+    inFlight.set(key, pending)
+  }
+  return withCallerSignal(pending as Promise<T>, opts.signal)
+}
+
+async function performRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { token, signal, method = 'GET', body } = opts
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -92,6 +156,7 @@ function installUnauthorizedInterceptor() {
     if (res.status === 401 && unauthorizedListener && bearerToken(input, init) === unauthorizedListener.token) {
       const { notify } = unauthorizedListener
       unauthorizedListener = null
+      clearRequestCache()
       notify()
     }
     return res
@@ -100,10 +165,14 @@ function installUnauthorizedInterceptor() {
 }
 
 export function onUnauthorizedResponse(token: string, handler: () => void): () => void {
+  clearRequestCache()
   installUnauthorizedInterceptor()
   const listener = { token, notify: handler }
   unauthorizedListener = listener
   return () => {
-    if (unauthorizedListener === listener) unauthorizedListener = null
+    if (unauthorizedListener === listener) {
+      unauthorizedListener = null
+      clearRequestCache()
+    }
   }
 }
