@@ -24,6 +24,10 @@ Además, guardar las comidas crea una versión nueva del plan; hasta ahora esa v
 
 Las reglas `USUARIO` y los ajustes del catálogo se crean, editan y borran en el lugar sobre la versión vigente, incluso si está usada. Cada cambio efectivo incrementa su revisión y reinterpreta las notas de hoy, sin copiar el plan: los alimentos son el diccionario con el que se interpreta lo anotado, no parte de lo que definió el profesional. Los días anteriores conservan los ítems y el `applied_rule` guardados. Si se cambia el texto de una nota pasada de esa misma versión, se reinterpreta con los alimentos actuales.
 
+### Historial
+
+"Planes anteriores" agrupa en un solo período las versiones consecutivas sin cambios visibles en grupos y comidas, y omite el período más reciente si coincide con el plan vigente. Las porciones se comparan por `uid` de grupo y valor numérico. No se borran versiones: las que ya existían sin cambios visibles dejan de mostrarse.
+
 ### Identidad estable
 
 Grupos, reglas y hábitos tienen un `uid` que se conserva entre versiones. Un ajuste del usuario sobre el catálogo guarda el `uid` de la regla que sobrescribe (`overrides_rule_uid`), y los registros de hábitos se asocian por `habit_uid`, de modo que Semana muestra la continuidad aunque cambie la versión.

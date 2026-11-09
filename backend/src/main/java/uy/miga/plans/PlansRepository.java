@@ -24,7 +24,11 @@ interface PlansRepository extends JpaRepository<Plan, Long> {
     @Query("SELECT p FROM Plan p WHERE p.userId = :userId AND p.current = true")
     Optional<Plan> lockCurrentByUserId(@Param("userId") Long userId);
 
-    List<Plan> findTop50ByUserIdAndCurrentFalseOrderBySupersededAtDescIdDesc(Long userId);
+    @Query("SELECT DISTINCT p FROM Plan p LEFT JOIN FETCH p.foodGroups WHERE p.userId = :userId ORDER BY p.createdAt, p.id")
+    List<Plan> findHistoryWithGroups(@Param("userId") Long userId);
+
+    @Query("SELECT DISTINCT p FROM Plan p LEFT JOIN FETCH p.meals WHERE p.userId = :userId")
+    List<Plan> fetchHistoryMeals(@Param("userId") Long userId);
 
     @Query(value = """
         SELECT * FROM plans
