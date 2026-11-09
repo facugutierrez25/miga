@@ -4,7 +4,7 @@ import Brand from './Brand'
 import { LoadingSkeleton } from './Skeleton'
 import './AppLayout.css'
 
-function IcHoy() {
+function IcToday() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
@@ -13,7 +13,7 @@ function IcHoy() {
   )
 }
 
-function IcSemana() {
+function IcWeek() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -32,7 +32,7 @@ function IcPlan() {
   )
 }
 
-function IcPerfil() {
+function IcProfile() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8"/>
@@ -50,10 +50,10 @@ function IcMenu() {
 }
 
 const NAV_ITEMS = [
-  { to: '/hoy',     label: 'Hoy',     Icon: IcHoy     },
-  { to: '/semana',  label: 'Semana',  Icon: IcSemana  },
+  { to: '/hoy',     label: 'Hoy',     Icon: IcToday     },
+  { to: '/semana',  label: 'Semana',  Icon: IcWeek  },
   { to: '/mi-plan', label: 'Mi plan', Icon: IcPlan    },
-  { to: '/perfil',  label: 'Perfil',  Icon: IcPerfil  },
+  { to: '/perfil',  label: 'Perfil',  Icon: IcProfile  },
 ]
 
 function NavItem({ to, label, Icon }: { to: string; label: string; Icon: () => React.ReactElement }) {

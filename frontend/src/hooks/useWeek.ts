@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { getWeek, type WeekSummaryDto } from '../api/semana'
+import { getWeek, type WeekSummaryDto } from '../api/week'
 import { useResource } from './useResource'
 
 const isEmpty = (week: WeekSummaryDto) => week.habits.length === 0 && week.days.every(day => !day.hasData)

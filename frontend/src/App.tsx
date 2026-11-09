@@ -30,13 +30,13 @@ function lazyPage<T extends { default: React.ComponentType }>(load: () => Promis
 }
 const RegisterPage = lazyPage(() => import('./pages/RegisterPage'))
 const LoginPage = lazyPage(() => import('./pages/LoginPage'))
-const HoyPage = lazyPage(() => import('./pages/HoyPage'))
-const SemanaPage = lazyPage(() => import('./pages/SemanaPage'))
-const PerfilPage = lazyPage(() => import('./pages/PerfilPage'))
-const MiPlanPage = lazyPage(() => import('./pages/MiPlanPage'))
+const TodayPage = lazyPage(() => import('./pages/TodayPage'))
+const WeekPage = lazyPage(() => import('./pages/WeekPage'))
+const ProfilePage = lazyPage(() => import('./pages/ProfilePage'))
+const MyPlanPage = lazyPage(() => import('./pages/MyPlanPage'))
 const OnboardingPage = lazyPage(() => import('./pages/OnboardingPage'))
-const PrivacidadPage = lazyPage(() => import('./pages/PrivacidadPage'))
-const VerificarEmailPage = lazyPage(() => import('./pages/VerificarEmailPage'))
+const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage'))
+const VerifyEmailPage = lazyPage(() => import('./pages/VerifyEmailPage'))
 
 function AuthLayout() {
   const { token, restoring } = useAuth()
@@ -50,13 +50,13 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route path="/" element={<LandingPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/login" element={<LoginPage />} />
-    <Route path="/privacidad" element={<PrivacidadPage />} />
-    <Route path="/verificar-email" element={<VerificarEmailPage />} />
+    <Route path="/privacidad" element={<PrivacyPage />} />
+    <Route path="/verificar-email" element={<VerifyEmailPage />} />
     <Route element={<AuthLayout />}>
-      <Route path="/hoy" element={<HoyPage />} />
-      <Route path="/semana" element={<SemanaPage />} />
-      <Route path="/perfil" element={<PerfilPage />} />
-      <Route path="/mi-plan" element={<MiPlanPage />} />
+      <Route path="/hoy" element={<TodayPage />} />
+      <Route path="/semana" element={<WeekPage />} />
+      <Route path="/perfil" element={<ProfilePage />} />
+      <Route path="/mi-plan" element={<MyPlanPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />

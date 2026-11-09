@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, test, expect, afterEach } from 'vitest'
 import TodayHabits from '../components/TodayHabits'
-import * as api from '../api/semana'
+import * as api from '../api/week'
 import { useWeek } from '../hooks/useWeek'
 
 const defaultUseWeek = vi.mocked(useWeek).getMockImplementation()!
@@ -11,7 +11,7 @@ afterEach(() => {
   vi.mocked(useWeek).mockImplementation(defaultUseWeek)
 })
 
-vi.mock('../hooks/useAhora', () => ({ useAhora: () => new Date('2026-10-26T12:00:00') }))
+vi.mock('../hooks/useNow', () => ({ useNow: () => new Date('2026-10-26T12:00:00') }))
 
 vi.mock('../auth/authTypes', () => ({ useAuth: () => ({ token: 'tok', email: 'user@miga.uy' }) }))
 vi.mock('../hooks/useWeek', () => ({ useWeek: vi.fn(() => ({
