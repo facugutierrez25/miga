@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { useState } from 'react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, test, expect, afterEach } from 'vitest'
 import TodayHabits from '../components/TodayHabits'
 import * as api from '../api/semana'
@@ -94,4 +95,30 @@ test('Hoy permite anotar el hábito semanal sin mostrar el resumen de Metas sema
   expect(screen.getByRole('group', { name: /Agua: 2, lunes/ })).not.toHaveClass('hoy-habito--ok')
   expect(screen.queryByRole('region', { name: 'Metas semanales' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Sumar 0,5 a Agua/ })).toBeEnabled()
+})
+
+
+test.each([true, false])('actualiza el hábito antes de guardar y reconcilia o revierte (éxito: %s)', async (success) => {
+  const initial = defaultUseWeek(null, null, '2026-10-26')!
+  vi.mocked(useWeek).mockImplementation(function useTestWeek() {
+    const [data, setData] = useState<api.WeekSummaryDto | null>(initial.data)
+    return { ...initial, data, setData }
+  })
+  let resolve!: (log: api.HabitLogDto) => void
+  let reject!: (error: Error) => void
+  const request = vi.spyOn(api, 'logHabit').mockReturnValue(new Promise((res, rej) => { resolve = res; reject = rej }))
+  render(<TodayHabits date="2026-10-26" />)
+  const button = screen.getByRole('button', { name: /Sumar 250 ml a Agua/ })
+  fireEvent.click(button)
+  expect(screen.getByText('750 ml')).toBeInTheDocument()
+  expect(button).toBeDisabled()
+  fireEvent.click(button)
+  expect(request).toHaveBeenCalledTimes(1)
+  await act(async () => {
+    if (success) resolve({ habitId: 2, date: '2026-10-26', value: 800 })
+    else reject(new Error('offline'))
+  })
+  expect(screen.getByText(success ? '800 ml' : '500 ml')).toBeInTheDocument()
+  if (!success) expect(screen.getByRole('alert')).toHaveTextContent('No se pudo registrar')
+  expect(button).toBeEnabled()
 })

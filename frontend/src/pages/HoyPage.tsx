@@ -1,3 +1,4 @@
+import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
 import { mealStatus, type MealStateKind } from '../lib/mealStatus'
 import { displayUnit } from '../lib/displayUnit'
 import { groupColor } from '../groupColors'
@@ -553,7 +554,7 @@ interface NotaMealSectionProps {
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onNotaBorrada: (mealId: number, version: number | null) => void
   onReload: () => Promise<DayRegistroDto>
-  onRespuestaGuardada: (mealId: number) => void
+  onRespuestaGuardada: (mealId: number) => Promise<void>
 }
 
 function NotaMealSection({
@@ -591,7 +592,12 @@ function NotaMealSection({
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
   const comparison = mealDay?.comparison ?? []
-  const preguntas = comparison.filter(s => s.status === 'PREGUNTAR')
+  // Las respuestas guardadas se ocultan hasta que llega la comparación nueva, aunque falle la recarga.
+  const [answered, setAnswered] = useState<{ source: unknown; groupIds: number[] }>({ source: null, groupIds: [] })
+  const answeredGroups = answered.source === mealDay?.comparison ? answered.groupIds : []
+  const answerPending = useRef(false)
+  const [answerSaving, setAnswerSaving] = useState(false)
+  const preguntas = comparison.filter(s => s.status === 'PREGUNTAR' && !answeredGroups.includes(s.foodGroupId))
   const understoodFoods = [...new Set(items.map(item => item.food))]
   const understoodSummary = understoodFoods.slice(0, 3).join(', ')
     + (understoodFoods.length > 3 ? ' y otros alimentos' : '')
@@ -720,15 +726,24 @@ function NotaMealSection({
   }
 
   async function handleRespuesta(foodGroupId: number, consumed: boolean) {
-    if (!meal.id) return
+    if (!meal.id || answerPending.current) return
+    answerPending.current = true
+    setAnswerSaving(true)
+    setError(null)
+    const source = mealDay?.comparison
+    setAnswered({ source, groupIds: [...answeredGroups, foodGroupId] })
     try {
       await saveRespuesta(token, date, meal.id, { foodGroupId, consumed })
-      onRespuestaGuardada(meal.id)
     } catch {
+      setAnswered(prev => ({ ...prev, groupIds: prev.groupIds.filter(id => id !== foodGroupId) }))
       setError('No se pudo guardar la respuesta. Intentá de nuevo.')
+      return
+    } finally {
+      answerPending.current = false
+      setAnswerSaving(false)
     }
+    await onRespuestaGuardada(meal.id).catch(() => {})
   }
-
   const feedback = (<>
       <p className="nota-guardado" role="status">{guardado}</p>
       {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
@@ -833,8 +848,8 @@ function NotaMealSection({
             ¿Consumiste <strong>{p.name}</strong>?
           </span>
           <div className="nota-pregunta__acciones">
-            <button className="nota-pregunta__si" onClick={() => handleRespuesta(p.foodGroupId, true)}>Sí</button>
-            <button className="nota-pregunta__no" onClick={() => handleRespuesta(p.foodGroupId, false)}>No</button>
+            <button disabled={answerSaving} className="nota-pregunta__si" onClick={() => handleRespuesta(p.foodGroupId, true)}>Sí</button>
+            <button disabled={answerSaving} className="nota-pregunta__no" onClick={() => handleRespuesta(p.foodGroupId, false)}>No</button>
           </div>
         </div>
       ))}
@@ -1008,7 +1023,7 @@ interface MealProps {
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onNotaBorrada: (mealId: number, version: number | null) => void
   onReload: () => Promise<DayRegistroDto>
-  onRespuestaGuardada: (mealId: number) => void
+  onRespuestaGuardada: (mealId: number) => Promise<void>
 }
 
 function MealDetail(props: MealProps & { ficha?: boolean }) {
@@ -1168,10 +1183,9 @@ function HoyContent() {
     }
   }, [token, reloadDay, setDayRegistro])
 
-  const handleRespuestaGuardada = useCallback((_mealId: number) => {
+  const handleRespuestaGuardada = useCallback(async (_mealId: number) => {
     if (!token) return
-    reloadDay()
-      .catch(() => {})
+    await reloadDay()
   }, [token, reloadDay])
 
   const esHoy = fecha === HOY
@@ -1255,7 +1269,11 @@ function HoyContent() {
           <h1 className="hoy-desktop-saludo__titulo">{titulo}</h1>
         </div>
         {cargando ? (
-          <p className="hoy-loading">Cargando tu día…</p>
+          <LoadingSkeleton label="Cargando tu día…">
+            <Skeleton />
+            <div className="loading-skeleton__card"><Skeleton /><Skeleton shape="block" /><Skeleton /></div>
+            {Array.from({ length: 3 }, (_, i) => <div key={i} className="loading-skeleton__row"><Skeleton /><Skeleton shape="block" /></div>)}
+          </LoadingSkeleton>
         ) : planLoad.status === 'error' ? (
           <p role="alert">No se pudo cargar el plan. <button onClick={planLoad.retry}>Reintentar</button></p>
         ) : sinPlan ? (

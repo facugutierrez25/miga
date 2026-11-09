@@ -49,18 +49,24 @@ export default function TodayHabits({ date, revision }: { date: string; revision
   }
   const [habitError, setHabitError] = useState('')
   const [savingHabit, setSavingHabit] = useState<number | null>(null)
+  const habitPending = useRef(false)
   const logMap = new Map((day?.habitLogs ?? []).map(l => [l.habitId, l]))
 
   async function setHabit(habit: HabitDto, newVal: number) {
-    if (savingHabit !== null) return
+    if (habitPending.current) return
+    habitPending.current = true
+    const previous = day?.habitLogs ?? []
+    onLogUpdated({ habitId: habit.id, date, value: newVal })
     setHabitError('')
     setSavingHabit(habit.id)
     try {
       const updated = await logHabit(token!, habit.id, date, newVal)
       onLogUpdated(updated)
     } catch {
+      setData(prev => prev && ({ ...prev, days: prev.days.map(d => d.date !== date ? d : { ...d, habitLogs: previous }) }))
       setHabitError('No se pudo registrar el hábito. Probá de nuevo.')
     } finally {
+      habitPending.current = false
       setSavingHabit(null)
     }
   }

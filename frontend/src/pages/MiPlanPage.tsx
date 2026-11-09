@@ -1,3 +1,4 @@
+import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
 import { MAX_PORCIONES_FICHA } from '../components/migaSlots'
 import { groupColor } from '../groupColors'
 import { useContext, useCallback, useEffect, useRef, useState } from 'react'
@@ -436,7 +437,10 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
         ) : loadError ? (
           <p role="alert">No se pudo cargar el plan. <button onClick={retry}>Reintentar</button></p>
         ) : cargando || loading ? (
-          <p className="mi-plan-loading">Cargando tu plan…</p>
+          <LoadingSkeleton label="Cargando tu plan…">
+            <Skeleton />
+            {Array.from({ length: 3 }, (_, i) => <div key={i} className="loading-skeleton__row"><Skeleton /><Skeleton shape="block" /></div>)}
+          </LoadingSkeleton>
         ) : (
           <>
             <div className="meal-list">
