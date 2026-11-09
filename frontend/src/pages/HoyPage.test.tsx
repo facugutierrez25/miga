@@ -9,6 +9,31 @@ import * as plansApi from '../api/plans'
 import * as registroApi from '../api/registro'
 import * as AuthContext from '../auth/authTypes'
 
+const mealRenders = vi.hoisted(() => new Map<string, number>())
+
+vi.mock('react/jsx-dev-runtime', async importOriginal => {
+  const runtime = await importOriginal<typeof import('react/jsx-dev-runtime')>()
+  const { memo } = await import('react')
+  const wrappers = new Map<unknown, React.ElementType>()
+  function instrument(type: React.ElementType): React.ElementType {
+    const component = typeof type === 'function' ? type : (type as { type?: unknown }).type
+    if (typeof component !== 'function' || !['NotaMealSection', 'MealDetail', 'MealRow', 'MealAhora'].includes(component.name)) return type
+    if (!wrappers.has(type)) {
+      const counted = (props: { meal: { id: number } }) => {
+        const key = `${component.name}-${props.meal.id}`
+        mealRenders.set(key, (mealRenders.get(key) ?? 0) + 1)
+        return component(props)
+      }
+      wrappers.set(type, typeof type === 'function' ? counted : memo(counted))
+    }
+    return wrappers.get(type)!
+  }
+  return {
+    ...runtime,
+    jsxDEV: (type, props, key, isStatic, source, self) => runtime.jsxDEV(instrument(type), props, key, isStatic, source, self),
+  } satisfies typeof runtime
+})
+
 vi.mock('../api/semana', () => ({ getWeek: vi.fn().mockResolvedValue({ habits: [], days: [] }) }))
 
 vi.mock('../api/plans')
@@ -1198,4 +1223,25 @@ test('una respuesta guardada no se reporta como error si falla la recarga del d�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sí' })) })
   expect(screen.queryByRole('button', { name: 'Sí' })).not.toBeInTheDocument()
   expect(screen.queryByText(/No se pudo guardar la respuesta/)).not.toBeInTheDocument()
+})
+
+test('meal renders stay isolated while typing and toggling the daily summary', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, meals: ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((name, index) => ({
+    ...planConComida.meals[0], id: index + 1, name, suggestedTime: undefined, displayOrder: index,
+  })) })
+  renderHoy()
+  await screen.findByRole('heading', { name: 'Snack', level: 2 })
+  fireEvent.click(screen.getByRole('button', { name: /Breakfast/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Lunch/ }))
+  await waitFor(() => expect(mockGetSugerencias).toHaveBeenCalledTimes(3))
+  await act(async () => {})
+  mealRenders.clear()
+  const editor = screen.getAllByRole('textbox', { name: /comiste/ })[1]
+  for (const value of ['a', 'ab', 'abc']) fireEvent.change(editor, { target: { value } })
+  expect(Object.fromEntries(mealRenders)).toEqual({ 'NotaMealSection-1': 3 })
+  mealRenders.clear()
+  const summary = screen.getByText(/Tu d.a por grupo/).closest('details')!
+  summary.open = false
+  fireEvent(summary, new Event('toggle'))
+  expect(Object.fromEntries(mealRenders)).toEqual({})
 })
