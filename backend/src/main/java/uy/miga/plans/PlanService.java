@@ -243,7 +243,7 @@ public class PlanService {
 
     private PlanDto toDto(Plan plan) {
         List<PlanFoodGroupDto> groups = toGroupDtos(plan.getFoodGroups());
-        var meals = plan.getMeals().stream().map(meal -> {
+        var meals = mealRepository.findWithPortionsByPlanId(plan.getId()).stream().map(meal -> {
             var portions = meal.getPortions().stream()
                 .map(p -> new MealPortionDto(p.getFoodGroupId(), p.getPortions()))
                 .toList();

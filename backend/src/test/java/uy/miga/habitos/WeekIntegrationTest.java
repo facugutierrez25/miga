@@ -125,6 +125,70 @@ class WeekIntegrationTest {
         }
     }
 
+    @Autowired private jakarta.persistence.EntityManagerFactory entityManagerFactory;
+
+    @Test
+    void readStatementCountsDoNotGrowWithMealsNotesEntriesAndDays() throws Exception {
+        String email = "growth-" + UUID.randomUUID() + "@miga.uy";
+        token = registerAndLogin(email);
+        long userId = jdbc.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+        long planId = jdbc.queryForObject("INSERT INTO plans (user_id, created_at, updated_at) VALUES (?, NOW() - INTERVAL '30 days', NOW()) RETURNING id", Long.class, userId);
+        long groupId = jdbc.queryForObject("INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order) VALUES (?, 'Frutas', 'FRU', 1) RETURNING id", Long.class, planId);
+        var date = LocalDate.now(clock);
+        addReadFixture(userId, planId, groupId, date, 0, 1, 1);
+        jdbc.update("UPDATE plan_food_groups SET clave = 'frutas' WHERE id = ?", groupId);
+        jdbc.update("INSERT INTO food_rules (plan_id, alcance, alimento, standard_group_key) VALUES (?, 'PLAN', 'Fruta inicial', 'frutas')", planId);
+        var small = readCounts(date, false);
+        addReadFixture(userId, planId, groupId, date, 1, 12, 7);
+        for (int i = 0; i < 12; i++) {
+            jdbc.update("INSERT INTO food_rules (plan_id, alcance, alimento, standard_group_key) VALUES (?, 'PLAN', ?, 'frutas')", planId, "Fruta " + i);
+            long historical = jdbc.queryForObject("INSERT INTO plans (user_id, created_at, updated_at, is_current, superseded_at) VALUES (?, NOW() - INTERVAL '2 years', NOW(), false, NOW() - INTERVAL '1 year') RETURNING id", Long.class, userId);
+            long historicalGroup = jdbc.queryForObject("INSERT INTO plan_food_groups (plan_id, name, abbreviation, display_order) VALUES (?, 'Frutas', 'FRU', 1) RETURNING id", Long.class, historical);
+            addReadFixture(userId, historical, historicalGroup, date.minusYears(2), 0, 2, 1);
+        }
+        var large = readCounts(date, true);
+        for (String endpoint : small.keySet()) {
+            System.out.printf("Consultas %s: menor=%d grande=%d%n", endpoint, small.get(endpoint), large.get(endpoint));
+            assertThat(large.get(endpoint)).as(endpoint).isLessThanOrEqualTo(small.get(endpoint) + 1);
+        }
+    }
+
+    private void addReadFixture(long userId, long planId, long groupId, LocalDate date,
+                                int offset, int meals, int days) {
+        for (int i = offset; i < offset + meals; i++) {
+            long mealId = jdbc.queryForObject("INSERT INTO meals (plan_id, name, display_order) VALUES (?, ?, ?) RETURNING id",
+                Long.class, planId, "Comida " + i, i + 1);
+            jdbc.update("INSERT INTO meal_portions (meal_id, food_group_id, portions) VALUES (?, ?, 1)", mealId, groupId);
+            for (int d = 0; d < days; d++) {
+                var day = date.with(java.time.DayOfWeek.MONDAY).plusDays(d);
+                long noteId = jdbc.queryForObject("INSERT INTO meal_notes (user_id, plan_id, meal_id, fecha, texto) VALUES (?, ?, ?, ?, 'manzana') RETURNING id",
+                    Long.class, userId, planId, mealId, day);
+                jdbc.update("INSERT INTO food_entries (user_id, user_email, meal_id, date, food, quantity, unit, food_group_id, porciones, meal_note_id) VALUES (?, 'fixture@miga.uy', ?, ?, 'manzana', 1, 'unidad', ?, 1, ?)",
+                    userId, mealId, day, groupId, noteId);
+            }
+        }
+    }
+
+    private java.util.Map<String, Long> readCounts(LocalDate date, boolean expanded) throws Exception {
+        var result = new java.util.LinkedHashMap<String, Long>();
+        var endpoints = java.util.List.of("/api/v1/registro/" + date, "/api/v1/semana",
+            "/api/v1/my-plan", "/api/v1/my-plan/reglas", "/api/v1/my-plan/historial",
+            "/api/v1/semana/export?format=csv", "/api/v1/semana/export?format=xlsx", "/api/v1/semana/export?format=pdf");
+        var statistics = entityManagerFactory.unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        for (String endpoint : endpoints) {
+            statistics.clear();
+            var request = get(endpoint).param("date", date.toString()).header("Authorization", "Bearer " + token);
+            if (endpoint.contains("export")) {
+                request.param("from", date.with(java.time.DayOfWeek.MONDAY).toString())
+                    .param("to", date.with(java.time.DayOfWeek.MONDAY).plusDays(expanded ? 6 : 0).toString());
+            }
+            mockMvc.perform(request).andExpect(status().isOk());
+            assertThat(statistics.getPrepareStatementCount()).as(endpoint).isPositive();
+            result.put(endpoint, statistics.getPrepareStatementCount());
+        }
+        return result;
+    }
+
     @Test
     void removedMentionDisappearsFromWeekAndExports() throws Exception {
         String date = LocalDate.now().toString();

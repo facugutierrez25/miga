@@ -31,17 +31,21 @@ class PlanRulesService {
         PlanRef ref = plans.currentPlanRef(userId);
         var groups = plans.getPlanFoodGroups(ref.id());
         return new PlanRulesDto(ref.id(), ref.version(), plans.getModoRegistro(ref.id()), groups,
-            rules.getPlanRules(ref.id(), userId).stream().map(r -> dto(r, ref.id(), groups)).toList(), habits.listHabits(ref.id()));
+            rules.getPlanRules(ref.id(), userId).stream().map(r -> dto(r, groups)).toList(), habits.listHabits(ref.id()));
     }
-    private FoodRuleDto resolve(FoodRuleDto r, Long planId) {
-        Long group = r.foodGroupId() != null ? r.foodGroupId() : plans.findGroupIdByClave(planId, r.standardGroupKey());
+    private FoodRuleDto resolve(FoodRuleDto r, List<PlanFoodGroupDto> groups) {
+        Long group = r.foodGroupId() != null ? r.foodGroupId() : groupId(groups, r.standardGroupKey());
         var components = r.componentes() == null ? List.<Componente>of() : r.componentes().stream()
-            .map(c -> new Componente(c.foodGroupId() != null ? c.foodGroupId() : plans.findGroupIdByClave(planId, c.standardGroupKey()), c.standardGroupKey(), c.porciones())).toList();
+            .map(c -> new Componente(c.foodGroupId() != null ? c.foodGroupId() : groupId(groups, c.standardGroupKey()), c.standardGroupKey(), c.porciones())).toList();
         return new FoodRuleDto(r.id(), r.alcance(), r.planId(), r.userId(), r.alimento(), r.sinonimos(), r.tipo(), r.standardGroupKey(), group,
             components, r.cantidadPorPorcion(), r.unidad(), r.porcionPorDefecto(), r.uid(), r.overridesRuleUid());
     }
-    private PlanRulesDto.RuleDto dto(FoodRuleDto original, Long planId, List<PlanFoodGroupDto> groups) {
-        FoodRuleDto r = resolve(original, planId);
+    private Long groupId(List<PlanFoodGroupDto> groups, String key) {
+        if (key == null) return null;
+        return groups.stream().filter(g -> key.equals(g.clave())).map(PlanFoodGroupDto::id).findFirst().orElse(null);
+    }
+    private PlanRulesDto.RuleDto dto(FoodRuleDto original, List<PlanFoodGroupDto> groups) {
+        FoodRuleDto r = resolve(original, groups);
         Map<Long, UUID> uids = groups.stream().collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::uid));
         Map<Long, String> names = groups.stream().collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::name));
         return new PlanRulesDto.RuleDto(r.uid(), r.alcance(), r.alimento(), r.sinonimos(), r.tipo(), uids.get(r.foodGroupId()),
@@ -155,13 +159,13 @@ class PlanRulesService {
             .collect(Collectors.toMap(FoodRuleDto::overridesRuleUid, FoodRuleDto::uid));
         var groups = plans.getPlanFoodGroups(id);
         return rules.searchCatalog(q, id, user, 30).stream().map(r -> {
-            var d = dto(r, id, groups);
+            var d = dto(r, groups);
             return new PlanRulesDto.CatalogDto(d.uid(), d.alcance(), d.alimento(), d.sinonimos(), d.tipo(), d.groupUid(), d.textoRegla(), adjustments.get(d.uid()));
         }).toList();
     }
     PlanRulesDto adjust(String email, UUID uid, Requests.Version req) {
         return mutateInPlace(email, req.planVersion(), cur -> rules.getRuleForAdjust(uid, cur.id()), cur -> false, (u, id) -> {
-            FoodRuleDto r = resolve(rules.getRuleForAdjust(uid, id), id);
+            FoodRuleDto r = resolve(rules.getRuleForAdjust(uid, id), plans.getPlanFoodGroups(id));
             if ("NORMAL".equals(r.tipo()) && r.foodGroupId() == null) throw new InvalidRuleException("No hay un grupo del plan para la clave de este alimento.");
             rules.createUserRule(u, id, new RuleInput(r.alimento(), r.sinonimos(), r.tipo(), r.foodGroupId(), r.cantidadPorPorcion(), r.unidad(), r.porcionPorDefecto(), r.componentes(), uid));
         });
