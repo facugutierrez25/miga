@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, test, expect, beforeEach, afterEach } from 'vitest'
 import HoyPage from './HoyPage'
 import { reglaLegible } from './reglaLegible'
+import { searchCatalog } from '../api/planRules'
 import * as plansApi from '../api/plans'
 import * as registroApi from '../api/registro'
 import * as AuthContext from '../auth/authTypes'
@@ -36,11 +37,12 @@ vi.mock('react/jsx-dev-runtime', async importOriginal => {
 
 vi.mock('../api/semana', () => ({ getWeek: vi.fn().mockResolvedValue({ habits: [], days: [] }) }))
 
+vi.mock('../api/planRules', () => ({ searchCatalog: vi.fn().mockResolvedValue([]) }))
 vi.mock('../api/plans')
 vi.mock('../api/registro', async importOriginal => {
   const actual = await importOriginal<typeof import('../api/registro')>()
   return { ...actual, getDayRegistro: vi.fn(), saveNota: vi.fn(), patchItem: vi.fn(),
-    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn(), removeItem: vi.fn() }
+    saveRespuesta: vi.fn(), getSugerencias: vi.fn(), deleteNota: vi.fn(), removeItem: vi.fn(), resolveItem: vi.fn(), undoResolveItem: vi.fn() }
 })
 vi.mock('../auth/authTypes')
 
@@ -569,7 +571,7 @@ test('al recargar muestra menciones persistidas sin corrección ni porciones', a
   renderHoy()
   await abrirNota()
   expect(screen.getByText('mate')).toBeInTheDocument()
-  expect(screen.getByText('algo raro')).toBeInTheDocument()
+  expect(screen.getByText('«algo raro»')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /Corregir/ })).not.toBeInTheDocument()
 })
 
@@ -1006,10 +1008,10 @@ test('las preguntas quedan en Hoy y los alimentos sin grupo se muestran en el po
   expect(screen.getByText(/¿Consumiste/)).toBeVisible()
   expect(screen.getByRole('button', { name: 'Sí' })).toBeVisible()
   expect(screen.getByText('manzana')).not.toBeVisible()
-  expect(screen.getByText('algo raro')).not.toBeVisible()
+  expect(screen.getByText('«algo raro»')).not.toBeVisible()
   await abrirDetalle()
   expect(screen.getByText('manzana')).toBeVisible()
-  expect(screen.getByText('algo raro')).toBeVisible()
+  expect(screen.getByText('«algo raro»')).toBeVisible()
   expect(screen.getByRole('button', { name: 'Corregir leche' })).toBeVisible()
 })
 
@@ -1244,4 +1246,79 @@ test('meal renders stay isolated while typing and toggling the daily summary', a
   summary.open = false
   fireEvent(summary, new Event('toggle'))
   expect(Object.fromEntries(mealRenders)).toEqual({})
+})
+
+const unknownFood: registroApi.EntryItemDto = { id: 501, food: 'milanesa rara', originalText: 'milanesa rara', quantity: null, unit: null, foodGroupId: null, portions: null, origin: 'UNKNOWN', uncertain: false }
+async function openResolution() {
+  setupRemoval([unknownFood, { ...removableItems[0], uncertain: true }])
+  renderHoy()
+  await abrirDetalle()
+  fireEvent.click(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' }))
+}
+function mockResolution() {
+  const resolved = { ...unknownFood, id: 502, food: 'Milanesa', origin: 'REGLA' }
+  vi.mocked(registroApi.resolveItem).mockImplementation(async () => {
+    mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{ mealId: 1, noteId: 3, noteVersion: 7, noteText: 'nota', items: [resolved], comparison: [] }] })
+    return { replacedItemIds: [501], items: [resolved], undo: { occurrenceId: 'occ', ruleUid: 'rule' } }
+  })
+  return resolved
+}
+test('cuenta y separa los alimentos sin reconocer del resumen', async () => {
+  setupRemoval([unknownFood, { ...removableItems[0], uncertain: true }])
+  renderHoy()
+  expect(await screen.findByRole('button', { name: 'Así lo entendí · 1 sin reconocer · 1 estimados' })).toBeInTheDocument()
+  await abrirDetalle()
+  expect(screen.getByRole('heading', { name: 'No reconocí 1 cosa' })).toBeInTheDocument()
+  expect(screen.getByText('«milanesa rara»')).toBeInTheDocument()
+  expect(screen.getByText(/^Entendí:/)).not.toHaveTextContent('milanesa rara')
+})
+test('resuelve por catálogo y deshace restaurando el aviso', async () => {
+  const resolved = mockResolution()
+  vi.mocked(searchCatalog).mockResolvedValue([{ uid: 'milanesa', alcance: 'CATALOGO', alimento: 'Milanesa', sinonimos: [], tipo: 'NORMAL', groupUid: null, textoRegla: '1 porción', ajustadoPorUid: null }])
+  await openResolution()
+  expect(screen.getByRole('heading', { name: '¿Qué es «milanesa rara»?' })).toHaveFocus()
+  fireEvent.click(await screen.findByRole('button', { name: 'Es esto' }))
+  await waitFor(() => expect(registroApi.resolveItem).toHaveBeenCalledWith('tok', expect.any(String), 501, { kind: 'SAME_AS', ruleUid: 'milanesa', remember: true }))
+  expect(await screen.findByText(/Listo:.*Milanesa/)).toHaveTextContent('Lo voy a reconocer la próxima vez.')
+  vi.mocked(registroApi.undoResolveItem).mockImplementation(async () => {
+    mockGetDayRegistro.mockResolvedValue({ ...dayVacio, meals: [{ mealId: 1, noteId: 3, noteVersion: 7, noteText: 'nota', items: [unknownFood], comparison: [] }] })
+    return { replacedItemIds: [resolved.id], items: [unknownFood] }
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }))
+  expect(await screen.findByText('Listo, quedó como antes.')).toBeInTheDocument()
+  expect(registroApi.undoResolveItem).toHaveBeenCalledWith('tok', expect.any(String), { occurrenceId: 'occ', ruleUid: 'rule' })
+  expect(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' })).toBeInTheDocument()
+})
+test.each([['Comida flexible', 'FLEXIBLE'], ['No cuenta para el plan', 'NOT_COUNTED']])('resuelve %s sin recordar', async (label, kind) => {
+  mockResolution()
+  await openResolution()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Reconocerlo siempre que lo escriba' }))
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  await waitFor(() => expect(registroApi.resolveItem).toHaveBeenCalledWith('tok', expect.any(String), 501, { kind, remember: false }))
+  expect(await screen.findByText(/Listo:/)).not.toHaveTextContent('Lo voy a reconocer')
+})
+test('resuelve dos grupos con porciones', async () => {
+  mockResolution()
+  setupRemoval([unknownFood])
+  mockGetMyPlan.mockResolvedValue({ ...planConComida, foodGroups: [...gruposPRO, { id: 2, name: 'Cereales', abbreviation: 'CER', displayOrder: 2, color: null }] })
+  renderHoy()
+  await abrirDetalle()
+  fireEvent.click(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Elegir grupos y porciones' }))
+  fireEvent.click(screen.getByRole('button', { name: '+ Agregar grupo' }))
+  fireEvent.change(screen.getByLabelText('Porciones 2'), { target: { value: '1.5' } })
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Guardar$/ }))
+  await waitFor(() => expect(registroApi.resolveItem).toHaveBeenCalledWith('tok', expect.any(String), 501, { kind: 'GROUPS', groups: [{ foodGroupId: 1, portions: 1 }, { foodGroupId: 2, portions: 1.5 }], remember: true }))
+})
+test('muestra error y vuelve con foco mediante volver y Escape', async () => {
+  vi.mocked(searchCatalog).mockResolvedValue([])
+  vi.mocked(registroApi.resolveItem).mockRejectedValue(new Error('error'))
+  await openResolution()
+  fireEvent.click(screen.getByRole('button', { name: 'Comida flexible' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar. Probá de nuevo.')
+  fireEvent.click(screen.getByRole('button', { name: 'Volver a Así lo entendí' }))
+  expect(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' }))
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' })).toHaveFocus()
 })

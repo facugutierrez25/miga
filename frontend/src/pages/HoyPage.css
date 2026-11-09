@@ -1060,3 +1060,33 @@
 .entendido-dialog .nota-entendido { display: flex; flex-direction: column; gap: var(--s3); }
 .entendido-dialog .nota-items { gap: var(--s3); }
 .entendido-dialog .nota-entendido__resumen { margin: 0; }
+
+.resolve-notice { background: var(--warn-soft); padding: 1rem; border-radius: var(--radius-control); margin-block: 1rem; overflow-wrap: anywhere; }
+.resolve-unknown { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin-block: .75rem; }
+.entendido-dialog .resolve-primary { background: var(--primary); color: var(--on-primary); border: 0; padding: .6rem 1rem; border-radius: var(--radius-sm); }
+.resolve-food fieldset { border: 0; padding: 0; min-width: 0; display: grid; gap: .75rem; }
+.resolve-food button, .resolve-notice button, .resolve-food input:not([type=checkbox]), .resolve-food select { min-height: 44px; max-width: 100%; }
+.resolve-food label { display: grid; gap: .4rem; min-width: 0; }
+.resolve-food input:not([type=checkbox]), .resolve-food select { width: 100%; box-sizing: border-box; }
+.resolve-food article { padding-block: .75rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.resolve-group { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+.resolve-group label { flex: 1 1 110px; }
+.resolve-food .resolve-remember { display: flex; align-items: center; min-height: 44px; }
+.entendido-dialog .regla-dialog__title { min-width: 0; overflow-wrap: anywhere; }
+
+.resolve-food button:not(.resolve-primary):not(.nota-link), .resolve-notice button:not(.resolve-primary) {
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.resolve-food input:not([type=checkbox]), .resolve-food select {
+  padding: var(--s2);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+}
+.resolve-food button:disabled, .resolve-notice button:disabled { opacity: .6; cursor: default; }
