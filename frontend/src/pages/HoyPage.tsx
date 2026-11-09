@@ -2,7 +2,7 @@ import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
 import { mealStatus, type MealStateKind } from '../lib/mealStatus'
 import { displayUnit } from '../lib/displayUnit'
 import { groupColor } from '../groupColors'
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useCallback, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
@@ -557,7 +557,7 @@ interface NotaMealSectionProps {
   onRespuestaGuardada: (mealId: number) => Promise<void>
 }
 
-function NotaMealSection({
+const NotaMealSection = memo(function NotaMealSection({
   meal, drafts, mealDay, date, token, gruposMap,
   onNotaSaved, onItemPatched, onNotaBorrada, onRespuestaGuardada, onReload,
 }: NotaMealSectionProps) {
@@ -943,7 +943,7 @@ function NotaMealSection({
       )}
     </div>
   )
-}
+})
 
 // ── Resumen diario ────────────────────────────────────────────────────────
 
@@ -1026,7 +1026,7 @@ interface MealProps {
   onRespuestaGuardada: (mealId: number) => Promise<void>
 }
 
-function MealDetail(props: MealProps & { ficha?: boolean }) {
+const MealDetail = memo(function MealDetail(props: MealProps & { ficha?: boolean }) {
   const { meal, mealDay, fecha, token, gruposMap, ficha = false } = props
   const rows = mealMigas(meal, mealDay, gruposMap)
   return (
@@ -1052,9 +1052,9 @@ function MealDetail(props: MealProps & { ficha?: boolean }) {
       )}
     </>
   )
-}
+})
 
-function MealAhora(props: MealProps) {
+const MealAhora = memo(function MealAhora(props: MealProps) {
   const { meal } = props
   const headingId = `comida-${meal.id ?? meal.name}`
   return (
@@ -1067,9 +1067,9 @@ function MealAhora(props: MealProps) {
       <MealDetail {...props} ficha />
     </article>
   )
-}
+})
 
-function MealRow(props: MealProps) {
+const MealRow = memo(function MealRow(props: MealProps) {
   const { meal, mealDay } = props
   const [abierta, setAbierta] = useState(false)
   const detalleId = `comida-detalle-${meal.id ?? meal.name}`
@@ -1099,7 +1099,7 @@ function MealRow(props: MealProps) {
       )}
     </li>
   )
-}
+})
 
 // ── HoyPage ────────────────────────────────────────────────────────────────
 
@@ -1237,6 +1237,12 @@ function HoyContent() {
     </nav>
   )
 
+  const reloadPlan = planLoad.reload
+  const handleReload = useCallback(async () => {
+    const [, day] = await Promise.all([reloadPlan(), reloadDay()])
+    return day
+  }, [reloadPlan, reloadDay])
+
   const mealProps = {
     drafts,
     fecha,
@@ -1246,10 +1252,7 @@ function HoyContent() {
     onItemPatched: handleItemPatched,
     onNotaBorrada: handleNotaBorrada,
     // Un conflicto puede venir de un plan desactualizado: se recargan el plan y el día.
-    onReload: async () => {
-      const [, day] = await Promise.all([planLoad.reload(), reloadDay()])
-      return day
-    },
+    onReload: handleReload,
     onRespuestaGuardada: handleRespuestaGuardada,
   }
 
