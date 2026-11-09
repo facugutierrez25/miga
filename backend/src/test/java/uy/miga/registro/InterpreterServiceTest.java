@@ -14,6 +14,18 @@ class InterpreterServiceTest {
 
     private InterpreterService interpreter;
 
+    @Test
+    void unknownMentionPreservesWrittenMeasureForResolution() {
+        var item = new InterpreterService().interpret("200 g de zqxalimento", List.of()).getFirst();
+        assertThat(item.recognized()).isFalse();
+        assertThat(item.foodName()).isEqualTo("zqxalimento");
+        assertThat(item.quantity()).isEqualByComparingTo("200");
+        assertThat(item.unit()).isEqualTo("g");
+        var resolved = new InterpreterService().computePortions(item.originalText(), item.quantity().doubleValue(), item.unit(),
+            normal(1L, "equivalente", 1L, new BigDecimal("50"), "g"));
+        assertThat(resolved.portions()).isEqualByComparingTo("4");
+    }
+
     private static FoodRuleDto rule(Long id, String name, List<String> synonyms,
                                     String type, Long groupId, String groupKey,
                                     BigDecimal qtyPerPortion, String unit,

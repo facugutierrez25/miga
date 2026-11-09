@@ -161,7 +161,8 @@ class InterpreterService {
         if (foodName.isBlank()) return InterpretedItem.unrecognized(segment);
 
         FoodRuleDto rule = findRule(foodName, rules);
-        if (rule == null) return InterpretedItem.unrecognized(segment);
+        if (rule == null) return new InterpretedItem(segment, foodName, BigDecimal.valueOf(rawQty),
+            detectedUnit != null ? detectedUnit : "u", null, null, null, null, false, null, null, null);
 
         // Un número sin unidad cuenta piezas solo cuando la regla también cuenta piezas.
         // Sin medida no se inventan gramos ni tazas: se registra una estimación en porciones.
@@ -234,7 +235,7 @@ class InterpreterService {
         return (candidates.size() == 1 && bestDist <= 2) ? candidates.get(0) : null;
     }
 
-    private InterpretedItem computePortions(String originalText, double qty,
+    InterpretedItem computePortions(String originalText, double qty,
                                             String unit, FoodRuleDto rule) {
         boolean uncertain = false;
         BigDecimal portions;
