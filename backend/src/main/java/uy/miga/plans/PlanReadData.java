@@ -3,6 +3,7 @@ package uy.miga.plans;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.time.DayOfWeek;
 
 public record PlanReadData(Long id, LocalDate start, LocalDate end, String mode, BigDecimal margin,
                            List<PlanFoodGroupDto> groups, List<MealData> meals) {
@@ -12,7 +13,7 @@ public record PlanReadData(Long id, LocalDate start, LocalDate end, String mode,
             this(id, name, portions, null);
         }
 
-        public boolean appliesOn(java.time.DayOfWeek day) {
+        public boolean appliesOn(DayOfWeek day) {
             return weekdays == null || weekdays.isEmpty() || weekdays.contains(day.getValue());
         }
     }
@@ -22,7 +23,7 @@ public record PlanReadData(Long id, LocalDate start, LocalDate end, String mode,
     }
 
     // Meta del día: solo suman las comidas que tocan ese día (null = todas).
-    public BigDecimal totalGoal(java.time.DayOfWeek day) {
+    public BigDecimal totalGoal(DayOfWeek day) {
         if ("LIBRE".equals(mode)) return BigDecimal.ZERO;
         return meals.stream().filter(m -> day == null || m.appliesOn(day))
             .flatMap(m -> m.portions().stream()).map(MealPortionSummary::portions)

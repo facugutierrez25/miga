@@ -13,6 +13,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Set;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import uy.miga.plans.PlanNotFoundException;
+import uy.miga.plans.PlanReadData;
+import uy.miga.registro.RegistroService;
+import uy.miga.registro.SinReglaDto;
+import uy.miga.registro.WeekMealData;
 
 @Service
 class WeekService {
@@ -22,13 +33,13 @@ class WeekService {
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
     private final UserService userService;
-    private final uy.miga.registro.RegistroService registroService;
+    private final RegistroService registroService;
 
     WeekService(PlanHabitRepository habitRepository,
                 HabitLogRepository logRepository,
                 FoodEntryFacade entryFacade,
                 PlanService planService,
-                UserService userService, uy.miga.registro.RegistroService registroService) {
+                UserService userService, RegistroService registroService) {
         this.habitRepository = habitRepository;
         this.logRepository = logRepository;
         this.entryFacade = entryFacade;
@@ -45,31 +56,31 @@ class WeekService {
 
     // Datos para exportar un rango: la planilla, las porciones por grupo de cada día y lo no reconocido.
     @Transactional(readOnly = true)
-    WeekExport.Data getExportData(String email, LocalDate from, LocalDate to, java.util.Set<String> incluir) {
+    WeekExport.Data getExportData(String email, LocalDate from, LocalDate to, Set<String> incluir) {
         Long userId = userService.findUserIdByEmail(email);
         RangeData range = buildRange(userId, from, to);
         List<String> groupNames = new ArrayList<>();
-        Map<Long, String> groupById = new java.util.HashMap<>();
+        Map<Long, String> groupById = new HashMap<>();
         range.plans().values().stream().distinct().forEach(plan -> plan.groups().forEach(g -> {
             groupById.put(g.id(), g.name());
             if (!groupNames.contains(g.name())) groupNames.add(g.name());
         }));
-        Map<LocalDate, Map<String, BigDecimal>> portions = new java.util.HashMap<>();
+        Map<LocalDate, Map<String, BigDecimal>> portions = new HashMap<>();
         for (var e : range.entries()) {
             if (e.foodGroupId() == null || e.portions() == null || !groupById.containsKey(e.foodGroupId())) continue;
-            portions.computeIfAbsent(e.date(), d -> new java.util.HashMap<>())
+            portions.computeIfAbsent(e.date(), d -> new HashMap<>())
                 .merge(groupById.get(e.foodGroupId()), e.portions(), BigDecimal::add);
         }
         var sinRegla = incluir.contains(WeekExport.SIN_REGLA)
-            ? registroService.getSinRegla(userId, from, to) : List.<uy.miga.registro.SinReglaDto>of();
+            ? registroService.getSinRegla(userId, from, to) : List.<SinReglaDto>of();
         return new WeekExport.Data(range.summary(), incluir, groupNames, portions, sinRegla, userService.findFirstNameByEmail(email));
     }
 
-    private record RangeData(WeekSummaryDto summary, Map<LocalDate, uy.miga.plans.PlanReadData> plans,
+    private record RangeData(WeekSummaryDto summary, Map<LocalDate, PlanReadData> plans,
                              List<FoodEntryFacade.EntryData> entries) {}
 
     private RangeData buildRange(Long userId, LocalDate weekStart, LocalDate weekEnd) {
-        Map<Long, HabitDto> weekHabits = new java.util.LinkedHashMap<>();
+        Map<Long, HabitDto> weekHabits = new LinkedHashMap<>();
         List<HabitLog> weekLogs = logRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
         Map<LocalDate, List<HabitLog>> logsByDate = weekLogs.stream()
             .collect(Collectors.groupingBy(HabitLog::getLogDate));
@@ -78,10 +89,10 @@ class WeekService {
         var weekEntries = entryFacade.findByUserIdAndDateRange(userId, weekStart, weekEnd);
         var entriesByDate = weekEntries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::date));
         var mealsByDate = registroService.getWeekMealsForRange(userId, weekStart, weekEnd, plansByDate, weekEntries);
-        Map<Long, List<PlanHabit>> habitsByPlan = new java.util.HashMap<>();
+        Map<Long, List<PlanHabit>> habitsByPlan = new HashMap<>();
 
         List<WeekDayDto> days = new ArrayList<>();
-        long length = java.time.temporal.ChronoUnit.DAYS.between(weekStart, weekEnd) + 1;
+        long length = ChronoUnit.DAYS.between(weekStart, weekEnd) + 1;
         for (int i = 0; i < length; i++) {
             LocalDate day = weekStart.plusDays(i);
             List<FoodEntryFacade.EntryData> entries = entriesByDate.getOrDefault(day, List.of());
@@ -97,7 +108,7 @@ class WeekService {
                 .findByPlanIdOrderByDisplayOrderAsc(id).stream().filter(h -> h.getArchivedAt() == null).toList());
             dayHabits.forEach(h -> weekHabits.putIfAbsent(h.getId(), toDto(h)));
             var meals = mealsByDate.getOrDefault(day, List.of());
-            long flexibleCount = meals.stream().mapToLong(uy.miga.registro.WeekMealData::flexibleCount).sum();
+            long flexibleCount = meals.stream().mapToLong(WeekMealData::flexibleCount).sum();
             List<HabitLogDto> habitLogs = new ArrayList<>();
             for (PlanHabit habit : dayHabits) {
                 if (habit.isCountsFlexibleMeals()) {
@@ -152,18 +163,18 @@ class WeekService {
         Long userId = userService.findUserIdByEmail(email);
         try {
             planService.lockCurrentPlan(userId);
-        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+        } catch (PlanNotFoundException ignored) {
             // La validación posterior determina si el hábito se puede registrar.
         }
         PlanHabit habit = habitRepository.findById(habitId).orElseThrow();
         // Un día se registra contra el plan que regía ese día (ADR 0002), igual que lo muestra Semana.
         Long planId = planService.getPlanIdForDate(userId, date);
         if (!habit.getPlanId().equals(planId) || habit.getArchivedAt() != null) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "El hábito no pertenece al plan de ese día.");
         }
         if (habit.isCountsFlexibleMeals()) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Este hábito se calcula desde las comidas flexibles.");
         }
         HabitValidation.log(habit.getHabitType(), value);

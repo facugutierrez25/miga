@@ -7,13 +7,14 @@ import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+import java.io.ByteArrayInputStream;
 
 /** Embeds the app's wordmark as an image; no dependency on fonts installed in Excel. */
 final class ExportLogo {
     private ExportLogo() {}
 
     static void addToWorkbook(Path source, OutputStream out, int sheets, byte[] logo) throws IOException {
-        var image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(logo));
+        var image = javax.imageio.ImageIO.read(new ByteArrayInputStream(logo));
         if (image == null) throw new IOException("El logo de Miga no es una imagen válida.");
         long width = 80L * 9525;
         long height = Math.round(width * (double) image.getHeight() / image.getWidth());

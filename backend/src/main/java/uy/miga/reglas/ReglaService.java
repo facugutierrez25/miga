@@ -7,6 +7,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ReglaService {
@@ -21,13 +29,13 @@ public class ReglaService {
     public List<FoodRuleDto> findApplicable(Long planId, Long userId) {
         var all = repository.findApplicable(planId, userId);
         var overrides = all.stream().filter(r -> "USUARIO".equals(r.getAlcance()))
-            .map(FoodRule::getOverridesRuleUid).filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+            .map(FoodRule::getOverridesRuleUid).filter(Objects::nonNull).collect(Collectors.toSet());
         return all.stream().filter(r -> !overrides.contains(r.getUid())).map(r -> {
             FoodRuleDto dto = toDto(r);
             if (r.getOverridesRuleUid() == null) return dto;
             var source = all.stream().filter(original -> original.getUid().equals(r.getOverridesRuleUid())).findFirst();
             if (source.isEmpty()) return dto;
-            var aliases = new java.util.LinkedHashSet<String>();
+            var aliases = new LinkedHashSet<String>();
             if (dto.sinonimos() != null) aliases.addAll(dto.sinonimos());
             aliases.add(source.get().getAlimento());
             if (source.get().getSinonimos() != null) aliases.addAll(source.get().getSinonimos());
@@ -92,17 +100,17 @@ public class ReglaService {
     }
 
     private String normalize(String s) {
-        return java.text.Normalizer.normalize(s == null ? "" : s.strip(), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+        return Normalizer.normalize(s == null ? "" : s.strip(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
     }
 
     @Transactional(readOnly = true)
-    public FoodRuleDto getRuleForAdjust(java.util.UUID uid, Long planId) {
+    public FoodRuleDto getRuleForAdjust(UUID uid, Long planId) {
         return repository.findForAdjust(uid, planId).map(this::toDto).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
     @Transactional(readOnly = true)
-    public FoodRuleDto getRuleForResolve(java.util.UUID uid, Long userId, Long itemPlanId, Long currentPlanId) {
-        var rules = new java.util.ArrayList<>(repository.findApplicable(itemPlanId, userId));
+    public FoodRuleDto getRuleForResolve(UUID uid, Long userId, Long itemPlanId, Long currentPlanId) {
+        var rules = new ArrayList<>(repository.findApplicable(itemPlanId, userId));
         if (currentPlanId != null && !currentPlanId.equals(itemPlanId)) {
             rules.addAll(repository.findApplicable(currentPlanId, userId));
         }
@@ -110,7 +118,7 @@ public class ReglaService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
-    private FoodRule userRule(Long userId, Long planId, java.util.UUID uid) {
+    private FoodRule userRule(Long userId, Long planId, UUID uid) {
         return repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
             .filter(r -> r.getUid().equals(uid)).findFirst()
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
@@ -141,7 +149,7 @@ public class ReglaService {
             return createUserRule(userId, planId, in);
         }
         FoodRule rule = existing.get();
-        var aliases = new java.util.LinkedHashMap<String, String>();
+        var aliases = new LinkedHashMap<String, String>();
         if (rule.getSinonimos() != null) {
             rule.getSinonimos().forEach(alias -> aliases.putIfAbsent(normalize(alias), alias));
         }
@@ -154,7 +162,7 @@ public class ReglaService {
     }
 
     @Transactional
-    public FoodRuleDto updateUserRule(Long userId, Long planId, java.util.UUID uid, RuleInput in) {
+    public FoodRuleDto updateUserRule(Long userId, Long planId, UUID uid, RuleInput in) {
         FoodRule rule = userRule(userId, planId, uid);
         checkDuplicateName(userId, planId, uid, in.alimento());
         apply(rule, in);
@@ -162,9 +170,9 @@ public class ReglaService {
     }
 
     @Transactional
-    public void deleteUserRule(Long userId, Long planId, java.util.UUID uid) { repository.delete(userRule(userId, planId, uid)); }
+    public void deleteUserRule(Long userId, Long planId, UUID uid) { repository.delete(userRule(userId, planId, uid)); }
 
-    private void checkDuplicateName(Long userId, Long planId, java.util.UUID excludedUid, String name) {
+    private void checkDuplicateName(Long userId, Long planId, UUID excludedUid, String name) {
         if (repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
             .anyMatch(rule -> !rule.getUid().equals(excludedUid)
                 && normalize(rule.getAlimento()).equals(normalize(name)))) {
