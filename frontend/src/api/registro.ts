@@ -39,6 +39,16 @@ export type RuleType = 'NORMAL' | 'COMPUESTO' | 'LIBRE' | 'FLEXIBLE' | 'NO_CUENT
 // De dónde salió esa regla: el plan, el catálogo base o una corrección guardada por la persona.
 export type RuleSource = 'PLAN' | 'CATALOGO' | 'USUARIO'
 
+export const ItemOrigin = {
+  UNKNOWN: 'UNKNOWN',
+  MENTION: 'MENTION',
+  RESPUESTA: 'RESPUESTA',
+  USUARIO: 'USUARIO',
+  REGLA: 'REGLA',
+} as const
+
+export type ItemOrigin = typeof ItemOrigin[keyof typeof ItemOrigin]
+
 export interface EntryItemDto {
   id: number
   food: string
@@ -46,7 +56,7 @@ export interface EntryItemDto {
   unit: string | null
   foodGroupId: number | null
   portions: number | null
-  origin: string
+  origin: ItemOrigin | (string & {})
   uncertain: boolean
   originalText?: string | null
   appliedRule?: string | null
