@@ -81,9 +81,7 @@ class ItemResolutionService {
         if (id == null) return key == null ? null : support.resolveGroupId(key, targetPlan);
         if (target.stream().anyMatch(g -> id.equals(g.id()))) return id;
         if (sourcePlan == null) return null;
-        var uid = planService.getPlanFoodGroups(sourcePlan).stream().filter(g -> id.equals(g.id()))
-            .map(PlanFoodGroupDto::uid).findFirst().orElse(null);
-        return uid == null ? null : target.stream().filter(g -> uid.equals(g.uid())).map(PlanFoodGroupDto::id).findFirst().orElse(null);
+        return planService.findEquivalentGroupId(id, sourcePlan, targetPlan).orElse(null);
     }
 
     private RuleInput resolveRuleInput(FoodEntryFacade.EntryData entry, FoodRuleDto selected, String type,
