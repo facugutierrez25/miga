@@ -14,15 +14,20 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import org.springframework.web.server.ResponseStatusException;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import java.time.Clock;
+import java.time.DayOfWeek;
 
 @RestController
 @RequestMapping("/api/v1")
 class WeekController {
 
     private final WeekService service;
-    private final java.time.Clock clock;
+    private final Clock clock;
 
-    WeekController(WeekService service, java.time.Clock clock) {
+    WeekController(WeekService service, Clock clock) {
         this.clock = clock;
         this.service = service;
     }
@@ -89,7 +94,7 @@ class WeekController {
             end = to;
             fileName = "miga-" + from + "_" + to;
         } else {
-            start = (date != null ? date : LocalDate.now(clock)).with(java.time.DayOfWeek.MONDAY);
+            start = (date != null ? date : LocalDate.now(clock)).with(DayOfWeek.MONDAY);
             end = start.plusDays(6);
             fileName = "semana-" + start;
         }
@@ -115,7 +120,7 @@ class WeekController {
     static final int MAX_EXPORT_DAYS = 366;
 
     record LogValueRequest(
-        @jakarta.validation.constraints.NotNull(message = "Ingresá un valor.")
-        @jakarta.validation.constraints.PositiveOrZero(message = "El valor no puede ser negativo.")
-        @jakarta.validation.constraints.DecimalMax(value = "100000", message = "El valor admite hasta 100000.") BigDecimal value) {}
+        @NotNull(message = "Ingresá un valor.")
+        @PositiveOrZero(message = "El valor no puede ser negativo.")
+        @DecimalMax(value = "100000", message = "El valor admite hasta 100000.") BigDecimal value) {}
 }

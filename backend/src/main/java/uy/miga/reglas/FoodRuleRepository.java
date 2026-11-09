@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
 
@@ -33,7 +35,7 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
     List<FoodRule> findByPlanIdAndAlcanceIn(Long planId, List<String> alcances);
 
     @Query("SELECT r FROM FoodRule r WHERE r.uid = :uid AND (r.alcance = 'GLOBAL' OR (r.alcance = 'PLAN' AND r.planId = :planId))")
-    java.util.Optional<FoodRule> findForAdjust(@Param("uid") java.util.UUID uid, @Param("planId") Long planId);
+    Optional<FoodRule> findForAdjust(@Param("uid") UUID uid, @Param("planId") Long planId);
 
     void deleteByIdAndUserId(Long id, Long userId);
 }

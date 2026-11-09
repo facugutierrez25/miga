@@ -2,6 +2,7 @@ package uy.miga.reglas;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 public record FoodRuleDto(
     Long id,
@@ -17,8 +18,8 @@ public record FoodRuleDto(
     BigDecimal cantidadPorPorcion,
     String unidad,
     BigDecimal porcionPorDefecto,
-    java.util.UUID uid,
-    java.util.UUID overridesRuleUid
+    UUID uid,
+    UUID overridesRuleUid
 ) {
     public FoodRuleDto {
         sinonimos = sinonimos == null ? List.of() : List.copyOf(sinonimos);

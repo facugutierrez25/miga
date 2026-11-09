@@ -3,6 +3,7 @@ package uy.miga.habitos;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import uy.miga.registro.WeekMealData;
 
 record WeekDayDto(
     LocalDate date,
@@ -10,6 +11,6 @@ record WeekDayDto(
     BigDecimal totalRecorded,
     BigDecimal totalGoal,
     List<HabitLogDto> habitLogs,
-    List<uy.miga.registro.WeekMealData> meals,
+    List<WeekMealData> meals,
     List<Long> habitIds
 ) {}

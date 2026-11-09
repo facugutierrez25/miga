@@ -15,11 +15,15 @@ import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Component
 @Order(2)
 class SlowRequestFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(SlowRequestFilter.class);
+    // Números, fechas ISO y UUID en un segmento de la ruta.
+    private static final Pattern IDENTIFIER_SEGMENT = Pattern.compile(
+        "(?i)(?<=/)(?:[0-9]+|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?=/|$)");
     private final long thresholdMs;
 
     SlowRequestFilter(@Value("${app.slow-request-threshold-ms:1000}") long thresholdMs) {
@@ -41,13 +45,14 @@ class SlowRequestFilter extends OncePerRequestFilter {
             if (durationMs > thresholdMs) {
                 Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
                 String route = pattern != null ? pattern.toString() : sanitizedPath(request.getRequestURI());
+                int status = failed ? HttpServletResponse.SC_INTERNAL_SERVER_ERROR : response.getStatus();
                 log.warn("Solicitud lenta: metodo={} ruta={} estado={} duracionMs={} correlationId={}",
-                    request.getMethod(), route, failed ? HttpServletResponse.SC_INTERNAL_SERVER_ERROR : response.getStatus(), durationMs, MDC.get("correlationId"));
+                    request.getMethod(), route, status, durationMs, MDC.get("correlationId"));
             }
         }
     }
 
     static String sanitizedPath(String path) {
-        return path.replaceAll("(?i)(?<=/)(?:[0-9]+|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?=/|$)", "{id}");
+        return IDENTIFIER_SEGMENT.matcher(path).replaceAll("{id}");
     }
 }

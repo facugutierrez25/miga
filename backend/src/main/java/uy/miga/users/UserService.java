@@ -5,6 +5,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserService {
@@ -14,12 +18,12 @@ public class UserService {
     private final UsersRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final VerificationService verificationService;
-    private final org.springframework.context.ApplicationEventPublisher events;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final ApplicationEventPublisher events;
+    private final JdbcTemplate jdbc;
 
     UserService(UsersRepository repository, PasswordEncoder passwordEncoder,
                 VerificationService verificationService,
-                org.springframework.context.ApplicationEventPublisher events, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                ApplicationEventPublisher events, JdbcTemplate jdbc) {
         this.events = events;
         this.jdbc = jdbc;
         this.repository = repository;
@@ -68,8 +72,8 @@ public class UserService {
     void deleteAccount(String email, String password) {
         User user = repository.findByEmail(email).orElseThrow(InvalidCredentialsException::new);
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN, "Contraseña incorrecta. No se eliminó tu cuenta.");
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN, "Contraseña incorrecta. No se eliminó tu cuenta.");
         }
         events.publishEvent(new UserDeletionRequested(user.getId()));
         jdbc.update("delete from email_outbox where user_id = ?", user.getId());

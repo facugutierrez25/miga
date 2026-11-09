@@ -1,16 +1,36 @@
 package uy.miga.planrules;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
-import uy.miga.plans.*;
-import uy.miga.reglas.*;
-import uy.miga.habitos.*;
-import uy.miga.registro.RegistroService;
+import uy.miga.habitos.HabitConfigDto;
+import uy.miga.habitos.HabitConfigService;
 import uy.miga.intake.FoodEntryFacade;
+import uy.miga.plans.GroupInput;
+import uy.miga.plans.PlanFoodGroupDto;
+import uy.miga.plans.PlanRef;
+import uy.miga.plans.PlanService;
+import uy.miga.plans.PlanVersionConflictException;
+import uy.miga.registro.RegistroService;
+import uy.miga.reglas.Componente;
+import uy.miga.reglas.FoodRuleDto;
+import uy.miga.reglas.InvalidRuleException;
+import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.RuleInput;
+import uy.miga.reglas.RuleText;
 import uy.miga.users.UserService;
-import java.util.*;
+
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,152 +42,313 @@ class PlanRulesService {
     private final RegistroService notes;
     private final FoodEntryFacade entries;
     private final UserService users;
-    PlanRulesService(PlanService plans, ReglaService rules, HabitConfigService habits, RegistroService notes, FoodEntryFacade entries, UserService users) {
-        this.plans = plans; this.rules = rules; this.habits = habits; this.notes = notes; this.entries = entries; this.users = users;
+
+    PlanRulesService(PlanService plans, ReglaService rules, HabitConfigService habits,
+                     RegistroService notes, FoodEntryFacade entries, UserService users) {
+        this.plans = plans;
+        this.rules = rules;
+        this.habits = habits;
+        this.notes = notes;
+        this.entries = entries;
+        this.users = users;
     }
-    @Transactional(readOnly=true)
-    PlanRulesDto get(String email) { return aggregate(users.findUserIdByEmail(email)); }
-    private PlanRulesDto aggregate(Long userId) {
-        PlanRef ref = plans.currentPlanRef(userId);
-        var groups = plans.getPlanFoodGroups(ref.id());
-        return new PlanRulesDto(ref.id(), ref.version(), plans.getModoRegistro(ref.id()), groups,
-            rules.getPlanRules(ref.id(), userId).stream().map(r -> dto(r, groups)).toList(), habits.listHabits(ref.id()));
+
+    @Transactional(readOnly = true)
+    PlanRulesDto get(String email) {
+        return aggregate(users.findUserIdByEmail(email));
     }
-    private FoodRuleDto resolve(FoodRuleDto r, List<PlanFoodGroupDto> groups) {
-        Long group = r.foodGroupId() != null ? r.foodGroupId() : groupId(groups, r.standardGroupKey());
-        var components = r.componentes() == null ? List.<Componente>of() : r.componentes().stream()
-            .map(c -> new Componente(c.foodGroupId() != null ? c.foodGroupId() : groupId(groups, c.standardGroupKey()), c.standardGroupKey(), c.porciones())).toList();
-        return new FoodRuleDto(r.id(), r.alcance(), r.planId(), r.userId(), r.alimento(), r.sinonimos(), r.tipo(), r.standardGroupKey(), group,
-            components, r.cantidadPorPorcion(), r.unidad(), r.porcionPorDefecto(), r.uid(), r.overridesRuleUid());
-    }
-    private Long groupId(List<PlanFoodGroupDto> groups, String key) {
-        if (key == null) return null;
-        return groups.stream().filter(g -> key.equals(g.clave())).map(PlanFoodGroupDto::id).findFirst().orElse(null);
-    }
-    private PlanRulesDto.RuleDto dto(FoodRuleDto original, List<PlanFoodGroupDto> groups) {
-        FoodRuleDto r = resolve(original, groups);
-        Map<Long, UUID> uids = groups.stream().collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::uid));
-        Map<Long, String> names = groups.stream().collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::name));
-        return new PlanRulesDto.RuleDto(r.uid(), r.alcance(), r.alimento(), r.sinonimos(), r.tipo(), uids.get(r.foodGroupId()),
-            r.cantidadPorPorcion(), r.unidad(), r.porcionPorDefecto(), r.componentes().stream()
-                .map(c -> new PlanRulesDto.ComponentDto(uids.get(c.foodGroupId()), c.porciones())).toList(), r.overridesRuleUid(), RuleText.describe(r, names));
-    }
-    private PlanRulesDto mutate(String email, Long version, Consumer<PlanRef> validate, java.util.function.BiConsumer<Long, Long> change) {
-        return mutate(email, version, validate, cur -> false, change);
-    }
-    private PlanRulesDto mutate(String email, Long version, Consumer<PlanRef> validate,
-            java.util.function.Predicate<PlanRef> unchanged, java.util.function.BiConsumer<Long, Long> change) {
+
+    @Transactional(readOnly = true)
+    List<PlanRulesDto.CatalogDto> catalog(String email, String query) {
         Long user = users.findUserIdByEmail(email);
-        plans.lockCurrentPlan(user);
-        PlanRef cur = plans.currentPlanRef(user);
-        if (!Objects.equals(cur.version(), version)) throw new PlanVersionConflictException();
-        validate.accept(cur);
-        if (unchanged.test(cur)) return aggregate(user);
-        boolean used = notes.planHasNotes(cur.id()) || entries.hasEntriesForMeals(plans.getMealIds(cur.id())) || habits.planHasLogs(cur.id());
-        Long editable = used ? plans.forkCurrentPlan(user) : cur.id();
-        change.accept(user, editable);
-        if (used) notes.reinterpretTodayNotes(email, editable);
-        if (!used) plans.checkAndBumpVersion(editable, version);
-        return aggregate(user);
+        Long planId = plans.currentPlanRef(user).id();
+        Map<UUID, UUID> adjustments = rules.getUserRules(user, planId).stream()
+            .filter(rule -> rule.overridesRuleUid() != null)
+            .collect(Collectors.toMap(FoodRuleDto::overridesRuleUid, FoodRuleDto::uid));
+        List<PlanFoodGroupDto> groups = plans.getPlanFoodGroups(planId);
+        return rules.searchCatalog(query, planId, user, 30).stream()
+            .map(rule -> toCatalogDto(toRuleDto(rule, groups), adjustments))
+            .toList();
     }
-    private PlanRulesDto mutateInPlace(String email, Long version, Consumer<PlanRef> validate,
-            java.util.function.Predicate<PlanRef> unchanged, java.util.function.BiConsumer<Long, Long> change) {
-        Long user = users.findUserIdByEmail(email);
-        plans.lockCurrentPlan(user);
-        PlanRef cur = plans.currentPlanRef(user);
-        if (!Objects.equals(cur.version(), version)) throw new PlanVersionConflictException();
-        validate.accept(cur);
-        if (unchanged.test(cur)) return aggregate(user);
-        change.accept(user, cur.id());
-        plans.checkAndBumpVersion(cur.id(), version);
-        notes.reinterpretTodayNotes(email, cur.id());
-        return aggregate(user);
-    }
+
+    // ── Grupos ────────────────────────────────────────────────────────────────
+
     PlanRulesDto group(String email, UUID uid, Requests.Group req) {
-        return mutate(email, req.planVersion(), cur -> { if (uid != null) plans.findGroupIdByUid(cur.id(), uid); },
-            cur -> uid != null && plans.getPlanFoodGroups(cur.id()).stream().filter(g -> g.uid().equals(uid))
-                .anyMatch(g -> new GroupInput(req.name().strip(), req.abbreviation() == null || req.abbreviation().isBlank() ? g.abbreviation() : req.abbreviation(), req.clave(), req.color() == null ? g.color() : req.color(), Boolean.TRUE.equals(req.preguntarSiFalta()), Boolean.TRUE.equals(req.opcional()))
-                    .equals(new GroupInput(g.name(), g.abbreviation(), g.clave(), g.color(), g.preguntarSiFalta(), g.opcional()))),
-            (user, id) -> { if (uid == null) plans.createGroup(id, req.input()); else plans.updateGroup(id, uid, req.input()); });
+        return mutateWithCopy(email, req.planVersion(),
+            current -> { if (uid != null) plans.findGroupIdByUid(current.id(), uid); },
+            current -> uid != null && groupUnchanged(current.id(), uid, req),
+            (user, planId) -> {
+                if (uid == null) plans.createGroup(planId, req.input());
+                else plans.updateGroup(planId, uid, req.input());
+            });
     }
+
     PlanRulesDto order(String email, Requests.Order req) {
-        return mutate(email, req.planVersion(), cur -> {
-            var all = plans.getPlanFoodGroups(cur.id()).stream().map(PlanFoodGroupDto::uid).collect(Collectors.toSet());
-            if (req.uids().size() != all.size() || !all.equals(new HashSet<>(req.uids()))) throw new IllegalArgumentException("Indicá todos los grupos del plan una sola vez.");
-        }, cur -> plans.getPlanFoodGroups(cur.id()).stream().map(PlanFoodGroupDto::uid).toList().equals(req.uids()),
-            (user, id) -> plans.reorderGroups(id, req.uids()));
+        return mutateWithCopy(email, req.planVersion(),
+            current -> requireAllGroups(current.id(), req.uids()),
+            current -> groupUids(current.id()).equals(req.uids()),
+            (user, planId) -> plans.reorderGroups(planId, req.uids()));
     }
+
     PlanRulesDto deleteGroup(String email, UUID uid, Long version) {
-        return mutate(email, version, cur -> plans.findGroupIdByUid(cur.id(), uid), (user, id) -> {
-            Long groupId = plans.findGroupIdByUid(id, uid);
-            int meals = plans.countMealPortions(id, groupId), foods = rules.countGroupReferences(id, groupId);
-            if (meals + foods > 0) throw new GroupInUseException(plans.getPlanFoodGroups(id).stream().filter(g -> g.uid().equals(uid)).findFirst().orElseThrow().name(), meals, foods);
-            entries.detachGroup(groupId);
-            plans.deleteGroup(id, uid);
-        });
+        return mutateWithCopy(email, version,
+            current -> plans.findGroupIdByUid(current.id(), uid),
+            current -> false,
+            (user, planId) -> {
+                Long groupId = plans.findGroupIdByUid(planId, uid);
+                int meals = plans.countMealPortions(planId, groupId);
+                int foods = rules.countGroupReferences(planId, groupId);
+                if (meals + foods > 0) throw new GroupInUseException(groupName(planId, uid), meals, foods);
+                entries.detachGroup(groupId);
+                plans.deleteGroup(planId, uid);
+            });
     }
-    private RuleInput input(Long id, Requests.Rule req) {
-        if (req.overridesRuleUid() != null) rules.getRuleForAdjust(req.overridesRuleUid(), id);
-        return new RuleInput(req.alimento(), req.sinonimos(), req.tipo(), req.groupUid() == null ? null : plans.findGroupIdByUid(id, req.groupUid()),
-            req.cantidadPorPorcion(), req.unidad(), req.porcionPorDefecto(), req.componentes() == null ? List.of() : req.componentes().stream()
-                .map(c -> new Componente(plans.findGroupIdByUid(id, c.groupUid()), null, c.porciones())).toList(), req.overridesRuleUid());
-    }
-    private void requireUserRule(Long user, Long id, UUID uid) {
-        if (rules.getUserRules(user, id).stream().noneMatch(r -> r.uid().equals(uid))) throw missing();
-    }
+
+    // ── Alimentos (se editan en la versión vigente, ver ADR-0005) ────────────
+
     PlanRulesDto rule(String email, UUID uid, Requests.Rule req) {
         Long user = users.findUserIdByEmail(email);
-        return mutateInPlace(email, req.planVersion(), cur -> { input(cur.id(), req); if (uid != null) requireUserRule(user, cur.id(), uid); },
-            cur -> uid != null && aggregate(user).alimentos().stream().filter(r -> r.uid().equals(uid))
-                .anyMatch(r -> sameRule(r, req)),
-            (u, id) -> { if (uid == null) rules.createUserRule(u, id, input(id, req)); else rules.updateUserRule(u, id, uid, input(id, req)); });
+        return mutateInPlace(email, req.planVersion(),
+            current -> {
+                toRuleInput(current.id(), req);
+                if (uid != null) requireUserRule(user, current.id(), uid);
+            },
+            current -> uid != null && ruleUnchanged(user, uid, req),
+            (owner, planId) -> {
+                if (uid == null) rules.createUserRule(owner, planId, toRuleInput(planId, req));
+                else rules.updateUserRule(owner, planId, uid, toRuleInput(planId, req));
+            });
     }
+
     PlanRulesDto deleteRule(String email, UUID uid, Long version) {
         Long user = users.findUserIdByEmail(email);
-        return mutateInPlace(email, version, cur -> requireUserRule(user, cur.id(), uid), cur -> false, (u, id) -> rules.deleteUserRule(u, id, uid));
+        return mutateInPlace(email, version,
+            current -> requireUserRule(user, current.id(), uid),
+            current -> false,
+            (owner, planId) -> rules.deleteUserRule(owner, planId, uid));
     }
+
+    PlanRulesDto adjust(String email, UUID uid, Requests.Version req) {
+        return mutateInPlace(email, req.planVersion(),
+            current -> rules.getRuleForAdjust(uid, current.id()),
+            current -> false,
+            (owner, planId) -> {
+                FoodRuleDto rule = withPlanGroups(rules.getRuleForAdjust(uid, planId), plans.getPlanFoodGroups(planId));
+                if ("NORMAL".equals(rule.tipo()) && rule.foodGroupId() == null) {
+                    throw new InvalidRuleException("No hay un grupo del plan para la clave de este alimento.");
+                }
+                rules.createUserRule(owner, planId, new RuleInput(rule.alimento(), rule.sinonimos(), rule.tipo(),
+                    rule.foodGroupId(), rule.cantidadPorPorcion(), rule.unidad(), rule.porcionPorDefecto(),
+                    rule.componentes(), uid));
+            });
+    }
+
+    // ── Hábitos ───────────────────────────────────────────────────────────────
+
     PlanRulesDto habit(String email, UUID uid, Requests.Habit req) {
-        return mutate(email, req.planVersion(), cur -> { if (uid != null) requireHabit(cur.id(), uid); },
-            cur -> uid != null && habits.listHabits(cur.id()).stream().filter(h -> h.uid().equals(uid))
-                .anyMatch(h -> h.name().equals(req.name().strip()) && h.habitType().equals(req.habitType())
-                    && Objects.equals(h.unit(), req.unit()) && decimalEquals(h.goal(), req.goal())
-                    && h.period().equals(req.period()) && decimalEquals(h.step(), req.step() == null ? java.math.BigDecimal.ONE : req.step())
-                    && h.countsFlexibleMeals() == Boolean.TRUE.equals(req.countsFlexibleMeals())),
-            (u, id) -> { if (uid == null) habits.createHabit(id, req.input()); else habits.updateHabit(id, uid, req.input()); });
+        return mutateWithCopy(email, req.planVersion(),
+            current -> { if (uid != null) requireHabit(current.id(), uid); },
+            current -> uid != null && habitUnchanged(current.id(), uid, req),
+            (user, planId) -> {
+                if (uid == null) habits.createHabit(planId, req.input());
+                else habits.updateHabit(planId, uid, req.input());
+            });
     }
-    private void requireHabit(Long id, UUID uid) { if (habits.listHabits(id).stream().noneMatch(h -> h.uid().equals(uid))) throw missing(); }
+
     PlanRulesDto deleteHabit(String email, UUID uid, Long version) {
-        return mutate(email, version, cur -> requireHabit(cur.id(), uid), (u, id) -> habits.removeHabit(id, uid));
+        return mutateWithCopy(email, version,
+            current -> requireHabit(current.id(), uid),
+            current -> false,
+            (user, planId) -> habits.removeHabit(planId, uid));
     }
-    private static boolean decimalEquals(java.math.BigDecimal a, java.math.BigDecimal b) {
+
+    // ── Mutaciones ────────────────────────────────────────────────────────────
+
+    // Grupos y hábitos: si la versión ya tiene registros, el cambio se aplica a una copia.
+    private PlanRulesDto mutateWithCopy(String email, Long version, Consumer<PlanRef> validate,
+                                        Predicate<PlanRef> unchanged, BiConsumer<Long, Long> change) {
+        Long user = users.findUserIdByEmail(email);
+        PlanRef current = lockAndCheck(user, version);
+        validate.accept(current);
+        if (unchanged.test(current)) return aggregate(user);
+        boolean used = planIsUsed(current.id());
+        Long editable = used ? plans.forkCurrentPlan(user) : current.id();
+        change.accept(user, editable);
+        if (used) notes.reinterpretTodayNotes(email, editable);
+        else plans.checkAndBumpVersion(editable, version);
+        return aggregate(user);
+    }
+
+    private PlanRulesDto mutateInPlace(String email, Long version, Consumer<PlanRef> validate,
+                                       Predicate<PlanRef> unchanged, BiConsumer<Long, Long> change) {
+        Long user = users.findUserIdByEmail(email);
+        PlanRef current = lockAndCheck(user, version);
+        validate.accept(current);
+        if (unchanged.test(current)) return aggregate(user);
+        change.accept(user, current.id());
+        plans.checkAndBumpVersion(current.id(), version);
+        notes.reinterpretTodayNotes(email, current.id());
+        return aggregate(user);
+    }
+
+    private PlanRef lockAndCheck(Long user, Long version) {
+        plans.lockCurrentPlan(user);
+        PlanRef current = plans.currentPlanRef(user);
+        if (!Objects.equals(current.version(), version)) throw new PlanVersionConflictException();
+        return current;
+    }
+
+    private boolean planIsUsed(Long planId) {
+        return notes.planHasNotes(planId)
+            || entries.hasEntriesForMeals(plans.getMealIds(planId))
+            || habits.planHasLogs(planId);
+    }
+
+    // ── Lectura ───────────────────────────────────────────────────────────────
+
+    private PlanRulesDto aggregate(Long userId) {
+        PlanRef ref = plans.currentPlanRef(userId);
+        List<PlanFoodGroupDto> groups = plans.getPlanFoodGroups(ref.id());
+        List<PlanRulesDto.RuleDto> foods = rules.getPlanRules(ref.id(), userId).stream()
+            .map(rule -> toRuleDto(rule, groups))
+            .toList();
+        return new PlanRulesDto(ref.id(), ref.version(), plans.getModoRegistro(ref.id()), groups,
+            foods, habits.listHabits(ref.id()));
+    }
+
+    private PlanRulesDto.RuleDto toRuleDto(FoodRuleDto original, List<PlanFoodGroupDto> groups) {
+        FoodRuleDto rule = withPlanGroups(original, groups);
+        Map<Long, UUID> uids = groups.stream().collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::uid));
+        Map<Long, String> names = groups.stream().collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::name));
+        List<PlanRulesDto.ComponentDto> components = rule.componentes().stream()
+            .map(component -> new PlanRulesDto.ComponentDto(uids.get(component.foodGroupId()), component.porciones()))
+            .toList();
+        return new PlanRulesDto.RuleDto(rule.uid(), rule.alcance(), rule.alimento(), rule.sinonimos(), rule.tipo(),
+            uids.get(rule.foodGroupId()), rule.cantidadPorPorcion(), rule.unidad(), rule.porcionPorDefecto(),
+            components, rule.overridesRuleUid(), RuleText.describe(rule, names));
+    }
+
+    private static PlanRulesDto.CatalogDto toCatalogDto(PlanRulesDto.RuleDto rule, Map<UUID, UUID> adjustments) {
+        return new PlanRulesDto.CatalogDto(rule.uid(), rule.alcance(), rule.alimento(), rule.sinonimos(), rule.tipo(),
+            rule.groupUid(), rule.textoRegla(), adjustments.get(rule.uid()));
+    }
+
+    // Las reglas del catálogo nombran el grupo por clave: se resuelve al grupo del plan.
+    private static FoodRuleDto withPlanGroups(FoodRuleDto rule, List<PlanFoodGroupDto> groups) {
+        Long group = rule.foodGroupId() != null ? rule.foodGroupId() : groupIdByKey(groups, rule.standardGroupKey());
+        List<Componente> components = rule.componentes() == null ? List.of() : rule.componentes().stream()
+            .map(component -> new Componente(
+                component.foodGroupId() != null ? component.foodGroupId() : groupIdByKey(groups, component.standardGroupKey()),
+                component.standardGroupKey(), component.porciones()))
+            .toList();
+        return new FoodRuleDto(rule.id(), rule.alcance(), rule.planId(), rule.userId(), rule.alimento(),
+            rule.sinonimos(), rule.tipo(), rule.standardGroupKey(), group, components, rule.cantidadPorPorcion(),
+            rule.unidad(), rule.porcionPorDefecto(), rule.uid(), rule.overridesRuleUid());
+    }
+
+    private static Long groupIdByKey(List<PlanFoodGroupDto> groups, String key) {
+        if (key == null) return null;
+        return groups.stream().filter(group -> key.equals(group.clave()))
+            .map(PlanFoodGroupDto::id).findFirst().orElse(null);
+    }
+
+    // ── Validaciones y comparaciones ──────────────────────────────────────────
+
+    private RuleInput toRuleInput(Long planId, Requests.Rule req) {
+        if (req.overridesRuleUid() != null) rules.getRuleForAdjust(req.overridesRuleUid(), planId);
+        Long group = req.groupUid() == null ? null : plans.findGroupIdByUid(planId, req.groupUid());
+        List<Componente> components = req.componentes() == null ? List.of() : req.componentes().stream()
+            .map(component -> new Componente(plans.findGroupIdByUid(planId, component.groupUid()), null, component.porciones()))
+            .toList();
+        return new RuleInput(req.alimento(), req.sinonimos(), req.tipo(), group, req.cantidadPorPorcion(),
+            req.unidad(), req.porcionPorDefecto(), components, req.overridesRuleUid());
+    }
+
+    private void requireAllGroups(Long planId, List<UUID> requested) {
+        Set<UUID> all = new HashSet<>(groupUids(planId));
+        if (requested.size() != all.size() || !all.equals(new HashSet<>(requested))) {
+            throw new IllegalArgumentException("Indicá todos los grupos del plan una sola vez.");
+        }
+    }
+
+    private List<UUID> groupUids(Long planId) {
+        return plans.getPlanFoodGroups(planId).stream().map(PlanFoodGroupDto::uid).toList();
+    }
+
+    private String groupName(Long planId, UUID uid) {
+        return plans.getPlanFoodGroups(planId).stream()
+            .filter(group -> group.uid().equals(uid)).findFirst().orElseThrow().name();
+    }
+
+    private boolean groupUnchanged(Long planId, UUID uid, Requests.Group req) {
+        return plans.getPlanFoodGroups(planId).stream()
+            .filter(group -> group.uid().equals(uid))
+            .anyMatch(group -> requestedGroup(req, group).equals(new GroupInput(group.name(), group.abbreviation(),
+                group.clave(), group.color(), group.preguntarSiFalta(), group.opcional())));
+    }
+
+    // Sin abreviatura ni color en el pedido, se conservan los del grupo.
+    private static GroupInput requestedGroup(Requests.Group req, PlanFoodGroupDto group) {
+        String abbreviation = req.abbreviation() == null || req.abbreviation().isBlank() ? group.abbreviation() : req.abbreviation();
+        String color = req.color() == null ? group.color() : req.color();
+        return new GroupInput(req.name().strip(), abbreviation, req.clave(), color,
+            Boolean.TRUE.equals(req.preguntarSiFalta()), Boolean.TRUE.equals(req.opcional()));
+    }
+
+    private void requireUserRule(Long user, Long planId, UUID uid) {
+        if (rules.getUserRules(user, planId).stream().noneMatch(rule -> rule.uid().equals(uid))) throw missing();
+    }
+
+    private boolean ruleUnchanged(Long user, UUID uid, Requests.Rule req) {
+        return aggregate(user).alimentos().stream()
+            .filter(rule -> rule.uid().equals(uid))
+            .anyMatch(rule -> sameRule(rule, req));
+    }
+
+    private static boolean sameRule(PlanRulesDto.RuleDto rule, Requests.Rule req) {
+        List<Requests.Component> components = rule.componentes().stream()
+            .map(component -> new Requests.Component(component.groupUid(), component.porciones()))
+            .toList();
+        return rule.alimento().equals(req.alimento().strip())
+            && Objects.equals(rule.tipo(), req.tipo())
+            && Objects.equals(orEmpty(rule.sinonimos()), orEmpty(req.sinonimos()))
+            && Objects.equals(rule.groupUid(), req.groupUid())
+            && Objects.equals(rule.unidad(), req.unidad())
+            && decimalEquals(rule.cantidadPorPorcion(), req.cantidadPorPorcion())
+            && decimalEquals(rule.porcionPorDefecto(), req.porcionPorDefecto() == null ? BigDecimal.ONE : req.porcionPorDefecto())
+            && Objects.equals(components, orEmpty(req.componentes()))
+            && Objects.equals(rule.overridesRuleUid(), req.overridesRuleUid());
+    }
+
+    private void requireHabit(Long planId, UUID uid) {
+        if (habits.listHabits(planId).stream().noneMatch(habit -> habit.uid().equals(uid))) throw missing();
+    }
+
+    private boolean habitUnchanged(Long planId, UUID uid, Requests.Habit req) {
+        return habits.listHabits(planId).stream()
+            .filter(habit -> habit.uid().equals(uid))
+            .anyMatch(habit -> sameHabit(habit, req));
+    }
+
+    private static boolean sameHabit(HabitConfigDto habit, Requests.Habit req) {
+        return habit.name().equals(req.name().strip())
+            && habit.habitType().equals(req.habitType())
+            && Objects.equals(habit.unit(), req.unit())
+            && decimalEquals(habit.goal(), req.goal())
+            && habit.period().equals(req.period())
+            && decimalEquals(habit.step(), req.step() == null ? BigDecimal.ONE : req.step())
+            && habit.countsFlexibleMeals() == Boolean.TRUE.equals(req.countsFlexibleMeals());
+    }
+
+    private static <T> List<T> orEmpty(List<T> values) {
+        return values == null ? List.of() : values;
+    }
+
+    private static boolean decimalEquals(BigDecimal a, BigDecimal b) {
         return a == null ? b == null : b != null && a.compareTo(b) == 0;
     }
-    private static boolean sameRule(PlanRulesDto.RuleDto r, Requests.Rule in) {
-        return r.alimento().equals(in.alimento().strip()) && Objects.equals(r.tipo(), in.tipo())
-            && Objects.equals(r.sinonimos() == null ? List.of() : r.sinonimos(), in.sinonimos() == null ? List.of() : in.sinonimos())
-            && Objects.equals(r.groupUid(), in.groupUid()) && Objects.equals(r.unidad(), in.unidad())
-            && decimalEquals(r.cantidadPorPorcion(), in.cantidadPorPorcion())
-            && decimalEquals(r.porcionPorDefecto(), in.porcionPorDefecto() == null ? java.math.BigDecimal.ONE : in.porcionPorDefecto())
-            && Objects.equals(r.componentes().stream().map(c -> new Requests.Component(c.groupUid(), c.porciones())).toList(), in.componentes() == null ? List.of() : in.componentes())
-            && Objects.equals(r.overridesRuleUid(), in.overridesRuleUid());
-    }
-    private ResponseStatusException missing() { return new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el recurso en tu plan."); }
-    @Transactional(readOnly=true)
-    List<PlanRulesDto.CatalogDto> catalog(String email, String q) {
-        Long user = users.findUserIdByEmail(email); Long id = plans.currentPlanRef(user).id();
-        var adjustments = rules.getUserRules(user, id).stream().filter(r -> r.overridesRuleUid() != null)
-            .collect(Collectors.toMap(FoodRuleDto::overridesRuleUid, FoodRuleDto::uid));
-        var groups = plans.getPlanFoodGroups(id);
-        return rules.searchCatalog(q, id, user, 30).stream().map(r -> {
-            var d = dto(r, groups);
-            return new PlanRulesDto.CatalogDto(d.uid(), d.alcance(), d.alimento(), d.sinonimos(), d.tipo(), d.groupUid(), d.textoRegla(), adjustments.get(d.uid()));
-        }).toList();
-    }
-    PlanRulesDto adjust(String email, UUID uid, Requests.Version req) {
-        return mutateInPlace(email, req.planVersion(), cur -> rules.getRuleForAdjust(uid, cur.id()), cur -> false, (u, id) -> {
-            FoodRuleDto r = resolve(rules.getRuleForAdjust(uid, id), plans.getPlanFoodGroups(id));
-            if ("NORMAL".equals(r.tipo()) && r.foodGroupId() == null) throw new InvalidRuleException("No hay un grupo del plan para la clave de este alimento.");
-            rules.createUserRule(u, id, new RuleInput(r.alimento(), r.sinonimos(), r.tipo(), r.foodGroupId(), r.cantidadPorPorcion(), r.unidad(), r.porcionPorDefecto(), r.componentes(), uid));
-        });
+
+    private static ResponseStatusException missing() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró el recurso en tu plan.");
     }
 }

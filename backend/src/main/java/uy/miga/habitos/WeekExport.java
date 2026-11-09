@@ -23,6 +23,27 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Image;
+import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.ColumnText;
+import com.lowagie.text.pdf.PdfAction;
+import com.lowagie.text.pdf.PdfAnnotation;
+import com.lowagie.text.pdf.PdfBorderArray;
+import com.lowagie.text.pdf.PdfPageEventHelper;
+import java.awt.Color;
+import java.nio.file.Files;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import org.dhatim.fastexcel.BorderSide;
+import org.dhatim.fastexcel.HyperLink;
+import org.dhatim.fastexcel.PaperSize;
+import org.dhatim.fastexcel.Position;
+import org.dhatim.fastexcel.Worksheet;
 
 final class WeekExport {
     private WeekExport() {}
@@ -109,7 +130,7 @@ final class WeekExport {
     // Como las comidas, un hábito ocupa una columna aunque el plan tenga varias versiones.
     // El uid identifica el hábito; cada día conserva el id de la versión vigente para sus registros.
     private static List<HabitColumn> habitColumns(List<HabitDto> habits) {
-        Map<Object, List<HabitDto>> versions = new java.util.LinkedHashMap<>();
+        Map<Object, List<HabitDto>> versions = new LinkedHashMap<>();
         for (var habit : habits) {
             Object key = habit.uid() != null ? habit.uid() : habit.id();
             versions.computeIfAbsent(key, ignored -> new ArrayList<>()).add(habit);
@@ -195,21 +216,21 @@ final class WeekExport {
     private static final int TABLE_ROW = 5;
 
     static void writeXlsx(Data data, OutputStream out) throws IOException {
-        var file = java.nio.file.Files.createTempFile("miga-export-", ".xlsx");
+        var file = Files.createTempFile("miga-export-", ".xlsx");
         try {
-            try (var stream = java.nio.file.Files.newOutputStream(file);
+            try (var stream = Files.newOutputStream(file);
                  Workbook workbook = new Workbook(stream, "Miga", "1.0")) {
                 writeSheet(workbook.newWorksheet("Planilla"), grid(data), data, title(data));
                 if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data), data, "Sin regla");
             }
             ExportLogo.addToWorkbook(file, out, withSinRegla(data) ? 2 : 1, resource("miga-wordmark.png"));
         } finally {
-            java.nio.file.Files.deleteIfExists(file);
+            Files.deleteIfExists(file);
         }
     }
 
     static String title(Data data) {
-        boolean week = java.time.temporal.ChronoUnit.DAYS.between(data.week().weekStart(), data.week().weekEnd()) == 6;
+        boolean week = ChronoUnit.DAYS.between(data.week().weekStart(), data.week().weekEnd()) == 6;
         String name = data.userName() == null ? "" : data.userName().replaceAll("[\\r\\n]+", " ").strip();
         return name.isEmpty() ? week ? "Tu semana" : "Tu registro" : (week ? "Semana de " : "Registro de ") + name;
     }
@@ -218,14 +239,14 @@ final class WeekExport {
         var start = data.week().weekStart();
         var end = data.week().weekEnd();
         var locale = Locale.forLanguageTag("es-UY");
-        var full = java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", locale);
+        var full = DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", locale);
         if (start.equals(end)) return start.format(full);
         if (start.getYear() != end.getYear()) return start.format(full) + " al " + end.format(full);
         if (start.getMonth() == end.getMonth()) return start.getDayOfMonth() + " al " + end.format(full);
-        return start.format(java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM", locale)) + " al " + end.format(full);
+        return start.format(DateTimeFormatter.ofPattern("d 'de' MMMM", locale)) + " al " + end.format(full);
     }
 
-    private static void writeSheet(org.dhatim.fastexcel.Worksheet sheet, List<List<String>> rows,
+    private static void writeSheet(Worksheet sheet, List<List<String>> rows,
                                    Data data, String title) {
         int lastCol = Math.max(1, rows.getFirst().size() - 1);
         sheet.hideGridLines();
@@ -233,15 +254,15 @@ final class WeekExport {
             .fontName("Onest").fontSize(11).fontColor(INK).fillColor(SURFACE).set();
         sheet.range(0, 0, 3, lastCol).style().fillColor(PAPER).set();
         sheet.range(0, 0, 0, lastCol).style().merge().fontName("Onest").fontSize(26).fontColor(BRAND).bold()
-            .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "medium")
-            .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, ACCENT).set();
+            .borderStyle(BorderSide.BOTTOM, "medium")
+            .borderColor(BorderSide.BOTTOM, ACCENT).set();
         sheet.rowHeight(0, 44);
         sheet.value(1, 0, title);
         sheet.range(1, 0, 1, lastCol).style().merge().fontName("Onest").fontSize(16).bold().set();
         sheet.rowHeight(1, 30);
         sheet.value(2, 0, period(data));
         sheet.range(2, 0, 2, lastCol).style().merge().fontName("Onest").fontColor(MUTED).set();
-        sheet.hyperlink(3, 0, org.dhatim.fastexcel.HyperLink.external(SITE, "Registrado con Miga"));
+        sheet.hyperlink(3, 0, HyperLink.external(SITE, "Registrado con Miga"));
         sheet.range(3, 0, 3, lastCol).style().merge().fontName("Onest").fontColor(BRAND).underlined().set();
         sheet.rowHeight(3, 26);
         for (int c = 0; c <= lastCol; c++) sheet.width(c, c == 0 ? 17 : 29);
@@ -254,8 +275,8 @@ final class WeekExport {
                 sheet.rowHeight(row, 32);
             } else {
                 style.fillColor(r % 2 == 0 ? PAPER : SURFACE)
-                    .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "thin")
-                    .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, LINE);
+                    .borderStyle(BorderSide.BOTTOM, "thin")
+                    .borderColor(BorderSide.BOTTOM, LINE);
                 int lines = rows.get(r).stream().mapToInt(value -> value.lines()
                     .mapToInt(line -> Math.max(1, (line.length() + 26) / 27)).sum()).max().orElse(1);
                 sheet.rowHeight(row, Math.min(409, Math.max(48, 16 * lines + 16)));
@@ -264,16 +285,16 @@ final class WeekExport {
         }
         sheet.freezePane(1, TABLE_ROW + 1);
         sheet.pageOrientation("landscape");
-        sheet.paperSize(org.dhatim.fastexcel.PaperSize.A4_PAPER);
+        sheet.paperSize(PaperSize.A4_PAPER);
         sheet.fitToWidth((short) 1);
         sheet.fitToHeight((short) 0);
         sheet.repeatRows(0, TABLE_ROW);
-        sheet.footer("Registrado con Miga · miga.uy", org.dhatim.fastexcel.Position.LEFT);
-        sheet.footer("Página &P de &N", org.dhatim.fastexcel.Position.RIGHT);
+        sheet.footer("Registrado con Miga · miga.uy", Position.LEFT);
+        sheet.footer("Página &P de &N", Position.RIGHT);
     }
 
-    private static java.awt.Color color(String hex) {
-        return java.awt.Color.decode("#" + hex);
+    private static Color color(String hex) {
+        return Color.decode("#" + hex);
     }
 
     private static byte[] resource(String name) throws IOException {
@@ -289,7 +310,7 @@ final class WeekExport {
         Document document = new Document(grid(data).getFirst().size() > 8 ? PageSize.A3.rotate() : PageSize.A4.rotate(),
             28, 28, 78, 40);
         try {
-            var face = com.lowagie.text.pdf.BaseFont.createFont("Onest.ttf", com.lowagie.text.pdf.BaseFont.IDENTITY_H,
+            var face = BaseFont.createFont("Onest.ttf", BaseFont.IDENTITY_H,
                 true, false, resource("Onest.ttf"), null);
             Font head = new Font(face, 9, Font.BOLD, color(SURFACE));
             Font body = new Font(face, 9, Font.NORMAL, color(INK));
@@ -312,7 +333,7 @@ final class WeekExport {
     }
 
     private static void addTables(Document document, List<List<String>> rows, Font head, Font body,
-                                  String title) throws com.lowagie.text.DocumentException {
+                                  String title) throws DocumentException {
         int columns = rows.getFirst().size();
         int blockSize = document.getPageSize().getWidth() > 1000 ? 12 : 7;
         for (int start = 1; start < Math.max(2, columns); start += blockSize) {
@@ -337,7 +358,7 @@ final class WeekExport {
         PdfPTable table = new PdfPTable(columns);
         table.setWidthPercentage(100);
         float[] widths = new float[columns];
-        java.util.Arrays.fill(widths, 1);
+        Arrays.fill(widths, 1);
         widths[0] = 0.85f;
         table.setWidths(widths);
         table.setHeaderRows(1);
@@ -348,9 +369,9 @@ final class WeekExport {
                 PdfPCell cell = new PdfPCell(new Phrase(value.isEmpty() ? "—" : value, r == 0 ? head : body));
                 cell.setPadding(8);
                 cell.setLeading(0, 1.4f);
-                cell.setVerticalAlignment(com.lowagie.text.Element.ALIGN_TOP);
+                cell.setVerticalAlignment(Element.ALIGN_TOP);
                 cell.setBackgroundColor(color(r == 0 ? BRAND : r % 2 == 0 ? PAPER : SURFACE));
-                cell.setBorder(com.lowagie.text.Rectangle.BOTTOM);
+                cell.setBorder(Rectangle.BOTTOM);
                 cell.setBorderWidth(0.5f);
                 cell.setBorderColor(color(LINE));
                 table.addCell(cell);
@@ -359,15 +380,15 @@ final class WeekExport {
         return table;
     }
 
-    private static final class ExportPage extends com.lowagie.text.pdf.PdfPageEventHelper {
+    private static final class ExportPage extends PdfPageEventHelper {
         private final Data data;
-        private final com.lowagie.text.pdf.BaseFont face;
-        private final com.lowagie.text.Image logo;
+        private final BaseFont face;
+        private final Image logo;
 
-        ExportPage(Data data, com.lowagie.text.pdf.BaseFont face) throws IOException {
+        ExportPage(Data data, BaseFont face) throws IOException {
             this.data = data;
             this.face = face;
-            this.logo = com.lowagie.text.Image.getInstance(resource("miga-wordmark.png"));
+            this.logo = Image.getInstance(resource("miga-wordmark.png"));
             logo.scaleToFit(84, 36);
         }
 
@@ -383,10 +404,10 @@ final class WeekExport {
             try {
                 logo.setAbsolutePosition(document.left(), height - 58);
                 canvas.addImage(logo);
-            } catch (com.lowagie.text.DocumentException e) {
+            } catch (DocumentException e) {
                 throw new IllegalStateException("No se pudo dibujar el logo de Miga.", e);
             }
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
+            ColumnText.showTextAligned(canvas, Element.ALIGN_RIGHT,
                 new Phrase(period(data), new Font(face, 10, Font.NORMAL, color(MUTED))), document.right(), height - 43, 0);
             canvas.setColorStroke(color(ACCENT));
             canvas.setLineWidth(2);
@@ -395,14 +416,14 @@ final class WeekExport {
             canvas.stroke();
             float y = 19;
             var footer = new Phrase("Registrado con Miga · miga.uy", new Font(face, 9, Font.NORMAL, color(BRAND)));
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_LEFT,
+            ColumnText.showTextAligned(canvas, Element.ALIGN_LEFT,
                 footer, document.left(), y, 0);
-            var link = com.lowagie.text.pdf.PdfAnnotation.createLink(writer,
-                new com.lowagie.text.Rectangle(document.left(), y - 2, document.left() + 180, y + 11),
-                com.lowagie.text.pdf.PdfAnnotation.HIGHLIGHT_INVERT, new com.lowagie.text.pdf.PdfAction(SITE));
-            link.setBorder(new com.lowagie.text.pdf.PdfBorderArray(0, 0, 0));
+            var link = PdfAnnotation.createLink(writer,
+                new Rectangle(document.left(), y - 2, document.left() + 180, y + 11),
+                PdfAnnotation.HIGHLIGHT_INVERT, new PdfAction(SITE));
+            link.setBorder(new PdfBorderArray(0, 0, 0));
             writer.addAnnotation(link);
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
+            ColumnText.showTextAligned(canvas, Element.ALIGN_RIGHT,
                 new Phrase("Página " + writer.getPageNumber(), new Font(face, 9, Font.NORMAL, color(MUTED))),
                 document.right(), y, 0);
         }

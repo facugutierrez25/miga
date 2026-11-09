@@ -14,6 +14,9 @@ import uy.miga.users.InvalidCredentialsException;
 import uy.miga.users.InvalidVerificationTokenException;
 
 import java.util.Map;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
+import uy.miga.plans.PlanVersionConflictException;
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -63,9 +66,9 @@ class GlobalExceptionHandler {
         return Map.of("error", ex.getMessage());
     }
 
-    @ExceptionHandler(uy.miga.plans.PlanVersionConflictException.class)
+    @ExceptionHandler(PlanVersionConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    Map<String, Object> handlePlanVersionConflict(uy.miga.plans.PlanVersionConflictException ex) {
+    Map<String, Object> handlePlanVersionConflict(PlanVersionConflictException ex) {
         return Map.of("code", "VERSION_CONFLICT", "error", ex.getMessage());
     }
 
@@ -86,9 +89,9 @@ class GlobalExceptionHandler {
     Map<String, Object> handleDataIntegrity(DataIntegrityViolationException ex) {
         return Map.of("code", "PLAN_CONFLICT", "error", "Operación rechazada por restricción de integridad. Intentá de nuevo.");
     }
-    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
-    org.springframework.http.ResponseEntity<?> handleStatus(org.springframework.web.server.ResponseStatusException ex) {
-        return org.springframework.http.ResponseEntity.status(ex.getStatusCode())
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<?> handleStatus(ResponseStatusException ex) {
+        return ResponseEntity.status(ex.getStatusCode())
             .body(Map.of("error", ex.getReason() == null ? "No se pudo completar la solicitud." : ex.getReason()));
     }
 }

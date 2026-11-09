@@ -7,6 +7,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ReglaService {
@@ -21,18 +29,19 @@ public class ReglaService {
     public List<FoodRuleDto> findApplicable(Long planId, Long userId) {
         var all = repository.findApplicable(planId, userId);
         var overrides = all.stream().filter(r -> "USUARIO".equals(r.getAlcance()))
-            .map(FoodRule::getOverridesRuleUid).filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+            .map(FoodRule::getOverridesRuleUid).filter(Objects::nonNull).collect(Collectors.toSet());
         return all.stream().filter(r -> !overrides.contains(r.getUid())).map(r -> {
             FoodRuleDto dto = toDto(r);
             if (r.getOverridesRuleUid() == null) return dto;
             var source = all.stream().filter(original -> original.getUid().equals(r.getOverridesRuleUid())).findFirst();
             if (source.isEmpty()) return dto;
-            var aliases = new java.util.LinkedHashSet<String>();
+            var aliases = new LinkedHashSet<String>();
             if (dto.sinonimos() != null) aliases.addAll(dto.sinonimos());
             aliases.add(source.get().getAlimento());
             if (source.get().getSinonimos() != null) aliases.addAll(source.get().getSinonimos());
-            return new FoodRuleDto(dto.id(), dto.alcance(), dto.planId(), dto.userId(), dto.alimento(), List.copyOf(aliases), dto.tipo(),
-                dto.standardGroupKey(), dto.foodGroupId(), dto.componentes(), dto.cantidadPorPorcion(), dto.unidad(), dto.porcionPorDefecto(), dto.uid(), dto.overridesRuleUid());
+            return new FoodRuleDto(dto.id(), dto.alcance(), dto.planId(), dto.userId(), dto.alimento(), List.copyOf(aliases),
+                dto.tipo(), dto.standardGroupKey(), dto.foodGroupId(), dto.componentes(), dto.cantidadPorPorcion(),
+                dto.unidad(), dto.porcionPorDefecto(), dto.uid(), dto.overridesRuleUid());
         }).toList();
     }
 
@@ -92,17 +101,18 @@ public class ReglaService {
     }
 
     private String normalize(String s) {
-        return java.text.Normalizer.normalize(s == null ? "" : s.strip(), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+        return Normalizer.normalize(s == null ? "" : s.strip(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
     }
 
     @Transactional(readOnly = true)
-    public FoodRuleDto getRuleForAdjust(java.util.UUID uid, Long planId) {
-        return repository.findForAdjust(uid, planId).map(this::toDto).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
+    public FoodRuleDto getRuleForAdjust(UUID uid, Long planId) {
+        return repository.findForAdjust(uid, planId).map(this::toDto)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
     @Transactional(readOnly = true)
-    public FoodRuleDto getRuleForResolve(java.util.UUID uid, Long userId, Long itemPlanId, Long currentPlanId) {
-        var rules = new java.util.ArrayList<>(repository.findApplicable(itemPlanId, userId));
+    public FoodRuleDto getRuleForResolve(UUID uid, Long userId, Long itemPlanId, Long currentPlanId) {
+        var rules = new ArrayList<>(repository.findApplicable(itemPlanId, userId));
         if (currentPlanId != null && !currentPlanId.equals(itemPlanId)) {
             rules.addAll(repository.findApplicable(currentPlanId, userId));
         }
@@ -110,7 +120,7 @@ public class ReglaService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
-    private FoodRule userRule(Long userId, Long planId, java.util.UUID uid) {
+    private FoodRule userRule(Long userId, Long planId, UUID uid) {
         return repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
             .filter(r -> r.getUid().equals(uid)).findFirst()
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
@@ -141,7 +151,7 @@ public class ReglaService {
             return createUserRule(userId, planId, in);
         }
         FoodRule rule = existing.get();
-        var aliases = new java.util.LinkedHashMap<String, String>();
+        var aliases = new LinkedHashMap<String, String>();
         if (rule.getSinonimos() != null) {
             rule.getSinonimos().forEach(alias -> aliases.putIfAbsent(normalize(alias), alias));
         }
@@ -154,7 +164,7 @@ public class ReglaService {
     }
 
     @Transactional
-    public FoodRuleDto updateUserRule(Long userId, Long planId, java.util.UUID uid, RuleInput in) {
+    public FoodRuleDto updateUserRule(Long userId, Long planId, UUID uid, RuleInput in) {
         FoodRule rule = userRule(userId, planId, uid);
         checkDuplicateName(userId, planId, uid, in.alimento());
         apply(rule, in);
@@ -162,9 +172,9 @@ public class ReglaService {
     }
 
     @Transactional
-    public void deleteUserRule(Long userId, Long planId, java.util.UUID uid) { repository.delete(userRule(userId, planId, uid)); }
+    public void deleteUserRule(Long userId, Long planId, UUID uid) { repository.delete(userRule(userId, planId, uid)); }
 
-    private void checkDuplicateName(Long userId, Long planId, java.util.UUID excludedUid, String name) {
+    private void checkDuplicateName(Long userId, Long planId, UUID excludedUid, String name) {
         if (repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
             .anyMatch(rule -> !rule.getUid().equals(excludedUid)
                 && normalize(rule.getAlimento()).equals(normalize(name)))) {
@@ -195,26 +205,51 @@ public class ReglaService {
             throw new InvalidRuleException("Nombre, tipo o porción por defecto inválidos.");
         boolean components = in.componentes() != null && !in.componentes().isEmpty();
         if ("NORMAL".equals(in.tipo())) {
-            if (in.foodGroupId() == null || components || !((in.cantidadPorPorcion() == null && in.unidad() == null) ||
-                (in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0 && in.unidad() != null && !in.unidad().isBlank())))
+            boolean noMeasure = in.cantidadPorPorcion() == null && in.unidad() == null;
+            if (in.foodGroupId() == null || components || !(noMeasure || hasPositiveMeasure(in))) {
                 throw new InvalidRuleException("El alimento normal requiere grupo y cantidad positiva con unidad, o ambos vacíos.");
+            }
         } else if ("COMPUESTO".equals(in.tipo())) {
-            if (in.cantidadPorPorcion() != null && (in.cantidadPorPorcion().signum() <= 0 || in.unidad() == null || in.unidad().isBlank()))
+            if (in.cantidadPorPorcion() != null && !hasPositiveMeasure(in)) {
                 throw new InvalidRuleException("El compuesto requiere cantidad positiva y unidad juntas, o ambas vacías.");
-            if (in.foodGroupId() != null || !components || in.componentes().size() < 2 ||
-                in.componentes().stream().anyMatch(c -> c == null || c.foodGroupId() == null || !Double.isFinite(c.porciones()) || c.porciones() <= 0) ||
-                in.componentes().stream().map(Componente::foodGroupId).distinct().count() != in.componentes().size())
+            }
+            if (in.foodGroupId() != null || !components || !validComponents(in.componentes())) {
                 throw new InvalidRuleException("El compuesto requiere al menos dos grupos distintos con porciones positivas.");
-        } else if (in.foodGroupId() != null || components) throw new InvalidRuleException("Este tipo no admite grupos ni componentes.");
+            }
+        } else if (in.foodGroupId() != null || components) {
+            throw new InvalidRuleException("Este tipo no admite grupos ni componentes.");
+        }
         if (in.unidad() != null && in.unidad().length() > 20) throw new InvalidRuleException("La unidad admite hasta 20 caracteres.");
-        if (in.overridesRuleUid() != null && repository.findByUserIdAndPlanIdAndAlcance(rule.getUserId(), rule.getPlanId(), "USUARIO").stream()
-            .anyMatch(r -> !r.getUid().equals(rule.getUid()) && in.overridesRuleUid().equals(r.getOverridesRuleUid())))
+        if (in.overridesRuleUid() != null && hasOtherAdjustment(rule, in.overridesRuleUid())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un ajuste de este alimento.");
-        rule.setAlimento(in.alimento().strip()); rule.setSinonimos(in.sinonimos() == null ? List.of() : in.sinonimos());
-        rule.setTipo(in.tipo()); rule.setFoodGroupId(in.foodGroupId()); rule.setCantidadPorPorcion(in.cantidadPorPorcion());
+        }
+        rule.setAlimento(in.alimento().strip());
+        rule.setSinonimos(in.sinonimos() == null ? List.of() : in.sinonimos());
+        rule.setTipo(in.tipo());
+        rule.setFoodGroupId(in.foodGroupId());
+        rule.setCantidadPorPorcion(in.cantidadPorPorcion());
         // Los compuestos guardados antes con unidad y sin cantidad conservan su comportamiento: la unidad suelta se descarta.
-        rule.setUnidad("COMPUESTO".equals(in.tipo()) && in.cantidadPorPorcion() == null ? null : in.unidad()); rule.setPorcionPorDefecto(in.porcionPorDefecto() == null ? BigDecimal.ONE : in.porcionPorDefecto());
-        rule.setComponentes(in.componentes()); rule.setOverridesRuleUid(in.overridesRuleUid());
+        rule.setUnidad("COMPUESTO".equals(in.tipo()) && in.cantidadPorPorcion() == null ? null : in.unidad());
+        rule.setPorcionPorDefecto(in.porcionPorDefecto() == null ? BigDecimal.ONE : in.porcionPorDefecto());
+        rule.setComponentes(in.componentes());
+        rule.setOverridesRuleUid(in.overridesRuleUid());
+    }
+
+    private static boolean hasPositiveMeasure(RuleInput in) {
+        return in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0
+            && in.unidad() != null && !in.unidad().isBlank();
+    }
+
+    private static boolean validComponents(List<Componente> components) {
+        boolean allPositive = components.stream().allMatch(c -> c != null && c.foodGroupId() != null
+            && Double.isFinite(c.porciones()) && c.porciones() > 0);
+        return components.size() >= 2 && allPositive
+            && components.stream().map(Componente::foodGroupId).distinct().count() == components.size();
+    }
+
+    private boolean hasOtherAdjustment(FoodRule rule, UUID overridden) {
+        return repository.findByUserIdAndPlanIdAndAlcance(rule.getUserId(), rule.getPlanId(), "USUARIO").stream()
+            .anyMatch(other -> !other.getUid().equals(rule.getUid()) && overridden.equals(other.getOverridesRuleUid()));
     }
 
     @Transactional(readOnly = true)

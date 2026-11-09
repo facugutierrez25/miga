@@ -12,6 +12,8 @@ import jakarta.persistence.QueryHint;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
+import org.springframework.data.jpa.repository.Modifying;
 
 interface EmailOutboxJobRepository extends JpaRepository<EmailOutboxJob, Long> {
 
@@ -32,8 +34,8 @@ interface EmailOutboxJobRepository extends JpaRepository<EmailOutboxJob, Long> {
     void deleteByUserIdAndJobTypeAndStatus(Long userId, String jobType, String status);
 
     @Query("DELETE FROM EmailOutboxJob j WHERE j.status IN ('SENT', 'FAILED') AND j.processedAt < :cutoff")
-    @org.springframework.data.jpa.repository.Modifying
+    @Modifying
     int deleteOldJobs(@Param("cutoff") OffsetDateTime cutoff);
 
-    long countByStatusIn(java.util.Collection<String> statuses);
+    long countByStatusIn(Collection<String> statuses);
 }

@@ -20,21 +20,29 @@ final class PlanHistory {
             Signature signature = signature(plan);
             if (!periods.isEmpty() && periods.getLast().signature().equals(signature)) {
                 Period previous = periods.removeLast();
-                periods.add(new Period(plan, signature, previous.start().isBefore(plan.getCreatedAt()) ? previous.start() : plan.getCreatedAt(),
-                    previous.end().isAfter(plan.getSupersededAt()) ? previous.end() : plan.getSupersededAt()));
-            } else periods.add(new Period(plan, signature, plan.getCreatedAt(), plan.getSupersededAt()));
+                OffsetDateTime start = previous.start().isBefore(plan.getCreatedAt()) ? previous.start() : plan.getCreatedAt();
+                OffsetDateTime end = previous.end().isAfter(plan.getSupersededAt()) ? previous.end() : plan.getSupersededAt();
+                periods.add(new Period(plan, signature, start, end));
+            } else {
+                periods.add(new Period(plan, signature, plan.getCreatedAt(), plan.getSupersededAt()));
+            }
         }
         if (!periods.isEmpty() && periods.getLast().signature().equals(current)) periods.removeLast();
         Collections.reverse(periods);
-        return periods.stream().limit(50).map(period -> {
-            Plan plan = period.plan();
-            var groups = plan.getFoodGroups().stream().map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(),
-                g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid())).toList();
-            var meals = orderedMeals(plan).stream().map(m -> new MealSummaryDto(m.getName(), m.getPortions().stream()
-                .filter(p -> p.getPortions().signum() > 0).map(p -> new MealPortionDto(p.getFoodGroupId(), p.getPortions())).toList())).toList();
-            return new PlanSummaryDto(period.start().atZoneSameInstant(zone).toLocalDate(), period.end().atZoneSameInstant(zone).toLocalDate(),
-                meals.size(), groups, meals);
-        }).toList();
+        return periods.stream().limit(50).map(period -> toSummary(period, zone)).toList();
+    }
+
+    private static PlanSummaryDto toSummary(Period period, ZoneId zone) {
+        Plan plan = period.plan();
+        var groups = plan.getFoodGroups().stream().map(PlanService::toGroupDto).toList();
+        var meals = orderedMeals(plan).stream()
+            .map(meal -> new MealSummaryDto(meal.getName(), meal.getPortions().stream()
+                .filter(portion -> portion.getPortions().signum() > 0)
+                .map(portion -> new MealPortionDto(portion.getFoodGroupId(), portion.getPortions()))
+                .toList()))
+            .toList();
+        return new PlanSummaryDto(period.start().atZoneSameInstant(zone).toLocalDate(),
+            period.end().atZoneSameInstant(zone).toLocalDate(), meals.size(), groups, meals);
     }
 
     private static List<Meal> orderedMeals(Plan plan) {
