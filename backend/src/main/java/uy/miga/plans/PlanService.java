@@ -422,10 +422,7 @@ public class PlanService {
             .setParameter("version", Math.max(copy.getVersion(), old.getVersion()) + 1)
             .executeUpdate();
         entityManager.refresh(copy);
-        Map<UUID, Long> groupsByUid = copy.getFoodGroups().stream()
-            .collect(Collectors.toMap(PlanFoodGroup::getUid, PlanFoodGroup::getId));
-        Map<Long, Long> groupIdMap = old.getFoodGroups().stream()
-            .collect(Collectors.toMap(PlanFoodGroup::getId, g -> groupsByUid.get(g.getUid())));
+        Map<Long, Long> groupIdMap = equivalentGroupIds(old.getFoodGroups(), copy.getFoodGroups());
         // Empareja comidas por nombre; si se renombró, por posición.
         Map<Long, Long> mealIdMap = new HashMap<>();
         Set<Long> taken = new HashSet<>();
@@ -473,6 +470,22 @@ public class PlanService {
 
     @Transactional(readOnly = true)
     public Long findGroupIdByUid(Long planId, UUID uid) { return group(planId, uid).getId(); }
+
+    // Los grupos conservan su uid entre versiones del plan: así se encuentra el mismo grupo en otra versión.
+    @Transactional(readOnly = true)
+    public Optional<Long> findEquivalentGroupId(Long groupId, Long sourcePlanId, Long targetPlanId) {
+        var source = groupRepository.findByPlanIdOrderByDisplayOrderAsc(sourcePlanId);
+        var target = groupRepository.findByPlanIdOrderByDisplayOrderAsc(targetPlanId);
+        return Optional.ofNullable(equivalentGroupIds(source, target).get(groupId));
+    }
+
+    private static Map<Long, Long> equivalentGroupIds(List<PlanFoodGroup> source, List<PlanFoodGroup> target) {
+        Map<UUID, Long> targetByUid = target.stream()
+            .collect(Collectors.toMap(PlanFoodGroup::getUid, PlanFoodGroup::getId));
+        Map<Long, Long> result = new HashMap<>();
+        source.forEach(group -> result.put(group.getId(), targetByUid.get(group.getUid())));
+        return result;
+    }
 
     @Transactional
     public PlanFoodGroupDto createGroup(Long planId, GroupInput in) {

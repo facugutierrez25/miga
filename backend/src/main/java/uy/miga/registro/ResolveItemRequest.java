@@ -15,5 +15,6 @@ record ResolveItemRequest(@NotNull(message = "Elegí cómo reconocer el alimento
     enum Kind { SAME_AS, GROUPS, FLEXIBLE, NOT_COUNTED }
     record GroupPortion(@NotNull(message = "Indicá el grupo.") Long foodGroupId,
                         @NotNull(message = "Indicá las porciones.")
-                        @DecimalMin(value = "0", inclusive = false, message = "Las porciones deben ser mayores a cero.") BigDecimal portions) {}
+                        @DecimalMin(value = "0", inclusive = false, message = "Las porciones deben ser mayores a cero.")
+                        BigDecimal portions) {}
 }

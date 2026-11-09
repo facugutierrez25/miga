@@ -9,6 +9,7 @@ import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import uy.miga.reglas.RuleText;
 
 @Service
 class InterpreterService {
@@ -175,9 +176,11 @@ class InterpreterService {
             }
         }
         InterpretedItem item = computePortions(segment, rawQty, detectedUnit, rule);
+        boolean countsPortions = "NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo());
+        boolean uncertain = (countsPortions && assumed) || item.uncertain();
         return new InterpretedItem(item.originalText(), item.foodName(), item.quantity(), item.unit(),
             item.foodGroupId(), item.standardGroupKey(), item.portions(), item.appliedRule(),
-            (("NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo())) && assumed) || item.uncertain(), item.ruleId(), item.components(), item.tipo());
+            uncertain, item.ruleId(), item.components(), item.tipo());
     }
 
     FoodRuleDto findRule(String name, List<FoodRuleDto> rules) {
@@ -281,12 +284,13 @@ class InterpreterService {
                         portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
                             .setScale(3, RoundingMode.HALF_UP);
                         uncertain = true;
-                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " " + uy.miga.reglas.RuleText.portionUnit(rule.porcionPorDefecto()) + " (supuesto)";
+                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " "
+                            + RuleText.portionUnit(rule.porcionPorDefecto()) + " (supuesto)";
                     }
                 } else {
                     portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
                         .setScale(3, RoundingMode.HALF_UP);
-                    appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " " + uy.miga.reglas.RuleText.portionUnit(rule.porcionPorDefecto());
+                    appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " " + RuleText.portionUnit(rule.porcionPorDefecto());
                 }
             }
         }
@@ -295,7 +299,7 @@ class InterpreterService {
             originalText, rule.alimento(),
             unit == null && ("NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo()))
                 ? portions : BigDecimal.valueOf(qty),
-            unit != null ? unit : uy.miga.reglas.RuleText.portionUnit(portions),
+            unit != null ? unit : RuleText.portionUnit(portions),
             rule.foodGroupId(), rule.standardGroupKey(),
             portions, appliedRule, uncertain, rule.id(),
             "COMPUESTO".equals(rule.tipo()) ? rule.componentes() : null,

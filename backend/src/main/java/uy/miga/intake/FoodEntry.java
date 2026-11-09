@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "food_entries")
@@ -62,7 +63,7 @@ class FoodEntry {
     private String appliedRule;
 
     @Column(name = "occurrence_id")
-    private java.util.UUID occurrenceId;
+    private UUID occurrenceId;
 
     // Tipo y origen de la regla aplicada (V36).
     @Column(name = "rule_type", length = 12)
@@ -75,10 +76,10 @@ class FoodEntry {
     private boolean resolved;
 
     @Column(name = "resolved_rule_uid")
-    private java.util.UUID resolvedRuleUid;
+    private UUID resolvedRuleUid;
 
-    java.util.UUID getResolvedRuleUid() { return resolvedRuleUid; }
-    void setResolvedRuleUid(java.util.UUID uid) { this.resolvedRuleUid = uid; }
+    UUID getResolvedRuleUid() { return resolvedRuleUid; }
+    void setResolvedRuleUid(UUID uid) { this.resolvedRuleUid = uid; }
 
     boolean isResolved() { return resolved; }
     void setResolved(boolean resolved) { this.resolved = resolved; }
@@ -114,7 +115,7 @@ class FoodEntry {
     Boolean getSupuesto()    { return supuesto; }
     BigDecimal getPorciones(){ return porciones; }
     String getAppliedRule()  { return appliedRule; }
-    java.util.UUID getOccurrenceId() { return occurrenceId; }
+    UUID getOccurrenceId() { return occurrenceId; }
     String getRuleType()     { return ruleType; }
     String getRuleSource()   { return ruleSource; }
 
@@ -129,7 +130,7 @@ class FoodEntry {
     void setSupuesto(Boolean supuesto)        { this.supuesto = supuesto; }
     void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
     void setAppliedRule(String appliedRule)   { this.appliedRule = appliedRule; }
-    void setOccurrenceId(java.util.UUID id)   { this.occurrenceId = id; }
+    void setOccurrenceId(UUID id)   { this.occurrenceId = id; }
     void setRuleType(String ruleType)         { this.ruleType = ruleType; }
     void setRuleSource(String ruleSource)     { this.ruleSource = ruleSource; }
 }

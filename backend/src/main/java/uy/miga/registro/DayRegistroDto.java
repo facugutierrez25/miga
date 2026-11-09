@@ -3,6 +3,7 @@ package uy.miga.registro;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 record DayRegistroDto(
     LocalDate date,
@@ -29,7 +30,7 @@ record DayRegistroDto(
         Boolean uncertain,
         String originalText,
         String appliedRule,
-        java.util.UUID occurrenceId,
+        UUID occurrenceId,
         // NORMAL, COMPUESTO, LIBRE, FLEXIBLE, NO_CUENTA o PREGUNTAR
         String ruleType,
         // PLAN, CATALOGO o USUARIO

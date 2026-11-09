@@ -27,7 +27,7 @@ class RegistroServiceTest {
     private final PlanService plans = mock(PlanService.class);
     private final ReglaService rules = mock(ReglaService.class);
     private final UserService users = mock(UserService.class);
-    private final RegistroService service = new RegistroService(notes, mock(InterpreterService.class),
+    private final RegistroService service = RegistroTestServices.create(notes, mock(InterpreterService.class),
         mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
     private final LocalDate today = LocalDate.now();
 
@@ -42,7 +42,7 @@ class RegistroServiceTest {
     @ValueSource(strings = {"LIBRE", "FLEXIBLE", "NO_CUENTA", "UNKNOWN"})
     void persistsNonCountingMentionsWithTheirMetadata(String type) {
         InterpreterService interpreter = mock(InterpreterService.class);
-        RegistroService service = new RegistroService(notes, interpreter,
+        RegistroService service = RegistroTestServices.create(notes, interpreter,
             mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));
@@ -245,7 +245,7 @@ class RegistroServiceTest {
     @Test
     void recognizedItemPersistsRuleTypeAndPlanSource() {
         InterpreterService interpreter = mock(InterpreterService.class);
-        RegistroService service = new RegistroService(notes, interpreter,
+        RegistroService service = RegistroTestServices.create(notes, interpreter,
             mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));

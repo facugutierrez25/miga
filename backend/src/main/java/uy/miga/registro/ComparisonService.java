@@ -7,6 +7,7 @@ import uy.miga.plans.PlanService;
 
 import java.math.BigDecimal;
 import java.util.*;
+import uy.miga.plans.PlanReadData;
 
 @Service
 class ComparisonService {
@@ -33,10 +34,10 @@ class ComparisonService {
         return compare(planPortions, groups, margin, recordedPortions);
     }
 
-    List<GroupStatus> compare(uy.miga.plans.PlanReadData plan, Long mealId, Map<Long, BigDecimal> recordedPortions) {
+    List<GroupStatus> compare(PlanReadData plan, Long mealId, Map<Long, BigDecimal> recordedPortions) {
         if ("LIBRE".equals(plan.mode())) return List.of();
         var portions = plan.meals().stream().filter(m -> m.id().equals(mealId)).findFirst()
-            .map(uy.miga.plans.PlanReadData.MealData::portions).orElse(List.of());
+            .map(PlanReadData.MealData::portions).orElse(List.of());
         return compare(portions, plan.groups(), plan.margin(), recordedPortions);
     }
 
