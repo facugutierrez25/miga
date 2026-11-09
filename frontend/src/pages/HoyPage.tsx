@@ -1232,7 +1232,10 @@ function HoyContent() {
     onItemPatched: handleItemPatched,
     onNotaBorrada: handleNotaBorrada,
     // Un conflicto puede venir de un plan desactualizado: se recargan el plan y el día.
-    onReload: async () => { await planLoad.reload(); return reloadDay() },
+    onReload: async () => {
+      const [, day] = await Promise.all([planLoad.reload(), reloadDay()])
+      return day
+    },
     onRespuestaGuardada: handleRespuestaGuardada,
   }
 
