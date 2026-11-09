@@ -47,6 +47,7 @@ public class HabitConfigService {
         h.setDailyGoal(in.goal()); h.setPeriod(in.period()); h.setStep(in.step() == null ? BigDecimal.ONE : in.step());
     }
     private HabitConfigDto dto(PlanHabit h) {
-        return new HabitConfigDto(h.getUid(), h.getId(), h.getName(), h.getHabitType().name(), h.getUnit(), h.getDailyGoal(), h.getPeriod(), h.getStep(), h.getDisplayOrder(), h.isCountsFlexibleMeals());
+        return new HabitConfigDto(h.getUid(), h.getId(), h.getName(), h.getHabitType().name(), h.getUnit(),
+            h.getDailyGoal(), h.getPeriod(), h.getStep(), h.getDisplayOrder(), h.isCountsFlexibleMeals());
     }
 }

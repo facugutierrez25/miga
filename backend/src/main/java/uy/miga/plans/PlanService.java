@@ -272,10 +272,7 @@ public class PlanService {
 
     @Transactional(readOnly = true)
     public List<PlanFoodGroupDto> getPlanFoodGroups(Long planId) {
-        return groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId)
-            .stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid()))
-            .toList();
+        return toGroupDtos(groupRepository.findByPlanIdOrderByDisplayOrderAsc(planId));
     }
 
     @Transactional(readOnly = true)
@@ -368,9 +365,12 @@ public class PlanService {
     // ── privados ──────────────────────────────────────────────────────────────
 
     private List<PlanFoodGroupDto> toGroupDtos(List<PlanFoodGroup> groups) {
-        return groups.stream()
-            .map(g -> new PlanFoodGroupDto(g.getId(), g.getName(), g.getAbbreviation(), g.getDisplayOrder(), g.getColor(), g.getClave(), g.isPreguntarSiFalta(), g.isOpcional(), g.getUid()))
-            .toList();
+        return groups.stream().map(PlanService::toGroupDto).toList();
+    }
+
+    static PlanFoodGroupDto toGroupDto(PlanFoodGroup group) {
+        return new PlanFoodGroupDto(group.getId(), group.getName(), group.getAbbreviation(), group.getDisplayOrder(),
+            group.getColor(), group.getClave(), group.isPreguntarSiFalta(), group.isOpcional(), group.getUid());
     }
 
     @Transactional(readOnly = true)
@@ -382,8 +382,11 @@ public class PlanService {
     @Transactional
     public void checkAndBumpVersion(Long planId, Long expectedVersion) {
         entityManager.flush();
-        int changed = entityManager.createNativeQuery("UPDATE plans SET version = version + 1 WHERE id = :id AND version = :version AND is_current = true")
-            .setParameter("id", planId).setParameter("version", expectedVersion).executeUpdate();
+        int changed = entityManager.createNativeQuery(
+                "UPDATE plans SET version = version + 1 WHERE id = :id AND version = :version AND is_current = true")
+            .setParameter("id", planId)
+            .setParameter("version", expectedVersion)
+            .executeUpdate();
         if (changed != 1) throw new PlanVersionConflictException();
         entityManager.refresh(entityManager.find(Plan.class, planId));
     }
@@ -399,9 +402,13 @@ public class PlanService {
         Plan copy = copyPlan(userId, Optional.of(old));
         Map<Long, String> abbreviations = old.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getId, PlanFoodGroup::getAbbreviation));
-        var meals = old.getMeals().stream().map(m -> new MealSaveDto(m.getName(), m.getSuggestedTime(), m.getDisplayOrder(),
-            m.getPortions().stream().map(portion -> new MealPortionInput(abbreviations.get(portion.getFoodGroupId()), portion.getPortions())).toList(),
-            Weekdays.toList(m.getWeekdays()))).toList();
+        var meals = old.getMeals().stream()
+            .map(meal -> new MealSaveDto(meal.getName(), meal.getSuggestedTime(), meal.getDisplayOrder(),
+                meal.getPortions().stream()
+                    .map(portion -> new MealPortionInput(abbreviations.get(portion.getFoodGroupId()), portion.getPortions()))
+                    .toList(),
+                Weekdays.toList(meal.getWeekdays())))
+            .toList();
         buildMeals(copy, new PlanSaveDto(meals, null), copy.getFoodGroups().stream()
             .collect(Collectors.toMap(PlanFoodGroup::getAbbreviation, PlanFoodGroup::getId)));
         plansRepository.flush();
@@ -470,7 +477,8 @@ public class PlanService {
     @Transactional
     public PlanFoodGroupDto createGroup(Long planId, GroupInput in) {
         Plan plan = plansRepository.findById(planId).orElseThrow(PlanNotFoundException::new);
-        PlanFoodGroup group = new PlanFoodGroup(plan, in.name(), "", (short)(getPlanFoodGroups(planId).stream().mapToInt(PlanFoodGroupDto::displayOrder).max().orElse(0) + 1));
+        int lastOrder = getPlanFoodGroups(planId).stream().mapToInt(PlanFoodGroupDto::displayOrder).max().orElse(0);
+        PlanFoodGroup group = new PlanFoodGroup(plan, in.name(), "", (short) (lastOrder + 1));
         applyGroup(group, in, true);
         plan.getFoodGroups().add(group);
         groupRepository.saveAndFlush(group);
@@ -485,7 +493,9 @@ public class PlanService {
     }
 
     private void applyGroup(PlanFoodGroup group, GroupInput in, boolean creating) {
-        if (in.name() == null || in.name().isBlank() || in.name().length() > 60) throw new IllegalArgumentException("Nombre o color de grupo inválido.");
+        if (in.name() == null || in.name().isBlank() || in.name().length() > 60) {
+            throw new IllegalArgumentException("Nombre o color de grupo inválido.");
+        }
         var others = groupRepository.findByPlanIdOrderByDisplayOrderAsc(group.getPlan().getId()).stream()
             .filter(g -> !g.getUid().equals(group.getUid())).toList();
         String abbr = in.abbreviation();
@@ -497,9 +507,14 @@ public class PlanService {
             int suffix = 1;
             while (hasAbbreviation(others, abbr)) abbr = base + suffix++;
         }
-        if (abbr.length() > 10 || (in.clave() != null && in.clave().length() > 50)) throw new IllegalArgumentException("Abreviatura o clave demasiado larga.");
-        if (hasAbbreviation(others, abbr) || (in.clave() != null && others.stream().anyMatch(g -> in.clave().equals(g.getClave())))) throw new DuplicateGroupException();
-        group.setName(in.name().strip()); group.setAbbreviation(abbr); group.setClave(in.clave());
+        if (abbr.length() > 10 || (in.clave() != null && in.clave().length() > 50)) {
+            throw new IllegalArgumentException("Abreviatura o clave demasiado larga.");
+        }
+        boolean duplicateKey = in.clave() != null && others.stream().anyMatch(g -> in.clave().equals(g.getClave()));
+        if (hasAbbreviation(others, abbr) || duplicateKey) throw new DuplicateGroupException();
+        group.setName(in.name().strip());
+        group.setAbbreviation(abbr);
+        group.setClave(in.clave());
         // Al editar sin indicar color, el grupo conserva el suyo.
         String color = !creating && in.color() == null ? group.getColor() : in.color();
         if (creating && !GroupColors.contains(color)) {

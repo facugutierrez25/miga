@@ -39,8 +39,9 @@ public class ReglaService {
             if (dto.sinonimos() != null) aliases.addAll(dto.sinonimos());
             aliases.add(source.get().getAlimento());
             if (source.get().getSinonimos() != null) aliases.addAll(source.get().getSinonimos());
-            return new FoodRuleDto(dto.id(), dto.alcance(), dto.planId(), dto.userId(), dto.alimento(), List.copyOf(aliases), dto.tipo(),
-                dto.standardGroupKey(), dto.foodGroupId(), dto.componentes(), dto.cantidadPorPorcion(), dto.unidad(), dto.porcionPorDefecto(), dto.uid(), dto.overridesRuleUid());
+            return new FoodRuleDto(dto.id(), dto.alcance(), dto.planId(), dto.userId(), dto.alimento(), List.copyOf(aliases),
+                dto.tipo(), dto.standardGroupKey(), dto.foodGroupId(), dto.componentes(), dto.cantidadPorPorcion(),
+                dto.unidad(), dto.porcionPorDefecto(), dto.uid(), dto.overridesRuleUid());
         }).toList();
     }
 
@@ -105,7 +106,8 @@ public class ReglaService {
 
     @Transactional(readOnly = true)
     public FoodRuleDto getRuleForAdjust(UUID uid, Long planId) {
-        return repository.findForAdjust(uid, planId).map(this::toDto).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
+        return repository.findForAdjust(uid, planId).map(this::toDto)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
     @Transactional(readOnly = true)
@@ -203,26 +205,51 @@ public class ReglaService {
             throw new InvalidRuleException("Nombre, tipo o porción por defecto inválidos.");
         boolean components = in.componentes() != null && !in.componentes().isEmpty();
         if ("NORMAL".equals(in.tipo())) {
-            if (in.foodGroupId() == null || components || !((in.cantidadPorPorcion() == null && in.unidad() == null) ||
-                (in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0 && in.unidad() != null && !in.unidad().isBlank())))
+            boolean noMeasure = in.cantidadPorPorcion() == null && in.unidad() == null;
+            if (in.foodGroupId() == null || components || !(noMeasure || hasPositiveMeasure(in))) {
                 throw new InvalidRuleException("El alimento normal requiere grupo y cantidad positiva con unidad, o ambos vacíos.");
+            }
         } else if ("COMPUESTO".equals(in.tipo())) {
-            if (in.cantidadPorPorcion() != null && (in.cantidadPorPorcion().signum() <= 0 || in.unidad() == null || in.unidad().isBlank()))
+            if (in.cantidadPorPorcion() != null && !hasPositiveMeasure(in)) {
                 throw new InvalidRuleException("El compuesto requiere cantidad positiva y unidad juntas, o ambas vacías.");
-            if (in.foodGroupId() != null || !components || in.componentes().size() < 2 ||
-                in.componentes().stream().anyMatch(c -> c == null || c.foodGroupId() == null || !Double.isFinite(c.porciones()) || c.porciones() <= 0) ||
-                in.componentes().stream().map(Componente::foodGroupId).distinct().count() != in.componentes().size())
+            }
+            if (in.foodGroupId() != null || !components || !validComponents(in.componentes())) {
                 throw new InvalidRuleException("El compuesto requiere al menos dos grupos distintos con porciones positivas.");
-        } else if (in.foodGroupId() != null || components) throw new InvalidRuleException("Este tipo no admite grupos ni componentes.");
+            }
+        } else if (in.foodGroupId() != null || components) {
+            throw new InvalidRuleException("Este tipo no admite grupos ni componentes.");
+        }
         if (in.unidad() != null && in.unidad().length() > 20) throw new InvalidRuleException("La unidad admite hasta 20 caracteres.");
-        if (in.overridesRuleUid() != null && repository.findByUserIdAndPlanIdAndAlcance(rule.getUserId(), rule.getPlanId(), "USUARIO").stream()
-            .anyMatch(r -> !r.getUid().equals(rule.getUid()) && in.overridesRuleUid().equals(r.getOverridesRuleUid())))
+        if (in.overridesRuleUid() != null && hasOtherAdjustment(rule, in.overridesRuleUid())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un ajuste de este alimento.");
-        rule.setAlimento(in.alimento().strip()); rule.setSinonimos(in.sinonimos() == null ? List.of() : in.sinonimos());
-        rule.setTipo(in.tipo()); rule.setFoodGroupId(in.foodGroupId()); rule.setCantidadPorPorcion(in.cantidadPorPorcion());
+        }
+        rule.setAlimento(in.alimento().strip());
+        rule.setSinonimos(in.sinonimos() == null ? List.of() : in.sinonimos());
+        rule.setTipo(in.tipo());
+        rule.setFoodGroupId(in.foodGroupId());
+        rule.setCantidadPorPorcion(in.cantidadPorPorcion());
         // Los compuestos guardados antes con unidad y sin cantidad conservan su comportamiento: la unidad suelta se descarta.
-        rule.setUnidad("COMPUESTO".equals(in.tipo()) && in.cantidadPorPorcion() == null ? null : in.unidad()); rule.setPorcionPorDefecto(in.porcionPorDefecto() == null ? BigDecimal.ONE : in.porcionPorDefecto());
-        rule.setComponentes(in.componentes()); rule.setOverridesRuleUid(in.overridesRuleUid());
+        rule.setUnidad("COMPUESTO".equals(in.tipo()) && in.cantidadPorPorcion() == null ? null : in.unidad());
+        rule.setPorcionPorDefecto(in.porcionPorDefecto() == null ? BigDecimal.ONE : in.porcionPorDefecto());
+        rule.setComponentes(in.componentes());
+        rule.setOverridesRuleUid(in.overridesRuleUid());
+    }
+
+    private static boolean hasPositiveMeasure(RuleInput in) {
+        return in.cantidadPorPorcion() != null && in.cantidadPorPorcion().signum() > 0
+            && in.unidad() != null && !in.unidad().isBlank();
+    }
+
+    private static boolean validComponents(List<Componente> components) {
+        boolean allPositive = components.stream().allMatch(c -> c != null && c.foodGroupId() != null
+            && Double.isFinite(c.porciones()) && c.porciones() > 0);
+        return components.size() >= 2 && allPositive
+            && components.stream().map(Componente::foodGroupId).distinct().count() == components.size();
+    }
+
+    private boolean hasOtherAdjustment(FoodRule rule, UUID overridden) {
+        return repository.findByUserIdAndPlanIdAndAlcance(rule.getUserId(), rule.getPlanId(), "USUARIO").stream()
+            .anyMatch(other -> !other.getUid().equals(rule.getUid()) && overridden.equals(other.getOverridesRuleUid()));
     }
 
     @Transactional(readOnly = true)
