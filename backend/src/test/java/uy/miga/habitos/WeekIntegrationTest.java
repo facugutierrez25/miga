@@ -376,6 +376,42 @@ class WeekIntegrationTest {
     }
 
     @Test
+    void editingAFlexibleFoodKeepsPastFlexibleCounts() throws Exception {
+        JsonNode rules = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan/reglas")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        rules = objectMapper.readTree(mockMvc.perform(post("/api/v1/my-plan/alimentos").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("""
+                {"planVersion":%d,"alimento":"galleta especial","sinonimos":[],"tipo":"FLEXIBLE"}
+                """.formatted(rules.path("planVersion").asLong()))).andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString());
+        mockMvc.perform(post("/api/v1/habitos").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"name":"Flexibles","habitType":"CONTADOR","countsFlexibleMeals":true,"step":1,"displayOrder":1}
+                """)).andExpect(status().isCreated());
+        JsonNode plan = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        long meal = plan.path("meals").get(0).path("id").asLong();
+        String yesterday = LocalDate.now().minusDays(1).toString();
+        mockMvc.perform(post("/api/v1/registro/" + yesterday + "/" + meal + "/note")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of("text", "galleta especial")))).andExpect(status().isCreated());
+        rules = objectMapper.readTree(mockMvc.perform(get("/api/v1/my-plan/reglas")
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        mockMvc.perform(put("/api/v1/my-plan/alimentos/" + rules.path("alimentos").get(0).path("uid").asText())
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content("""
+                {"planVersion":%d,"alimento":"galleta especial","sinonimos":[],"tipo":"LIBRE"}
+                """.formatted(rules.path("planVersion").asLong()))).andExpect(status().isOk());
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", yesterday)
+            .header("Authorization", "Bearer " + token)).andReturn().getResponse().getContentAsString());
+        boolean found = false;
+        for (JsonNode day : week.path("days")) if (day.path("date").asText().equals(yesterday)) {
+            assertThat(day.path("habitLogs").get(0).path("value").asInt()).isEqualTo(1);
+            found = true;
+        }
+        assertThat(found).isTrue();
+    }
+
+    @Test
     void habitOfAnEarlierPlanCanBeLoggedOnItsDayButNotToday() throws Exception {
         long oldHabit = createHabit("Agua", "CANTIDAD", "lt");
         mockMvc.perform(put("/api/v1/my-plan")

@@ -66,6 +66,19 @@ class PlanRulesService {
         if (!used) plans.checkAndBumpVersion(editable, version);
         return aggregate(user);
     }
+    private PlanRulesDto mutateInPlace(String email, Long version, Consumer<PlanRef> validate,
+            java.util.function.Predicate<PlanRef> unchanged, java.util.function.BiConsumer<Long, Long> change) {
+        Long user = users.findUserIdByEmail(email);
+        plans.lockCurrentPlan(user);
+        PlanRef cur = plans.currentPlanRef(user);
+        if (!Objects.equals(cur.version(), version)) throw new PlanVersionConflictException();
+        validate.accept(cur);
+        if (unchanged.test(cur)) return aggregate(user);
+        change.accept(user, cur.id());
+        plans.checkAndBumpVersion(cur.id(), version);
+        notes.reinterpretTodayNotes(email, cur.id());
+        return aggregate(user);
+    }
     PlanRulesDto group(String email, UUID uid, Requests.Group req) {
         return mutate(email, req.planVersion(), cur -> { if (uid != null) plans.findGroupIdByUid(cur.id(), uid); },
             cur -> uid != null && plans.getPlanFoodGroups(cur.id()).stream().filter(g -> g.uid().equals(uid))
@@ -100,14 +113,14 @@ class PlanRulesService {
     }
     PlanRulesDto rule(String email, UUID uid, Requests.Rule req) {
         Long user = users.findUserIdByEmail(email);
-        return mutate(email, req.planVersion(), cur -> { input(cur.id(), req); if (uid != null) requireUserRule(user, cur.id(), uid); },
+        return mutateInPlace(email, req.planVersion(), cur -> { input(cur.id(), req); if (uid != null) requireUserRule(user, cur.id(), uid); },
             cur -> uid != null && aggregate(user).alimentos().stream().filter(r -> r.uid().equals(uid))
                 .anyMatch(r -> sameRule(r, req)),
             (u, id) -> { if (uid == null) rules.createUserRule(u, id, input(id, req)); else rules.updateUserRule(u, id, uid, input(id, req)); });
     }
     PlanRulesDto deleteRule(String email, UUID uid, Long version) {
         Long user = users.findUserIdByEmail(email);
-        return mutate(email, version, cur -> requireUserRule(user, cur.id(), uid), (u, id) -> rules.deleteUserRule(u, id, uid));
+        return mutateInPlace(email, version, cur -> requireUserRule(user, cur.id(), uid), cur -> false, (u, id) -> rules.deleteUserRule(u, id, uid));
     }
     PlanRulesDto habit(String email, UUID uid, Requests.Habit req) {
         return mutate(email, req.planVersion(), cur -> { if (uid != null) requireHabit(cur.id(), uid); },
@@ -147,7 +160,7 @@ class PlanRulesService {
         }).toList();
     }
     PlanRulesDto adjust(String email, UUID uid, Requests.Version req) {
-        return mutate(email, req.planVersion(), cur -> rules.getRuleForAdjust(uid, cur.id()), (u, id) -> {
+        return mutateInPlace(email, req.planVersion(), cur -> rules.getRuleForAdjust(uid, cur.id()), cur -> false, (u, id) -> {
             FoodRuleDto r = resolve(rules.getRuleForAdjust(uid, id), id);
             if ("NORMAL".equals(r.tipo()) && r.foodGroupId() == null) throw new InvalidRuleException("No hay un grupo del plan para la clave de este alimento.");
             rules.createUserRule(u, id, new RuleInput(r.alimento(), r.sinonimos(), r.tipo(), r.foodGroupId(), r.cantidadPorPorcion(), r.unidad(), r.porcionPorDefecto(), r.componentes(), uid));

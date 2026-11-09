@@ -53,10 +53,17 @@ public class RegistroService {
                 var note = byMeal.get(meal.mealId());
                 long flexible = 0;
                 if (note != null && !note.getText().isBlank()) {
-                    Long notePlan = note.getPlanId() != null ? note.getPlanId() : plan.id();
-                    flexible = interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
-                        id -> ruleService.findApplicable(id, userId))).stream()
-                        .filter(item -> "FLEXIBLE".equals(item.tipo())).count();
+                    // Los alimentos se editan en el lugar: se cuenta con el tipo guardado en cada ítem.
+                    // Solo los registros anteriores a rule_type se reinterpretan.
+                    var noteItems = meal.items().stream().filter(item -> !"RESPUESTA".equals(item.origin())).toList();
+                    if (noteItems.stream().anyMatch(item -> item.ruleType() != null)) {
+                        flexible = noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType())).count();
+                    } else {
+                        Long notePlan = note.getPlanId() != null ? note.getPlanId() : plan.id();
+                        flexible = interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
+                            id -> ruleService.findApplicable(id, userId))).stream()
+                            .filter(item -> "FLEXIBLE".equals(item.tipo())).count();
+                    }
                 }
                 String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
                     ? recordedMealStatus(meal.comparison()) : ComparisonService.MISSING;
@@ -82,7 +89,7 @@ public class RegistroService {
     @Transactional(readOnly = true)
     public boolean planHasNotes(Long planId) { return noteRepository.existsByPlanId(planId); }
 
-    // El fork ya trasladó las referencias; las reglas deben aplicarse después de la edición.
+    // Se llama después de editar la configuración del plan, con las referencias de hoy ya en planId.
     @Transactional
     public void reinterpretTodayNotes(String email, Long planId) {
         Long userId = userService.findUserIdByEmail(email);

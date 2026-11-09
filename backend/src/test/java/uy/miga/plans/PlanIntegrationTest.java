@@ -557,6 +557,7 @@ class PlanIntegrationTest {
                 NOW(), false, TIMESTAMPTZ '2025-01-02 12:00:00+00' + i * INTERVAL '1 day'
             FROM generate_series(1, 55) AS i
             """, userId);
+        jdbc.update("INSERT INTO meals (plan_id, name, display_order) SELECT id, 'Comida ' || id, 1 FROM plans WHERE user_id = ?", userId);
         String result = mockMvc.perform(get("/api/v1/my-plan/historial").header("Authorization", "Bearer " + historyToken))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         JsonNode history = objectMapper.readTree(result);
