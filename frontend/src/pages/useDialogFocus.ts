@@ -32,7 +32,11 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void, activ
       if (items.length === 0) return
       const first = items[0]
       const last = items[items.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
+      // Con el foco en el título (tabIndex -1) o fuera de los controles, el ciclo sigue dentro del diálogo.
+      if (!items.includes(document.activeElement as HTMLElement)) {
+        e.preventDefault()
+        ;(e.shiftKey ? last : first).focus()
+      } else if (e.shiftKey && document.activeElement === first) {
         e.preventDefault()
         last.focus()
       } else if (!e.shiftKey && document.activeElement === last) {
