@@ -71,6 +71,12 @@ class FoodEntry {
     @Column(name = "rule_source", length = 10)
     private String ruleSource;
 
+    @Column(nullable = false)
+    private boolean resolved;
+
+    boolean isResolved() { return resolved; }
+    void setResolved(boolean resolved) { this.resolved = resolved; }
+
     FoodEntry() {}
 
     FoodEntry(Long userId, String userEmail, Long mealId, LocalDate date,

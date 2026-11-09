@@ -17,6 +17,19 @@ public class FoodEntryFacade {
 
     private final FoodEntryRepository repository;
 
+    @Transactional
+    public void markResolved(List<Long> ids) {
+        repository.findAllById(ids).forEach(e -> {
+            e.setResolved(true);
+            if ("REGLA".equals(e.getOrigen())) e.setOrigen("USUARIO");
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isResolved(Long id) {
+        return repository.findById(id).map(FoodEntry::isResolved).orElse(false);
+    }
+
     public FoodEntryFacade(FoodEntryRepository repository) {
         this.repository = repository;
     }

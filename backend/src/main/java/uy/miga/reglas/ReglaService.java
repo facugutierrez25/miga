@@ -100,6 +100,16 @@ public class ReglaService {
         return repository.findForAdjust(uid, planId).map(this::toDto).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
     }
 
+    @Transactional(readOnly = true)
+    public FoodRuleDto getRuleForResolve(java.util.UUID uid, Long userId, Long itemPlanId, Long currentPlanId) {
+        var rules = new java.util.ArrayList<>(repository.findApplicable(itemPlanId, userId));
+        if (currentPlanId != null && !currentPlanId.equals(itemPlanId)) {
+            rules.addAll(repository.findApplicable(currentPlanId, userId));
+        }
+        return rules.stream().filter(r -> uid.equals(r.getUid())).findFirst().map(this::toDto)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alimento no encontrado."));
+    }
+
     private FoodRule userRule(Long userId, Long planId, java.util.UUID uid) {
         return repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
             .filter(r -> r.getUid().equals(uid)).findFirst()
