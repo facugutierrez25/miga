@@ -49,15 +49,16 @@ class FoodEntry {
     private Long mealNoteId;
 
     @Column(name = "texto_original", length = 10000)
-    private String textoOriginal;
+    private String originalText;
 
-    @Column(length = 10)
-    private String origen;
+    @Column(name = "origen", length = 10)
+    private String origin;
 
-    private Boolean supuesto;
+    @Column(name = "supuesto")
+    private Boolean estimated;
 
-    @Column(precision = 8, scale = 3)
-    private BigDecimal porciones;
+    @Column(name = "porciones", precision = 8, scale = 3)
+    private BigDecimal portions;
 
     @Column(name = "applied_rule", columnDefinition = "text")
     private String appliedRule;
@@ -110,10 +111,10 @@ class FoodEntry {
     boolean isConsumed()     { return consumed; }
     Long getDishId()         { return dishId; }
     Long getMealNoteId()     { return mealNoteId; }
-    String getTextoOriginal(){ return textoOriginal; }
-    String getOrigen()       { return origen; }
-    Boolean getSupuesto()    { return supuesto; }
-    BigDecimal getPorciones(){ return porciones; }
+    String getOriginalText(){ return originalText; }
+    String getOrigin()       { return origin; }
+    Boolean getEstimated()    { return estimated; }
+    BigDecimal getPortions(){ return portions; }
     String getAppliedRule()  { return appliedRule; }
     UUID getOccurrenceId() { return occurrenceId; }
     String getRuleType()     { return ruleType; }
@@ -125,10 +126,10 @@ class FoodEntry {
     void setFoodGroupId(Long foodGroupId)          { this.foodGroupId = foodGroupId; }
     void setConsumed(boolean consumed)             { this.consumed = consumed; }
     void setMealNoteId(Long mealNoteId)       { this.mealNoteId = mealNoteId; }
-    void setTextoOriginal(String textoOriginal){ this.textoOriginal = textoOriginal; }
-    void setOrigen(String origen)             { this.origen = origen; }
-    void setSupuesto(Boolean supuesto)        { this.supuesto = supuesto; }
-    void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
+    void setOriginalText(String originalText){ this.originalText = originalText; }
+    void setOrigin(String origin)             { this.origin = origin; }
+    void setEstimated(Boolean estimated)        { this.estimated = estimated; }
+    void setPortions(BigDecimal portions)   { this.portions = portions; }
     void setAppliedRule(String appliedRule)   { this.appliedRule = appliedRule; }
     void setOccurrenceId(UUID id)   { this.occurrenceId = id; }
     void setRuleType(String ruleType)         { this.ruleType = ruleType; }

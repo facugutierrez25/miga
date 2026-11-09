@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class ItemCorrectionIntegrationTest extends RegistroIntegrationTestBase {
+class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
     void responsesAreIdempotentAndCanBeRemoved() throws Exception {
         createUniqueUserPlan();

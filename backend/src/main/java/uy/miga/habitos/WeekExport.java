@@ -1,5 +1,7 @@
 package uy.miga.habitos;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.lowagie.text.Document;
 import com.lowagie.text.Font;
 import com.lowagie.text.PageSize;
@@ -9,7 +11,7 @@ import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import org.dhatim.fastexcel.Workbook;
-import uy.miga.registro.SinReglaDto;
+import uy.miga.registro.UnmatchedFoodDto;
 import uy.miga.registro.WeekMealData;
 
 import java.io.IOException;
@@ -49,35 +51,35 @@ final class WeekExport {
     private WeekExport() {}
 
     // Secciones que se pueden incluir (parámetro `incluir`).
-    static final String TEXTO = "texto";
-    static final String PORCIONES = "porciones";
-    static final String HABITOS = "habitos";
-    static final String SIN_REGLA = "sinregla";
-    static final Set<String> SECCIONES = Set.of(TEXTO, PORCIONES, HABITOS, SIN_REGLA);
+    static final String TEXT = "texto";
+    static final String PORTIONS = "porciones";
+    static final String HABITS = "habitos";
+    static final String UNMATCHED_FOODS = "sinregla";
+    static final Set<String> SECTIONS = Set.of(TEXT, PORTIONS, HABITS, UNMATCHED_FOODS);
     // Sin `incluir`, la planilla sale como antes: lo escrito y los hábitos.
-    static final Set<String> POR_DEFECTO = Set.of(TEXTO, HABITOS);
+    static final Set<String> DEFAULT_SECTIONS = Set.of(TEXT, HABITS);
 
-    record Data(WeekSummaryDto week, Set<String> incluir, List<String> groupNames,
-                Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla, String userName) {
-        Data(WeekSummaryDto week, Set<String> incluir, List<String> groupNames,
-             Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla) {
-            this(week, incluir, groupNames, portions, sinRegla, null);
+    record Data(WeekSummaryDto week, @JsonProperty("incluir") Set<String> includedSections, List<String> groupNames,
+                Map<LocalDate, Map<String, BigDecimal>> portions, @JsonProperty("sinRegla") List<UnmatchedFoodDto> unmatchedFoods, String userName) {
+        Data(WeekSummaryDto week, Set<String> includedSections, List<String> groupNames,
+             Map<LocalDate, Map<String, BigDecimal>> portions, List<UnmatchedFoodDto> unmatchedFoods) {
+            this(week, includedSections, groupNames, portions, unmatchedFoods, null);
         }
         static Data of(WeekSummaryDto week) {
-            return new Data(week, POR_DEFECTO, List.of(), Map.of(), List.of());
+            return new Data(week, DEFAULT_SECTIONS, List.of(), Map.of(), List.of());
         }
     }
 
-    static Set<String> parseIncluir(String raw) {
-        if (raw == null || raw.isBlank()) return POR_DEFECTO;
+    static Set<String> parseIncludedSections(String raw) {
+        if (raw == null || raw.isBlank()) return DEFAULT_SECTIONS;
         Set<String> result = new LinkedHashSet<>();
         for (String part : raw.split(",")) {
             String value = part.strip().toLowerCase(Locale.ROOT);
             if (value.isEmpty()) continue;
-            if (!SECCIONES.contains(value)) throw new IllegalArgumentException("Sección inválida: " + value);
+            if (!SECTIONS.contains(value)) throw new IllegalArgumentException("Sección inválida: " + value);
             result.add(value);
         }
-        return result.isEmpty() ? POR_DEFECTO : Set.copyOf(result);
+        return result.isEmpty() ? DEFAULT_SECTIONS : Set.copyOf(result);
     }
 
     static List<List<String>> grid(WeekSummaryDto week) {
@@ -87,14 +89,14 @@ final class WeekExport {
     // Una fila por día y una columna por comida, como la planilla.
     static List<List<String>> grid(Data data) {
         var week = data.week();
-        boolean texto = data.incluir().contains(TEXTO);
-        boolean porciones = data.incluir().contains(PORCIONES);
-        boolean habitos = data.incluir().contains(HABITOS);
-        var mealNames = texto || porciones
+        boolean text = data.includedSections().contains(TEXT);
+        boolean portions = data.includedSections().contains(PORTIONS);
+        boolean includeHabits = data.includedSections().contains(HABITS);
+        var mealNames = text || portions
             ? week.days().stream().flatMap(d -> d.meals().stream()).map(WeekMealData::name).distinct().toList()
             : List.<String>of();
-        var groupNames = porciones ? data.groupNames() : List.<String>of();
-        var habits = habitos ? habitColumns(week.habits()) : List.<HabitColumn>of();
+        var groupNames = portions ? data.groupNames() : List.<String>of();
+        var habits = includeHabits ? habitColumns(week.habits()) : List.<HabitColumn>of();
 
         List<List<String>> rows = new ArrayList<>();
         List<String> header = new ArrayList<>(List.of("Fecha"));
@@ -106,7 +108,7 @@ final class WeekExport {
             List<String> row = new ArrayList<>(List.of(day.date().toString()));
             for (String name : mealNames) {
                 row.add(day.meals().stream().filter(m -> name.equals(m.name()))
-                    .map(m -> mealCell(m, texto, porciones)).collect(Collectors.joining("\n")));
+                    .map(m -> mealCell(m, text, portions)).collect(Collectors.joining("\n")));
             }
             var dayPortions = data.portions().getOrDefault(day.date(), Map.of());
             for (String group : groupNames) {
@@ -139,21 +141,21 @@ final class WeekExport {
             values.getLast().name(), values.stream().map(HabitDto::id).distinct().toList())).toList();
     }
 
-    static List<List<String>> sinReglaGrid(Data data) {
+    static List<List<String>> unmatchedFoodsGrid(Data data) {
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Fecha", "Comida", "Lo que escribiste"));
-        for (var item : data.sinRegla()) rows.add(List.of(item.fecha().toString(), item.comida(), item.texto()));
+        for (var item : data.unmatchedFoods()) rows.add(List.of(item.date().toString(), item.meal(), item.text()));
         return rows;
     }
 
-    private static boolean withSinRegla(Data data) {
-        return data.incluir().contains(SIN_REGLA);
+    private static boolean withUnmatchedFoods(Data data) {
+        return data.includedSections().contains(UNMATCHED_FOODS);
     }
 
-    private static String mealCell(WeekMealData meal, boolean texto, boolean porciones) {
+    private static String mealCell(WeekMealData meal, boolean text, boolean portions) {
         List<String> parts = new ArrayList<>();
-        if (texto && meal.noteText() != null && !meal.noteText().isBlank()) parts.add(meal.noteText());
-        if (porciones) parts.add(statusLabel(meal));
+        if (text && meal.noteText() != null && !meal.noteText().isBlank()) parts.add(meal.noteText());
+        if (portions) parts.add(statusLabel(meal));
         return String.join("\n", parts);
     }
 
@@ -185,9 +187,9 @@ final class WeekExport {
     static String csv(Data data) {
         StringBuilder csv = new StringBuilder("﻿");
         appendCsv(csv, grid(data));
-        if (withSinRegla(data)) {
+        if (withUnmatchedFoods(data)) {
             csv.append("\r\n");
-            appendCsv(csv, sinReglaGrid(data));
+            appendCsv(csv, unmatchedFoodsGrid(data));
         }
         return csv.toString();
     }
@@ -221,9 +223,9 @@ final class WeekExport {
             try (var stream = Files.newOutputStream(file);
                  Workbook workbook = new Workbook(stream, "Miga", "1.0")) {
                 writeSheet(workbook.newWorksheet("Planilla"), grid(data), data, title(data));
-                if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data), data, "Sin regla");
+                if (withUnmatchedFoods(data)) writeSheet(workbook.newWorksheet("Sin regla"), unmatchedFoodsGrid(data), data, "Sin regla");
             }
-            ExportLogo.addToWorkbook(file, out, withSinRegla(data) ? 2 : 1, resource("miga-wordmark.png"));
+            ExportLogo.addToWorkbook(file, out, withUnmatchedFoods(data) ? 2 : 1, resource("miga-wordmark.png"));
         } finally {
             Files.deleteIfExists(file);
         }
@@ -321,9 +323,9 @@ final class WeekExport {
             document.addCreator("Miga · " + SITE);
             document.open();
             addTables(document, grid(data), head, body, title(data));
-            if (withSinRegla(data)) {
+            if (withUnmatchedFoods(data)) {
                 document.newPage();
-                addTables(document, sinReglaGrid(data), head, body, "Sin regla");
+                addTables(document, unmatchedFoodsGrid(data), head, body, "Sin regla");
             }
         } catch (Exception e) {
             throw e instanceof IOException io ? io : new IOException("No se pudo generar el PDF.", e);

@@ -34,10 +34,10 @@ class Plan {
     private List<Meal> meals = new ArrayList<>();
 
     @Column(name = "modo_registro", nullable = false, length = 20)
-    private String modoRegistro = "PORCIONES";
+    private String loggingMode = "PORCIONES";
 
     @Column(name = "margen_porciones", nullable = false)
-    private BigDecimal margenPorciones = new BigDecimal("0.5");
+    private BigDecimal portionMargin = new BigDecimal("0.5");
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -65,12 +65,12 @@ class Plan {
     OffsetDateTime getCreatedAt() { return createdAt; }
     List<PlanFoodGroup> getFoodGroups() { return foodGroups; }
     List<Meal> getMeals() { return meals; }
-    String getModoRegistro() { return modoRegistro; }
-    BigDecimal getMargenPorciones() { return margenPorciones; }
+    String getLoggingMode() { return loggingMode; }
+    BigDecimal getPortionMargin() { return portionMargin; }
     Long getVersion() { return version; }
 
-    void setModoRegistro(String modoRegistro) { this.modoRegistro = modoRegistro; }
-    void setMargenPorciones(BigDecimal margenPorciones) { this.margenPorciones = margenPorciones; }
+    void setLoggingMode(String loggingMode) { this.loggingMode = loggingMode; }
+    void setPortionMargin(BigDecimal portionMargin) { this.portionMargin = portionMargin; }
     void setUserId(Long userId) { this.userId = userId; }
     void setCurrent(boolean current) { this.current = current; }
     void setSupersededAt(OffsetDateTime supersededAt) { this.supersededAt = supersededAt; }

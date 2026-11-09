@@ -31,7 +31,7 @@ class PlanRulesAdvice {
     @ExceptionHandler(GroupInUseException.class)
     ResponseEntity<?> used(GroupInUseException e) {
         return ResponseEntity.status(409).body(Map.of("code", "GROUP_IN_USE", "error", e.getMessage(),
-            "comidas", e.comidas, "alimentos", e.alimentos));
+            "comidas", e.meals, "alimentos", e.foods));
     }
 
     @ExceptionHandler(DuplicateGroupException.class)
@@ -47,7 +47,7 @@ class PlanRulesAdvice {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<?> fields(MethodArgumentNotValidException e) {
         var errors = e.getBindingResult().getFieldErrors().stream()
-            .map(f -> f.getField() + ": " + f.getDefaultMessage())
+            .map(f -> uy.miga.ValidationFieldNames.jsonPath(e.getBindingResult(), f.getField()) + ": " + f.getDefaultMessage())
             .toList();
         return ResponseEntity.badRequest().body(Map.of("code", "VALIDATION", "error", "Revisá los datos enviados.", "errors", errors));
     }

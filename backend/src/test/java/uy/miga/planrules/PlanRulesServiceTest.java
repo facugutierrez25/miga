@@ -2,9 +2,9 @@ package uy.miga.planrules;
 
 import org.junit.jupiter.api.Test;
 import uy.miga.plans.*;
-import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.FoodRuleService;
 import uy.miga.habitos.HabitConfigService;
-import uy.miga.registro.RegistroService;
+import uy.miga.registro.DailyLogService;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.users.UserService;
 import java.util.List;
@@ -14,9 +14,9 @@ import static org.mockito.Mockito.*;
 class PlanRulesServiceTest {
     @Test void unchangedOrderDoesNotForkOrBumpEvenWhenPlanHasNotes() {
         var plans = mock(PlanService.class);
-        var rules = mock(ReglaService.class);
+        var rules = mock(FoodRuleService.class);
         var habits = mock(HabitConfigService.class);
-        var notes = mock(RegistroService.class);
+        var notes = mock(DailyLogService.class);
         var entries = mock(FoodEntryFacade.class);
         var users = mock(UserService.class);
         when(users.findUserIdByEmail("user")).thenReturn(7L);
@@ -35,9 +35,9 @@ class PlanRulesServiceTest {
 
     @Test void unchangedGroupDoesNotForkWhenColorIsOmitted() {
         var plans = mock(PlanService.class);
-        var rules = mock(ReglaService.class);
+        var rules = mock(FoodRuleService.class);
         var habits = mock(HabitConfigService.class);
-        var notes = mock(RegistroService.class);
+        var notes = mock(DailyLogService.class);
         var entries = mock(FoodEntryFacade.class);
         var users = mock(UserService.class);
         var uid = java.util.UUID.randomUUID();
@@ -55,9 +55,9 @@ class PlanRulesServiceTest {
     }
     @Test void unchangedHabitIgnoresDecimalScaleAndDefaultStep() {
         var plans = mock(PlanService.class);
-        var rules = mock(ReglaService.class);
+        var rules = mock(FoodRuleService.class);
         var habits = mock(HabitConfigService.class);
-        var notes = mock(RegistroService.class);
+        var notes = mock(DailyLogService.class);
         var entries = mock(FoodEntryFacade.class);
         var users = mock(UserService.class);
         var uid = java.util.UUID.randomUUID();

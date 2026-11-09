@@ -45,7 +45,7 @@ class GroupColorsTest {
         copy.setAccessible(true);
         Plan first = (Plan) copy.invoke(service, 1L, java.util.Optional.empty());
         assertThat(first.getFoodGroups()).hasSize(6).allSatisfy(g ->
-            assertThat(g.getColor()).isEqualTo(GroupColors.forKey(g.getClave())));
+            assertThat(g.getColor()).isEqualTo(GroupColors.forKey(g.getStandardKey())));
         first.getFoodGroups().getFirst().setColor("#0e6e6b");
         Plan next = (Plan) copy.invoke(service, 1L, java.util.Optional.of(first));
         assertThat(next.getFoodGroups()).extracting(PlanFoodGroup::getColor)

@@ -31,7 +31,7 @@ class HabitConfigServiceTest {
 
     @Test void sharedValidationRejectsInvalidNumbersOnBothWriteRoutes() {
         var week = new WeekService(habits, logs, mock(uy.miga.intake.FoodEntryFacade.class),
-            mock(uy.miga.plans.PlanService.class), mock(uy.miga.users.UserService.class), mock(uy.miga.registro.RegistroService.class));
+            mock(uy.miga.plans.PlanService.class), mock(uy.miga.users.UserService.class), mock(uy.miga.registro.DailyLogService.class));
         for (String step : List.of("0", "-1", "100001", "0.001")) {
             var value = new java.math.BigDecimal(step);
             assertThatThrownBy(() -> service.createHabit(1L, new HabitInput("Agua", "CANTIDAD", "lt", null, "DIA", value)))

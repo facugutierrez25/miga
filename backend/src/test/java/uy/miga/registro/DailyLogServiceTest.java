@@ -9,7 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanNotFoundException;
 import uy.miga.plans.PlanService;
-import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.FoodRuleService;
 import uy.miga.reglas.RuleInput;
 import uy.miga.users.UserService;
 
@@ -21,13 +21,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class RegistroServiceTest {
+class DailyLogServiceTest {
     private final MealNoteRepository notes = mock(MealNoteRepository.class);
     private final FoodEntryFacade entries = mock(FoodEntryFacade.class);
     private final PlanService plans = mock(PlanService.class);
-    private final ReglaService rules = mock(ReglaService.class);
+    private final FoodRuleService rules = mock(FoodRuleService.class);
     private final UserService users = mock(UserService.class);
-    private final RegistroService service = RegistroTestServices.create(notes, mock(InterpreterService.class),
+    private final DailyLogService service = DailyLogTestServices.create(notes, mock(InterpreterService.class),
         mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
     private final LocalDate today = LocalDate.now();
 
@@ -42,7 +42,7 @@ class RegistroServiceTest {
     @ValueSource(strings = {"LIBRE", "FLEXIBLE", "NO_CUENTA", "UNKNOWN"})
     void persistsNonCountingMentionsWithTheirMetadata(String type) {
         InterpreterService interpreter = mock(InterpreterService.class);
-        RegistroService service = RegistroTestServices.create(notes, interpreter,
+        DailyLogService service = DailyLogTestServices.create(notes, interpreter,
             mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));
@@ -125,7 +125,7 @@ class RegistroServiceTest {
     void respuestaAlwaysLocksAndRejectsStaleMeal(boolean consumed) {
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(11L));
-        assertThatThrownBy(() -> service.saveRespuesta("user", today, 10L, new RespuestaRequest(7L, consumed)))
+        assertThatThrownBy(() -> service.saveAnswer("user", today, 10L, new AnswerRequest(7L, consumed)))
             .isInstanceOf(PlanChangedException.class);
         var order = inOrder(plans);
         order.verify(plans).lockCurrentPlan(1L);
@@ -202,8 +202,8 @@ class RegistroServiceTest {
             new PatchItemRequest(new BigDecimal("2"), null, null, new BigDecimal("3"), null, true));
         ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
         verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
-        assertThat(input.getValue().cantidadPorPorcion()).isEqualByComparingTo("0.667");
-        assertThat(input.getValue().porcionPorDefecto()).isEqualByComparingTo("1");
+        assertThat(input.getValue().amountPerPortion()).isEqualByComparingTo("0.667");
+        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo("1");
     }
 
     @ParameterizedTest
@@ -230,22 +230,22 @@ class RegistroServiceTest {
 
     @Test
     void ruleSourceMapsScopeToOrigin() {
-        assertThat(RegistroService.sourceOf("GLOBAL")).isEqualTo("CATALOGO");
-        assertThat(RegistroService.sourceOf("PLAN")).isEqualTo("PLAN");
-        assertThat(RegistroService.sourceOf("USUARIO")).isEqualTo("USUARIO");
-        assertThat(RegistroService.sourceOf(null)).isNull();
+        assertThat(DailyLogService.sourceOf("GLOBAL")).isEqualTo("CATALOGO");
+        assertThat(DailyLogService.sourceOf("PLAN")).isEqualTo("PLAN");
+        assertThat(DailyLogService.sourceOf("USUARIO")).isEqualTo("USUARIO");
+        assertThat(DailyLogService.sourceOf(null)).isNull();
         var personal = new uy.miga.reglas.FoodRuleDto(8L, "USUARIO", 20L, 1L, "pan", List.of(), "NORMAL",
             null, 7L, null, null, null, BigDecimal.ONE);
         var item = new InterpretedItem("pan", "pan", BigDecimal.ONE, "u", 7L, null,
             BigDecimal.ONE, "pan = 1 porción", false, 8L, null, "NORMAL");
-        assertThat(RegistroService.ruleSource(item, List.of(personal))).isEqualTo("USUARIO");
-        assertThat(RegistroService.ruleSource(InterpretedItem.unrecognized("x"), List.of(personal))).isNull();
+        assertThat(DailyLogService.ruleSource(item, List.of(personal))).isEqualTo("USUARIO");
+        assertThat(DailyLogService.ruleSource(InterpretedItem.unrecognized("x"), List.of(personal))).isNull();
     }
 
     @Test
     void recognizedItemPersistsRuleTypeAndPlanSource() {
         InterpreterService interpreter = mock(InterpreterService.class);
-        RegistroService service = RegistroTestServices.create(notes, interpreter,
+        DailyLogService service = DailyLogTestServices.create(notes, interpreter,
             mock(ComparisonService.class), entries, plans, rules, users, java.time.Clock.system(java.time.ZoneId.of("America/Montevideo")));
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
         when(plans.getMealIds(20L)).thenReturn(List.of(10L));
@@ -274,18 +274,18 @@ class RegistroServiceTest {
                 null, monday, null, null, null, null, null, false, null)));
         when(plans.getMealNames(any())).thenReturn(java.util.Map.of(10L, "Desayuno", 11L, "Almuerzo"));
 
-        var result = service.getSinRegla("user", monday, monday.plusDays(6));
+        var result = service.getUnmatchedFoods("user", monday, monday.plusDays(6));
 
         assertThat(result).containsExactly(
-            new SinReglaDto("torta frita", monday, "Desayuno"),
-            new SinReglaDto("chivito al pan", monday.plusDays(1), "Almuerzo"));
+            new UnmatchedFoodDto("torta frita", monday, "Desayuno"),
+            new UnmatchedFoodDto("chivito al pan", monday.plusDays(1), "Almuerzo"));
     }
 
     @Test
     void sinReglaRejectsInvertedOrTooLongRanges() {
         LocalDate day = LocalDate.of(2026, 11, 2);
         for (var range : List.of(List.of(day, day.minusDays(1)), List.of(day, day.plusDays(400)))) {
-            assertThatThrownBy(() -> service.getSinRegla("user", range.get(0), range.get(1)))
+            assertThatThrownBy(() -> service.getUnmatchedFoods("user", range.get(0), range.get(1)))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                     e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
         }

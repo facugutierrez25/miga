@@ -9,9 +9,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = RegistroController.class)
+@RestControllerAdvice(assignableTypes = DailyLogController.class)
 @Order(-1)
-class RegistroAdvice {
+class DailyLogAdvice {
 
     @ExceptionHandler({NoteConflictException.class, ObjectOptimisticLockingFailureException.class,
         OptimisticLockException.class})

@@ -22,7 +22,7 @@ class ApiContractsTest {
     @Test
     void serializedDtosMatchVersionedFrontendFixtures() throws Exception {
         var contracts = Map.of(
-            "day-registro", "uy.miga.registro.DayRegistroDto",
+            "day-registro", "uy.miga.registro.DayLogDto",
             "plan", "uy.miga.plans.PlanDto",
             "plan-rules", "uy.miga.planrules.PlanRulesDto",
             "week-summary", "uy.miga.habitos.WeekSummaryDto");
@@ -45,7 +45,7 @@ class ApiContractsTest {
         }
         Class<?> cls = (Class<?>) type;
         if (cls == String.class) return switch (name) {
-            case "tipo" -> "NORMAL";
+            case "type" -> "NORMAL";
             case "habitType" -> "CANTIDAD";
             case "period" -> "DIA";
             case "status" -> "OK";

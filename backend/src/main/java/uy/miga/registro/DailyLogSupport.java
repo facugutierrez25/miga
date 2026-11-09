@@ -10,24 +10,24 @@ import java.util.*;
 import uy.miga.plans.PlanNotFoundException;
 
 @Service
-class RegistroSupport {
+class DailyLogSupport {
     private final MealNoteRepository noteRepository;
     private final PlanService planService;
 
-    RegistroSupport(MealNoteRepository noteRepository, PlanService planService) {
+    DailyLogSupport(MealNoteRepository noteRepository, PlanService planService) {
         this.noteRepository = noteRepository;
         this.planService = planService;
     }
 
-    DayRegistroDto.EntryItemDto toEntryItemDto(FoodEntryFacade.EntryData e) {
-        return new DayRegistroDto.EntryItemDto(
+    DayLogDto.EntryItemDto toEntryItemDto(FoodEntryFacade.EntryData e) {
+        return new DayLogDto.EntryItemDto(
             e.id(), e.food(), e.quantity(), e.unit(), e.foodGroupId(), e.portions(), e.origin(),
             e.uncertain(), e.originalText(), e.appliedRule(), e.occurrenceId(),
             e.ruleType(), e.ruleSource() != null ? e.ruleSource() : (EntryOrigin.USER.equals(e.origin()) ? EntryOrigin.USER : null));
     }
 
     Long resolveGroupId(String standardGroupKey, Long planId) {
-        return planService.findGroupIdByClave(planId, standardGroupKey);
+        return planService.findGroupIdByStandardKey(planId, standardGroupKey);
     }
 
     Long entryPlanId(Long userId, FoodEntryFacade.EntryData entry) {

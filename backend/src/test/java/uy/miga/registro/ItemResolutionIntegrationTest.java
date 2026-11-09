@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class ItemResolutionIntegrationTest extends RegistroIntegrationTestBase {
+class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
     void resolveGroupsRemembersInPlaceAndUndoRestoresUnknown() throws Exception {
         String date = LocalDate.now().toString();

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class NoteIntegrationTest extends RegistroIntegrationTestBase {
+class NoteIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
     void longUnrecognizedMentionSurvivesReload() throws Exception {
         createUniqueUserPlan();

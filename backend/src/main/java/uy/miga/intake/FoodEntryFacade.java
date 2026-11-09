@@ -23,7 +23,7 @@ public class FoodEntryFacade {
         repository.findAllById(ids).forEach(e -> {
             e.setResolved(true);
             e.setResolvedRuleUid(ruleUid);
-            if (EntryOrigin.RULE.equals(e.getOrigen())) e.setOrigen(EntryOrigin.USER);
+            if (EntryOrigin.RULE.equals(e.getOrigin())) e.setOrigin(EntryOrigin.USER);
         });
     }
 
@@ -41,10 +41,10 @@ public class FoodEntryFacade {
         String cleanUnit = unit != null ? unit.strip() : null;
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, cleanUnit, foodGroupId);
         entry.setMealNoteId(mealNoteId);
-        entry.setTextoOriginal(originalText);
-        entry.setOrigen(EntryOrigin.RULE);
-        entry.setSupuesto(uncertain);
-        entry.setPorciones(portions);
+        entry.setOriginalText(originalText);
+        entry.setOrigin(EntryOrigin.RULE);
+        entry.setEstimated(uncertain);
+        entry.setPortions(portions);
         entry.setAppliedRule(appliedRule);
         entry.setOccurrenceId(occurrenceId);
         entry.setRuleType(ruleType);
@@ -60,7 +60,7 @@ public class FoodEntryFacade {
         Long id = createNoteEntry(userId, userEmail, mealId, date, food, quantity, unit,
             null, mealNoteId, originalText, uncertain, null, appliedRule, occurrenceId,
             recognized ? ruleType : null, recognized ? ruleSource : null);
-        repository.findById(id).orElseThrow().setOrigen(recognized ? EntryOrigin.MENTION : EntryOrigin.UNKNOWN);
+        repository.findById(id).orElseThrow().setOrigin(recognized ? EntryOrigin.MENTION : EntryOrigin.UNKNOWN);
         return id;
     }
 
@@ -117,10 +117,10 @@ public class FoodEntryFacade {
             if (quantity != null) e.setQuantity(quantity);
             if (unit != null) e.setUnit(unit.strip());
             if (foodGroupId != null) e.setFoodGroupId(foodGroupId);
-            if (portions != null) e.setPorciones(portions);
-            e.setAppliedRule("Corrección del usuario: " + e.getPorciones() + " " + RuleText.portionUnit(e.getPorciones()));
-            e.setSupuesto(false);
-            e.setOrigen(EntryOrigin.USER);
+            if (portions != null) e.setPortions(portions);
+            e.setAppliedRule("Corrección del usuario: " + e.getPortions() + " " + RuleText.portionUnit(e.getPortions()));
+            e.setEstimated(false);
+            e.setOrigin(EntryOrigin.USER);
             e.setRuleType("NORMAL");
             e.setRuleSource(EntryOrigin.USER);
             repository.save(e);
@@ -136,14 +136,14 @@ public class FoodEntryFacade {
             FoodEntry entry = new FoodEntry(source.getUserId(), source.getUserEmail(), source.getMealId(),
                 source.getDate(), source.getFood(), source.getQuantity(), source.getUnit(), groupId);
             entry.setMealNoteId(source.getMealNoteId());
-            entry.setTextoOriginal(source.getTextoOriginal());
+            entry.setOriginalText(source.getOriginalText());
             entry.setOccurrenceId(source.getOccurrenceId());
             entry.setConsumed(source.isConsumed());
-            entry.setOrigen(EntryOrigin.USER);
+            entry.setOrigin(EntryOrigin.USER);
             entry.setRuleType("COMPUESTO");
             entry.setRuleSource(EntryOrigin.USER);
-            entry.setSupuesto(false);
-            entry.setPorciones(portions);
+            entry.setEstimated(false);
+            entry.setPortions(portions);
             ids.add(repository.save(entry).getId());
         });
         repository.delete(source);
@@ -154,29 +154,29 @@ public class FoodEntryFacade {
     public Long createUserEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                 String food, Long foodGroupId) {
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
-        entry.setOrigen(EntryOrigin.USER);
+        entry.setOrigin(EntryOrigin.USER);
         entry.setRuleSource(EntryOrigin.USER);
-        entry.setPorciones(BigDecimal.ONE);
+        entry.setPortions(BigDecimal.ONE);
         return repository.save(entry).getId();
     }
 
     @Transactional
     public void createResponseEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                     String food, Long foodGroupId) {
-        if (repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+        if (repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigin(
             userId, date, mealId, foodGroupId, EntryOrigin.RESPONSE)) return;
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
-        entry.setOrigen(EntryOrigin.RESPONSE);
+        entry.setOrigin(EntryOrigin.RESPONSE);
         // La respuesta viene de un grupo del plan marcado para preguntar si falta.
         entry.setRuleType("PREGUNTAR");
         entry.setRuleSource("PLAN");
-        entry.setPorciones(BigDecimal.ONE);
+        entry.setPortions(BigDecimal.ONE);
         repository.save(entry);
     }
 
     @Transactional
     public void deleteResponseEntries(Long userId, LocalDate date, Long mealId, Long foodGroupId) {
-        repository.deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+        repository.deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigin(
             userId, date, mealId, foodGroupId, EntryOrigin.RESPONSE);
     }
 
@@ -196,8 +196,8 @@ public class FoodEntryFacade {
         return new EntryData(
             e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
             e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
-            e.getOrigen(), e.getSupuesto(), e.getPorciones(),
-            e.getDate(), e.getTextoOriginal(), e.getAppliedRule(), e.getOccurrenceId(),
+            e.getOrigin(), e.getEstimated(), e.getPortions(),
+            e.getDate(), e.getOriginalText(), e.getAppliedRule(), e.getOccurrenceId(),
             e.getRuleType(), e.getRuleSource(), e.isResolved(), e.getResolvedRuleUid());
     }
 

@@ -39,7 +39,7 @@ public class PlanService {
         new Object[]{"Verduras",  "VER", 6, "verduras"}
     );
 
-    static final Map<String, String> ABBR_TO_CLAVE = Map.of(
+    static final Map<String, String> ABBR_TO_STANDARD_KEY = Map.of(
         "PRO", "proteinas",
         "CER", "cereales_tuberculos",
         "PAN", "panificados",
@@ -158,16 +158,16 @@ public class PlanService {
         plan.setUserId(userId);
         if (existing.isPresent()) {
             Plan old = existing.get();
-            plan.setModoRegistro(old.getModoRegistro());
-            plan.setMargenPorciones(old.getMargenPorciones());
+            plan.setLoggingMode(old.getLoggingMode());
+            plan.setPortionMargin(old.getPortionMargin());
             for (PlanFoodGroup source : old.getFoodGroups()) {
                 PlanFoodGroup group = new PlanFoodGroup(plan, source.getName(),
                     source.getAbbreviation(), (short) source.getDisplayOrder());
                 group.setUid(source.getUid());
-                group.setClave(source.getClave());
+                group.setStandardKey(source.getStandardKey());
                 group.setColor(source.getColor());
-                group.setPreguntarSiFalta(source.isPreguntarSiFalta());
-                group.setOpcional(source.isOpcional());
+                group.setAskIfMissing(source.isAskIfMissing());
+                group.setOptional(source.isOptional());
                 plan.getFoodGroups().add(group);
             }
         } else {
@@ -181,7 +181,7 @@ public class PlanService {
     private void createDefaultFoodGroups(Plan plan) {
         for (Object[] g : DEFAULT_GROUPS) {
             PlanFoodGroup group = new PlanFoodGroup(plan, (String) g[0], (String) g[1], (short)(int) g[2]);
-            group.setClave((String) g[3]);
+            group.setStandardKey((String) g[3]);
             group.setColor(GroupColors.forKey((String) g[3]));
             plan.getFoodGroups().add(group);
         }
@@ -285,16 +285,16 @@ public class PlanService {
     }
 
     @Transactional(readOnly = true)
-    public String getModoRegistro(Long planId) {
+    public String getLoggingMode(Long planId) {
         return plansRepository.findById(planId)
-            .map(Plan::getModoRegistro)
+            .map(Plan::getLoggingMode)
             .orElse("PORCIONES");
     }
 
     @Transactional(readOnly = true)
-    public BigDecimal getMargenPorciones(Long planId) {
+    public BigDecimal getPortionMargin(Long planId) {
         return plansRepository.findById(planId)
-            .map(Plan::getMargenPorciones)
+            .map(Plan::getPortionMargin)
             .orElse(new BigDecimal("0.5"));
     }
 
@@ -310,9 +310,9 @@ public class PlanService {
     }
 
     @Transactional(readOnly = true)
-    public Long findGroupIdByClave(Long planId, String clave) {
-        if (clave == null) return null;
-        return groupRepository.findByPlanIdAndClave(planId, clave)
+    public Long findGroupIdByStandardKey(Long planId, String standardKey) {
+        if (standardKey == null) return null;
+        return groupRepository.findByPlanIdAndStandardKey(planId, standardKey)
             .map(PlanFoodGroup::getId)
             .orElse(null);
     }
@@ -359,7 +359,7 @@ public class PlanService {
                 Weekdays.toList(m.getWeekdays()))).toList();
         return new PlanReadData(plan.getId(), plan.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
             plan.getSupersededAt() == null ? null : plan.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
-            plan.getModoRegistro(), plan.getMargenPorciones(), getPlanFoodGroups(plan.getId()), meals);
+            plan.getLoggingMode(), plan.getPortionMargin(), getPlanFoodGroups(plan.getId()), meals);
     }
 
     // ── privados ──────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ public class PlanService {
 
     static PlanFoodGroupDto toGroupDto(PlanFoodGroup group) {
         return new PlanFoodGroupDto(group.getId(), group.getName(), group.getAbbreviation(), group.getDisplayOrder(),
-            group.getColor(), group.getClave(), group.isPreguntarSiFalta(), group.isOpcional(), group.getUid());
+            group.getColor(), group.getStandardKey(), group.isAskIfMissing(), group.isOptional(), group.getUid());
     }
 
     @Transactional(readOnly = true)
@@ -520,14 +520,14 @@ public class PlanService {
             int suffix = 1;
             while (hasAbbreviation(others, abbr)) abbr = base + suffix++;
         }
-        if (abbr.length() > 10 || (in.clave() != null && in.clave().length() > 50)) {
+        if (abbr.length() > 10 || (in.standardKey() != null && in.standardKey().length() > 50)) {
             throw new IllegalArgumentException("Abreviatura o clave demasiado larga.");
         }
-        boolean duplicateKey = in.clave() != null && others.stream().anyMatch(g -> in.clave().equals(g.getClave()));
+        boolean duplicateKey = in.standardKey() != null && others.stream().anyMatch(g -> in.standardKey().equals(g.getStandardKey()));
         if (hasAbbreviation(others, abbr) || duplicateKey) throw new DuplicateGroupException();
         group.setName(in.name().strip());
         group.setAbbreviation(abbr);
-        group.setClave(in.clave());
+        group.setStandardKey(in.standardKey());
         // Al editar sin indicar color, el grupo conserva el suyo.
         String color = !creating && in.color() == null ? group.getColor() : in.color();
         if (creating && !GroupColors.contains(color)) {
@@ -537,7 +537,7 @@ public class PlanService {
                 "Elegí un color de la paleta de grupos.");
         }
         group.setColor(color);
-        group.setPreguntarSiFalta(in.preguntarSiFalta()); group.setOpcional(in.opcional());
+        group.setAskIfMissing(in.askIfMissing()); group.setOptional(in.optional());
     }
 
     private boolean hasAbbreviation(List<PlanFoodGroup> groups, String abbreviation) {

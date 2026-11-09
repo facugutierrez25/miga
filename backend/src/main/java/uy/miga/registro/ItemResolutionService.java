@@ -9,8 +9,8 @@ import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanService;
 import uy.miga.reglas.FoodRuleDto;
-import uy.miga.reglas.ReglaService;
-import uy.miga.reglas.Componente;
+import uy.miga.reglas.FoodRuleService;
+import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.RuleInput;
 import uy.miga.reglas.RuleText;
 import uy.miga.users.UserService;
@@ -27,12 +27,12 @@ class ItemResolutionService {
     private final InterpreterService interpreter;
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
-    private final ReglaService ruleService;
+    private final FoodRuleService ruleService;
     private final UserService userService;
-    private final RegistroSupport support;
+    private final DailyLogSupport support;
 
     ItemResolutionService(InterpreterService interpreter, FoodEntryFacade entryFacade, PlanService planService,
-            ReglaService ruleService, UserService userService, RegistroSupport support) {
+            FoodRuleService ruleService, UserService userService, DailyLogSupport support) {
         this.interpreter = interpreter;
         this.entryFacade = entryFacade;
         this.planService = planService;
@@ -87,23 +87,23 @@ class ItemResolutionService {
     private RuleInput resolveRuleInput(FoodEntryFacade.EntryData entry, FoodRuleDto selected, String type,
             Map<Long, BigDecimal> groups, Long planId, Long currentPlan) {
         Long groupId = null;
-        List<Componente> components = new ArrayList<>();
+        List<RuleComponent> components = new ArrayList<>();
         BigDecimal quantity = BigDecimal.valueOf(entry.quantity());
         BigDecimal amount = null;
         String unit = null;
         BigDecimal defaultPortion = BigDecimal.ONE;
         if (selected != null) {
-            amount = selected.cantidadPorPorcion();
-            unit = selected.unidad();
-            defaultPortion = selected.porcionPorDefecto();
+            amount = selected.amountPerPortion();
+            unit = selected.unit();
+            defaultPortion = selected.defaultPortions();
             if ("NORMAL".equals(type)) {
                 groupId = mapRuleGroup(selected.foodGroupId(), selected.standardGroupKey(), selected.planId(), currentPlan);
                 if (groupId == null) return null;
             } else if ("COMPUESTO".equals(type)) {
-                for (var c : selected.componentes()) {
+                for (var c : selected.components()) {
                     Long mapped = mapRuleGroup(c.foodGroupId(), c.standardGroupKey(), selected.planId(), currentPlan);
                     if (mapped == null) return null;
-                    components.add(new Componente(mapped, null, c.porciones()));
+                    components.add(new RuleComponent(mapped, null, c.portions()));
                 }
             }
         } else if (!groups.isEmpty()) {
@@ -116,7 +116,7 @@ class ItemResolutionService {
                     groupId = mapped;
                     if (unit == null) defaultPortion = g.getValue();
                     else amount = quantity.divide(g.getValue(), 6, RoundingMode.HALF_UP);
-                } else components.add(new Componente(mapped, null, g.getValue().divide(quantity, 6, RoundingMode.HALF_UP).doubleValue()));
+                } else components.add(new RuleComponent(mapped, null, g.getValue().divide(quantity, 6, RoundingMode.HALF_UP).doubleValue()));
             }
         }
         return new RuleInput(entry.food(), List.of(), type, groupId, amount, unit, defaultPortion, components, null);
@@ -159,7 +159,7 @@ class ItemResolutionService {
             if (req.ruleUid() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un alimento.");
             selected = ruleService.getRuleForResolve(req.ruleUid(), userId, planId, currentPlan);
             var interpreted = interpreter.computePortions(entry.originalText(), entry.quantity(), entry.unit(), selected);
-            type = selected.tipo();
+            type = selected.type();
             explanation = interpreted.appliedRule();
             addSelectedGroups(selected, type, planId, interpreted, groups);
 
@@ -205,10 +205,10 @@ class ItemResolutionService {
     private void addSelectedGroups(FoodRuleDto selected, String type, Long planId, InterpretedItem interpreted,
             Map<Long, BigDecimal> groups) {
         if ("COMPUESTO".equals(type)) {
-            for (var component : selected.componentes()) {
+            for (var component : selected.components()) {
                 Long group = mapRuleGroup(component.foodGroupId(), component.standardGroupKey(), selected.planId(), planId);
                 if (group == null) throw missingResolveGroup();
-                BigDecimal portions = interpreted.portions().multiply(BigDecimal.valueOf(component.porciones()))
+                BigDecimal portions = interpreted.portions().multiply(BigDecimal.valueOf(component.portions()))
                     .setScale(3, RoundingMode.HALF_UP);
                 groups.merge(group, portions, BigDecimal::add);
             }

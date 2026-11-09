@@ -26,14 +26,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(classes = MigaApplication.class, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
-abstract class RegistroIntegrationTestBase {
+abstract class DailyLogIntegrationTestBase {
 
     @Autowired protected WebApplicationContext context;
     @Autowired protected FilterChainProxy springSecurityFilterChain;
     @Autowired protected MockEmailService mockEmailService;
     @Autowired protected EmailOutboxWorker outboxWorker;
     @Autowired protected MealNoteRepository notes;
-    @Autowired protected RegistroService registro;
+    @Autowired protected DailyLogService registro;
     @Autowired protected org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     protected JsonNode undo(String date, JsonNode body) throws Exception {

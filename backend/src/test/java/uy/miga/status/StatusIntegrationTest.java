@@ -44,11 +44,11 @@ class StatusIntegrationTest {
 
     @Test
     void flywayCreatesUsersTable() {
-        Integer tablas = jdbcTemplate.queryForObject(
+        Integer tables = jdbcTemplate.queryForObject(
             "select count(*) from information_schema.tables where table_name = 'users'",
             Integer.class);
 
-        assertThat(tablas).isEqualTo(1);
+        assertThat(tables).isEqualTo(1);
     }
 
     @Test

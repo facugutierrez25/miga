@@ -25,7 +25,7 @@ class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     Map<String, Object> handleValidation(MethodArgumentNotValidException ex) {
         var errors = ex.getBindingResult().getFieldErrors().stream()
-            .map(e -> e.getField() + ": " + e.getDefaultMessage())
+            .map(e -> uy.miga.ValidationFieldNames.jsonPath(ex.getBindingResult(), e.getField()) + ": " + e.getDefaultMessage())
             .toList();
         return Map.of("errors", errors);
     }

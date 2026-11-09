@@ -22,8 +22,8 @@ class FoodRule {
     @Column(name = "overrides_rule_uid")
     private UUID overridesRuleUid;
 
-    @Column(nullable = false, length = 10)
-    private String alcance;
+    @Column(name = "alcance", nullable = false, length = 10)
+    private String scope;
 
     @Column(name = "plan_id")
     private Long planId;
@@ -31,15 +31,15 @@ class FoodRule {
     @Column(name = "user_id")
     private Long userId;
 
-    @Column(nullable = false, length = 200)
-    private String alimento;
+    @Column(name = "alimento", nullable = false, length = 200)
+    private String food;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(columnDefinition = "text[]")
-    private List<String> sinonimos;
+    @Column(name = "sinonimos", columnDefinition = "text[]")
+    private List<String> synonyms;
 
-    @Column(nullable = false, length = 20)
-    private String tipo;
+    @Column(name = "tipo", nullable = false, length = 20)
+    private String type;
 
     @Column(name = "standard_group_key", length = 50)
     private String standardGroupKey;
@@ -48,49 +48,49 @@ class FoodRule {
     private Long foodGroupId;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private List<Componente> componentes;
+    @Column(name = "componentes", columnDefinition = "jsonb")
+    private List<RuleComponent> components;
 
     @Column(name = "cantidad_por_porcion", precision = 8, scale = 3)
-    private BigDecimal cantidadPorPorcion;
+    private BigDecimal amountPerPortion;
 
-    @Column(length = 20)
-    private String unidad;
+    @Column(name = "unidad", length = 20)
+    private String unit;
 
     @Column(name = "porcion_por_defecto", nullable = false, precision = 8, scale = 3)
-    private BigDecimal porcionPorDefecto = BigDecimal.ONE;
+    private BigDecimal defaultPortions = BigDecimal.ONE;
 
     FoodRule() {}
 
     Long getId()                    { return id; }
     UUID getUid()                   { return uid; }
     UUID getOverridesRuleUid()      { return overridesRuleUid; }
-    String getAlcance()             { return alcance; }
+    String getScope()             { return scope; }
     Long getPlanId()                { return planId; }
     Long getUserId()                { return userId; }
-    String getAlimento()            { return alimento; }
-    List<String> getSinonimos()     { return sinonimos; }
-    String getTipo()                { return tipo; }
+    String getFood()            { return food; }
+    List<String> getSynonyms()     { return synonyms; }
+    String getType()                { return type; }
     String getStandardGroupKey()    { return standardGroupKey; }
     Long getFoodGroupId()           { return foodGroupId; }
-    List<Componente> getComponentes() { return componentes; }
-    BigDecimal getCantidadPorPorcion() { return cantidadPorPorcion; }
-    String getUnidad()              { return unidad; }
-    BigDecimal getPorcionPorDefecto() { return porcionPorDefecto; }
+    List<RuleComponent> getComponents() { return components; }
+    BigDecimal getAmountPerPortion() { return amountPerPortion; }
+    String getUnit()              { return unit; }
+    BigDecimal getDefaultPortions() { return defaultPortions; }
 
     void setUid(UUID uid)                       { this.uid = uid; }
     void setOverridesRuleUid(UUID u)            { this.overridesRuleUid = u; }
-    void setAlcance(String alcance)             { this.alcance = alcance; }
+    void setScope(String scope)             { this.scope = scope; }
     void setPlanId(Long planId)                 { this.planId = planId; }
     void setUserId(Long userId)                 { this.userId = userId; }
-    void setAlimento(String alimento)           { this.alimento = alimento; }
-    void setSinonimos(List<String> sinonimos)   { this.sinonimos = sinonimos; }
-    void setTipo(String tipo)                   { this.tipo = tipo; }
+    void setFood(String food)           { this.food = food; }
+    void setSynonyms(List<String> synonyms)   { this.synonyms = synonyms; }
+    void setType(String type)                   { this.type = type; }
     void setStandardGroupKey(String k)          { this.standardGroupKey = k; }
     void setFoodGroupId(Long foodGroupId)       { this.foodGroupId = foodGroupId; }
-    void setComponentes(List<Componente> c)     { this.componentes = c; }
-    void setCantidadPorPorcion(BigDecimal c)    { this.cantidadPorPorcion = c; }
-    void setUnidad(String unidad)               { this.unidad = unidad; }
-    void setPorcionPorDefecto(BigDecimal p)     { this.porcionPorDefecto = p; }
+    void setComponents(List<RuleComponent> c)     { this.components = c; }
+    void setAmountPerPortion(BigDecimal c)    { this.amountPerPortion = c; }
+    void setUnit(String unit)               { this.unit = unit; }
+    void setDefaultPortions(BigDecimal p)     { this.defaultPortions = p; }
 
 }

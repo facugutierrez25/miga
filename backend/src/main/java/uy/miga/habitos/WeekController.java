@@ -70,14 +70,14 @@ class WeekController {
                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                     @RequestParam(defaultValue = "csv") String format,
-                    @RequestParam(required = false) String incluir,
+                    @RequestParam(value = "incluir", required = false) String includedSections,
                     HttpServletResponse response) throws IOException {
         if (!List.of("csv", "xlsx", "pdf").contains(format)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato inválido.");
         }
         Set<String> sections;
         try {
-            sections = WeekExport.parseIncluir(incluir);
+            sections = WeekExport.parseIncludedSections(includedSections);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí qué incluir: texto, porciones, habitos o sinregla.");
         }
