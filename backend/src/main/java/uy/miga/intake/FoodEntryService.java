@@ -14,6 +14,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import uy.miga.plans.PlanNotFoundException;
+import uy.miga.plans.PlanVersionConflictException;
 
 @Service
 class FoodEntryService {
@@ -51,7 +53,7 @@ class FoodEntryService {
         }
         Long planId = planService.getPlanIdForDate(userId, date);
         if (!planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+            throw new PlanVersionConflictException();
         }
         if (foodGroupId != null && planService.getPlanFoodGroups(planId).stream()
             .noneMatch(g -> g.id().equals(foodGroupId))) {
@@ -104,7 +106,7 @@ class FoodEntryService {
         }
         Long planId = planService.getPlanIdForDate(userId, date);
         if (!planService.getMealIds(planId).contains(mealId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+            throw new PlanVersionConflictException();
         }
         repository.setConsumedByMeal(userId, mealId, date, consumed);
     }
@@ -112,7 +114,7 @@ class FoodEntryService {
     private void lockCurrentPlanIfPresent(Long userId) {
         try {
             planService.lockCurrentPlan(userId);
-        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+        } catch (PlanNotFoundException ignored) {
             // Un registro histórico puede existir sin plan vigente.
         }
     }

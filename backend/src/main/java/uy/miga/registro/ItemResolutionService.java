@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import uy.miga.plans.PlanFoodGroupDto;
 
 @Service
 class ItemResolutionService {
@@ -67,8 +68,8 @@ class ItemResolutionService {
         }
         List<Long> ids = replaceUnknown(id, userId, email, date, entry, occurrence, groups, type, explanation);
         entryFacade.markResolved(ids, ruleUid);
-        return new ResolveItemResultDto(List.of(id), ids.stream().map(i -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(i, userId))).toList(),
-            new ResolveItemResultDto.Undo(occurrence, ruleUid));
+        var items = ids.stream().map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList();
+        return new ResolveItemResultDto(List.of(id), items, new ResolveItemResultDto.Undo(occurrence, ruleUid));
     }
 
     private ResponseStatusException missingResolveGroup() {
@@ -81,8 +82,8 @@ class ItemResolutionService {
         if (target.stream().anyMatch(g -> id.equals(g.id()))) return id;
         if (sourcePlan == null) return null;
         var uid = planService.getPlanFoodGroups(sourcePlan).stream().filter(g -> id.equals(g.id()))
-            .map(uy.miga.plans.PlanFoodGroupDto::uid).findFirst().orElse(null);
-        return uid == null ? null : target.stream().filter(g -> uid.equals(g.uid())).map(uy.miga.plans.PlanFoodGroupDto::id).findFirst().orElse(null);
+            .map(PlanFoodGroupDto::uid).findFirst().orElse(null);
+        return uid == null ? null : target.stream().filter(g -> uid.equals(g.uid())).map(PlanFoodGroupDto::id).findFirst().orElse(null);
     }
 
     private RuleInput resolveRuleInput(FoodEntryFacade.EntryData entry, FoodRuleDto selected, String type,
@@ -144,8 +145,9 @@ class ItemResolutionService {
         }
         var ids = entries.stream().map(FoodEntryFacade.EntryData::id).toList();
         entryFacade.deleteEntries(ids);
-        Long restored = entryFacade.createMentionEntry(userId, email, source.mealId(), date, source.food(), source.quantity(), source.unit(),
-            source.mealNoteId(), source.originalText(), false, null, req.occurrenceId(), false, null, null);
+        Long restored = entryFacade.createMentionEntry(userId, email, source.mealId(), date, source.food(),
+            source.quantity(), source.unit(), source.mealNoteId(), source.originalText(), false, null,
+            req.occurrenceId(), false, null, null);
         return new PatchItemResultDto(ids, List.of(support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(restored, userId))));
     }
 
@@ -165,13 +167,14 @@ class ItemResolutionService {
 
         } else if (req.kind() == ResolveItemRequest.Kind.GROUPS) {
             if (req.groups() == null || req.groups().isEmpty()) throw missingResolveGroup();
-            var allowed = planService.getPlanFoodGroups(planId).stream().map(uy.miga.plans.PlanFoodGroupDto::id).collect(Collectors.toSet());
+            var allowed = planService.getPlanFoodGroups(planId).stream().map(PlanFoodGroupDto::id).collect(Collectors.toSet());
             for (var group : req.groups()) {
-                if (!allowed.contains(group.foodGroupId()) || groups.putIfAbsent(group.foodGroupId(), group.portions()) != null) throw missingResolveGroup();
+                boolean repeated = groups.putIfAbsent(group.foodGroupId(), group.portions()) != null;
+                if (!allowed.contains(group.foodGroupId()) || repeated) throw missingResolveGroup();
             }
             type = groups.size() == 1 ? "NORMAL" : "COMPUESTO";
             var names = planService.getPlanFoodGroups(planId).stream().collect(Collectors.toMap(
-                uy.miga.plans.PlanFoodGroupDto::id, uy.miga.plans.PlanFoodGroupDto::name));
+                PlanFoodGroupDto::id, PlanFoodGroupDto::name));
             explanation = "Corrección del usuario: " + groups.entrySet().stream()
                 .map(g -> g.getValue() + " " + RuleText.portionUnit(g.getValue()) + " de " + names.get(g.getKey()))
                 .collect(Collectors.joining(" + "));
@@ -193,8 +196,9 @@ class ItemResolutionService {
                 entry.mealNoteId(), entry.originalText(), false, explanation, occurrence, true, type, EntryOrigin.USER));
         } else {
             for (var group : groups.entrySet()) {
-                ids.add(entryFacade.createNoteEntry(userId, email, entry.mealId(), date, entry.food(), entry.quantity(), entry.unit(),
-                    group.getKey(), entry.mealNoteId(), entry.originalText(), false, group.getValue(), explanation, occurrence, type, EntryOrigin.USER));
+                ids.add(entryFacade.createNoteEntry(userId, email, entry.mealId(), date, entry.food(), entry.quantity(),
+                    entry.unit(), group.getKey(), entry.mealNoteId(), entry.originalText(), false, group.getValue(),
+                    explanation, occurrence, type, EntryOrigin.USER));
             }
         }
         return ids;
@@ -206,7 +210,9 @@ class ItemResolutionService {
             for (var component : selected.componentes()) {
                 Long group = mapRuleGroup(component.foodGroupId(), component.standardGroupKey(), selected.planId(), planId);
                 if (group == null) throw missingResolveGroup();
-                groups.merge(group, interpreted.portions().multiply(BigDecimal.valueOf(component.porciones())).setScale(3, RoundingMode.HALF_UP), BigDecimal::add);
+                BigDecimal portions = interpreted.portions().multiply(BigDecimal.valueOf(component.porciones()))
+                    .setScale(3, RoundingMode.HALF_UP);
+                groups.merge(group, portions, BigDecimal::add);
             }
         } else if ("NORMAL".equals(type)) {
             Long group = mapRuleGroup(selected.foodGroupId(), selected.standardGroupKey(), selected.planId(), planId);

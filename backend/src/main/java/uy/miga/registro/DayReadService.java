@@ -16,6 +16,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.temporal.ChronoUnit;
+import uy.miga.plans.PlanNotFoundException;
+import uy.miga.plans.PlanReadData;
 
 @Service
 class DayReadService {
@@ -43,7 +46,7 @@ class DayReadService {
 
     @Transactional(readOnly = true)
     public Map<LocalDate, List<WeekMealData>> getWeekMealsForRange(Long userId, LocalDate start, LocalDate end,
-            Map<LocalDate, uy.miga.plans.PlanReadData> plans, List<FoodEntryFacade.EntryData> entries) {
+            Map<LocalDate, PlanReadData> plans, List<FoodEntryFacade.EntryData> entries) {
         var entriesByDate = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::date));
         var notesByDate = noteRepository.findByUserIdAndDateBetween(userId, start, end).stream()
             .collect(Collectors.groupingBy(MealNote::getDate));
@@ -53,9 +56,9 @@ class DayReadService {
             var notes = notesByDate.getOrDefault(date, List.of());
             var byMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
             var day = buildDay(date, plan, entriesByDate.getOrDefault(date, List.of()), notes);
-            var names = plan.meals().stream().collect(Collectors.toMap(uy.miga.plans.PlanReadData.MealData::id,
-                uy.miga.plans.PlanReadData.MealData::name));
-            var applies = plan.meals().stream().collect(Collectors.toMap(uy.miga.plans.PlanReadData.MealData::id,
+            var names = plan.meals().stream().collect(Collectors.toMap(PlanReadData.MealData::id,
+                PlanReadData.MealData::name));
+            var applies = plan.meals().stream().collect(Collectors.toMap(PlanReadData.MealData::id,
                 m -> m.appliesOn(date.getDayOfWeek())));
             // Una comida que no toca ese día se omite, salvo que ya tenga algo anotado.
             result.put(date, day.meals().stream().filter(meal -> applies.getOrDefault(meal.mealId(), true)
@@ -73,7 +76,7 @@ class DayReadService {
     public List<WeekMealData> getWeekMeals(String email, LocalDate date) {
         Long userId = userService.findUserIdByEmail(email);
         var plans = planService.getPlansForRange(userId, date, date);
-        if (!plans.containsKey(date)) throw new uy.miga.plans.PlanNotFoundException();
+        if (!plans.containsKey(date)) throw new PlanNotFoundException();
         return getWeekMealsForRange(userId, date, date, plans,
             entryFacade.findByUserIdAndDate(userId, date)).get(date);
     }
@@ -102,7 +105,7 @@ class DayReadService {
 
         // Todas las comidas del plan: no tener nota no confirma un consumo de cero.
         var plan = planService.getReadData(planId);
-        var planMealIds = plan.meals().stream().map(uy.miga.plans.PlanReadData.MealData::id).toList();
+        var planMealIds = plan.meals().stream().map(PlanReadData.MealData::id).toList();
 
         List<MealComparisonDto> mealComparisons = new ArrayList<>();
         for (Long mealId : planMealIds) {
@@ -135,11 +138,11 @@ class DayReadService {
             noteRepository.findByUserIdAndDate(userId, date));
     }
 
-    private DayRegistroDto buildDay(LocalDate date, uy.miga.plans.PlanReadData plan,
+    private DayRegistroDto buildDay(LocalDate date, PlanReadData plan,
                                     List<FoodEntryFacade.EntryData> entries, List<MealNote> notes) {
         var byMeal = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
         var noteByMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
-        var planMealIds = plan.meals().stream().map(uy.miga.plans.PlanReadData.MealData::id).toList();
+        var planMealIds = plan.meals().stream().map(PlanReadData.MealData::id).toList();
         var groups = plan.groups();
 
         Map<Long, BigDecimal> totalByGroup = new HashMap<>();
@@ -183,7 +186,7 @@ class DayReadService {
 
     private static void validateRange(LocalDate desde, LocalDate hasta) {
         if (desde == null || hasta == null || hasta.isBefore(desde)
-            || java.time.temporal.ChronoUnit.DAYS.between(desde, hasta) >= MAX_RANGE_DAYS) {
+            || ChronoUnit.DAYS.between(desde, hasta) >= MAX_RANGE_DAYS) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un rango de hasta " + MAX_RANGE_DAYS + " días.");
         }
     }
@@ -209,7 +212,7 @@ class DayReadService {
         return new WeekMealData(meal.mealId(), mealName, meal.noteText(), status, flexible);
     }
 
-    private DayRegistroDto.MealDayDto buildMeal(uy.miga.plans.PlanReadData plan, Long mealId, MealNote note,
+    private DayRegistroDto.MealDayDto buildMeal(PlanReadData plan, Long mealId, MealNote note,
             List<FoodEntryFacade.EntryData> mealEntries, Map<Long, BigDecimal> totalByGroup) {
 
         List<DayRegistroDto.EntryItemDto> itemDtos = mealEntries.stream()

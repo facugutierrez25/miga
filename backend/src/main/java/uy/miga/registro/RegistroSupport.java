@@ -7,6 +7,7 @@ import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanService;
 
 import java.util.*;
+import uy.miga.plans.PlanNotFoundException;
 
 @Service
 class RegistroSupport {
@@ -40,7 +41,7 @@ class RegistroSupport {
     Long lockCurrentPlanIfPresent(Long userId) {
         try {
             return planService.lockCurrentPlan(userId);
-        } catch (uy.miga.plans.PlanNotFoundException ignored) {
+        } catch (PlanNotFoundException ignored) {
             // Un registro histórico puede existir sin plan vigente.
             return null;
         }

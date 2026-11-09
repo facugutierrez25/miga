@@ -18,6 +18,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import uy.miga.plans.PlanFoodGroupDto;
+import uy.miga.plans.PlanVersionConflictException;
 
 @Service
 class ItemCorrectionService {
@@ -81,10 +83,10 @@ class ItemCorrectionService {
 
         Long planId = support.entryPlanId(userId, entry);
         if (!planService.getMealIds(planId).contains(entry.mealId())) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+            throw new PlanVersionConflictException();
         }
         if (req.savesRule() && !planId.equals(currentPlanId)) {
-            throw new uy.miga.plans.PlanVersionConflictException();
+            throw new PlanVersionConflictException();
         }
         validateCorrectionGroups(planId, req);
 
@@ -127,7 +129,7 @@ class ItemCorrectionService {
 
         String food = planService.getPlanFoodGroups(planId).stream()
             .filter(g -> g.id().equals(req.foodGroupId()))
-            .findFirst().map(uy.miga.plans.PlanFoodGroupDto::name).orElse("alimento");
+            .findFirst().map(PlanFoodGroupDto::name).orElse("alimento");
 
         entryFacade.createResponseEntry(userId, userEmail, mealId, date, food, req.foodGroupId());
     }
@@ -195,7 +197,7 @@ class ItemCorrectionService {
 
     private void validateCorrectionGroups(Long planId, PatchItemRequest req) {
         Set<Long> planGroups = planService.getPlanFoodGroups(planId).stream()
-            .map(uy.miga.plans.PlanFoodGroupDto::id).collect(Collectors.toSet());
+            .map(PlanFoodGroupDto::id).collect(Collectors.toSet());
         List<Long> requestedGroups = req.grupos() != null
             ? req.grupos().stream().map(PatchItemRequest.GroupPortion::foodGroupId).toList()
             : (req.foodGroupId() != null ? List.of(req.foodGroupId()) : List.of());

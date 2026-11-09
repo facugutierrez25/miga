@@ -6,6 +6,7 @@ import uy.miga.reglas.FoodRuleDto;
 
 import java.time.LocalDate;
 import java.util.*;
+import uy.miga.plans.PlanReadData;
 
 @Service
 public class RegistroService {
@@ -29,7 +30,7 @@ public class RegistroService {
     }
 
     public Map<LocalDate, List<WeekMealData>> getWeekMealsForRange(Long userId, LocalDate start, LocalDate end,
-            Map<LocalDate, uy.miga.plans.PlanReadData> plans, List<FoodEntryFacade.EntryData> entries) {
+            Map<LocalDate, PlanReadData> plans, List<FoodEntryFacade.EntryData> entries) {
         return dayReadService.getWeekMealsForRange(userId, start, end, plans, entries);
     }
 

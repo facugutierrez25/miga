@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import uy.miga.reglas.RuleText;
 
 @Component
 public class FoodEntryFacade {
@@ -37,7 +38,8 @@ public class FoodEntryFacade {
                                 String originalText, Boolean uncertain,
                                 BigDecimal portions, String appliedRule, UUID occurrenceId,
                                 String ruleType, String ruleSource) {
-        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit != null ? unit.strip() : null, foodGroupId);
+        String cleanUnit = unit != null ? unit.strip() : null;
+        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, cleanUnit, foodGroupId);
         entry.setMealNoteId(mealNoteId);
         entry.setTextoOriginal(originalText);
         entry.setOrigen(EntryOrigin.RULE);
@@ -116,7 +118,7 @@ public class FoodEntryFacade {
             if (unit != null) e.setUnit(unit.strip());
             if (foodGroupId != null) e.setFoodGroupId(foodGroupId);
             if (portions != null) e.setPorciones(portions);
-            e.setAppliedRule("Corrección del usuario: " + e.getPorciones() + " " + uy.miga.reglas.RuleText.portionUnit(e.getPorciones()));
+            e.setAppliedRule("Corrección del usuario: " + e.getPorciones() + " " + RuleText.portionUnit(e.getPorciones()));
             e.setSupuesto(false);
             e.setOrigen(EntryOrigin.USER);
             e.setRuleType("NORMAL");

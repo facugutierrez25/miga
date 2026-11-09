@@ -18,6 +18,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.Clock;
+import uy.miga.plans.PlanFoodGroupDto;
 
 @Service
 class NoteService {
@@ -28,13 +30,13 @@ class NoteService {
     private final PlanService planService;
     private final ReglaService ruleService;
     private final UserService userService;
-    private final java.time.Clock clock;
+    private final Clock clock;
     private final RegistroSupport support;
     private final DayReadService dayReadService;
 
     NoteService(MealNoteRepository noteRepository, InterpreterService interpreter, ComparisonService comparison,
             FoodEntryFacade entryFacade, PlanService planService, ReglaService ruleService, UserService userService,
-            java.time.Clock clock, RegistroSupport support, DayReadService dayReadService) {
+            Clock clock, RegistroSupport support, DayReadService dayReadService) {
         this.noteRepository = noteRepository;
         this.interpreter = interpreter;
         this.comparison = comparison;
@@ -113,7 +115,7 @@ class NoteService {
 
         List<InterpretedItem> items = interpreter.interpret(text, rules);
         Map<Long, String> groupNames = planService.getPlanFoodGroups(planId).stream()
-            .collect(Collectors.toMap(uy.miga.plans.PlanFoodGroupDto::id, uy.miga.plans.PlanFoodGroupDto::name));
+            .collect(Collectors.toMap(PlanFoodGroupDto::id, PlanFoodGroupDto::name));
 
         createNoteEntries(userId, userEmail, mealId, date, saved, items, rules, planId, groupNames);
 
@@ -135,7 +137,7 @@ class NoteService {
                         item.originalText(), item.foodName(),
                         item.quantity(), item.unit(),
                         groupId, comp.standardGroupKey(),
-                        BigDecimal.valueOf(comp.porciones()).multiply(item.portions()).setScale(3, java.math.RoundingMode.HALF_UP),
+                        BigDecimal.valueOf(comp.porciones()).multiply(item.portions()).setScale(3, RoundingMode.HALF_UP),
                         item.appliedRule(), item.uncertain(), item.ruleId(), null, null
                     ));
                 }
