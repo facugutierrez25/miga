@@ -50,6 +50,24 @@ class SlowRequestFilterTest {
     }
 
     @Test
+    void logsFailedSlowRequestAsServerError() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SlowRequestFilter.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> new SlowRequestFilter(-1).doFilter(
+                    new MockHttpServletRequest("GET", "/api/v1/semana"), new MockHttpServletResponse(),
+                    (req, res) -> { throw new IllegalStateException("sin conexión"); }))
+                .isInstanceOf(IllegalStateException.class);
+            assertThat(appender.list).singleElement()
+                .extracting(ILoggingEvent::getFormattedMessage).asString().contains("estado=500");
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
     void sanitizesIdentifiersInFallbackPath() {
         assertThat(SlowRequestFilter.sanitizedPath("/api/123/2026-11-09/550e8400-e29b-41d4-a716-446655440000"))
             .isEqualTo("/api/{id}/{id}/{id}");

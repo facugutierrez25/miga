@@ -30,15 +30,19 @@ class SlowRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         long start = System.nanoTime();
+        boolean failed = false;
         try {
             chain.doFilter(request, response);
+        } catch (IOException | ServletException | RuntimeException e) {
+            failed = true;
+            throw e;
         } finally {
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             if (durationMs > thresholdMs) {
                 Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
                 String route = pattern != null ? pattern.toString() : sanitizedPath(request.getRequestURI());
                 log.warn("Solicitud lenta: metodo={} ruta={} estado={} duracionMs={} correlationId={}",
-                    request.getMethod(), route, response.getStatus(), durationMs, MDC.get("correlationId"));
+                    request.getMethod(), route, failed ? HttpServletResponse.SC_INTERNAL_SERVER_ERROR : response.getStatus(), durationMs, MDC.get("correlationId"));
             }
         }
     }
