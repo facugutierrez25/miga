@@ -55,10 +55,10 @@ class PlanIntegrationTest {
 
     @Test
     void getMyPlan_whenNoPlan_returns404() throws Exception {
-        String sinPlanToken = registerAndLogin("sinplan-" + java.util.UUID.randomUUID() + "@miga.uy");
+        String noPlanToken = registerAndLogin("sinplan-" + java.util.UUID.randomUUID() + "@miga.uy");
 
         mockMvc.perform(get("/api/v1/my-plan")
-                .header("Authorization", "Bearer " + sinPlanToken))
+                .header("Authorization", "Bearer " + noPlanToken))
                 .andExpect(status().isNotFound());
     }
 
@@ -151,7 +151,7 @@ class PlanIntegrationTest {
                 }
                 """;
 
-        String segundoPlan = """
+        String secondPlan = """
                 {
                   "meals": [
                     {
@@ -191,7 +191,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + histToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, histToken, segundoPlan)))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, histToken, secondPlan)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meals[0].name").value("Almuerzo"))
                 .andExpect(jsonPath("$.meals[1].name").value("Cena"));
@@ -264,7 +264,7 @@ class PlanIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
-    private static final String PLAN_UNA_COMIDA = """
+    private static final String SINGLE_MEAL_PLAN = """
             {
               "meals": [{
                 "name": "Desayuno",
@@ -288,7 +288,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, SINGLE_MEAL_PLAN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").isNumber());
     }
@@ -300,7 +300,7 @@ class PlanIntegrationTest {
         MvcResult first = mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, SINGLE_MEAL_PLAN)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -340,7 +340,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, SINGLE_MEAL_PLAN)))
                 .andExpect(status().isOk());
 
         String planVersionObsoleta = """
@@ -376,7 +376,7 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, PLAN_UNA_COMIDA)))
+                .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, t, SINGLE_MEAL_PLAN)))
                 .andExpect(status().isOk());
 
         String planSinVersion = """
@@ -415,7 +415,7 @@ class PlanIntegrationTest {
         java.util.List<Integer> statuses = runConcurrently(2, () -> mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_UNA_COMIDA))
+                .content(SINGLE_MEAL_PLAN))
             .andReturn().getResponse().getStatus());
 
         assertThat(statuses).containsExactlyInAnyOrder(200, 409);
@@ -431,10 +431,10 @@ class PlanIntegrationTest {
         mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(PLAN_UNA_COMIDA))
+                .content(SINGLE_MEAL_PLAN))
             .andExpect(status().isOk());
         String edited = uy.miga.PlanVersions.withCurrentVersion(mockMvc, t,
-            PLAN_UNA_COMIDA.replace("Desayuno", "Desayuno editado"));
+            SINGLE_MEAL_PLAN.replace("Desayuno", "Desayuno editado"));
 
         java.util.List<Integer> statuses = runConcurrently(2, () -> mockMvc.perform(put("/api/v1/my-plan")
                 .header("Authorization", "Bearer " + t)
@@ -473,7 +473,7 @@ class PlanIntegrationTest {
     @Test
     void versionCopiesConfigurationRulesAndActiveHabits() throws Exception {
         String t = registerAndLogin("copy-" + java.util.UUID.randomUUID() + "@miga.uy");
-        savePlan(t, PLAN_UNA_COMIDA);
+        savePlan(t, SINGLE_MEAL_PLAN);
         long oldId = jdbc.queryForObject("select max(id) from plans", Long.class);
         jdbc.update("update plans set modo_registro = 'LIBRE', margen_porciones = 1.5 where id = ?", oldId);
         jdbc.update("insert into plan_food_groups (plan_id, name, abbreviation, display_order, clave, color, preguntar_si_falta, opcional) values (?, 'Grupo propio', 'ABC', 9, 'propio', '#123456', true, true)", oldId);
@@ -486,7 +486,7 @@ class PlanIntegrationTest {
         jdbc.update("insert into food_rules (plan_id, alcance, alimento, tipo, componentes) values (?, 'PLAN', 'Compuesto sintético', 'COMPUESTO', cast(? as jsonb))",
                 oldId, "[{\"foodGroupId\":" + groupId + ",\"porciones\":2},{\"standardGroupKey\":\"frutas\",\"porciones\":1}]");
         jdbc.update("insert into plan_habits (plan_id, name, habit_type, archived_at) values (?, 'Archivado', 'SI_NO', now())", oldId);
-        savePlan(t, PLAN_UNA_COMIDA.replace("Desayuno", "Cena"));
+        savePlan(t, SINGLE_MEAL_PLAN.replace("Desayuno", "Cena"));
         long newId = jdbc.queryForObject("select max(id) from plans", Long.class);
         assertThat(newId).isNotEqualTo(oldId);
         assertThat(jdbc.queryForList("select uid, name, abbreviation, clave, color, display_order, preguntar_si_falta, opcional from plan_food_groups where plan_id = ? order by display_order", oldId))
@@ -507,10 +507,10 @@ class PlanIntegrationTest {
     @Test
     void unmappedComponentRollsBackNewVersion() throws Exception {
         String t = registerAndLogin("rollback-" + java.util.UUID.randomUUID() + "@miga.uy");
-        savePlan(t, PLAN_UNA_COMIDA);
+        savePlan(t, SINGLE_MEAL_PLAN);
         long oldId = jdbc.queryForObject("select max(id) from plans", Long.class);
         jdbc.update("insert into food_rules (plan_id, alcance, alimento, tipo, componentes) values (?, 'PLAN', 'Inv�lido', 'COMPUESTO', '[{\"foodGroupId\":-1,\"porciones\":1}]'::jsonb)", oldId);
-        assertThatThrownBy(() -> savePlan(t, PLAN_UNA_COMIDA.replace("Desayuno", "Cena")))
+        assertThatThrownBy(() -> savePlan(t, SINGLE_MEAL_PLAN.replace("Desayuno", "Cena")))
                 .hasRootCauseInstanceOf(IllegalStateException.class);
         assertThat(jdbc.queryForObject("select is_current from plans where id = ?", Boolean.class, oldId)).isTrue();
         assertThat(jdbc.queryForObject("select count(*) from plans where user_id = (select user_id from plans where id = ?)", Long.class, oldId)).isEqualTo(1);

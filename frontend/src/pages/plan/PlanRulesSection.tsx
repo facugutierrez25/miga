@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../components/Skeleton'
 import type { MealDto } from '../../api/plans'
 import { useCallback, useEffect, useState } from 'react'
 import { getPlanRules, type PlanRules } from '../../api/planRules'
@@ -105,7 +106,7 @@ export default function PlanRulesSection({
         </div>
       )}
 
-      {!plan && !error && <p role="status">Cargando reglas…</p>}
+      {!plan && !error && <LoadingSkeleton label="Cargando reglas…" />}
 
       {props && (
         <>

@@ -20,7 +20,7 @@ class WeekServiceTest {
         var entries = mock(FoodEntryFacade.class);
         var plans = mock(PlanService.class);
         var users = mock(UserService.class);
-        var registro = mock(uy.miga.registro.RegistroService.class);
+        var registro = mock(uy.miga.registro.DailyLogService.class);
         var service = new WeekService(habits, logs, entries, plans, users, registro);
         LocalDate monday = LocalDate.of(2026, 1, 5);
         when(users.findUserIdByEmail("user")).thenReturn(1L);
@@ -47,7 +47,7 @@ class WeekServiceTest {
         var users = mock(UserService.class);
         var plans = mock(PlanService.class);
         var service = new WeekService(mock(PlanHabitRepository.class), mock(HabitLogRepository.class),
-            mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.RegistroService.class));
+            mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.DailyLogService.class));
         LocalDate monday = LocalDate.of(2026, 11, 2);
         when(users.findUserIdByEmail("user")).thenReturn(1L);
         var plan = new uy.miga.plans.PlanReadData(10L, monday, null, "PORCIONES", new BigDecimal("0.5"),
@@ -72,7 +72,7 @@ class WeekServiceTest {
         HabitLogRepository logs = mock(HabitLogRepository.class);
         PlanService plans = mock(PlanService.class);
         UserService users = mock(UserService.class);
-        WeekService service = new WeekService(habits, logs, mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.RegistroService.class));
+        WeekService service = new WeekService(habits, logs, mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.DailyLogService.class));
         when(users.findUserIdByEmail("user")).thenReturn(1L);
         when(plans.getPlanIdForDate(1L, LocalDate.now())).thenReturn(20L);
         PlanHabit habit = new PlanHabit();
@@ -92,7 +92,7 @@ class WeekServiceTest {
         var logs = mock(HabitLogRepository.class);
         var plans = mock(PlanService.class);
         var users = mock(UserService.class);
-        var service = new WeekService(habits, logs, mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.RegistroService.class));
+        var service = new WeekService(habits, logs, mock(FoodEntryFacade.class), plans, users, mock(uy.miga.registro.DailyLogService.class));
         when(users.findUserIdByEmail("user")).thenReturn(1L);
         when(plans.getPlanIdForDate(eq(1L), any())).thenReturn(10L);
         PlanHabit habit = new PlanHabit(); habit.setPlanId(10L); habit.setHabitType(HabitType.SI_NO);
@@ -111,7 +111,7 @@ class WeekServiceTest {
         var plans = mock(PlanService.class);
         var entries = mock(FoodEntryFacade.class);
         var service = new WeekService(mock(PlanHabitRepository.class), mock(HabitLogRepository.class),
-            entries, plans, users, mock(uy.miga.registro.RegistroService.class));
+            entries, plans, users, mock(uy.miga.registro.DailyLogService.class));
         var start = LocalDate.of(2026, 11, 2);
         when(users.findUserIdByEmail("facundo@miga.uy")).thenReturn(42L);
         when(users.findFirstNameByEmail("facundo@miga.uy")).thenReturn("Facundo");

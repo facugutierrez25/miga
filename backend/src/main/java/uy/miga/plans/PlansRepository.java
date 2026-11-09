@@ -7,6 +7,8 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 interface PlansRepository extends JpaRepository<Plan, Long> {
     @Query(value = """
@@ -20,7 +22,7 @@ interface PlansRepository extends JpaRepository<Plan, Long> {
                             @Param("end") LocalDate end, @Param("zone") String zone);
 
     Optional<Plan> findByUserIdAndCurrentTrue(Long userId);
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Plan p WHERE p.userId = :userId AND p.current = true")
     Optional<Plan> lockCurrentByUserId(@Param("userId") Long userId);
 

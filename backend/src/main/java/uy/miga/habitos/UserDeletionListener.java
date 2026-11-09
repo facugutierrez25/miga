@@ -21,7 +21,10 @@ class UserDeletionListener {
     @Order(30)
     @Transactional(propagation = Propagation.MANDATORY)
     public void deleteUserData(UserDeletionRequested event) {
-        jdbc.update("delete from habit_logs where user_id = ? or plan_habit_id in (select h.id from plan_habits h join plans p on p.id=h.plan_id where p.user_id = ?)", event.userId(), event.userId());
+        jdbc.update("""
+            delete from habit_logs where user_id = ? or plan_habit_id in
+                (select h.id from plan_habits h join plans p on p.id = h.plan_id where p.user_id = ?)
+            """, event.userId(), event.userId());
         jdbc.update("delete from plan_habits where plan_id in (select id from plans where user_id = ?)", event.userId());
     }
 }

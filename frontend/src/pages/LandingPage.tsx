@@ -1,12 +1,12 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
-import Migas from '../components/Migas'
+import Crumbs from '../components/Crumbs'
 import { useTitle } from '../hooks/useTitle'
 import './LandingPage.css'
 
 // Un almuerzo de ejemplo: el plan en papel y cómo se ve en miga después de anotarlo.
-const ALMUERZO = [
+const LUNCH = [
   { id: 'prot', name: 'Proteínas', color: 'var(--g-prot)', done: 2, total: 2 },
   { id: 'cer', name: 'Cereales', color: 'var(--g-cer)', done: 1, total: 2 },
   { id: 'gras', name: 'Grasas', color: 'var(--g-gras)', done: 1, total: 1 },
@@ -60,7 +60,7 @@ export default function LandingPage() {
             </div>
             <div className="land-ejemplo__miga">
               <p className="land-ejemplo__rotulo">El almuerzo en miga</p>
-              <Migas rows={ALMUERZO} />
+              <Crumbs rows={LUNCH} />
               <p className="land-ejemplo__nota">
                 Anotaste milanesa con ensalada y una rodaja de pan: faltó 1 cereal.
               </p>

@@ -17,24 +17,24 @@ class PlanVersionListener {
 
     @EventListener
     void copyRules(PlanVersionCreated event) {
-        for (FoodRule source : repository.findByPlanIdAndAlcanceIn(event.oldPlanId(), List.of("PLAN", "USUARIO"))) {
+        for (FoodRule source : repository.findByPlanIdAndScopeIn(event.oldPlanId(), List.of("PLAN", "USUARIO"))) {
             FoodRule copy = new FoodRule();
             copy.setUid(source.getUid());
             copy.setOverridesRuleUid(source.getOverridesRuleUid());
             copy.setPlanId(event.newPlanId());
             copy.setUserId(source.getUserId());
-            copy.setAlcance(source.getAlcance());
-            copy.setAlimento(source.getAlimento());
-            copy.setSinonimos(source.getSinonimos() == null ? null : List.copyOf(source.getSinonimos()));
-            copy.setTipo(source.getTipo());
+            copy.setScope(source.getScope());
+            copy.setFood(source.getFood());
+            copy.setSynonyms(source.getSynonyms() == null ? null : List.copyOf(source.getSynonyms()));
+            copy.setType(source.getType());
             copy.setStandardGroupKey(source.getStandardGroupKey());
             copy.setFoodGroupId(remap(source.getFoodGroupId(), event.groupIdMap()));
-            copy.setComponentes(source.getComponentes() == null ? null : source.getComponentes().stream()
-                .map(c -> new Componente(remap(c.foodGroupId(), event.groupIdMap()), c.standardGroupKey(), c.porciones()))
+            copy.setComponents(source.getComponents() == null ? null : source.getComponents().stream()
+                .map(c -> new RuleComponent(remap(c.foodGroupId(), event.groupIdMap()), c.standardGroupKey(), c.portions()))
                 .toList());
-            copy.setCantidadPorPorcion(source.getCantidadPorPorcion());
-            copy.setUnidad(source.getUnidad());
-            copy.setPorcionPorDefecto(source.getPorcionPorDefecto());
+            copy.setAmountPerPortion(source.getAmountPerPortion());
+            copy.setUnit(source.getUnit());
+            copy.setDefaultPortions(source.getDefaultPortions());
             repository.save(copy);
         }
     }

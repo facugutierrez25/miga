@@ -1,5 +1,7 @@
 package uy.miga.registro;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 
 record InterpretedItemDto(
@@ -13,5 +15,5 @@ record InterpretedItemDto(
     String appliedRule,
     boolean uncertain,
     boolean recognized,
-    String tipo
+    @JsonProperty("tipo") String type
 ) {}

@@ -1,6 +1,8 @@
 package uy.miga.registro;
 
-import uy.miga.reglas.Componente;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import uy.miga.reglas.RuleComponent;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,8 +18,8 @@ record InterpretedItem(
     String appliedRule,
     boolean uncertain,
     Long ruleId,
-    List<Componente> components,
-    String tipo
+    List<RuleComponent> components,
+    @JsonProperty("tipo") String type
 ) {
     static InterpretedItem unrecognized(String originalText) {
         return new InterpretedItem(originalText, originalText, BigDecimal.ONE, "u",

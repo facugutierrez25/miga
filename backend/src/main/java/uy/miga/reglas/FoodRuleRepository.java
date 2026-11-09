@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
 
@@ -14,11 +16,11 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
     @Query("""
         SELECT r FROM FoodRule r
         WHERE
-            (r.alcance = 'GLOBAL')
-            OR (r.alcance = 'PLAN'    AND r.planId = :planId)
-            OR (r.alcance = 'USUARIO' AND r.userId = :userId AND r.planId = :planId)
+            (r.scope = 'GLOBAL')
+            OR (r.scope = 'PLAN'    AND r.planId = :planId)
+            OR (r.scope = 'USUARIO' AND r.userId = :userId AND r.planId = :planId)
         ORDER BY
-            CASE r.alcance
+            CASE r.scope
                 WHEN 'USUARIO' THEN 1
                 WHEN 'PLAN'    THEN 2
                 WHEN 'GLOBAL'  THEN 3
@@ -28,12 +30,12 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
     List<FoodRule> findApplicable(@Param("planId") Long planId,
                                   @Param("userId") Long userId);
 
-    List<FoodRule> findByUserIdAndPlanIdAndAlcance(Long userId, Long planId, String alcance);
+    List<FoodRule> findByUserIdAndPlanIdAndScope(Long userId, Long planId, String scope);
 
-    List<FoodRule> findByPlanIdAndAlcanceIn(Long planId, List<String> alcances);
+    List<FoodRule> findByPlanIdAndScopeIn(Long planId, List<String> scopes);
 
-    @Query("SELECT r FROM FoodRule r WHERE r.uid = :uid AND (r.alcance = 'GLOBAL' OR (r.alcance = 'PLAN' AND r.planId = :planId))")
-    java.util.Optional<FoodRule> findForAdjust(@Param("uid") java.util.UUID uid, @Param("planId") Long planId);
+    @Query("SELECT r FROM FoodRule r WHERE r.uid = :uid AND (r.scope = 'GLOBAL' OR (r.scope = 'PLAN' AND r.planId = :planId))")
+    Optional<FoodRule> findForAdjust(@Param("uid") UUID uid, @Param("planId") Long planId);
 
     void deleteByIdAndUserId(Long id, Long userId);
 }

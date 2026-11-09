@@ -1,5 +1,8 @@
 # Testcontainers levanta un PostgreSQL real y descartable para cada corrida de tests.
 spring:
+  jpa:
+    properties:
+      hibernate.generate_statistics: true
   datasource:
     url: jdbc:tc:postgresql:17-alpine:///miga
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver

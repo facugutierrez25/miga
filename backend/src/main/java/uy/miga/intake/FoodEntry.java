@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "food_entries")
@@ -31,7 +32,7 @@ class FoodEntry {
     @Column(nullable = false)
     private Double quantity;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String unit;
 
     @Column(name = "food_group_id")
@@ -48,21 +49,22 @@ class FoodEntry {
     private Long mealNoteId;
 
     @Column(name = "texto_original", length = 10000)
-    private String textoOriginal;
+    private String originalText;
 
-    @Column(length = 10)
-    private String origen;
+    @Column(name = "origen", length = 10)
+    private String origin;
 
-    private Boolean supuesto;
+    @Column(name = "supuesto")
+    private Boolean estimated;
 
-    @Column(precision = 8, scale = 3)
-    private BigDecimal porciones;
+    @Column(name = "porciones", precision = 8, scale = 3)
+    private BigDecimal portions;
 
     @Column(name = "applied_rule", columnDefinition = "text")
     private String appliedRule;
 
     @Column(name = "occurrence_id")
-    private java.util.UUID occurrenceId;
+    private UUID occurrenceId;
 
     // Tipo y origen de la regla aplicada (V36).
     @Column(name = "rule_type", length = 12)
@@ -70,6 +72,18 @@ class FoodEntry {
 
     @Column(name = "rule_source", length = 10)
     private String ruleSource;
+
+    @Column(nullable = false)
+    private boolean resolved;
+
+    @Column(name = "resolved_rule_uid")
+    private UUID resolvedRuleUid;
+
+    UUID getResolvedRuleUid() { return resolvedRuleUid; }
+    void setResolvedRuleUid(UUID uid) { this.resolvedRuleUid = uid; }
+
+    boolean isResolved() { return resolved; }
+    void setResolved(boolean resolved) { this.resolved = resolved; }
 
     FoodEntry() {}
 
@@ -97,12 +111,12 @@ class FoodEntry {
     boolean isConsumed()     { return consumed; }
     Long getDishId()         { return dishId; }
     Long getMealNoteId()     { return mealNoteId; }
-    String getTextoOriginal(){ return textoOriginal; }
-    String getOrigen()       { return origen; }
-    Boolean getSupuesto()    { return supuesto; }
-    BigDecimal getPorciones(){ return porciones; }
+    String getOriginalText(){ return originalText; }
+    String getOrigin()       { return origin; }
+    Boolean getEstimated()    { return estimated; }
+    BigDecimal getPortions(){ return portions; }
     String getAppliedRule()  { return appliedRule; }
-    java.util.UUID getOccurrenceId() { return occurrenceId; }
+    UUID getOccurrenceId() { return occurrenceId; }
     String getRuleType()     { return ruleType; }
     String getRuleSource()   { return ruleSource; }
 
@@ -112,12 +126,12 @@ class FoodEntry {
     void setFoodGroupId(Long foodGroupId)          { this.foodGroupId = foodGroupId; }
     void setConsumed(boolean consumed)             { this.consumed = consumed; }
     void setMealNoteId(Long mealNoteId)       { this.mealNoteId = mealNoteId; }
-    void setTextoOriginal(String textoOriginal){ this.textoOriginal = textoOriginal; }
-    void setOrigen(String origen)             { this.origen = origen; }
-    void setSupuesto(Boolean supuesto)        { this.supuesto = supuesto; }
-    void setPorciones(BigDecimal porciones)   { this.porciones = porciones; }
+    void setOriginalText(String originalText){ this.originalText = originalText; }
+    void setOrigin(String origin)             { this.origin = origin; }
+    void setEstimated(Boolean estimated)        { this.estimated = estimated; }
+    void setPortions(BigDecimal portions)   { this.portions = portions; }
     void setAppliedRule(String appliedRule)   { this.appliedRule = appliedRule; }
-    void setOccurrenceId(java.util.UUID id)   { this.occurrenceId = id; }
+    void setOccurrenceId(UUID id)   { this.occurrenceId = id; }
     void setRuleType(String ruleType)         { this.ruleType = ruleType; }
     void setRuleSource(String ruleSource)     { this.ruleSource = ruleSource; }
 }

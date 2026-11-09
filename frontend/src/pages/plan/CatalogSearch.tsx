@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
 import {
-  searchCatalog,
   adjustFromCatalog,
   type CatalogItem,
   type FoodRule,
 } from '../../api/planRules'
+import { useCatalogSearch } from '../../lib/useCatalogSearch'
 import type { EditorProps } from './GroupsEditor'
 
 export default function CatalogSearch({
@@ -14,38 +13,7 @@ export default function CatalogSearch({
   onAdjusted,
   query,
 }: EditorProps & { query: string; onAdjusted: (rule: FoodRule) => void }) {
-  const [response, setResponse] = useState<{ query: string; items: CatalogItem[] }>({ query: '', items: [] })
-  const results = response.query === query ? response.items : []
-  const [failure, setFailure] = useState({ query: '', message: '' })
-  const error = failure.query === query ? failure.message : ''
-  const [loadingQuery, setLoadingQuery] = useState<string | null>(null)
-  const loading = loadingQuery === query && query.trim().length >= 2
-  useEffect(() => {
-    let active = true
-    const timer = setTimeout(() => {
-      if (query.trim().length < 2) {
-        setResponse({ query, items: [] })
-        return
-      }
-      setLoadingQuery(query)
-      setFailure({ query, message: '' })
-      searchCatalog(token, query.trim())
-        .then((data) => {
-          if (active) setResponse({ query, items: data })
-        })
-        .catch(() => {
-          if (active) setFailure({ query, message: 'No se pudo buscar. Intentá de nuevo.' })
-        })
-        .finally(() => {
-          if (active) setLoadingQuery(null)
-        })
-    }, 300)
-
-    return () => {
-      active = false
-      clearTimeout(timer)
-    }
-  }, [token, query])
+  const { results, error, loading } = useCatalogSearch(token, query)
 
   async function adjust(item: CatalogItem, row: HTMLElement | null) {
     const next = await mutate(() => adjustFromCatalog(token, item.uid, plan.planVersion))

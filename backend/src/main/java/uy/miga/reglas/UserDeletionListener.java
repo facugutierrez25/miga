@@ -21,6 +21,9 @@ class UserDeletionListener {
     @Order(40)
     @Transactional(propagation = Propagation.MANDATORY)
     public void deleteUserData(UserDeletionRequested event) {
-        jdbc.update("delete from food_rules where alcance <> 'GLOBAL' and (user_id = ? or plan_id in (select id from plans where user_id = ?))", event.userId(), event.userId());
+        jdbc.update("""
+            delete from food_rules where alcance <> 'GLOBAL'
+                and (user_id = ? or plan_id in (select id from plans where user_id = ?))
+            """, event.userId(), event.userId());
     }
 }

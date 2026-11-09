@@ -10,16 +10,29 @@ public final class RuleText {
     }
     public static String describe(FoodRuleDto r, Map<Long, String> groupNames) {
         String group = r.foodGroupId() == null ? "grupo" : groupNames.getOrDefault(r.foodGroupId(), "grupo");
-        return switch (r.tipo()) {
-            case "LIBRE" -> r.alimento() + ": libre";
-            case "FLEXIBLE" -> r.alimento() + ": cuenta como comida flexible";
-            case "NO_CUENTA" -> r.alimento() + ": no suma";
-            case "COMPUESTO" -> "1 " + r.alimento()
-                + (r.cantidadPorPorcion() != null ? " (" + number(r.cantidadPorPorcion()) + " " + r.unidad() + ")" : "") + " = " + r.componentes().stream()
-                .map(c -> number(BigDecimal.valueOf(c.porciones())) + " " + portionUnit(BigDecimal.valueOf(c.porciones())) + " de " + (c.foodGroupId() == null ? (c.standardGroupKey() == null ? "grupo" : c.standardGroupKey()) : groupNames.getOrDefault(c.foodGroupId(), "grupo")))
+        return switch (r.type()) {
+            case "LIBRE" -> r.food() + ": libre";
+            case "FLEXIBLE" -> r.food() + ": cuenta como comida flexible";
+            case "NO_CUENTA" -> r.food() + ": no suma";
+            case "COMPUESTO" -> "1 " + r.food() + compoundMeasure(r) + " = " + r.components().stream()
+                .map(c -> componentText(c, groupNames))
                 .collect(Collectors.joining(" + "));
-            default -> r.cantidadPorPorcion() != null ? number(r.cantidadPorPorcion()) + " " + r.unidad() + " de " + r.alimento() + " = 1 porción de " + group
-                : "1 " + r.alimento() + " = " + number(r.porcionPorDefecto()) + " " + portionUnit(r.porcionPorDefecto()) + " de " + group;
+            default -> r.amountPerPortion() != null
+                ? number(r.amountPerPortion()) + " " + r.unit() + " de " + r.food() + " = 1 porción de " + group
+                : "1 " + r.food() + " = " + number(r.defaultPortions()) + " " + portionUnit(r.defaultPortions())
+                    + " de " + group;
         };
+    }
+
+    private static String compoundMeasure(FoodRuleDto r) {
+        return r.amountPerPortion() != null ? " (" + number(r.amountPerPortion()) + " " + r.unit() + ")" : "";
+    }
+
+    private static String componentText(RuleComponent c, Map<Long, String> groupNames) {
+        BigDecimal portions = BigDecimal.valueOf(c.portions());
+        String group = c.foodGroupId() != null
+            ? groupNames.getOrDefault(c.foodGroupId(), "grupo")
+            : (c.standardGroupKey() == null ? "grupo" : c.standardGroupKey());
+        return number(portions) + " " + portionUnit(portions) + " de " + group;
     }
 }

@@ -2,23 +2,95 @@ package uy.miga.registro;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import uy.miga.reglas.Componente;
+import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.FoodRuleDto;
+import uy.miga.reglas.RuleInput;
+import uy.miga.reglas.FoodRuleService;
+import uy.miga.intake.FoodEntryFacade;
+import uy.miga.plans.PlanService;
+import uy.miga.plans.PlanFoodGroupDto;
+import uy.miga.users.UserService;
+import org.mockito.ArgumentCaptor;
+import java.time.LocalDate;
+import java.time.Clock;
+import java.util.UUID;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 class InterpreterServiceTest {
 
     private InterpreterService interpreter;
 
+    @Test
+    void unknownMentionPreservesWrittenMeasureForResolution() {
+        var item = new InterpreterService().interpret("200 g de zqxalimento", List.of()).getFirst();
+        assertThat(item.recognized()).isFalse();
+        assertThat(item.foodName()).isEqualTo("zqxalimento");
+        assertThat(item.quantity()).isEqualByComparingTo("200");
+        assertThat(item.unit()).isEqualTo("g");
+        var resolved = new InterpreterService().computePortions(item.originalText(), item.quantity().doubleValue(), item.unit(),
+            normal(1L, "equivalente", 1L, new BigDecimal("50"), "g"));
+        assertThat(resolved.portions()).isEqualByComparingTo("4");
+    }
+
+    @Test
+    void bareSameAsUsesDefaultPortion() {
+        var item = interpreter.interpret("zqxalimento", List.of()).getFirst();
+        assertThat(item.unit()).isNull();
+        assertThat(item.quantity()).isEqualByComparingTo("1");
+        var equivalent = rule(1L, "equivalente", List.of(), "NORMAL", 7L, null,
+            new BigDecimal("50"), "u", new BigDecimal("3"), List.of());
+        var resolved = interpreter.computePortions(item.originalText(), item.quantity().doubleValue(), item.unit(), equivalent);
+        assertThat(resolved.portions()).isEqualByComparingTo("3");
+        assertThat(resolved.portions()).isEqualByComparingTo(interpreter.interpret("equivalente", List.of(equivalent)).getFirst().portions());
+    }
+
+    @Test
+    void bareGroupsRememberedRuleRoundTrips() {
+        var entries = mock(FoodEntryFacade.class);
+        var plans = mock(PlanService.class);
+        var rules = mock(FoodRuleService.class);
+        var users = mock(UserService.class);
+        var date = LocalDate.now();
+        var entry = new FoodEntryFacade.EntryData(3L, 10L, "zqxalimento", 1.0, null,
+            null, false, null, "UNKNOWN", false, null, date, "zqxalimento", null,
+            UUID.randomUUID(), null, null, false, null);
+        when(users.findUserIdByEmail("user")).thenReturn(1L);
+        when(plans.lockCurrentPlan(1L)).thenReturn(20L);
+        when(plans.getPlanIdForDate(1L, date)).thenReturn(20L);
+        when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(
+            new PlanFoodGroupDto(7L, "Cereales", "CER", 0, null, "CER", false, false, UUID.randomUUID())));
+        when(entries.findEntryByIdAndUserId(anyLong(), eq(1L))).thenReturn(entry);
+        when(rules.createUserRule(eq(1L), eq(20L),
+            any(RuleInput.class))).thenAnswer(invocation -> {
+                RuleInput input = invocation.getArgument(2);
+                return rule(1L, input.food(), input.synonyms(), input.type(), input.foodGroupId(), null,
+                    input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components());
+            });
+        var service = DailyLogTestServices.create(mock(MealNoteRepository.class), interpreter,
+            mock(ComparisonService.class), entries, plans, rules, users, Clock.systemUTC());
+        service.resolveItem("user", date, 3L, new ResolveItemRequest(ResolveItemRequest.Kind.GROUPS, null,
+            List.of(new ResolveItemRequest.GroupPortion(7L, new BigDecimal("2"))), true));
+        var capture = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).createUserRule(eq(1L), eq(20L), capture.capture());
+        var input = capture.getValue();
+        assertThat(input.amountPerPortion()).isNull();
+        assertThat(input.unit()).isNull();
+        var created = rule(1L, input.food(), input.synonyms(), input.type(), input.foodGroupId(), null,
+            input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components());
+        assertThat(interpreter.interpret("zqxalimento", List.of(created)).getFirst().portions()).isEqualByComparingTo("2");
+    }
+
     private static FoodRuleDto rule(Long id, String name, List<String> synonyms,
                                     String type, Long groupId, String groupKey,
                                     BigDecimal qtyPerPortion, String unit,
                                     BigDecimal defaultPortion,
-                                    List<Componente> components) {
+                                    List<RuleComponent> components) {
         return new FoodRuleDto(id, "GLOBAL", null, null, name, synonyms, type,
             groupKey, groupId, components, qtyPerPortion, unit, defaultPortion);
     }
@@ -331,7 +403,7 @@ class InterpreterServiceTest {
     @Test void compoundConvertsMeasuredQuantityToPortions() {
         var compound = rule(1L, "Tarta", List.of(), "COMPUESTO", null, null,
             new BigDecimal("150"), "g", BigDecimal.ONE,
-            List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+            List.of(new RuleComponent(3L, null, 1), new RuleComponent(4L, null, 1)));
         for (String text : List.of("200 g de tarta", "0.2 kg de tarta")) {
             var item = interpreter.interpret(text, List.of(compound)).getFirst();
             assertThat(item.portions()).isEqualTo(new BigDecimal("1.333"));
@@ -345,7 +417,7 @@ class InterpreterServiceTest {
 
     @Test void compoundWithoutConversionScalesByQuantityEvenWithAnotherDefaultPortion() {
         var compound = rule(1L, "Tarta", List.of(), "COMPUESTO", null, null, null, null, new BigDecimal("2"),
-            List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+            List.of(new RuleComponent(3L, null, 1), new RuleComponent(4L, null, 1)));
         assertThat(interpreter.interpret("1 tarta", List.of(compound)).getFirst().portions()).isEqualTo(new BigDecimal("1.000"));
     }
 
@@ -353,7 +425,7 @@ class InterpreterServiceTest {
         for (boolean measured : List.of(true, false)) {
             var compound = rule(1L, "chivito", List.of(), "COMPUESTO", null, null,
                 measured ? new BigDecimal("150") : null, measured ? "g" : null, BigDecimal.ONE,
-                List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)));
+                List.of(new RuleComponent(3L, null, 1), new RuleComponent(4L, null, 1)));
             var item = interpreter.interpret("2 chivitos", List.of(compound)).getFirst();
             assertThat(item.portions()).isEqualTo(new BigDecimal("2.000"));
             assertThat(item.uncertain()).isTrue();

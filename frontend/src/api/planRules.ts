@@ -23,10 +23,10 @@ export class PlanRulesError extends ApiError {
   declare readonly error: string
   readonly comidas?: number
   readonly alimentos?: number
-  constructor(code: ErrorCode, error: string, comidas?: number, alimentos?: number, status = 409) {
-    super(status, error, { code, error, comidas, alimentos })
-    this.comidas = comidas
-    this.alimentos = alimentos
+  constructor(code: ErrorCode, error: string, meals?: number, foods?: number, status = 409) {
+    super(status, error, { code, error, comidas: meals, alimentos: foods })
+    this.comidas = meals
+    this.alimentos = foods
   }
 }
 async function request<T>(token: string, path: string, method = 'GET', body?: unknown): Promise<T> {

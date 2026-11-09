@@ -1,27 +1,27 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { useDayRegistro } from './useDayRegistro'
+import { useDayRecord } from './useDayRecord'
 import { usePlan } from './usePlan'
 import { useWeek } from './useWeek'
-import { getDayRegistro, type DayRegistroDto } from '../api/registro'
+import { getDayRecord, type DayRecordDto } from '../api/records'
 import { getMyPlan, type PlanDto } from '../api/plans'
-import { getWeek, type WeekSummaryDto } from '../api/semana'
+import { getWeek, type WeekSummaryDto } from '../api/week'
 
-vi.mock('../api/registro')
+vi.mock('../api/records')
 vi.mock('../api/plans')
-vi.mock('../api/semana')
+vi.mock('../api/week')
 afterEach(() => vi.resetAllMocks())
 
-const day: DayRegistroDto = { date: '2026-01-01', meals: [], summary: [] }
+const day: DayRecordDto = { date: '2026-01-01', meals: [], summary: [] }
 const plan: PlanDto = { foodGroups: [], meals: [] }
 const week: WeekSummaryDto = { weekStart: '2026-01-01', weekEnd: '2026-01-07', habits: [], days: [] }
 
 it('descarta el día A lento cuando ya se pidió B, aunque el servidor ignore abort', async () => {
-  let resolveA!: (value: DayRegistroDto) => void
-  vi.mocked(getDayRegistro).mockImplementationOnce(() => new Promise(resolve => { resolveA = resolve }))
+  let resolveA!: (value: DayRecordDto) => void
+  vi.mocked(getDayRecord).mockImplementationOnce(() => new Promise(resolve => { resolveA = resolve }))
     .mockResolvedValueOnce({ ...day, date: '2026-01-02' })
-  const { result, rerender } = renderHook(({ date }) => useDayRegistro('token', 'a@b.uy', date), { initialProps: { date: '2026-01-01' } })
-  const signalA = vi.mocked(getDayRegistro).mock.calls[0][2]!
+  const { result, rerender } = renderHook(({ date }) => useDayRecord('token', 'a@b.uy', date), { initialProps: { date: '2026-01-01' } })
+  const signalA = vi.mocked(getDayRecord).mock.calls[0][2]!
   rerender({ date: '2026-01-02' })
   expect(signalA.aborted).toBe(true)
   await waitFor(() => expect(result.current.data?.date).toBe('2026-01-02'))
@@ -30,7 +30,7 @@ it('descarta el día A lento cuando ya se pidió B, aunque el servidor ignore ab
 })
 
 const cases = [
-  { name: 'día', mock: vi.mocked(getDayRegistro), data: day, useLoad: (token: string | null, user: string) => useDayRegistro(token, user, day.date) },
+  { name: 'día', mock: vi.mocked(getDayRecord), data: day, useLoad: (token: string | null, user: string) => useDayRecord(token, user, day.date) },
   { name: 'plan', mock: vi.mocked(getMyPlan), data: plan, useLoad: (token: string | null, user: string) => usePlan(token, user) },
   { name: 'semana', mock: vi.mocked(getWeek), data: week, useLoad: (token: string | null, user: string) => useWeek(token, user, week.weekStart) },
 ]
@@ -100,10 +100,10 @@ it('descarta el plan del usuario anterior aunque termine después del nuevo', as
 })
 
 it('distingue éxito, error de recarga y reintento', async () => {
-  const recordedDay: DayRegistroDto = { ...day, meals: [{ mealId: 1, noteId: 1, noteVersion: 1, noteText: 'pan', items: [], comparison: [] }] }
-  vi.mocked(getDayRegistro).mockResolvedValueOnce(recordedDay).mockRejectedValueOnce(new Error('Sin conexión'))
+  const recordedDay: DayRecordDto = { ...day, meals: [{ mealId: 1, noteId: 1, noteVersion: 1, noteText: 'pan', items: [], comparison: [] }] }
+  vi.mocked(getDayRecord).mockResolvedValueOnce(recordedDay).mockRejectedValueOnce(new Error('Sin conexión'))
     .mockResolvedValueOnce(recordedDay)
-  const { result } = renderHook(() => useDayRegistro('token', 'a@b.uy', day.date))
+  const { result } = renderHook(() => useDayRecord('token', 'a@b.uy', day.date))
   await waitFor(() => expect(result.current.status).toBe('success'))
   await act(async () => { await expect(result.current.reload()).rejects.toThrow('Sin conexión') })
   expect(result.current.status).toBe('error')
@@ -113,11 +113,11 @@ it('distingue éxito, error de recarga y reintento', async () => {
 })
 
 it('cancela también la recarga manual cuando se cambia de día', async () => {
-  let resolveReload!: (value: DayRegistroDto) => void
-  vi.mocked(getDayRegistro).mockResolvedValueOnce(day)
+  let resolveReload!: (value: DayRecordDto) => void
+  vi.mocked(getDayRecord).mockResolvedValueOnce(day)
     .mockImplementationOnce(() => new Promise(resolve => { resolveReload = resolve }))
     .mockResolvedValueOnce({ ...day, date: '2026-01-02' })
-  const { result, rerender } = renderHook(({ date }) => useDayRegistro('token', 'a@b.uy', date), { initialProps: { date: day.date } })
+  const { result, rerender } = renderHook(({ date }) => useDayRecord('token', 'a@b.uy', date), { initialProps: { date: day.date } })
   await waitFor(() => expect(result.current.data).toEqual(day))
   const pending = result.current.reload()
   const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })

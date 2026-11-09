@@ -1,5 +1,7 @@
 package uy.miga.habitos;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.lowagie.text.Document;
 import com.lowagie.text.Font;
 import com.lowagie.text.PageSize;
@@ -9,7 +11,7 @@ import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import org.dhatim.fastexcel.Workbook;
-import uy.miga.registro.SinReglaDto;
+import uy.miga.registro.UnmatchedFoodDto;
 import uy.miga.registro.WeekMealData;
 
 import java.io.IOException;
@@ -23,40 +25,61 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Image;
+import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.ColumnText;
+import com.lowagie.text.pdf.PdfAction;
+import com.lowagie.text.pdf.PdfAnnotation;
+import com.lowagie.text.pdf.PdfBorderArray;
+import com.lowagie.text.pdf.PdfPageEventHelper;
+import java.awt.Color;
+import java.nio.file.Files;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import org.dhatim.fastexcel.BorderSide;
+import org.dhatim.fastexcel.HyperLink;
+import org.dhatim.fastexcel.PaperSize;
+import org.dhatim.fastexcel.Position;
+import org.dhatim.fastexcel.Worksheet;
 
 final class WeekExport {
     private WeekExport() {}
 
     // Secciones que se pueden incluir (parámetro `incluir`).
-    static final String TEXTO = "texto";
-    static final String PORCIONES = "porciones";
-    static final String HABITOS = "habitos";
-    static final String SIN_REGLA = "sinregla";
-    static final Set<String> SECCIONES = Set.of(TEXTO, PORCIONES, HABITOS, SIN_REGLA);
+    static final String TEXT = "texto";
+    static final String PORTIONS = "porciones";
+    static final String HABITS = "habitos";
+    static final String UNMATCHED_FOODS = "sinregla";
+    static final Set<String> SECTIONS = Set.of(TEXT, PORTIONS, HABITS, UNMATCHED_FOODS);
     // Sin `incluir`, la planilla sale como antes: lo escrito y los hábitos.
-    static final Set<String> POR_DEFECTO = Set.of(TEXTO, HABITOS);
+    static final Set<String> DEFAULT_SECTIONS = Set.of(TEXT, HABITS);
 
-    record Data(WeekSummaryDto week, Set<String> incluir, List<String> groupNames,
-                Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla, String userName) {
-        Data(WeekSummaryDto week, Set<String> incluir, List<String> groupNames,
-             Map<LocalDate, Map<String, BigDecimal>> portions, List<SinReglaDto> sinRegla) {
-            this(week, incluir, groupNames, portions, sinRegla, null);
+    record Data(WeekSummaryDto week, @JsonProperty("incluir") Set<String> includedSections, List<String> groupNames,
+                Map<LocalDate, Map<String, BigDecimal>> portions, @JsonProperty("sinRegla") List<UnmatchedFoodDto> unmatchedFoods, String userName) {
+        Data(WeekSummaryDto week, Set<String> includedSections, List<String> groupNames,
+             Map<LocalDate, Map<String, BigDecimal>> portions, List<UnmatchedFoodDto> unmatchedFoods) {
+            this(week, includedSections, groupNames, portions, unmatchedFoods, null);
         }
         static Data of(WeekSummaryDto week) {
-            return new Data(week, POR_DEFECTO, List.of(), Map.of(), List.of());
+            return new Data(week, DEFAULT_SECTIONS, List.of(), Map.of(), List.of());
         }
     }
 
-    static Set<String> parseIncluir(String raw) {
-        if (raw == null || raw.isBlank()) return POR_DEFECTO;
+    static Set<String> parseIncludedSections(String raw) {
+        if (raw == null || raw.isBlank()) return DEFAULT_SECTIONS;
         Set<String> result = new LinkedHashSet<>();
         for (String part : raw.split(",")) {
             String value = part.strip().toLowerCase(Locale.ROOT);
             if (value.isEmpty()) continue;
-            if (!SECCIONES.contains(value)) throw new IllegalArgumentException("Sección inválida: " + value);
+            if (!SECTIONS.contains(value)) throw new IllegalArgumentException("Sección inválida: " + value);
             result.add(value);
         }
-        return result.isEmpty() ? POR_DEFECTO : Set.copyOf(result);
+        return result.isEmpty() ? DEFAULT_SECTIONS : Set.copyOf(result);
     }
 
     static List<List<String>> grid(WeekSummaryDto week) {
@@ -66,14 +89,14 @@ final class WeekExport {
     // Una fila por día y una columna por comida, como la planilla.
     static List<List<String>> grid(Data data) {
         var week = data.week();
-        boolean texto = data.incluir().contains(TEXTO);
-        boolean porciones = data.incluir().contains(PORCIONES);
-        boolean habitos = data.incluir().contains(HABITOS);
-        var mealNames = texto || porciones
+        boolean text = data.includedSections().contains(TEXT);
+        boolean portions = data.includedSections().contains(PORTIONS);
+        boolean includeHabits = data.includedSections().contains(HABITS);
+        var mealNames = text || portions
             ? week.days().stream().flatMap(d -> d.meals().stream()).map(WeekMealData::name).distinct().toList()
             : List.<String>of();
-        var groupNames = porciones ? data.groupNames() : List.<String>of();
-        var habits = habitos ? habitColumns(week.habits()) : List.<HabitColumn>of();
+        var groupNames = portions ? data.groupNames() : List.<String>of();
+        var habits = includeHabits ? habitColumns(week.habits()) : List.<HabitColumn>of();
 
         List<List<String>> rows = new ArrayList<>();
         List<String> header = new ArrayList<>(List.of("Fecha"));
@@ -85,7 +108,7 @@ final class WeekExport {
             List<String> row = new ArrayList<>(List.of(day.date().toString()));
             for (String name : mealNames) {
                 row.add(day.meals().stream().filter(m -> name.equals(m.name()))
-                    .map(m -> mealCell(m, texto, porciones)).collect(Collectors.joining("\n")));
+                    .map(m -> mealCell(m, text, portions)).collect(Collectors.joining("\n")));
             }
             var dayPortions = data.portions().getOrDefault(day.date(), Map.of());
             for (String group : groupNames) {
@@ -109,7 +132,7 @@ final class WeekExport {
     // Como las comidas, un hábito ocupa una columna aunque el plan tenga varias versiones.
     // El uid identifica el hábito; cada día conserva el id de la versión vigente para sus registros.
     private static List<HabitColumn> habitColumns(List<HabitDto> habits) {
-        Map<Object, List<HabitDto>> versions = new java.util.LinkedHashMap<>();
+        Map<Object, List<HabitDto>> versions = new LinkedHashMap<>();
         for (var habit : habits) {
             Object key = habit.uid() != null ? habit.uid() : habit.id();
             versions.computeIfAbsent(key, ignored -> new ArrayList<>()).add(habit);
@@ -118,21 +141,21 @@ final class WeekExport {
             values.getLast().name(), values.stream().map(HabitDto::id).distinct().toList())).toList();
     }
 
-    static List<List<String>> sinReglaGrid(Data data) {
+    static List<List<String>> unmatchedFoodsGrid(Data data) {
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Fecha", "Comida", "Lo que escribiste"));
-        for (var item : data.sinRegla()) rows.add(List.of(item.fecha().toString(), item.comida(), item.texto()));
+        for (var item : data.unmatchedFoods()) rows.add(List.of(item.date().toString(), item.meal(), item.text()));
         return rows;
     }
 
-    private static boolean withSinRegla(Data data) {
-        return data.incluir().contains(SIN_REGLA);
+    private static boolean withUnmatchedFoods(Data data) {
+        return data.includedSections().contains(UNMATCHED_FOODS);
     }
 
-    private static String mealCell(WeekMealData meal, boolean texto, boolean porciones) {
+    private static String mealCell(WeekMealData meal, boolean text, boolean portions) {
         List<String> parts = new ArrayList<>();
-        if (texto && meal.noteText() != null && !meal.noteText().isBlank()) parts.add(meal.noteText());
-        if (porciones) parts.add(statusLabel(meal));
+        if (text && meal.noteText() != null && !meal.noteText().isBlank()) parts.add(meal.noteText());
+        if (portions) parts.add(statusLabel(meal));
         return String.join("\n", parts);
     }
 
@@ -164,9 +187,9 @@ final class WeekExport {
     static String csv(Data data) {
         StringBuilder csv = new StringBuilder("﻿");
         appendCsv(csv, grid(data));
-        if (withSinRegla(data)) {
+        if (withUnmatchedFoods(data)) {
             csv.append("\r\n");
-            appendCsv(csv, sinReglaGrid(data));
+            appendCsv(csv, unmatchedFoodsGrid(data));
         }
         return csv.toString();
     }
@@ -195,21 +218,21 @@ final class WeekExport {
     private static final int TABLE_ROW = 5;
 
     static void writeXlsx(Data data, OutputStream out) throws IOException {
-        var file = java.nio.file.Files.createTempFile("miga-export-", ".xlsx");
+        var file = Files.createTempFile("miga-export-", ".xlsx");
         try {
-            try (var stream = java.nio.file.Files.newOutputStream(file);
+            try (var stream = Files.newOutputStream(file);
                  Workbook workbook = new Workbook(stream, "Miga", "1.0")) {
                 writeSheet(workbook.newWorksheet("Planilla"), grid(data), data, title(data));
-                if (withSinRegla(data)) writeSheet(workbook.newWorksheet("Sin regla"), sinReglaGrid(data), data, "Sin regla");
+                if (withUnmatchedFoods(data)) writeSheet(workbook.newWorksheet("Sin regla"), unmatchedFoodsGrid(data), data, "Sin regla");
             }
-            ExportLogo.addToWorkbook(file, out, withSinRegla(data) ? 2 : 1, resource("miga-wordmark.png"));
+            ExportLogo.addToWorkbook(file, out, withUnmatchedFoods(data) ? 2 : 1, resource("miga-wordmark.png"));
         } finally {
-            java.nio.file.Files.deleteIfExists(file);
+            Files.deleteIfExists(file);
         }
     }
 
     static String title(Data data) {
-        boolean week = java.time.temporal.ChronoUnit.DAYS.between(data.week().weekStart(), data.week().weekEnd()) == 6;
+        boolean week = ChronoUnit.DAYS.between(data.week().weekStart(), data.week().weekEnd()) == 6;
         String name = data.userName() == null ? "" : data.userName().replaceAll("[\\r\\n]+", " ").strip();
         return name.isEmpty() ? week ? "Tu semana" : "Tu registro" : (week ? "Semana de " : "Registro de ") + name;
     }
@@ -218,14 +241,14 @@ final class WeekExport {
         var start = data.week().weekStart();
         var end = data.week().weekEnd();
         var locale = Locale.forLanguageTag("es-UY");
-        var full = java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", locale);
+        var full = DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", locale);
         if (start.equals(end)) return start.format(full);
         if (start.getYear() != end.getYear()) return start.format(full) + " al " + end.format(full);
         if (start.getMonth() == end.getMonth()) return start.getDayOfMonth() + " al " + end.format(full);
-        return start.format(java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM", locale)) + " al " + end.format(full);
+        return start.format(DateTimeFormatter.ofPattern("d 'de' MMMM", locale)) + " al " + end.format(full);
     }
 
-    private static void writeSheet(org.dhatim.fastexcel.Worksheet sheet, List<List<String>> rows,
+    private static void writeSheet(Worksheet sheet, List<List<String>> rows,
                                    Data data, String title) {
         int lastCol = Math.max(1, rows.getFirst().size() - 1);
         sheet.hideGridLines();
@@ -233,15 +256,15 @@ final class WeekExport {
             .fontName("Onest").fontSize(11).fontColor(INK).fillColor(SURFACE).set();
         sheet.range(0, 0, 3, lastCol).style().fillColor(PAPER).set();
         sheet.range(0, 0, 0, lastCol).style().merge().fontName("Onest").fontSize(26).fontColor(BRAND).bold()
-            .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "medium")
-            .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, ACCENT).set();
+            .borderStyle(BorderSide.BOTTOM, "medium")
+            .borderColor(BorderSide.BOTTOM, ACCENT).set();
         sheet.rowHeight(0, 44);
         sheet.value(1, 0, title);
         sheet.range(1, 0, 1, lastCol).style().merge().fontName("Onest").fontSize(16).bold().set();
         sheet.rowHeight(1, 30);
         sheet.value(2, 0, period(data));
         sheet.range(2, 0, 2, lastCol).style().merge().fontName("Onest").fontColor(MUTED).set();
-        sheet.hyperlink(3, 0, org.dhatim.fastexcel.HyperLink.external(SITE, "Registrado con Miga"));
+        sheet.hyperlink(3, 0, HyperLink.external(SITE, "Registrado con Miga"));
         sheet.range(3, 0, 3, lastCol).style().merge().fontName("Onest").fontColor(BRAND).underlined().set();
         sheet.rowHeight(3, 26);
         for (int c = 0; c <= lastCol; c++) sheet.width(c, c == 0 ? 17 : 29);
@@ -254,8 +277,8 @@ final class WeekExport {
                 sheet.rowHeight(row, 32);
             } else {
                 style.fillColor(r % 2 == 0 ? PAPER : SURFACE)
-                    .borderStyle(org.dhatim.fastexcel.BorderSide.BOTTOM, "thin")
-                    .borderColor(org.dhatim.fastexcel.BorderSide.BOTTOM, LINE);
+                    .borderStyle(BorderSide.BOTTOM, "thin")
+                    .borderColor(BorderSide.BOTTOM, LINE);
                 int lines = rows.get(r).stream().mapToInt(value -> value.lines()
                     .mapToInt(line -> Math.max(1, (line.length() + 26) / 27)).sum()).max().orElse(1);
                 sheet.rowHeight(row, Math.min(409, Math.max(48, 16 * lines + 16)));
@@ -264,16 +287,16 @@ final class WeekExport {
         }
         sheet.freezePane(1, TABLE_ROW + 1);
         sheet.pageOrientation("landscape");
-        sheet.paperSize(org.dhatim.fastexcel.PaperSize.A4_PAPER);
+        sheet.paperSize(PaperSize.A4_PAPER);
         sheet.fitToWidth((short) 1);
         sheet.fitToHeight((short) 0);
         sheet.repeatRows(0, TABLE_ROW);
-        sheet.footer("Registrado con Miga · miga.uy", org.dhatim.fastexcel.Position.LEFT);
-        sheet.footer("Página &P de &N", org.dhatim.fastexcel.Position.RIGHT);
+        sheet.footer("Registrado con Miga · miga.uy", Position.LEFT);
+        sheet.footer("Página &P de &N", Position.RIGHT);
     }
 
-    private static java.awt.Color color(String hex) {
-        return java.awt.Color.decode("#" + hex);
+    private static Color color(String hex) {
+        return Color.decode("#" + hex);
     }
 
     private static byte[] resource(String name) throws IOException {
@@ -289,7 +312,7 @@ final class WeekExport {
         Document document = new Document(grid(data).getFirst().size() > 8 ? PageSize.A3.rotate() : PageSize.A4.rotate(),
             28, 28, 78, 40);
         try {
-            var face = com.lowagie.text.pdf.BaseFont.createFont("Onest.ttf", com.lowagie.text.pdf.BaseFont.IDENTITY_H,
+            var face = BaseFont.createFont("Onest.ttf", BaseFont.IDENTITY_H,
                 true, false, resource("Onest.ttf"), null);
             Font head = new Font(face, 9, Font.BOLD, color(SURFACE));
             Font body = new Font(face, 9, Font.NORMAL, color(INK));
@@ -300,9 +323,9 @@ final class WeekExport {
             document.addCreator("Miga · " + SITE);
             document.open();
             addTables(document, grid(data), head, body, title(data));
-            if (withSinRegla(data)) {
+            if (withUnmatchedFoods(data)) {
                 document.newPage();
-                addTables(document, sinReglaGrid(data), head, body, "Sin regla");
+                addTables(document, unmatchedFoodsGrid(data), head, body, "Sin regla");
             }
         } catch (Exception e) {
             throw e instanceof IOException io ? io : new IOException("No se pudo generar el PDF.", e);
@@ -312,7 +335,7 @@ final class WeekExport {
     }
 
     private static void addTables(Document document, List<List<String>> rows, Font head, Font body,
-                                  String title) throws com.lowagie.text.DocumentException {
+                                  String title) throws DocumentException {
         int columns = rows.getFirst().size();
         int blockSize = document.getPageSize().getWidth() > 1000 ? 12 : 7;
         for (int start = 1; start < Math.max(2, columns); start += blockSize) {
@@ -337,7 +360,7 @@ final class WeekExport {
         PdfPTable table = new PdfPTable(columns);
         table.setWidthPercentage(100);
         float[] widths = new float[columns];
-        java.util.Arrays.fill(widths, 1);
+        Arrays.fill(widths, 1);
         widths[0] = 0.85f;
         table.setWidths(widths);
         table.setHeaderRows(1);
@@ -348,9 +371,9 @@ final class WeekExport {
                 PdfPCell cell = new PdfPCell(new Phrase(value.isEmpty() ? "—" : value, r == 0 ? head : body));
                 cell.setPadding(8);
                 cell.setLeading(0, 1.4f);
-                cell.setVerticalAlignment(com.lowagie.text.Element.ALIGN_TOP);
+                cell.setVerticalAlignment(Element.ALIGN_TOP);
                 cell.setBackgroundColor(color(r == 0 ? BRAND : r % 2 == 0 ? PAPER : SURFACE));
-                cell.setBorder(com.lowagie.text.Rectangle.BOTTOM);
+                cell.setBorder(Rectangle.BOTTOM);
                 cell.setBorderWidth(0.5f);
                 cell.setBorderColor(color(LINE));
                 table.addCell(cell);
@@ -359,15 +382,15 @@ final class WeekExport {
         return table;
     }
 
-    private static final class ExportPage extends com.lowagie.text.pdf.PdfPageEventHelper {
+    private static final class ExportPage extends PdfPageEventHelper {
         private final Data data;
-        private final com.lowagie.text.pdf.BaseFont face;
-        private final com.lowagie.text.Image logo;
+        private final BaseFont face;
+        private final Image logo;
 
-        ExportPage(Data data, com.lowagie.text.pdf.BaseFont face) throws IOException {
+        ExportPage(Data data, BaseFont face) throws IOException {
             this.data = data;
             this.face = face;
-            this.logo = com.lowagie.text.Image.getInstance(resource("miga-wordmark.png"));
+            this.logo = Image.getInstance(resource("miga-wordmark.png"));
             logo.scaleToFit(84, 36);
         }
 
@@ -383,10 +406,10 @@ final class WeekExport {
             try {
                 logo.setAbsolutePosition(document.left(), height - 58);
                 canvas.addImage(logo);
-            } catch (com.lowagie.text.DocumentException e) {
+            } catch (DocumentException e) {
                 throw new IllegalStateException("No se pudo dibujar el logo de Miga.", e);
             }
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
+            ColumnText.showTextAligned(canvas, Element.ALIGN_RIGHT,
                 new Phrase(period(data), new Font(face, 10, Font.NORMAL, color(MUTED))), document.right(), height - 43, 0);
             canvas.setColorStroke(color(ACCENT));
             canvas.setLineWidth(2);
@@ -395,14 +418,14 @@ final class WeekExport {
             canvas.stroke();
             float y = 19;
             var footer = new Phrase("Registrado con Miga · miga.uy", new Font(face, 9, Font.NORMAL, color(BRAND)));
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_LEFT,
+            ColumnText.showTextAligned(canvas, Element.ALIGN_LEFT,
                 footer, document.left(), y, 0);
-            var link = com.lowagie.text.pdf.PdfAnnotation.createLink(writer,
-                new com.lowagie.text.Rectangle(document.left(), y - 2, document.left() + 180, y + 11),
-                com.lowagie.text.pdf.PdfAnnotation.HIGHLIGHT_INVERT, new com.lowagie.text.pdf.PdfAction(SITE));
-            link.setBorder(new com.lowagie.text.pdf.PdfBorderArray(0, 0, 0));
+            var link = PdfAnnotation.createLink(writer,
+                new Rectangle(document.left(), y - 2, document.left() + 180, y + 11),
+                PdfAnnotation.HIGHLIGHT_INVERT, new PdfAction(SITE));
+            link.setBorder(new PdfBorderArray(0, 0, 0));
             writer.addAnnotation(link);
-            com.lowagie.text.pdf.ColumnText.showTextAligned(canvas, com.lowagie.text.Element.ALIGN_RIGHT,
+            ColumnText.showTextAligned(canvas, Element.ALIGN_RIGHT,
                 new Phrase("Página " + writer.getPageNumber(), new Font(face, 9, Font.NORMAL, color(MUTED))),
                 document.right(), y, 0);
         }

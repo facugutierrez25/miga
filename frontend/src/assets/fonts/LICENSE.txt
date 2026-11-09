@@ -1,0 +1,6 @@
+Ambas fuentes se distribuyen bajo SIL Open Font License 1.1.
+
+Onest (c) 2021 The Onest Project Authors.
+Bricolage Grotesque (c) 2022 The Bricolage Grotesque Project Authors.
+
+Licencia: https://openfontlicense.org/open-font-license-official-text/

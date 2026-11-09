@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { DayRegistroDto } from '../../api/registro'
+import type { DayRecordDto } from '../../api/records'
 import day_registroJson from './day-registro.json?raw'
 import type { PlanDto } from '../../api/plans'
 import planJson from './plan.json?raw'
 import type { PlanRules } from '../../api/planRules'
 import plan_rulesJson from './plan-rules.json?raw'
-import type { WeekSummaryDto } from '../../api/semana'
+import type { WeekSummaryDto } from '../../api/week'
 import week_summaryJson from './week-summary.json?raw'
 
 // Valores esperados tipados: el compilador verifica el contrato y Vitest el JSON real.
 describe('contratos del backend', () => {
   it('DayRegistroDto conserva los campos consumidos por las páginas', () => {
-    const expected: DayRegistroDto = {
+    const expected: DayRecordDto = {
       "date": "2026-01-05",
       "meals": [
         {

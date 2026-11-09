@@ -1,5 +1,9 @@
 package uy.miga.plans;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.UUID;
+
 public record PlanFoodGroupDto(Long id, String name, String abbreviation, int displayOrder, String color,
-                               String clave, Boolean preguntarSiFalta, Boolean opcional,
-                               java.util.UUID uid) {}
+                               @JsonProperty("clave") String standardKey, @JsonProperty("preguntarSiFalta") Boolean askIfMissing, @JsonProperty("opcional") Boolean optional,
+                               UUID uid) {}

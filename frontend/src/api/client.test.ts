@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apiRequest, ApiError } from './client'
-import { login, register } from './users'
-import { saveNota, NoteConflictError, getSinRegla } from './registro'
+import { apiRequest, ApiError, onUnauthorizedResponse } from './client'
+import { login, register, logoutSession } from './users'
+import { saveNote, NoteConflictError, getUnmatchedFoods } from './records'
 import { saveMyPlan, PlanConflictError } from './plans'
 import { deleteGroup, PlanRulesError } from './planRules'
-import { exportWeekCsv, exportRange } from './semana'
+import { exportWeekCsv, exportRange } from './week'
 
 function respond(body: string | null, status = 200) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(body, { status })))
 }
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
+afterEach(() => { onUnauthorizedResponse('cleanup', () => {})(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('cliente HTTP', () => {
   it('conserva status, code y error del backend', async () => {
@@ -60,9 +60,9 @@ it('devuelve el token del login y conserva el mensaje de registro duplicado', as
 })
 it('conserva los conflictos de notas y del plan', async () => {
   respond('{"code":"NOTE_CONFLICT","error":"La nota cambió."}', 409)
-  await expect(saveNota('token', '2026-01-01', 1, 'pan', 1)).rejects.toBeInstanceOf(NoteConflictError)
+  await expect(saveNote('token', '2026-01-01', 1, 'pan', 1)).rejects.toBeInstanceOf(NoteConflictError)
   respond('{"code":"PLAN_CHANGED","error":"Tu plan cambió."}', 409)
-  await expect(saveNota('token', '2026-01-01', 1, 'pan', 1)).rejects.toThrow('Tu plan cambió.')
+  await expect(saveNote('token', '2026-01-01', 1, 'pan', 1)).rejects.toThrow('Tu plan cambió.')
   respond('{"code":"VERSION_CONFLICT"}', 409)
   await expect(saveMyPlan('token', { meals: [] })).rejects.toBeInstanceOf(PlanConflictError)
 })
@@ -95,6 +95,69 @@ it('exporta un rango con formato y secciones elegidas', async () => {
 it('pide lo que no se reconoció en un rango', async () => {
   const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
   vi.stubGlobal('fetch', fetchMock)
-  await expect(getSinRegla('token', '2026-11-02', '2026-11-08')).resolves.toEqual([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }])
+  await expect(getUnmatchedFoods('token', '2026-11-02', '2026-11-08')).resolves.toEqual([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }])
   expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/registro/sin-regla?desde=2026-11-02&hasta=2026-11-08')
+})
+
+describe('caché de GET', () => {
+  it('comparte GET simultáneos y vence a los 30 segundos', async () => {
+    vi.useFakeTimers()
+    respond('{"value":1}')
+    const values = await Promise.all([apiRequest('/cache'), apiRequest('/cache')])
+    expect(values).toEqual([{ value: 1 }, { value: 1 }])
+    await apiRequest('/cache')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(30_001)
+    await apiRequest('/cache')
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE'])('invalida con %s', async method => {
+    respond('{}')
+    await apiRequest('/cache')
+    await apiRequest('/mutation', { method })
+    await apiRequest('/cache')
+    expect(fetch).toHaveBeenCalledTimes(3)
+  })
+  it('cancelar un consumidor no afecta al otro ni a la caché', async () => {
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve })))
+    const controller = new AbortController()
+    const first = apiRequest('/cache', { signal: controller.signal })
+    const second = apiRequest('/cache')
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    controller.abort()
+    await rejected
+    finish(new Response('{"value":1}'))
+    await expect(second).resolves.toEqual({ value: 1 })
+    await expect(apiRequest('/cache')).resolves.toEqual({ value: 1 })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+  it('no guarda errores', async () => {
+    respond('{}', 500)
+    await expect(apiRequest('/cache')).rejects.toBeInstanceOf(ApiError)
+    await expect(apiRequest('/cache')).rejects.toBeInstanceOf(ApiError)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  it('logout y cambio de token vacían la caché', async () => {
+    respond('{}')
+    await apiRequest('/cache', { token: 'first' })
+    await apiRequest('/cache', { token: 'second' })
+    await apiRequest('/cache', { token: 'first' })
+    expect(fetch).toHaveBeenCalledTimes(3)
+    await logoutSession()
+    await apiRequest('/cache', { token: 'first' })
+    expect(fetch).toHaveBeenCalledTimes(5)
+  })
+  it('una respuesta anterior a una mutación no repuebla la caché', async () => {
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
+      .mockImplementation(async () => new Response('{}')))
+    const pending = apiRequest('/cache')
+    await apiRequest('/mutation', { method: 'POST' })
+    finish(new Response('{}'))
+    await pending
+    await apiRequest('/cache')
+    expect(fetch).toHaveBeenCalledTimes(3)
+  })
 })

@@ -31,16 +31,16 @@ class PlanFoodGroup {
     @Column(length = 7)
     private String color;
 
-    @Column(length = 50)
-    private String clave;
+    @Column(name = "clave", length = 50)
+    private String standardKey;
 
     // La columna meta_diaria se elimina en una migración posterior; el total sale de las comidas.
 
     @Column(name = "preguntar_si_falta", nullable = false)
-    private boolean preguntarSiFalta = false;
+    private boolean askIfMissing = false;
 
-    @Column(nullable = false)
-    private boolean opcional = false;
+    @Column(name = "opcional", nullable = false)
+    private boolean optional = false;
 
     PlanFoodGroup() {}
 
@@ -58,17 +58,17 @@ class PlanFoodGroup {
     String getAbbreviation() { return abbreviation; }
     int getDisplayOrder()    { return displayOrder; }
     String getColor()        { return color; }
-    String getClave()        { return clave; }
-    boolean isPreguntarSiFalta()          { return preguntarSiFalta; }
-    boolean isOpcional()                  { return opcional; }
+    String getStandardKey()        { return standardKey; }
+    boolean isAskIfMissing()          { return askIfMissing; }
+    boolean isOptional()                  { return optional; }
 
     void setName(String name) { this.name = name; }
     void setAbbreviation(String abbreviation) { this.abbreviation = abbreviation; }
     void setDisplayOrder(short order) { this.displayOrder = order; }
     void setUid(UUID uid) { this.uid = uid; }
-    void setPreguntarSiFalta(boolean preguntarSiFalta) { this.preguntarSiFalta = preguntarSiFalta; }
-    void setOpcional(boolean opcional) { this.opcional = opcional; }
+    void setAskIfMissing(boolean askIfMissing) { this.askIfMissing = askIfMissing; }
+    void setOptional(boolean optional) { this.optional = optional; }
     void setPlan(Plan plan)        { this.plan = plan; }
     void setColor(String color)    { this.color = color; }
-    void setClave(String clave)    { this.clave = clave; }
+    void setStandardKey(String standardKey)    { this.standardKey = standardKey; }
 }

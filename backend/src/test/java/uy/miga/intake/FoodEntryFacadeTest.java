@@ -16,7 +16,7 @@ class FoodEntryFacadeTest {
 
     @Test
     void repeatedResponseDoesNotCreateAnotherEntry() {
-        when(repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+        when(repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigin(
             1L, date, 2L, 3L, "RESPUESTA")).thenReturn(true);
         facade.createResponseEntry(1L, "user", 2L, date, "food", 3L);
         verify(repository, never()).save(any());
@@ -27,8 +27,8 @@ class FoodEntryFacadeTest {
         facade.createResponseEntry(1L, "user", 2L, date, "food", 3L);
         ArgumentCaptor<FoodEntry> entry = ArgumentCaptor.forClass(FoodEntry.class);
         verify(repository).save(entry.capture());
-        assertThat(entry.getValue().getOrigen()).isEqualTo("RESPUESTA");
-        assertThat(entry.getValue().getPorciones()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(entry.getValue().getOrigin()).isEqualTo("RESPUESTA");
+        assertThat(entry.getValue().getPortions()).isEqualByComparingTo(BigDecimal.ONE);
         assertThat(entry.getValue().getUserId()).isEqualTo(1L);
         assertThat(entry.getValue().getMealId()).isEqualTo(2L);
         assertThat(entry.getValue().getFoodGroupId()).isEqualTo(3L);
@@ -38,7 +38,7 @@ class FoodEntryFacadeTest {
     @Test
     void negativeResponseOnlyDeletesResponsesForTheSameUserDateMealAndGroup() {
         facade.deleteResponseEntries(1L, date, 2L, 3L);
-        verify(repository).deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
+        verify(repository).deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigin(
             1L, date, 2L, 3L, "RESPUESTA");
         verifyNoMoreInteractions(repository);
     }
@@ -46,11 +46,11 @@ class FoodEntryFacadeTest {
     @Test void correctionReplacesStaleRuleExplanation() {
         var entry = new FoodEntry(1L, "user", 2L, date, "Mandarina", 2.0, "u", 3L);
         entry.setAppliedRule("mandarina = 2 porciones");
-        entry.setSupuesto(true);
+        entry.setEstimated(true);
         when(repository.findById(1L)).thenReturn(java.util.Optional.of(entry));
         facade.correctEntry(1L, 2.0, "u", null, BigDecimal.ONE);
         assertThat(entry.getAppliedRule()).isEqualTo("Corrección del usuario: 1 porción");
-        assertThat(entry.getSupuesto()).isFalse();
-        assertThat(entry.getOrigen()).isEqualTo("USUARIO");
+        assertThat(entry.getEstimated()).isFalse();
+        assertThat(entry.getOrigin()).isEqualTo("USUARIO");
     }
 }

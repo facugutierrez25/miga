@@ -225,7 +225,7 @@ export default function FoodRuleForm({
           <CompoundComponentsField
             groups={groups}
             value={input.componentes}
-            onChange={(componentes) => setInput({ ...input, componentes })}
+            onChange={(components) => setInput({ ...input, componentes: components })}
             foodName={input.alimento}
           />
           {!compoundValid && (
