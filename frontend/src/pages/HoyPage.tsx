@@ -592,7 +592,9 @@ function NotaMealSection({
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
   const comparison = mealDay?.comparison ?? []
-  const [answeredGroups, setAnsweredGroups] = useState<number[]>([])
+  // Las respuestas guardadas se ocultan hasta que llega la comparación nueva, aunque falle la recarga.
+  const [answered, setAnswered] = useState<{ source: unknown; groupIds: number[] }>({ source: null, groupIds: [] })
+  const answeredGroups = answered.source === mealDay?.comparison ? answered.groupIds : []
   const answerPending = useRef(false)
   const [answerSaving, setAnswerSaving] = useState(false)
   const preguntas = comparison.filter(s => s.status === 'PREGUNTAR' && !answeredGroups.includes(s.foodGroupId))
@@ -728,17 +730,19 @@ function NotaMealSection({
     answerPending.current = true
     setAnswerSaving(true)
     setError(null)
-    setAnsweredGroups(prev => [...prev, foodGroupId])
+    const source = mealDay?.comparison
+    setAnswered({ source, groupIds: [...answeredGroups, foodGroupId] })
     try {
       await saveRespuesta(token, date, meal.id, { foodGroupId, consumed })
-      await onRespuestaGuardada(meal.id)
     } catch {
+      setAnswered(prev => ({ ...prev, groupIds: prev.groupIds.filter(id => id !== foodGroupId) }))
       setError('No se pudo guardar la respuesta. Intentá de nuevo.')
+      return
     } finally {
       answerPending.current = false
       setAnswerSaving(false)
-      setAnsweredGroups(prev => prev.filter(id => id !== foodGroupId))
     }
+    await onRespuestaGuardada(meal.id).catch(() => {})
   }
   const feedback = (<>
       <p className="nota-guardado" role="status">{guardado}</p>

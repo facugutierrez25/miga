@@ -1182,3 +1182,20 @@ test.each([true, false])('responde antes de guardar y reconcilia o revierte la p
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar la respuesta')
   }
 })
+
+test('una respuesta guardada no se reporta como error si falla la recarga del día', async () => {
+  vi.mocked(registroApi.saveRespuesta).mockResolvedValue(undefined)
+  mockGetMyPlan.mockResolvedValue(planConComida)
+  const day = {
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
+      comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }] }],
+  }
+  mockGetDayRegistro.mockResolvedValue(day)
+  renderHoy()
+  await abrirNota()
+  mockGetDayRegistro.mockRejectedValue(new Error('offline'))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sí' })) })
+  expect(screen.queryByRole('button', { name: 'Sí' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/No se pudo guardar la respuesta/)).not.toBeInTheDocument()
+})
