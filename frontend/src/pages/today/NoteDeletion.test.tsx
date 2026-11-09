@@ -20,7 +20,7 @@ import * as recordsApi from '../../api/records'
 test('un error al guardar una sugerencia conserva el borrador y permite reintentar', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetSuggestions.mockResolvedValue(['mate'])
-  mockSaveNote.mockRejectedValueOnce(new Error('sin red')).mockResolvedValueOnce({ noteId: 1, version: 0,
+  mockSaveNote.mockRejectedValueOnce(new Error('sin red')).mockResolvedValueOnce({ status: 'REGISTRADA' as const, noteId: 1, version: 0,
     text: 'mate', date: emptyDay.date, mealId: 1, items: [], entries: [], comparison: [] })
   renderToday()
   await openNote()
@@ -68,7 +68,7 @@ test('borrar lo anotado pide confirmación, vacía la comida y conserva la versi
   mockGetDayRecord.mockResolvedValue(dayWithNote)
   mockDeleteNote.mockResolvedValue(4)
   mockSaveNote.mockResolvedValue({
-    noteId: 5, version: 5, text: 'leche y pan', date: '2025-01-01', mealId: 1, items: [],
+    status: 'REGISTRADA' as const, noteId: 5, version: 5, text: 'leche y pan', date: '2025-01-01', mealId: 1, items: [],
     entries: dayWithNote.meals[0].items, comparison: dayWithNote.meals[0].comparison,
   })
   renderToday()

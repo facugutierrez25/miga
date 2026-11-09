@@ -1,4 +1,5 @@
 import { apiRequest } from './client'
+import type { MealStatusCode } from './records'
 
 export interface HabitDto {
   id: number
@@ -26,7 +27,7 @@ export interface WeekDayDto {
   totalGoal: number
   habitLogs: HabitLogDto[]
   habitIds?: number[]
-  meals?: { mealId: number; name: string; noteText: string | null; status: string; flexibleCount?: number }[]
+  meals?: { mealId: number; name: string; noteText: string | null; status: MealStatusCode; planned: boolean; flexibleCount?: number }[]
 }
 
 export interface WeekSummaryDto {

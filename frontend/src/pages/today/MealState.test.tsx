@@ -17,7 +17,7 @@ test.each([
   { names: [''], amounts: [2], expected: 'Faltó 2 porciones de un grupo del plan' },
 ])('describe las faltas: $expected', async ({ names, amounts, expected }) => {
   mockGetMyPlan.mockResolvedValue(twoMealPlan)
-  mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, noteId: 1, noteVersion: 0, noteText: 'comida', items: [], comparison: [
+  mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'MIXED' as const, noteId: 1, noteVersion: 0, noteText: 'comida', items: [], comparison: [
     ...names.map((name, i) => ({ foodGroupId: 9876 + i, name, expected: amounts[i], recorded: 0, status: 'CASI' })),
     { foodGroupId: 9999, name: 'Grasas', expected: 0, recorded: 1, status: 'DE_MAS' },
   ] }] })
@@ -40,7 +40,7 @@ test.each([
 ])('la ficha de la comida de ahora dice cada grupo con su diferencia: $label', async ({ status, recorded, label }) => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{
-    mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche', items: [],
+    mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 1, noteText: 'leche', items: [],
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status }],
   }] })
   renderToday()
@@ -60,7 +60,7 @@ test.each([
   mockGetDayRecord.mockResolvedValue({
     date: '2025-01-01', summary: [],
     meals: [{
-      mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', items: [],
+      mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 0, noteText: 'leche', items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status }],
     }],
   })

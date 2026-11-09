@@ -19,6 +19,7 @@ describe('contratos del backend', () => {
           "noteId": 1,
           "noteText": "Sintético",
           "noteVersion": 1,
+          "status": "EN_PLAN",
           "items": [
             {
               "id": 1,
@@ -42,7 +43,7 @@ describe('contratos del backend', () => {
               "name": "Sintético",
               "expected": 1.5,
               "recorded": 1.5,
-              "status": "OK"
+              "status": "EN_PLAN"
             }
           ]
         }
@@ -190,7 +191,8 @@ describe('contratos del backend', () => {
               "mealId": 1,
               "name": "Sintético",
               "noteText": "Sintético",
-              "status": "OK",
+              "status": "EN_PLAN",
+              "planned": true,
               "flexibleCount": 1
             }
           ],

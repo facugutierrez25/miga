@@ -64,6 +64,7 @@ function TodayContent() {
       if (!prev) return prev
       const updatedMeal: MealDayDto = {
         mealId,
+        status: interp.status,
         noteId: interp.noteId,
         noteVersion: interp.version,
         noteText: interp.text,
@@ -84,7 +85,7 @@ function TodayContent() {
       const previous = prev.meals.find(m => m.mealId === mealId)
       return {
         ...prev,
-        meals: prev.meals.map(m => m.mealId === mealId ? { ...m, noteText: '', noteVersion: version, items: [], comparison: [] } : m),
+        meals: prev.meals.map(m => m.mealId === mealId ? { ...m, status: 'SIN_ANOTAR', noteText: '', noteVersion: version, items: [], comparison: [] } : m),
         summary: adjustSummary(prev.summary, previous?.items ?? [], [], groupsMap),
       }
     })
@@ -99,7 +100,7 @@ function TodayContent() {
         const kept = m.items.filter(it => !result.replacedItemIds.includes(it.id))
         const items = at < 0 ? [...kept, ...result.items]
           : [...kept.slice(0, at), ...result.items, ...kept.slice(at)]
-        return { ...m, items }
+        return { ...m, items, status: result.status }
       })
       return { ...prev, meals }
     })

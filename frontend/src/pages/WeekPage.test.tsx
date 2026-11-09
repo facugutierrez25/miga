@@ -89,14 +89,14 @@ test('Exportar abre una hoja con Excel y PDF, sin CSV ni link, y cierra con Esca
 
 test('la tarjeta pone un guion cuando el plan de ese día no tiene esa comida', () => {
   const data = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26').data!
-  const otherDay = { ...data.days[0], date: '2026-10-27', meals: [{ mealId: 11, name: 'Pre entreno', status: 'SIN_ANOTAR', noteText: null }] }
+  const otherDay = { ...data.days[0], date: '2026-10-27', meals: [{ mealId: 11, name: 'Pre entreno', planned: true, status: 'SIN_ANOTAR' as const, noteText: null }] }
   vi.mocked(useWeek).mockReturnValue({ ...defaultUseWeek('tok', 'user@miga.uy', '2026-10-26'), data: { ...data, days: [data.days[0], otherDay] } })
   const { container } = render(<WeekPage />)
   expect(container.querySelectorAll('.semana-tarjeta .semana-miga--no-aplica')).toHaveLength(2)
   expect(screen.getByText('No toca ese día')).toBeInTheDocument()
 })
 
-test.each(['CASI', 'DE_MAS', 'PREGUNTAR'])('media miga de %s usa la marca sin acento', status => {
+test.each(['CASI', 'DE_MAS', 'PREGUNTAR'] as const)('media miga de %s usa la marca sin acento', status => {
   const data = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26').data!
   const week = { ...data, days: data.days.map(day => ({ ...day,
     meals: day.meals?.map(meal => ({ ...meal, status })) })) }
@@ -113,7 +113,7 @@ test.each(['CASI', 'DE_MAS', 'PREGUNTAR'])('media miga de %s usa la marca sin ac
 test('la tarjeta de develop destaca la comida flexible con el acento, aunque coincida con el plan', () => {
   const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
   const data = { ...base.data!, days: base.data!.days.map(day => ({ ...day,
-    meals: day.meals?.map(meal => ({ ...meal, status: 'EN_PLAN', flexibleCount: 1 })) })) }
+    meals: day.meals?.map(meal => ({ ...meal, planned: true, status: 'EN_PLAN' as const, flexibleCount: 1 })) })) }
   vi.mocked(useWeek).mockReturnValue({ ...base, data })
   const { container } = render(<WeekPage />)
   expect(container.querySelector('.semana-tarjeta__celda .semana-miga--flexible')).toBeInTheDocument()
@@ -124,7 +124,7 @@ test('la tarjeta de develop destaca la comida flexible con el acento, aunque coi
 test.each([false, true])('sin hábito flexible vigente ese día no destaca la comida (otro día: %s)', otherDay => {
   const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
   const day = { ...base.data!.days[0], habitIds: [2],
-    meals: [{ mealId: 10, name: 'Desayuno', status: 'EN_PLAN', noteText: 'pan', flexibleCount: 1 }] }
+    meals: [{ mealId: 10, name: 'Desayuno', planned: true, status: 'EN_PLAN' as const, noteText: 'pan', flexibleCount: 1 }] }
   const data = { ...base.data!, days: otherDay ? [day, { ...day, date: '2026-10-27', habitIds: [1, 2] }] : [day] }
   vi.mocked(useWeek).mockReturnValue({ ...base, data })
   const { container } = render(<WeekPage />)

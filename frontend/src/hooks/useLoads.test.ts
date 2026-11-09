@@ -100,7 +100,7 @@ it('descarta el plan del usuario anterior aunque termine después del nuevo', as
 })
 
 it('distingue éxito, error de recarga y reintento', async () => {
-  const recordedDay: DayRecordDto = { ...day, meals: [{ mealId: 1, noteId: 1, noteVersion: 1, noteText: 'pan', items: [], comparison: [] }] }
+  const recordedDay: DayRecordDto = { ...day, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 1, noteText: 'pan', items: [], comparison: [] }] }
   vi.mocked(getDayRecord).mockResolvedValueOnce(recordedDay).mockRejectedValueOnce(new Error('Sin conexión'))
     .mockResolvedValueOnce(recordedDay)
   const { result } = renderHook(() => useDayRecord('token', 'a@b.uy', day.date))

@@ -137,7 +137,7 @@ test('las otras comidas muestran su estado en texto y se abren para anotar', asy
   mockGetDayRecord.mockResolvedValue({
     ...emptyDay,
     meals: [{
-      mealId: 1, noteId: 3, noteVersion: 0, noteText: 'dos huevos', items: [],
+      mealId: 1, status: 'DE_MAS' as const, noteId: 3, noteVersion: 0, noteText: 'dos huevos', items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 2, status: 'DE_MAS' }],
     }],
   })
@@ -155,7 +155,7 @@ test('respeta el margen del plan: dentro del margen la comida es como el plan', 
   mockGetDayRecord.mockResolvedValue({
     ...emptyDay,
     meals: [{
-      mealId: 1, noteId: 3, noteVersion: 0, noteText: 'medio huevo', items: [],
+      mealId: 1, status: 'EN_PLAN' as const, noteId: 3, noteVersion: 0, noteText: 'medio huevo', items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0.5, status: 'EN_PLAN' }],
     }],
   })
@@ -177,7 +177,7 @@ test('a saved note with an empty comparison has no missing portions', async () =
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetDayRecord.mockResolvedValue({
     date: '2025-01-01', summary: [],
-    meals: [{ mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', items: [], comparison: [] }],
+    meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 0, noteText: 'leche', items: [], comparison: [] }],
   })
   renderToday()
   await openNote()
@@ -194,7 +194,7 @@ test('past dates load their plan and show its meal note', async () => {
   })
   mockGetDayRecord.mockImplementation(async (_token, date) => ({
     date, summary: [], meals: [{
-      mealId: 289, noteId: 1, noteVersion: 0, noteText: 'Historical note', items: [], comparison: [],
+      mealId: 289, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 0, noteText: 'Historical note', items: [], comparison: [],
     }],
   }))
   renderToday()

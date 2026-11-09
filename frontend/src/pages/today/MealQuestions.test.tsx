@@ -9,7 +9,7 @@ test.each([true, false])('responde antes de guardar y reconcilia o revierte la p
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   const day = {
     date: '2025-01-01', summary: [],
-    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
+    meals: [{ mealId: 1, status: 'PREGUNTAR' as const, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }] }],
   }
   mockGetDayRecord.mockResolvedValue(day)

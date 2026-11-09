@@ -35,8 +35,8 @@ test('resuelve por catálogo y deshace restaurando el aviso', async () => {
   await waitFor(() => expect(recordsApi.resolveItem).toHaveBeenCalledWith('tok', expect.any(String), 501, { kind: 'SAME_AS', ruleUid: 'milanesa', remember: true }))
   expect(await screen.findByText(/Listo:.*Milanesa/)).toHaveTextContent('Lo voy a reconocer la próxima vez.')
   vi.mocked(recordsApi.undoResolveItem).mockImplementation(async () => {
-    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, noteId: 3, noteVersion: 7, noteText: 'nota', items: [unknownFood], comparison: [] }] })
-    return { replacedItemIds: [resolved.id], items: [unknownFood] }
+    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 3, noteVersion: 7, noteText: 'nota', items: [unknownFood], comparison: [] }] })
+    return { status: 'REGISTRADA' as const, replacedItemIds: [resolved.id], items: [unknownFood] }
   })
   fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }))
   expect(await screen.findByText('Listo, quedó como antes.')).toBeInTheDocument()
