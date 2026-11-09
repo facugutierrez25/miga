@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { mealStatus } from './mealStatus'
-import type { GroupStatusDto } from '../api/registro'
+import type { GroupStatusDto } from '../api/records'
 
 const missing: GroupStatusDto = { foodGroupId: 1, name: 'Cereales', expected: 2, recorded: 1, status: 'CASI' }
 const extra: GroupStatusDto = { foodGroupId: 2, name: 'Proteínas', expected: 1, recorded: 3, status: 'DE_MAS' }
@@ -34,13 +34,13 @@ test.each([
   [[{ ...missing, status: 'EN_PLAN' }], 'Como el plan', 'Como el plan', 'ok', 'full'],
   [[{ ...missing, status: 'PREGUNTAR' }], 'Por confirmar', 'Por confirmar', 'ask', 'half'],
   [[], 'Anotada', 'Anotada', 'noted', 'noted'],
-] as const)('comparte estado, detalle e indicador de %s', (comparison, label, text, kind, miga) => {
-  expect(mealStatus({ noteText: 'pan', comparison: [...comparison] })).toEqual({ label, text, kind, miga })
+] as const)('comparte estado, detalle e indicador de %s', (comparison, label, text, kind, crumb) => {
+  expect(mealStatus({ noteText: 'pan', comparison: [...comparison] })).toEqual({ label, text, kind, crumb })
 })
 
 test('una nota vacía prevalece sobre la comparación y los códigos antiguos tienen respaldo', () => {
   expect(mealStatus({ noteText: '', comparison: [extra], status: 'DE_MAS' })).toEqual({
-    label: 'Sin anotar', text: 'Sin anotar', kind: 'none', miga: 'empty',
+    label: 'Sin anotar', text: 'Sin anotar', kind: 'none', crumb: 'empty',
   })
   expect(mealStatus({ noteText: 'pan', status: 'DESCONOCIDO' }).label).toBe('Anotada')
 })

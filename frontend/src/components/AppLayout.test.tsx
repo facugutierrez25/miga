@@ -14,9 +14,9 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function renderConRuta(ruta: string) {
+function renderWithRoute(route: string) {
   return render(
-    <MemoryRouter initialEntries={[ruta]}>
+    <MemoryRouter initialEntries={[route]}>
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/hoy"     element={<div>Hoy</div>}     />
@@ -30,7 +30,7 @@ function renderConRuta(ruta: string) {
 }
 
 test('muestra los 4 ítems de navegación', () => {
-  renderConRuta('/hoy')
+  renderWithRoute('/hoy')
   expect(screen.getByRole('link', { name: /hoy/i })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /semana/i })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /mi plan/i })).toBeInTheDocument()
@@ -40,20 +40,20 @@ test('muestra los 4 ítems de navegación', () => {
 })
 
 test('marca con aria-current el ítem activo', () => {
-  renderConRuta('/hoy')
+  renderWithRoute('/hoy')
   expect(screen.getByRole('link', { name: /hoy/i })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: /semana/i })).not.toHaveAttribute('aria-current')
 })
 
 test('navega a Semana al hacer clic', () => {
-  renderConRuta('/hoy')
+  renderWithRoute('/hoy')
   fireEvent.click(screen.getByRole('link', { name: /semana/i }))
   expect(screen.getByRole('link', { name: /semana/i })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: /hoy/i })).not.toHaveAttribute('aria-current')
 })
 
 test('navega a Perfil al hacer clic', () => {
-  renderConRuta('/hoy')
+  renderWithRoute('/hoy')
   fireEvent.click(screen.getByRole('link', { name: /perfil/i }))
   expect(screen.getByRole('link', { name: /perfil/i })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: /hoy/i })).not.toHaveAttribute('aria-current')

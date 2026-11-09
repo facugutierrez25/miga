@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest, ApiError, onUnauthorizedResponse } from './client'
 import { login, register, logoutSession } from './users'
-import { saveNota, NoteConflictError, getSinRegla } from './registro'
+import { saveNote, NoteConflictError, getUnmatchedFoods } from './records'
 import { saveMyPlan, PlanConflictError } from './plans'
 import { deleteGroup, PlanRulesError } from './planRules'
-import { exportWeekCsv, exportRange } from './semana'
+import { exportWeekCsv, exportRange } from './week'
 
 function respond(body: string | null, status = 200) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(body, { status })))
@@ -60,9 +60,9 @@ it('devuelve el token del login y conserva el mensaje de registro duplicado', as
 })
 it('conserva los conflictos de notas y del plan', async () => {
   respond('{"code":"NOTE_CONFLICT","error":"La nota cambió."}', 409)
-  await expect(saveNota('token', '2026-01-01', 1, 'pan', 1)).rejects.toBeInstanceOf(NoteConflictError)
+  await expect(saveNote('token', '2026-01-01', 1, 'pan', 1)).rejects.toBeInstanceOf(NoteConflictError)
   respond('{"code":"PLAN_CHANGED","error":"Tu plan cambió."}', 409)
-  await expect(saveNota('token', '2026-01-01', 1, 'pan', 1)).rejects.toThrow('Tu plan cambió.')
+  await expect(saveNote('token', '2026-01-01', 1, 'pan', 1)).rejects.toThrow('Tu plan cambió.')
   respond('{"code":"VERSION_CONFLICT"}', 409)
   await expect(saveMyPlan('token', { meals: [] })).rejects.toBeInstanceOf(PlanConflictError)
 })
@@ -95,7 +95,7 @@ it('exporta un rango con formato y secciones elegidas', async () => {
 it('pide lo que no se reconoció en un rango', async () => {
   const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
   vi.stubGlobal('fetch', fetchMock)
-  await expect(getSinRegla('token', '2026-11-02', '2026-11-08')).resolves.toEqual([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }])
+  await expect(getUnmatchedFoods('token', '2026-11-02', '2026-11-08')).resolves.toEqual([{ texto: 'torta frita', fecha: '2026-11-02', comida: 'Merienda' }])
   expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/registro/sin-regla?desde=2026-11-02&hasta=2026-11-08')
 })
 

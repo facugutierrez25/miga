@@ -132,7 +132,7 @@ Solo se mueve lo que cambió por algo que hiciste. Anotar nunca espera a una ani
 
 | Momento | Qué se mueve | Tiempo y curva | Cómo |
 | --- | --- | --- | --- |
-| Anotar una comida | Aparecen solo las porciones nuevas de la ficha, una tras otra | 500 ms, cada 60 ms, `back.out` | GSAP con `useGSAP` en `FichaComida` |
+| Anotar una comida | Aparecen solo las porciones nuevas de la ficha, una tras otra | 500 ms, cada 60 ms, `back.out` | GSAP con `useGSAP` en `MealCard` |
 | Abrir una hoja | Sube 24 px y aparece | 400 ms, `--ease-out` | CSS |
 | Cambiar de día o de vista | La franja o la pastilla se desliza | 250 ms ida y vuelta | CSS |
 | Tocar un botón | Se achica a 0,96 | 150 ms | CSS |

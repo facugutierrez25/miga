@@ -9,7 +9,7 @@ import './RegisterPage.css'
 
 const TOTAL_STEPS = 4
 
-const NOMBRES_SUGERIDOS = [
+const SUGGESTED_NAMES = [
   'Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Colación', 'Cena tardía', 'Media mañana',
 ]
 
@@ -163,7 +163,7 @@ function Step3({
                 className="ob-meal-row__name"
                 type="text"
                 value={m.name}
-                placeholder={NOMBRES_SUGERIDOS[i] ?? `Comida ${i + 1}`}
+                placeholder={SUGGESTED_NAMES[i] ?? `Comida ${i + 1}`}
                 onChange={e => onChange(i, 'name', e.target.value)}
                 aria-label={`Nombre de la comida ${i + 1}`}
               />
@@ -201,7 +201,7 @@ function Step4({ meals, onNext, onBack }: { meals: MealDraft[]; onNext: () => vo
           {meals.map((m, i) => (
             <li key={i} className="ob-meal-preview__item">
               <span className="ob-meal-preview__dot" />
-              <span className="ob-meal-preview__name">{m.name || NOMBRES_SUGERIDOS[i]}</span>
+              <span className="ob-meal-preview__name">{m.name || SUGGESTED_NAMES[i]}</span>
               {m.time && <span className="ob-meal-preview__time">{m.time}</span>}
             </li>
           ))}
@@ -223,7 +223,7 @@ export default function OnboardingPage() {
   const pageRef = useRef<HTMLDivElement>(null)
   const [mealCount, setMealCount] = useState(4)
   const [meals, setMeals] = useState<MealDraft[]>(() =>
-    Array.from({ length: 4 }, (_, i) => ({ name: NOMBRES_SUGERIDOS[i] ?? '', time: '' }))
+    Array.from({ length: 4 }, (_, i) => ({ name: SUGGESTED_NAMES[i] ?? '', time: '' }))
   )
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -239,7 +239,7 @@ export default function OnboardingPage() {
     setMealCount(n)
     setMeals(prev => {
       const next = Array.from({ length: n }, (_, i) => ({
-        name: prev[i]?.name ?? NOMBRES_SUGERIDOS[i] ?? '',
+        name: prev[i]?.name ?? SUGGESTED_NAMES[i] ?? '',
         time: prev[i]?.time ?? '',
       }))
       return next
@@ -270,11 +270,11 @@ export default function OnboardingPage() {
     }
   }
 
-  function goToMiPlan() {
+  function goToMyPlan() {
     navigate('/mi-plan', {
       state: {
         meals: meals.map((m, i) => ({
-          name: m.name.trim() || NOMBRES_SUGERIDOS[i] || `Comida ${i + 1}`,
+          name: m.name.trim() || SUGGESTED_NAMES[i] || `Comida ${i + 1}`,
           suggestedTime: m.time || null,
         })),
       },
@@ -321,7 +321,7 @@ export default function OnboardingPage() {
         {step === 4 && (
           <Step4
             meals={meals}
-            onNext={goToMiPlan}
+            onNext={goToMyPlan}
             onBack={() => setStep(3)}
           />
         )}

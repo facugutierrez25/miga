@@ -1,20 +1,20 @@
-import type { GroupStatusDto } from '../api/registro'
+import type { GroupStatusDto } from '../api/records'
 
 export interface MealStatus {
   kind: MealStateKind
   label: string
   text: string
-  miga: 'full' | 'half' | 'noted' | 'empty'
+  crumb: 'full' | 'half' | 'noted' | 'empty'
 }
 
-const STATUS_LABELS: Record<string, { kind: MealStateKind; label: string; miga: MealStatus['miga'] }> = {
-  EN_PLAN: { kind: 'ok', label: 'Como el plan', miga: 'full' },
-  CASI: { kind: 'warn', label: 'Faltó algo', miga: 'half' },
-  DE_MAS: { kind: 'warn', label: 'De más', miga: 'half' },
-  MIXED: { kind: 'warn', label: 'Faltó y de más', miga: 'half' },
-  PREGUNTAR: { kind: 'ask', label: 'Por confirmar', miga: 'half' },
-  SIN_ANOTAR: { kind: 'none', label: 'Sin anotar', miga: 'empty' },
-  REGISTRADA: { kind: 'noted', label: 'Anotada', miga: 'noted' },
+const STATUS_LABELS: Record<string, { kind: MealStateKind; label: string; crumb: MealStatus['crumb'] }> = {
+  EN_PLAN: { kind: 'ok', label: 'Como el plan', crumb: 'full' },
+  CASI: { kind: 'warn', label: 'Faltó algo', crumb: 'half' },
+  DE_MAS: { kind: 'warn', label: 'De más', crumb: 'half' },
+  MIXED: { kind: 'warn', label: 'Faltó y de más', crumb: 'half' },
+  PREGUNTAR: { kind: 'ask', label: 'Por confirmar', crumb: 'half' },
+  SIN_ANOTAR: { kind: 'none', label: 'Sin anotar', crumb: 'empty' },
+  REGISTRADA: { kind: 'noted', label: 'Anotada', crumb: 'noted' },
 }
 
 function statusFromCode(code: string): MealStatus {
