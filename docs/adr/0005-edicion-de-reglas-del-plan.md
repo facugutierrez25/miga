@@ -15,10 +15,18 @@ Además, guardar las comidas crea una versión nueva del plan; hasta ahora esa v
 ### Copia al escribir sobre una versión usada
 
 - Una versión del plan está **usada** cuando tiene notas, ítems registrados en sus comidas o registros de hábitos.
-- La configuración de una versión usada no se modifica. La primera edición sobre ella crea una versión nueva (copia completa) y aplica el cambio en la copia. Las ediciones siguientes, mientras la versión nueva no tenga uso, se aplican directamente sobre ella. Así, cargar un plan desde cero no genera una versión por cada cambio.
+- Los grupos, su orden y los hábitos de una versión usada no se modifican. La primera edición sobre ella crea una versión nueva (copia completa) y aplica el cambio en la copia. Las ediciones siguientes, mientras la versión nueva no tenga uso, se aplican directamente sobre ella. Así, cargar un plan desde cero no genera una versión por cada cambio.
 - Por la granularidad diaria del ADR-0002, los registros del día de la copia pasan a la versión nueva: notas y comidas equivalentes (mismo orden y nombre), ítems con sus grupos remapeados y registros de hábitos con el mismo `habit_uid`. Los días anteriores conservan la versión anterior. Una nota cuya comida no tiene equivalente permanece en la versión anterior.
 - Guardar las comidas mantiene su comportamiento: si cambian, se crea una versión nueva.
 - Toda versión nueva copia: modo de registro, margen, grupos (con todos sus campos), reglas `PLAN` y `USUARIO` (con los grupos de cada regla y de sus componentes remapeados) y hábitos no archivados. Si un componente no tiene grupo equivalente, la operación se aborta. La copia y la activación ocurren en la misma transacción.
+
+### Alimentos
+
+Las reglas `USUARIO` y los ajustes del catálogo se crean, editan y borran en el lugar sobre la versión vigente, incluso si está usada. Cada cambio efectivo incrementa su revisión y reinterpreta las notas de hoy, sin copiar el plan: los alimentos son el diccionario con el que se interpreta lo anotado, no parte de lo que definió el profesional. Los días anteriores conservan los ítems y el `applied_rule` guardados. Si se cambia el texto de una nota pasada de esa misma versión, se reinterpreta con los alimentos actuales.
+
+### Historial
+
+"Planes anteriores" agrupa en un solo período las versiones consecutivas sin cambios visibles en grupos y comidas, y omite el período más reciente si coincide con el plan vigente. Las porciones se comparan por `uid` de grupo y valor numérico. No se borran versiones: las que ya existían sin cambios visibles dejan de mostrarse.
 
 ### Identidad estable
 
@@ -38,8 +46,8 @@ Cada ítem interpretado guarda el texto de la regla aplicada (`applied_rule`) y 
 
 ## Consecuencias
 
-- Consultar o volver a guardar una nota de días anteriores usa la configuración con la que se registró.
-- El historial de versiones puede crecer cuando se edita un plan en uso; cada edición posterior sobre la versión nueva, sin uso todavía, no agrega versiones.
+- Consultar una nota de días anteriores conserva su interpretación guardada; cambiar su texto la reinterpreta con los alimentos actuales de su versión.
+- El historial de versiones puede crecer cuando se editan grupos o hábitos de un plan en uso; cada edición posterior sobre la versión nueva, sin uso todavía, no agrega versiones. Editar alimentos no agrega versiones.
 - Los identificadores de grupos, reglas y hábitos cambian al crearse una versión nueva; la API de edición devuelve siempre el estado completo y vigente para que el cliente no dependa de ids viejos.
 - "Guardar como regla" al corregir un ítem agrega la regla del usuario a la versión vigente sin copiarla: su propósito es aplicarse a los próximos registros. Solo se permite sobre ítems de la versión vigente.
 - Una corrección normal guardada como regla expresa la cantidad por porción (`cantidad / porciones`, con tres decimales) y usa porción por defecto 1; exige porciones mayores a cero. Al actualizar esa regla se conservan sus sinónimos, unidos sin duplicados normalizados a los nuevos. Crear o renombrar una regla exige un nombre único normalizado dentro de la versión del usuario.

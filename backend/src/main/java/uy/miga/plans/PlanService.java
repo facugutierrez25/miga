@@ -132,26 +132,10 @@ public class PlanService {
     @Transactional(readOnly = true)
     List<PlanSummaryDto> getPlanHistory(String email) {
         Long userId = userService.findUserIdByEmail(email);
-        return plansRepository.findTop50ByUserIdAndCurrentFalseOrderBySupersededAtDescIdDesc(userId)
-            .stream()
-            .map(p -> {
-                List<PlanFoodGroupDto> groups = toGroupDtos(p.getFoodGroups());
-                List<MealSummaryDto> meals = p.getMeals().stream().map(meal -> new MealSummaryDto(
-                    meal.getName(),
-                    meal.getPortions().stream()
-                        .filter(por -> por.getPortions().compareTo(BigDecimal.ZERO) > 0)
-                        .map(por -> new MealPortionDto(por.getFoodGroupId(), por.getPortions()))
-                        .toList()
-                )).toList();
-                return new PlanSummaryDto(
-                    p.getCreatedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
-                    p.getSupersededAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
-                    p.getMeals().size(),
-                    groups,
-                    meals
-                );
-            })
-            .toList();
+        var versions = plansRepository.findHistoryWithGroups(userId);
+        plansRepository.fetchHistoryMeals(userId);
+        mealRepository.fetchHistoryPortions(userId);
+        return PlanHistory.collapse(versions, clock.getZone());
     }
 
     private Plan copyPlan(Long userId, java.util.Optional<Plan> existing) {
