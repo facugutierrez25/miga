@@ -5,13 +5,13 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ComponenteTest {
+class RuleComponentTest {
     @Test
     void legacyJsonAllowsMissingFoodGroupId() throws Exception {
-        Componente component = new ObjectMapper().readValue(
-            "{\"standardGroupKey\":\"frutas\",\"porciones\":1}", Componente.class);
+        RuleComponent component = new ObjectMapper().readValue(
+            "{\"standardGroupKey\":\"frutas\",\"porciones\":1}", RuleComponent.class);
         assertThat(component.foodGroupId()).isNull();
         assertThat(component.standardGroupKey()).isEqualTo("frutas");
-        assertThat(component.porciones()).isEqualTo(1);
+        assertThat(component.portions()).isEqualTo(1);
     }
 }

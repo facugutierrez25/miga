@@ -169,18 +169,18 @@ class InterpreterService {
         // Sin medida no se inventan gramos ni tazas: se registra una estimación en porciones.
         boolean assumed = !explicitQuantity;
         if (detectedUnit == null) {
-            if (explicitQuantity && "u".equals(canonical(rule.unidad()))) {
+            if (explicitQuantity && "u".equals(canonical(rule.unit()))) {
                 detectedUnit = "u";
             } else {
                 assumed = true;
             }
         }
         InterpretedItem item = computePortions(segment, rawQty, detectedUnit, rule);
-        boolean countsPortions = "NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo());
+        boolean countsPortions = "NORMAL".equals(rule.type()) || "COMPUESTO".equals(rule.type());
         boolean uncertain = (countsPortions && assumed) || item.uncertain();
         return new InterpretedItem(item.originalText(), item.foodName(), item.quantity(), item.unit(),
             item.foodGroupId(), item.standardGroupKey(), item.portions(), item.appliedRule(),
-            uncertain, item.ruleId(), item.components(), item.tipo());
+            uncertain, item.ruleId(), item.components(), item.type());
     }
 
     FoodRuleDto findRule(String name, List<FoodRuleDto> rules) {
@@ -188,7 +188,7 @@ class InterpreterService {
         // aproximada personal no debe ocultar una coincidencia exacta global.
         for (String scope : List.of("USUARIO", "PLAN", "GLOBAL")) {
             FoodRuleDto match = findRuleWithin(name, rules.stream()
-                .filter(r -> scope.equals(r.alcance())).toList(), false);
+                .filter(r -> scope.equals(r.scope())).toList(), false);
             if (match != null) return match;
         }
         return findRuleWithin(name, rules, true);
@@ -197,22 +197,22 @@ class InterpreterService {
     private FoodRuleDto findRuleWithin(String name, List<FoodRuleDto> rules, boolean fuzzy) {
         // 1. Exact match on food name
         for (FoodRuleDto r : rules) {
-            if (normalize(r.alimento()).equals(name)) return r;
+            if (normalize(r.food()).equals(name)) return r;
         }
         // 2. Exact match on synonyms
         for (FoodRuleDto r : rules) {
-            if (r.sinonimos() != null)
-                for (String s : r.sinonimos())
+            if (r.synonyms() != null)
+                for (String s : r.synonyms())
                     if (normalize(s).equals(name)) return r;
         }
         // 3. Plural normalization: try stripping trailing -s / -es
         for (String stem : depluralize(name)) {
             for (FoodRuleDto r : rules) {
-                if (normalize(r.alimento()).equals(stem)) return r;
+                if (normalize(r.food()).equals(stem)) return r;
             }
             for (FoodRuleDto r : rules) {
-                if (r.sinonimos() != null)
-                    for (String s : r.sinonimos())
+                if (r.synonyms() != null)
+                    for (String s : r.synonyms())
                         if (normalize(s).equals(stem)) return r;
             }
         }
@@ -220,13 +220,13 @@ class InterpreterService {
         List<FoodRuleDto> candidates = new ArrayList<>();
         int bestDist = 3;
         for (FoodRuleDto r : rules) {
-            String rName = normalize(r.alimento());
+            String rName = normalize(r.food());
             if (rName.length() < 4) continue;
             int d = levenshtein(name, rName, 2);
             if (d < bestDist) { bestDist = d; candidates.clear(); candidates.add(r); }
             else if (d == bestDist) candidates.add(r);
-            if (r.sinonimos() != null) {
-                for (String s : r.sinonimos()) {
+            if (r.synonyms() != null) {
+                for (String s : r.synonyms()) {
                     String ns = normalize(s);
                     if (ns.length() < 4) continue;
                     d = levenshtein(name, ns, 2);
@@ -244,66 +244,66 @@ class InterpreterService {
         BigDecimal portions;
         String appliedRule;
 
-        switch (rule.tipo()) {
+        switch (rule.type()) {
             case "NO_CUENTA" -> {
                 portions = BigDecimal.ZERO;
-                appliedRule = rule.alimento() + " = no cuenta";
+                appliedRule = rule.food() + " = no cuenta";
             }
             case "LIBRE" -> {
                 portions = BigDecimal.ZERO;
-                appliedRule = rule.alimento() + " = libre (sin porción asignada)";
+                appliedRule = rule.food() + " = libre (sin porción asignada)";
             }
             case "FLEXIBLE" -> {
                 portions = BigDecimal.ZERO;
-                appliedRule = rule.alimento() + " = flexible (sin porción fija)";
+                appliedRule = rule.food() + " = flexible (sin porción fija)";
             }
             case "COMPUESTO" -> {
                 // Sin conversión, los componentes se escalan por la cantidad anotada, como antes de la #274.
                 portions = BigDecimal.valueOf(qty).setScale(3, RoundingMode.HALF_UP);
-                appliedRule = rule.alimento() + " (compuesto)";
-                if (rule.cantidadPorPorcion() != null && rule.unidad() != null && unit != null) {
-                    BigDecimal converted = convert(BigDecimal.valueOf(qty), unit, rule.unidad());
+                appliedRule = rule.food() + " (compuesto)";
+                if (rule.amountPerPortion() != null && rule.unit() != null && unit != null) {
+                    BigDecimal converted = convert(BigDecimal.valueOf(qty), unit, rule.unit());
                     if (converted != null) {
-                        portions = converted.divide(rule.cantidadPorPorcion(), 3, RoundingMode.HALF_UP);
-                        appliedRule = rule.cantidadPorPorcion() + " " + rule.unidad()
-                            + " de " + rule.alimento() + " = 1 porción (compuesto)";
+                        portions = converted.divide(rule.amountPerPortion(), 3, RoundingMode.HALF_UP);
+                        appliedRule = rule.amountPerPortion() + " " + rule.unit()
+                            + " de " + rule.food() + " = 1 porción (compuesto)";
                     } else {
                         uncertain = true;
-                        appliedRule = rule.alimento() + " (compuesto, cantidad supuesta)";
+                        appliedRule = rule.food() + " (compuesto, cantidad supuesta)";
                     }
                 }
             }
             default -> {
-                if (rule.cantidadPorPorcion() != null && rule.unidad() != null && unit != null) {
-                    BigDecimal converted = convert(BigDecimal.valueOf(qty), unit, rule.unidad());
+                if (rule.amountPerPortion() != null && rule.unit() != null && unit != null) {
+                    BigDecimal converted = convert(BigDecimal.valueOf(qty), unit, rule.unit());
                     if (converted != null) {
-                        portions = converted.divide(rule.cantidadPorPorcion(), 3, RoundingMode.HALF_UP);
-                        appliedRule = rule.cantidadPorPorcion() + " " + rule.unidad()
-                            + " de " + rule.alimento() + " = 1 porción";
+                        portions = converted.divide(rule.amountPerPortion(), 3, RoundingMode.HALF_UP);
+                        appliedRule = rule.amountPerPortion() + " " + rule.unit()
+                            + " de " + rule.food() + " = 1 porción";
                     } else {
-                        portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
+                        portions = rule.defaultPortions().multiply(BigDecimal.valueOf(qty))
                             .setScale(3, RoundingMode.HALF_UP);
                         uncertain = true;
-                        appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " "
-                            + RuleText.portionUnit(rule.porcionPorDefecto()) + " (supuesto)";
+                        appliedRule = rule.food() + " = " + rule.defaultPortions() + " "
+                            + RuleText.portionUnit(rule.defaultPortions()) + " (supuesto)";
                     }
                 } else {
-                    portions = rule.porcionPorDefecto().multiply(BigDecimal.valueOf(qty))
+                    portions = rule.defaultPortions().multiply(BigDecimal.valueOf(qty))
                         .setScale(3, RoundingMode.HALF_UP);
-                    appliedRule = rule.alimento() + " = " + rule.porcionPorDefecto() + " " + RuleText.portionUnit(rule.porcionPorDefecto());
+                    appliedRule = rule.food() + " = " + rule.defaultPortions() + " " + RuleText.portionUnit(rule.defaultPortions());
                 }
             }
         }
 
         return new InterpretedItem(
-            originalText, rule.alimento(),
-            unit == null && ("NORMAL".equals(rule.tipo()) || "COMPUESTO".equals(rule.tipo()))
+            originalText, rule.food(),
+            unit == null && ("NORMAL".equals(rule.type()) || "COMPUESTO".equals(rule.type()))
                 ? portions : BigDecimal.valueOf(qty),
             unit != null ? unit : RuleText.portionUnit(portions),
             rule.foodGroupId(), rule.standardGroupKey(),
             portions, appliedRule, uncertain, rule.id(),
-            "COMPUESTO".equals(rule.tipo()) ? rule.componentes() : null,
-            rule.tipo()
+            "COMPUESTO".equals(rule.type()) ? rule.components() : null,
+            rule.type()
         );
     }
 

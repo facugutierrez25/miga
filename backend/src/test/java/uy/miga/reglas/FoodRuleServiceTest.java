@@ -8,29 +8,29 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class ReglaServiceTest {
+class FoodRuleServiceTest {
     final FoodRuleRepository repository = mock(FoodRuleRepository.class);
-    final ReglaService service = new ReglaService(repository);
+    final FoodRuleService service = new FoodRuleService(repository);
     FoodRule rule(String scope, String name) {
-        FoodRule r = new FoodRule(); r.setAlcance(scope); r.setAlimento(name); r.setTipo("NORMAL"); r.setPorcionPorDefecto(BigDecimal.ONE); return r;
+        FoodRule r = new FoodRule(); r.setScope(scope); r.setFood(name); r.setType("NORMAL"); r.setDefaultPortions(BigDecimal.ONE); return r;
     }
     @Test void adjustmentReplacesOriginalIncludingItsAliases() {
-        FoodRule global = rule("GLOBAL", "sintético"); global.setSinonimos(List.of("alias global"));
+        FoodRule global = rule("GLOBAL", "sintético"); global.setSynonyms(List.of("alias global"));
         FoodRule adjustment = rule("USUARIO", "otro nombre"); adjustment.setOverridesRuleUid(global.getUid()); adjustment.setFoodGroupId(7L);
         FoodRule unrelated = rule("PLAN", "otro");
         when(repository.findApplicable(1L, 2L)).thenReturn(List.of(adjustment, unrelated, global));
         var applicable = service.findApplicable(1L, 2L);
         assertThat(applicable).hasSize(2);
         assertThat(applicable.getFirst().foodGroupId()).isEqualTo(7L);
-        assertThat(applicable.getFirst().sinonimos()).contains("alias global", "sintético");
+        assertThat(applicable.getFirst().synonyms()).contains("alias global", "sintético");
         assertThat(applicable).noneMatch(r -> r.uid().equals(global.getUid()));
     }
     @Test void catalogSearchIgnoresAccentsAndCaseAndCapsResults() {
         List<FoodRule> all = new ArrayList<>();
-        for(int i=0;i<40;i++) { var r=rule("GLOBAL","Nombre"+i); r.setSinonimos(List.of("SINTÉTICO")); all.add(r); }
+        for(int i=0;i<40;i++) { var r=rule("GLOBAL","Nombre"+i); r.setSynonyms(List.of("SINTÉTICO")); all.add(r); }
         all.add(rule("USUARIO","sintetico"));
         when(repository.findApplicable(1L,2L)).thenReturn(all);
-        assertThat(service.searchCatalog("sintetico",1L,2L,100)).hasSize(30).allMatch(r -> r.alcance().equals("GLOBAL"));
+        assertThat(service.searchCatalog("sintetico",1L,2L,100)).hasSize(30).allMatch(r -> r.scope().equals("GLOBAL"));
     }
     @ParameterizedTest @ValueSource(strings={"NORMAL","COMPUESTO","LIBRE","FLEXIBLE","NO_CUENTA","INVALIDO"})
     void invalidStructureIsRejected(String type) {
@@ -40,11 +40,11 @@ class ReglaServiceTest {
         verify(repository,never()).save(any());
     }
     @Test void duplicatedCompoundGroupsAreRejected() {
-        var in=new RuleInput("Compuesto",List.of(),"COMPUESTO",null,null,null,null,List.of(new Componente(3L,null,1),new Componente(3L,null,0.5)),null);
+        var in=new RuleInput("Compuesto",List.of(),"COMPUESTO",null,null,null,null,List.of(new RuleComponent(3L,null,1),new RuleComponent(3L,null,0.5)),null);
         assertThatThrownBy(() -> service.createUserRule(2L,1L,in)).isInstanceOf(InvalidRuleException.class);
     }
     @Test void textUsesCommaAndReadableGroupNames() {
-        FoodRule r=rule("USUARIO","barrita"); r.setTipo("COMPUESTO"); r.setComponentes(List.of(new Componente(3L,null,0.5),new Componente(4L,null,1)));
+        FoodRule r=rule("USUARIO","barrita"); r.setType("COMPUESTO"); r.setComponents(List.of(new RuleComponent(3L,null,0.5),new RuleComponent(4L,null,1)));
         when(repository.findApplicable(1L,2L)).thenReturn(List.of(r));
         assertThat(RuleText.describe(service.findApplicable(1L,2L).getFirst(),Map.of(3L,"Proteínas",4L,"Cereales")))
             .isEqualTo("1 barrita = 0,5 porciones de Proteínas + 1 porción de Cereales");
@@ -57,12 +57,12 @@ class ReglaServiceTest {
         UUID uid = existing.getUid();
         UUID override = UUID.randomUUID();
         existing.setOverridesRuleUid(override);
-        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("arbol", List.of(), "NORMAL",
             7L, BigDecimal.valueOf(2), "u", BigDecimal.ONE, List.of(), null));
         assertThat(result.uid()).isEqualTo(uid);
         assertThat(result.overridesRuleUid()).isEqualTo(override);
-        assertThat(result.cantidadPorPorcion()).isEqualByComparingTo("2");
+        assertThat(result.amountPerPortion()).isEqualByComparingTo("2");
         verify(repository, never()).save(any());
     }
 
@@ -71,35 +71,35 @@ class ReglaServiceTest {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("Nuevo", null, "LIBRE",
             null, null, null, null, List.of(), null));
-        assertThat(result.alimento()).isEqualTo("Nuevo");
-        assertThat(result.sinonimos()).isEmpty();
+        assertThat(result.food()).isEqualTo("Nuevo");
+        assertThat(result.synonyms()).isEmpty();
         FoodRule persisted = rule("PLAN", "Sin alias");
-        persisted.setSinonimos(null);
+        persisted.setSynonyms(null);
         when(repository.findApplicable(1L, 2L)).thenReturn(List.of(persisted));
-        assertThat(service.findApplicable(1L, 2L).getFirst().sinonimos()).isEmpty();
+        assertThat(service.findApplicable(1L, 2L).getFirst().synonyms()).isEmpty();
     }
 
     @Test
     void upsertUnionsSynonymsUsingNormalizedComparison() {
         FoodRule existing = rule("USUARIO", "yogur");
-        existing.setSinonimos(List.of("yogurt", "Álias"));
-        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        existing.setSynonyms(List.of("yogurt", "Álias"));
+        when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
 
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("yogur",
             List.of(" YOGURT ", "alias", "nuevo"), "NORMAL", 7L, new BigDecimal("0.667"),
             "u", BigDecimal.ONE, List.of(), null));
 
-        assertThat(result.sinonimos()).containsExactly("yogurt", "Álias", "nuevo");
+        assertThat(result.synonyms()).containsExactly("yogurt", "Álias", "nuevo");
         result = service.upsertUserRule(2L, 1L, new RuleInput("yogur", null, "NORMAL", 7L,
             BigDecimal.ONE, "u", BigDecimal.ONE, List.of(), null));
-        assertThat(result.sinonimos()).containsExactly("yogurt", "Álias", "nuevo");
+        assertThat(result.synonyms()).containsExactly("yogurt", "Álias", "nuevo");
     }
 
     @Test
     void updateRejectsNormalizedDuplicateButAllowsOwnName() {
         FoodRule first = rule("USUARIO", "Árbol");
         FoodRule second = rule("USUARIO", "Otro");
-        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO"))
+        when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO"))
             .thenReturn(List.of(first, second));
         RuleInput input = new RuleInput(" ARBOL ", List.of(), "LIBRE", null, null, null,
             BigDecimal.ONE, List.of(), null);
@@ -107,8 +107,8 @@ class ReglaServiceTest {
         assertThatThrownBy(() -> service.updateUserRule(2L, 1L, second.getUid(), input))
             .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
                 exception -> assertThat(exception.getStatusCode().value()).isEqualTo(409));
-        assertThat(second.getAlimento()).isEqualTo("Otro");
-        assertThat(service.updateUserRule(2L, 1L, first.getUid(), input).alimento()).isEqualTo("ARBOL");
+        assertThat(second.getFood()).isEqualTo("Otro");
+        assertThat(service.updateUserRule(2L, 1L, first.getUid(), input).food()).isEqualTo("ARBOL");
     }
 
 
@@ -146,30 +146,30 @@ class ReglaServiceTest {
         FoodRule existing = rule("USUARIO", "a".repeat(150));
         var aliases = new ArrayList<>(java.util.stream.IntStream.range(0, 21).mapToObj(i -> "alias" + i).toList());
         aliases.add("b".repeat(150));
-        existing.setSinonimos(aliases);
-        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
-        var input = new RuleInput(existing.getAlimento(), aliases, "NORMAL", 7L, null, null,
+        existing.setSynonyms(aliases);
+        when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        var input = new RuleInput(existing.getFood(), aliases, "NORMAL", 7L, null, null,
             BigDecimal.valueOf(2), List.of(), null);
         var result = service.updateUserRule(2L, 1L, existing.getUid(), input);
-        assertThat(result.porcionPorDefecto()).isEqualByComparingTo("2");
-        assertThat(result.alimento()).hasSize(150);
-        assertThat(result.sinonimos()).containsExactlyElementsOf(aliases);
-        assertThat(service.upsertUserRule(2L, 1L, input).sinonimos()).containsExactlyElementsOf(aliases);
+        assertThat(result.defaultPortions()).isEqualByComparingTo("2");
+        assertThat(result.food()).hasSize(150);
+        assertThat(result.synonyms()).containsExactlyElementsOf(aliases);
+        assertThat(service.upsertUserRule(2L, 1L, input).synonyms()).containsExactlyElementsOf(aliases);
         var added = new ArrayList<>(aliases);
         added.add("nuevo");
         assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
-            new RuleInput(existing.getAlimento(), added, "LIBRE", null, null, null, null, List.of(), null)))
+            new RuleInput(existing.getFood(), added, "LIBRE", null, null, null, null, List.of(), null)))
             .isInstanceOf(InvalidRuleException.class);
     }
 
     @Test void updateRejectsNewOversizedNamesAndSynonyms() {
         FoodRule existing = rule("USUARIO", "a".repeat(150));
-        when(repository.findByUserIdAndPlanIdAndAlcance(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
+        when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
         assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
             new RuleInput("b".repeat(101), List.of(), "LIBRE", null, null, null, null, List.of(), null)))
             .isInstanceOf(InvalidRuleException.class);
         assertThatThrownBy(() -> service.updateUserRule(2L, 1L, existing.getUid(),
-            new RuleInput(existing.getAlimento(), List.of("b".repeat(101)), "LIBRE", null, null, null, null, List.of(), null)))
+            new RuleInput(existing.getFood(), List.of("b".repeat(101)), "LIBRE", null, null, null, null, List.of(), null)))
             .isInstanceOf(InvalidRuleException.class);
     }
 
@@ -179,9 +179,9 @@ class ReglaServiceTest {
         for (boolean measured : List.of(true, false)) {
             var result = service.createUserRule(2L, 1L, new RuleInput("Tarta", List.of(), "COMPUESTO", null,
                 measured ? new BigDecimal("150") : null, measured ? "g" : null, BigDecimal.ONE,
-                List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)), null));
-            assertThat(result.cantidadPorPorcion()).isEqualTo(measured ? new BigDecimal("150") : null);
-            assertThat(result.unidad()).isEqualTo(measured ? "g" : null);
+                List.of(new RuleComponent(3L, null, 1), new RuleComponent(4L, null, 1)), null));
+            assertThat(result.amountPerPortion()).isEqualTo(measured ? new BigDecimal("150") : null);
+            assertThat(result.unit()).isEqualTo(measured ? "g" : null);
             assertThat(RuleText.describe(result, Map.of(3L, "Cereales", 4L, "Verduras")))
                 .isEqualTo("1 Tarta" + (measured ? " (150 g)" : "") + " = 1 porción de Cereales + 1 porción de Verduras");
         }
@@ -190,9 +190,9 @@ class ReglaServiceTest {
     @Test void legacyCompoundWithUnitButNoQuantityKeepsWorkingWithoutUnit() {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         var result = service.createUserRule(2L, 1L, new RuleInput("Barrita", List.of(), "COMPUESTO", null,
-            null, "u", BigDecimal.ONE, List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)), null));
-        assertThat(result.cantidadPorPorcion()).isNull();
-        assertThat(result.unidad()).isNull();
+            null, "u", BigDecimal.ONE, List.of(new RuleComponent(3L, null, 1), new RuleComponent(4L, null, 1)), null));
+        assertThat(result.amountPerPortion()).isNull();
+        assertThat(result.unit()).isNull();
     }
 
     @Test void compoundRejectsIncompleteOrInvalidQuantityUnitPair() {
@@ -202,7 +202,7 @@ class ReglaServiceTest {
             new Object[]{new BigDecimal("-1"), "g"})) {
             var input = new RuleInput("Tarta", List.of(), "COMPUESTO", null,
                 (BigDecimal) pair[0], (String) pair[1], BigDecimal.ONE,
-                List.of(new Componente(3L, null, 1), new Componente(4L, null, 1)), null);
+                List.of(new RuleComponent(3L, null, 1), new RuleComponent(4L, null, 1)), null);
             assertThatThrownBy(() -> service.createUserRule(2L, 1L, input))
                 .isInstanceOf(InvalidRuleException.class).hasMessageContaining("cantidad positiva y unidad juntas");
         }

@@ -1,11 +1,13 @@
 package uy.miga.registro;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-record DayRegistroDto(
+record DayLogDto(
     LocalDate date,
     List<MealDayDto> meals,
     List<DailySummaryDto> summary
@@ -40,7 +42,7 @@ record DayRegistroDto(
     record DailySummaryDto(
         Long foodGroupId,
         String name,
-        String clave,
+        @JsonProperty("clave") String standardKey,
         BigDecimal totalRecorded
     ) {}
 }

@@ -25,11 +25,11 @@ class ComparisonService {
     }
 
     List<GroupStatus> compare(Long planId, Long mealId, Map<Long, BigDecimal> recordedPortions) {
-        if ("LIBRE".equals(planService.getModoRegistro(planId))) return List.of();
+        if ("LIBRE".equals(planService.getLoggingMode(planId))) return List.of();
 
         List<MealPortionSummary> planPortions = planService.getMealPortions(mealId);
         List<PlanFoodGroupDto> groups = planService.getPlanFoodGroups(planId);
-        BigDecimal margin = planService.getMargenPorciones(planId);
+        BigDecimal margin = planService.getPortionMargin(planId);
 
         return compare(planPortions, groups, margin, recordedPortions);
     }
@@ -48,8 +48,8 @@ class ComparisonService {
         Map<Long, Boolean> optional = new HashMap<>();
         for (PlanFoodGroupDto g : groups) {
             groupNames.put(g.id(), g.name());
-            askIfMissing.put(g.id(), Boolean.TRUE.equals(g.preguntarSiFalta()));
-            optional.put(g.id(), Boolean.TRUE.equals(g.opcional()));
+            askIfMissing.put(g.id(), Boolean.TRUE.equals(g.askIfMissing()));
+            optional.put(g.id(), Boolean.TRUE.equals(g.optional()));
         }
 
         List<GroupStatus> result = new ArrayList<>();

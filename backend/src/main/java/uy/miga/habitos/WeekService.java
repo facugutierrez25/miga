@@ -21,8 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import uy.miga.plans.PlanNotFoundException;
 import uy.miga.plans.PlanReadData;
-import uy.miga.registro.RegistroService;
-import uy.miga.registro.SinReglaDto;
+import uy.miga.registro.DailyLogService;
+import uy.miga.registro.UnmatchedFoodDto;
 import uy.miga.registro.WeekMealData;
 
 @Service
@@ -33,19 +33,19 @@ class WeekService {
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
     private final UserService userService;
-    private final RegistroService registroService;
+    private final DailyLogService dailyLogService;
 
     WeekService(PlanHabitRepository habitRepository,
                 HabitLogRepository logRepository,
                 FoodEntryFacade entryFacade,
                 PlanService planService,
-                UserService userService, RegistroService registroService) {
+                UserService userService, DailyLogService dailyLogService) {
         this.habitRepository = habitRepository;
         this.logRepository = logRepository;
         this.entryFacade = entryFacade;
         this.planService = planService;
         this.userService = userService;
-        this.registroService = registroService;
+        this.dailyLogService = dailyLogService;
     }
 
     @Transactional(readOnly = true)
@@ -56,7 +56,7 @@ class WeekService {
 
     // Datos para exportar un rango: la planilla, las porciones por grupo de cada día y lo no reconocido.
     @Transactional(readOnly = true)
-    WeekExport.Data getExportData(String email, LocalDate from, LocalDate to, Set<String> incluir) {
+    WeekExport.Data getExportData(String email, LocalDate from, LocalDate to, Set<String> includedSections) {
         Long userId = userService.findUserIdByEmail(email);
         RangeData range = buildRange(userId, from, to);
         List<String> groupNames = new ArrayList<>();
@@ -71,9 +71,9 @@ class WeekService {
             portions.computeIfAbsent(e.date(), d -> new HashMap<>())
                 .merge(groupById.get(e.foodGroupId()), e.portions(), BigDecimal::add);
         }
-        var sinRegla = incluir.contains(WeekExport.SIN_REGLA)
-            ? registroService.getSinRegla(userId, from, to) : List.<SinReglaDto>of();
-        return new WeekExport.Data(range.summary(), incluir, groupNames, portions, sinRegla, userService.findFirstNameByEmail(email));
+        var unmatchedFoods = includedSections.contains(WeekExport.UNMATCHED_FOODS)
+            ? dailyLogService.getUnmatchedFoods(userId, from, to) : List.<UnmatchedFoodDto>of();
+        return new WeekExport.Data(range.summary(), includedSections, groupNames, portions, unmatchedFoods, userService.findFirstNameByEmail(email));
     }
 
     private record RangeData(WeekSummaryDto summary, Map<LocalDate, PlanReadData> plans,
@@ -88,7 +88,7 @@ class WeekService {
         var plansByDate = planService.getPlansForRange(userId, weekStart, weekEnd);
         var weekEntries = entryFacade.findByUserIdAndDateRange(userId, weekStart, weekEnd);
         var entriesByDate = weekEntries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::date));
-        var mealsByDate = registroService.getWeekMealsForRange(userId, weekStart, weekEnd, plansByDate, weekEntries);
+        var mealsByDate = dailyLogService.getWeekMealsForRange(userId, weekStart, weekEnd, plansByDate, weekEntries);
         Map<Long, List<PlanHabit>> habitsByPlan = new HashMap<>();
 
         List<WeekDayDto> days = new ArrayList<>();

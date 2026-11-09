@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import uy.miga.plans.PlanNotFoundException;
 import uy.miga.plans.PlanService;
 import uy.miga.plans.PlanVersionConflictException;
-import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.FoodRuleService;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
@@ -18,7 +18,7 @@ class FoodEntryServiceTest {
     private final FoodEntryRepository repository = mock(FoodEntryRepository.class);
     private final PlanService plans = mock(PlanService.class);
     private final UserService users = mock(UserService.class);
-    private final FoodEntryService service = new FoodEntryService(repository, users, plans, mock(ReglaService.class));
+    private final FoodEntryService service = new FoodEntryService(repository, users, plans, mock(FoodRuleService.class));
 
     @Test
     void manualEntryLocksThenRejectsOldMeal() {
@@ -52,14 +52,14 @@ class FoodEntryServiceTest {
     @Test
     void detachGroupPreservesRecordedPortionsAndRuleSnapshot() {
         FoodEntry entry = new FoodEntry(1L, "user", 10L, LocalDate.now(), "food", 2.0, "u", 7L);
-        entry.setPorciones(new BigDecimal("3"));
+        entry.setPortions(new BigDecimal("3"));
         entry.setAppliedRule("snapshot");
         when(repository.findByFoodGroupId(7L)).thenReturn(List.of(entry));
 
         new FoodEntryFacade(repository).detachGroup(7L);
 
         assertThat(entry.getFoodGroupId()).isNull();
-        assertThat(entry.getPorciones()).isEqualByComparingTo("3");
+        assertThat(entry.getPortions()).isEqualByComparingTo("3");
         assertThat(entry.getAppliedRule()).isEqualTo("snapshot");
         verify(repository).flush();
     }

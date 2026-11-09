@@ -9,12 +9,12 @@ import java.util.*;
 import uy.miga.plans.PlanReadData;
 
 @Service
-public class RegistroService {
+public class DailyLogService {
     private final NoteService noteService;
     private final DayReadService dayReadService;
     private final ItemCorrectionService itemCorrectionService;
     private final ItemResolutionService itemResolutionService;
-    RegistroService(NoteService noteService, DayReadService dayReadService, ItemCorrectionService itemCorrectionService,
+    DailyLogService(NoteService noteService, DayReadService dayReadService, ItemCorrectionService itemCorrectionService,
             ItemResolutionService itemResolutionService) {
         this.noteService = noteService;
         this.dayReadService = dayReadService;
@@ -24,7 +24,7 @@ public class RegistroService {
 
     static final int MAX_RANGE_DAYS = DayReadService.MAX_RANGE_DAYS;
     static String ruleSource(InterpretedItem item, List<FoodRuleDto> rules) { return NoteService.ruleSource(item, rules); }
-    static String sourceOf(String alcance) { return NoteService.sourceOf(alcance); }
+    static String sourceOf(String scope) { return NoteService.sourceOf(scope); }
     public List<WeekMealData> getWeekMeals(String email, LocalDate date) {
         return dayReadService.getWeekMeals(email, date);
     }
@@ -58,11 +58,11 @@ public class RegistroService {
         return dayReadService.getDayComparison(userEmail, date);
     }
 
-    DayRegistroDto getDayRegistro(String userEmail, LocalDate date) {
-        return dayReadService.getDayRegistro(userEmail, date);
+    DayLogDto getDayLog(String userEmail, LocalDate date) {
+        return dayReadService.getDayLog(userEmail, date);
     }
 
-    DayRegistroDto.MealDayDto removeItem(String userEmail, LocalDate date, Long entryId, Long version) {
+    DayLogDto.MealDayDto removeItem(String userEmail, LocalDate date, Long entryId, Long version) {
         return itemCorrectionService.removeItem(userEmail, date, entryId, version);
     }
 
@@ -82,19 +82,19 @@ public class RegistroService {
         return noteService.deleteNote(userEmail, date, mealId, version);
     }
 
-    void saveRespuesta(String userEmail, LocalDate date, Long mealId, RespuestaRequest req) {
-        itemCorrectionService.saveRespuesta(userEmail, date, mealId, req);
+    void saveAnswer(String userEmail, LocalDate date, Long mealId, AnswerRequest req) {
+        itemCorrectionService.saveAnswer(userEmail, date, mealId, req);
     }
 
-    public List<SinReglaDto> getSinRegla(Long userId, LocalDate desde, LocalDate hasta) {
-        return dayReadService.getSinRegla(userId, desde, hasta);
+    public List<UnmatchedFoodDto> getUnmatchedFoods(Long userId, LocalDate from, LocalDate to) {
+        return dayReadService.getUnmatchedFoods(userId, from, to);
     }
 
-    List<SinReglaDto> getSinRegla(String userEmail, LocalDate desde, LocalDate hasta) {
-        return dayReadService.getSinRegla(userEmail, desde, hasta);
+    List<UnmatchedFoodDto> getUnmatchedFoods(String userEmail, LocalDate from, LocalDate to) {
+        return dayReadService.getUnmatchedFoods(userEmail, from, to);
     }
 
-    List<String> getSugerencias(String userEmail, Long mealId) {
-        return noteService.getSugerencias(userEmail, mealId);
+    List<String> getSuggestions(String userEmail, Long mealId) {
+        return noteService.getSuggestions(userEmail, mealId);
     }
 }

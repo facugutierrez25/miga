@@ -9,7 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanService;
 import uy.miga.reglas.FoodRuleDto;
-import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.FoodRuleService;
 import uy.miga.reglas.RuleText;
 import uy.miga.users.UserService;
 
@@ -28,15 +28,15 @@ class NoteService {
     private final ComparisonService comparison;
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
-    private final ReglaService ruleService;
+    private final FoodRuleService ruleService;
     private final UserService userService;
     private final Clock clock;
-    private final RegistroSupport support;
+    private final DailyLogSupport support;
     private final DayReadService dayReadService;
 
     NoteService(MealNoteRepository noteRepository, InterpreterService interpreter, ComparisonService comparison,
-            FoodEntryFacade entryFacade, PlanService planService, ReglaService ruleService, UserService userService,
-            Clock clock, RegistroSupport support, DayReadService dayReadService) {
+            FoodEntryFacade entryFacade, PlanService planService, FoodRuleService ruleService, UserService userService,
+            Clock clock, DailyLogSupport support, DayReadService dayReadService) {
         this.noteRepository = noteRepository;
         this.interpreter = interpreter;
         this.comparison = comparison;
@@ -101,7 +101,7 @@ class NoteService {
         Long planId = selectNotePlan(note, userId, date, mealId);
 
         if (checkVersion && existing.isPresent() && text.strip().equals(note.getText())) {
-            DayRegistroDto.MealDayDto meal = dayReadService.getDayRegistro(userEmail, date).meals().stream()
+            DayLogDto.MealDayDto meal = dayReadService.getDayLog(userEmail, date).meals().stream()
                 .filter(m -> m.mealId().equals(mealId)).findFirst().orElseThrow();
             return new NoteInterpretationDto(note.getId(), note.getVersion(), note.getText(), date, mealId,
                 List.of(), meal.items(), meal.comparison());
@@ -137,7 +137,7 @@ class NoteService {
                         item.originalText(), item.foodName(),
                         item.quantity(), item.unit(),
                         groupId, comp.standardGroupKey(),
-                        BigDecimal.valueOf(comp.porciones()).multiply(item.portions()).setScale(3, RoundingMode.HALF_UP),
+                        BigDecimal.valueOf(comp.portions()).multiply(item.portions()).setScale(3, RoundingMode.HALF_UP),
                         item.appliedRule(), item.uncertain(), item.ruleId(), null, null
                     ));
                 }
@@ -148,7 +148,7 @@ class NoteService {
                     item.originalText(), item.foodName(),
                     item.quantity(), item.unit(),
                     groupId, item.standardGroupKey(),
-                    item.portions(), item.appliedRule(), item.uncertain(), item.ruleId(), null, item.tipo()
+                    item.portions(), item.appliedRule(), item.uncertain(), item.ruleId(), null, item.type()
                 ));
             } else {
                 result.add(item);
@@ -163,16 +163,16 @@ class NoteService {
         if (item.ruleId() == null) return null;
         FoodRuleDto rule = rules.stream().filter(r -> r.id().equals(item.ruleId())).findFirst().orElse(null);
         if (rule == null) return item.appliedRule();
-        if (!"COMPUESTO".equals(rule.tipo())) {
-            return rule.alcance().equals("GLOBAL") ? item.appliedRule() : RuleText.describe(rule, groupNames);
+        if (!"COMPUESTO".equals(rule.type())) {
+            return rule.scope().equals("GLOBAL") ? item.appliedRule() : RuleText.describe(rule, groupNames);
         }
-        return (rule.cantidadPorPorcion() != null
-            ? rule.cantidadPorPorcion().stripTrailingZeros().toPlainString().replace('.', ',') + " " + rule.unidad() + " de "
-            : "1 ") + rule.alimento() + " = " + rule.componentes().stream()
+        return (rule.amountPerPortion() != null
+            ? rule.amountPerPortion().stripTrailingZeros().toPlainString().replace('.', ',') + " " + rule.unit() + " de "
+            : "1 ") + rule.food() + " = " + rule.components().stream()
             .map(c -> {
                 Long groupId = c.foodGroupId() != null ? c.foodGroupId() : support.resolveGroupId(c.standardGroupKey(), planId);
                 String name = groupId == null ? c.standardGroupKey() : groupNames.getOrDefault(groupId, c.standardGroupKey());
-                return BigDecimal.valueOf(c.porciones()).stripTrailingZeros().toPlainString().replace('.', ',') + " " + name;
+                return BigDecimal.valueOf(c.portions()).stripTrailingZeros().toPlainString().replace('.', ',') + " " + name;
             })
             .collect(Collectors.joining(" + "));
     }
@@ -181,12 +181,12 @@ class NoteService {
     static String ruleSource(InterpretedItem item, List<FoodRuleDto> rules) {
         if (!item.recognized() || item.ruleId() == null) return null;
         return rules.stream().filter(r -> item.ruleId().equals(r.id())).findFirst()
-            .map(r -> sourceOf(r.alcance())).orElse(null);
+            .map(r -> sourceOf(r.scope())).orElse(null);
     }
 
-    static String sourceOf(String alcance) {
-        if (alcance == null) return null;
-        return switch (alcance) {
+    static String sourceOf(String scope) {
+        if (scope == null) return null;
+        return switch (scope) {
             case "GLOBAL" -> "CATALOGO";
             case "PLAN" -> "PLAN";
             case EntryOrigin.USER -> EntryOrigin.USER;
@@ -197,7 +197,7 @@ class NoteService {
     private String getType(InterpretedItem item, List<FoodRuleDto> rules) {
         if (item.ruleId() == null) return "NORMAL";
         return rules.stream().filter(r -> r.id().equals(item.ruleId()))
-            .findFirst().map(FoodRuleDto::tipo).orElse("NORMAL");
+            .findFirst().map(FoodRuleDto::type).orElse("NORMAL");
     }
 
     // Borra la nota de una comida y todo lo registrado en ella ese día. Exige la versión vigente,
@@ -225,7 +225,7 @@ class NoteService {
     }
 
     @Transactional(readOnly = true)
-    List<String> getSugerencias(String userEmail, Long mealId) {
+    List<String> getSuggestions(String userEmail, Long mealId) {
         Long userId = userService.findUserIdByEmail(userEmail);
         return noteRepository.findTopTextsByUserIdAndMealId(userId, mealId);
     }
@@ -235,7 +235,7 @@ class NoteService {
             item.originalText(), item.foodName(),
             item.quantity(), item.unit(),
             item.foodGroupId(), item.standardGroupKey(), item.portions(),
-            item.appliedRule(), item.uncertain(), item.recognized(), item.tipo()
+            item.appliedRule(), item.uncertain(), item.recognized(), item.type()
         );
     }
 
@@ -264,9 +264,9 @@ class NoteService {
         for (InterpretedItem mention : items) {
             UUID occurrenceId = UUID.randomUUID();
             String ruleText = describeRule(mention, rules, planId, groupNames);
-            String ruleType = mention.recognized() ? mention.tipo() : null;
+            String ruleType = mention.recognized() ? mention.type() : null;
             String ruleSource = ruleSource(mention, rules);
-            if (!mention.recognized() || Set.of("LIBRE", "FLEXIBLE", "NO_CUENTA").contains(mention.tipo())) {
+            if (!mention.recognized() || Set.of("LIBRE", "FLEXIBLE", "NO_CUENTA").contains(mention.type())) {
                 entryFacade.createMentionEntry(userId, userEmail, mealId, date, mention.foodName(),
                     mention.quantity().doubleValue(), mention.unit(), saved.getId(), mention.originalText(),
                     mention.recognized() && mention.uncertain(), ruleText, occurrenceId, mention.recognized(),

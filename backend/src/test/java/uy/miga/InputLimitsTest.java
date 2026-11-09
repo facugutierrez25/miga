@@ -33,12 +33,23 @@ class InputLimitsTest {
     }
 
     @Test void oversizedNotesReturn400OnBothRoutes() throws Exception {
-        var mvc = mvc("registro.RegistroController");
+        var mvc = mvc("registro.DailyLogController");
         String body = mapper.writeValueAsString(Map.of("text", "a".repeat(2001)));
         mvc.perform(put("/api/v1/registro/2026-01-01/comidas/1/nota").contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/registro/2026-01-01/1/note").contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test void nestedValidationErrorsKeepJsonPropertyNames() throws Exception {
+        mvc("registro.DailyLogController")
+            .perform(patch("/api/v1/registro/2026-01-01/items/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"grupos":[{"foodGroupId":1,"porciones":-1},{"foodGroupId":2,"porciones":1}]}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0]").value(org.hamcrest.Matchers.startsWith("grupos[0].porciones: ")));
     }
 
     @Test void oversizedRuleNamesAndSynonymsReturn400() throws Exception {

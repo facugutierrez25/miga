@@ -13,9 +13,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/registro")
-class RegistroController {
+class DailyLogController {
 
-    private final RegistroService service;
+    private final DailyLogService service;
 
     @PostMapping("/{date}/items/{id}/resolve")
     ResolveItemResultDto resolveItem(Authentication auth,
@@ -31,21 +31,21 @@ class RegistroController {
         return service.undoResolve(auth.getName(), date, req);
     }
 
-    RegistroController(RegistroService service) {
+    DailyLogController(DailyLogService service) {
         this.service = service;
     }
 
     // GET  /api/v1/registro/{date} — día completo con comidas, ítems y comparación
     @GetMapping("/{date}")
-    DayRegistroDto getDayRegistro(Authentication auth,
+    DayLogDto getDayLog(Authentication auth,
                                   @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return service.getDayRegistro(auth.getName(), date);
+        return service.getDayLog(auth.getName(), date);
     }
 
     // PUT  /api/v1/registro/{date}/comidas/{mealId}/nota — idempotente
     @PutMapping("/{date}/comidas/{mealId}/nota")
     @ResponseStatus(HttpStatus.CREATED)
-    NoteInterpretationDto saveNota(Authentication auth,
+    NoteInterpretationDto saveNote(Authentication auth,
                                    @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                    @PathVariable Long mealId,
                                    @RequestBody @Valid NoteRequest req) {
@@ -54,7 +54,7 @@ class RegistroController {
 
     // DELETE /api/v1/registro/{date}/comidas/{mealId}/nota?version= — borra la nota y lo registrado en la comida
     @DeleteMapping("/{date}/comidas/{mealId}/nota")
-    DeleteNoteResponse deleteNota(Authentication auth,
+    DeleteNoteResponse deleteNote(Authentication auth,
                     @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                     @PathVariable Long mealId,
                     @RequestParam(required = false) Long version) {
@@ -87,7 +87,7 @@ class RegistroController {
     }
 
     @DeleteMapping("/{date}/items/{id}")
-    DayRegistroDto.MealDayDto removeItem(Authentication auth,
+    DayLogDto.MealDayDto removeItem(Authentication auth,
                     @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                     @PathVariable Long id,
                     @RequestParam(required = false) Long version) {
@@ -106,26 +106,26 @@ class RegistroController {
     // POST /api/v1/registro/{date}/comidas/{mealId}/respuestas — responder preguntar_si_falta
     @PostMapping("/{date}/comidas/{mealId}/respuestas")
     @ResponseStatus(HttpStatus.CREATED)
-    void saveRespuesta(Authentication auth,
+    void saveAnswer(Authentication auth,
                        @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                        @PathVariable Long mealId,
-                       @RequestBody RespuestaRequest req) {
-        service.saveRespuesta(auth.getName(), date, mealId, req);
+                       @RequestBody AnswerRequest req) {
+        service.saveAnswer(auth.getName(), date, mealId, req);
     }
 
     // GET  /api/v1/registro/sugerencias?mealId= — top 5 textos frecuentes de esa comida
     @GetMapping("/sugerencias")
-    List<String> getSugerencias(Authentication auth,
+    List<String> getSuggestions(Authentication auth,
                                  @RequestParam Long mealId) {
-        return service.getSugerencias(auth.getName(), mealId);
+        return service.getSuggestions(auth.getName(), mealId);
     }
 
     // GET  /api/v1/registro/sin-regla?desde=&hasta= — lo anotado que no se reconoció en el rango
     @GetMapping("/sin-regla")
-    List<SinReglaDto> getSinRegla(Authentication auth,
-                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
-                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
-        return service.getSinRegla(auth.getName(), desde, hasta);
+    List<UnmatchedFoodDto> getUnmatchedFoods(Authentication auth,
+                                  @RequestParam(value = "desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                  @RequestParam(value = "hasta") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.getUnmatchedFoods(auth.getName(), from, to);
     }
 
     record DeleteNoteResponse(Long version) {}

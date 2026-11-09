@@ -9,7 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanService;
 import uy.miga.reglas.FoodRuleDto;
-import uy.miga.reglas.ReglaService;
+import uy.miga.reglas.FoodRuleService;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
@@ -24,16 +24,16 @@ import uy.miga.plans.PlanReadData;
 class DayReadService {
     private final MealNoteRepository noteRepository;
     private final InterpreterService interpreter;
-    private final ReglaService ruleService;
+    private final FoodRuleService ruleService;
     private final ComparisonService comparison;
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
     private final UserService userService;
-    private final RegistroSupport support;
+    private final DailyLogSupport support;
 
-    DayReadService(MealNoteRepository noteRepository, InterpreterService interpreter, ReglaService ruleService,
+    DayReadService(MealNoteRepository noteRepository, InterpreterService interpreter, FoodRuleService ruleService,
             ComparisonService comparison, FoodEntryFacade entryFacade, PlanService planService, UserService userService,
-            RegistroSupport support) {
+            DailyLogSupport support) {
         this.noteRepository = noteRepository;
         this.interpreter = interpreter;
         this.ruleService = ruleService;
@@ -129,7 +129,7 @@ class DayReadService {
     }
 
     @Transactional(readOnly = true)
-    DayRegistroDto getDayRegistro(String userEmail, LocalDate date) {
+    DayLogDto getDayLog(String userEmail, LocalDate date) {
         Long userId = userService.findUserIdByEmail(userEmail);
         Long planId = planService.getPlanIdForDate(userId, date);
 
@@ -138,7 +138,7 @@ class DayReadService {
             noteRepository.findByUserIdAndDate(userId, date));
     }
 
-    private DayRegistroDto buildDay(LocalDate date, PlanReadData plan,
+    private DayLogDto buildDay(LocalDate date, PlanReadData plan,
                                     List<FoodEntryFacade.EntryData> entries, List<MealNote> notes) {
         var byMeal = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
         var noteByMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
@@ -146,52 +146,52 @@ class DayReadService {
         var groups = plan.groups();
 
         Map<Long, BigDecimal> totalByGroup = new HashMap<>();
-        List<DayRegistroDto.MealDayDto> mealDtos = new ArrayList<>();
+        List<DayLogDto.MealDayDto> mealDtos = new ArrayList<>();
 
         for (Long mealId : planMealIds) {
             mealDtos.add(buildMeal(plan, mealId, noteByMeal.get(mealId),
                 byMeal.getOrDefault(mealId, List.of()), totalByGroup));
         }
 
-        List<DayRegistroDto.DailySummaryDto> summary = groups.stream()
-            .map(g -> new DayRegistroDto.DailySummaryDto(
-                g.id(), g.name(), g.clave(),
+        List<DayLogDto.DailySummaryDto> summary = groups.stream()
+            .map(g -> new DayLogDto.DailySummaryDto(
+                g.id(), g.name(), g.standardKey(),
                 totalByGroup.getOrDefault(g.id(), BigDecimal.ZERO)))
             .toList();
 
-        return new DayRegistroDto(date, mealDtos, summary);
+        return new DayLogDto(date, mealDtos, summary);
     }
 
     // Lo que la persona escribió y no se reconoció en el rango, en orden de fecha.
     @Transactional(readOnly = true)
-    public List<SinReglaDto> getSinRegla(Long userId, LocalDate desde, LocalDate hasta) {
-        validateRange(desde, hasta);
-        var unknown = entryFacade.findByUserIdAndDateRange(userId, desde, hasta).stream()
+    public List<UnmatchedFoodDto> getUnmatchedFoods(Long userId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        var unknown = entryFacade.findByUserIdAndDateRange(userId, from, to).stream()
             .filter(e -> EntryOrigin.UNKNOWN.equals(e.origin()))
             .sorted(Comparator.comparing(FoodEntryFacade.EntryData::date))
             .toList();
         if (unknown.isEmpty()) return List.of();
         Map<Long, String> names = planService.getMealNames(
             unknown.stream().map(FoodEntryFacade.EntryData::mealId).collect(Collectors.toSet()));
-        return unknown.stream().map(e -> new SinReglaDto(
+        return unknown.stream().map(e -> new UnmatchedFoodDto(
             e.originalText() != null && !e.originalText().isBlank() ? e.originalText() : e.food(),
             e.date(), names.getOrDefault(e.mealId(), ""))).toList();
     }
 
     @Transactional(readOnly = true)
-    List<SinReglaDto> getSinRegla(String userEmail, LocalDate desde, LocalDate hasta) {
-        validateRange(desde, hasta);
-        return getSinRegla(userService.findUserIdByEmail(userEmail), desde, hasta);
+    List<UnmatchedFoodDto> getUnmatchedFoods(String userEmail, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        return getUnmatchedFoods(userService.findUserIdByEmail(userEmail), from, to);
     }
 
-    private static void validateRange(LocalDate desde, LocalDate hasta) {
-        if (desde == null || hasta == null || hasta.isBefore(desde)
-            || ChronoUnit.DAYS.between(desde, hasta) >= MAX_RANGE_DAYS) {
+    private static void validateRange(LocalDate from, LocalDate to) {
+        if (from == null || to == null || to.isBefore(from)
+            || ChronoUnit.DAYS.between(from, to) >= MAX_RANGE_DAYS) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un rango de hasta " + MAX_RANGE_DAYS + " días.");
         }
     }
 
-    private WeekMealData weekMeal(DayRegistroDto.MealDayDto meal, MealNote note, String mealName, Long planId,
+    private WeekMealData weekMeal(DayLogDto.MealDayDto meal, MealNote note, String mealName, Long planId,
             Long userId, Map<Long, List<FoodRuleDto>> rules) {
         long flexible = 0;
         if (note != null && !note.getText().isBlank()) {
@@ -204,7 +204,7 @@ class DayReadService {
                 Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
                 flexible = interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
                     id -> ruleService.findApplicable(id, userId))).stream()
-                    .filter(item -> "FLEXIBLE".equals(item.tipo())).count();
+                    .filter(item -> "FLEXIBLE".equals(item.type())).count();
             }
         }
         String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
@@ -212,10 +212,10 @@ class DayReadService {
         return new WeekMealData(meal.mealId(), mealName, meal.noteText(), status, flexible);
     }
 
-    private DayRegistroDto.MealDayDto buildMeal(PlanReadData plan, Long mealId, MealNote note,
+    private DayLogDto.MealDayDto buildMeal(PlanReadData plan, Long mealId, MealNote note,
             List<FoodEntryFacade.EntryData> mealEntries, Map<Long, BigDecimal> totalByGroup) {
 
-        List<DayRegistroDto.EntryItemDto> itemDtos = mealEntries.stream()
+        List<DayLogDto.EntryItemDto> itemDtos = mealEntries.stream()
             .map(support::toEntryItemDto)
             .toList();
 
@@ -234,7 +234,7 @@ class DayReadService {
                 s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()))
             .toList();
 
-        return new DayRegistroDto.MealDayDto(
+        return new DayLogDto.MealDayDto(
             mealId,
             note != null ? note.getId() : null,
             note != null ? note.getText() : null,

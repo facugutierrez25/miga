@@ -1,5 +1,7 @@
 package uy.miga.planrules;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -26,34 +28,34 @@ final class Requests {
     record Group(@NotNull @PositiveOrZero Long planVersion,
                  @NotBlank @Size(max = 60) String name,
                  @Size(max = 10) String abbreviation,
-                 @Size(max = 50) String clave,
+                 @JsonProperty("clave") @Size(max = 50) String standardKey,
                  String color,
-                 Boolean preguntarSiFalta,
-                 Boolean opcional) {
+                 @JsonProperty("preguntarSiFalta") Boolean askIfMissing,
+                 @JsonProperty("opcional") Boolean optional) {
         GroupInput input() {
-            return new GroupInput(name, abbreviation, clave, color,
-                Boolean.TRUE.equals(preguntarSiFalta), Boolean.TRUE.equals(opcional));
+            return new GroupInput(name, abbreviation, standardKey, color,
+                Boolean.TRUE.equals(askIfMissing), Boolean.TRUE.equals(optional));
         }
     }
 
-    record Component(@NotNull UUID groupUid, @Positive double porciones) {}
+    record Component(@NotNull UUID groupUid, @JsonProperty("porciones") @Positive double portions) {}
 
     // Grupo de validación que solo se aplica al crear un alimento.
     interface CreateRule {}
 
     record Rule(@NotNull @PositiveOrZero Long planVersion,
-                @NotBlank
+                @JsonProperty("alimento") @NotBlank
                 @Size(max = 100, groups = CreateRule.class, message = "El alimento admite hasta 100 caracteres.")
-                String alimento,
-                @Size(max = 20, groups = CreateRule.class, message = "Podés indicar hasta 20 sinónimos.")
+                String food,
+                @JsonProperty("sinonimos") @Size(max = 20, groups = CreateRule.class, message = "Podés indicar hasta 20 sinónimos.")
                 List<@NotBlank @Size(max = 100, groups = CreateRule.class,
-                    message = "Cada sinónimo admite hasta 100 caracteres.") String> sinonimos,
-                @NotBlank String tipo,
+                    message = "Cada sinónimo admite hasta 100 caracteres.") String> synonyms,
+                @JsonProperty("tipo") @NotBlank String type,
                 UUID groupUid,
-                @Positive BigDecimal cantidadPorPorcion,
-                @Size(max = 20) String unidad,
-                @Positive BigDecimal porcionPorDefecto,
-                List<@NotNull @Valid Component> componentes,
+                @JsonProperty("cantidadPorPorcion") @Positive BigDecimal amountPerPortion,
+                @JsonProperty("unidad") @Size(max = 20) String unit,
+                @JsonProperty("porcionPorDefecto") @Positive BigDecimal defaultPortions,
+                @JsonProperty("componentes") List<@NotNull @Valid Component> components,
                 UUID overridesRuleUid) {}
 
     record Habit(@NotNull @PositiveOrZero Long planVersion,

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class DayReadIntegrationTest extends RegistroIntegrationTestBase {
+class DayReadIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
     void getDayComparison_afterNote_returnsStatuses() throws Exception {
         String date = LocalDate.now().toString();

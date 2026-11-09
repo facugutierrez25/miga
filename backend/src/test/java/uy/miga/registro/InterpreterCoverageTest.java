@@ -1,11 +1,13 @@
 package uy.miga.registro;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import uy.miga.reglas.Componente;
+import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.FoodRuleDto;
 
 import java.io.InputStream;
@@ -137,16 +139,16 @@ class InterpreterCoverageTest {
 
     static class RuleJson {
         public Long id;
-        public String alcance;
-        public String alimento;
-        public List<String> sinonimos;
-        public String tipo;
+        @JsonProperty("alcance") public String scope;
+        @JsonProperty("alimento") public String food;
+        @JsonProperty("sinonimos") public List<String> synonyms;
+        @JsonProperty("tipo") public String type;
         public String standardGroupKey;
         public Long foodGroupId;
-        public List<Componente> componentes;
-        public Double cantidadPorPorcion;
-        public String unidad;
-        public Double porcionPorDefecto;
+        @JsonProperty("componentes") public List<RuleComponent> components;
+        @JsonProperty("cantidadPorPorcion") public Double amountPerPortion;
+        @JsonProperty("unidad") public String unit;
+        @JsonProperty("porcionPorDefecto") public Double defaultPortions;
     }
 
     private List<FoodRuleDto> loadRules(String path) throws Exception {
@@ -166,11 +168,11 @@ class InterpreterCoverageTest {
 
     private FoodRuleDto toDto(RuleJson r) {
         return new FoodRuleDto(
-            r.id, r.alcance, null, null, r.alimento, r.sinonimos, r.tipo,
-            r.standardGroupKey, r.foodGroupId, r.componentes,
-            r.cantidadPorPorcion != null ? BigDecimal.valueOf(r.cantidadPorPorcion) : null,
-            r.unidad,
-            r.porcionPorDefecto != null ? BigDecimal.valueOf(r.porcionPorDefecto) : BigDecimal.ONE
+            r.id, r.scope, null, null, r.food, r.synonyms, r.type,
+            r.standardGroupKey, r.foodGroupId, r.components,
+            r.amountPerPortion != null ? BigDecimal.valueOf(r.amountPerPortion) : null,
+            r.unit,
+            r.defaultPortions != null ? BigDecimal.valueOf(r.defaultPortions) : BigDecimal.ONE
         );
     }
 }

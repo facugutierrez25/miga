@@ -1,5 +1,7 @@
 package uy.miga.registro;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -14,10 +16,10 @@ record PatchItemRequest(
     @Size(max = 20) String unit,
     Long foodGroupId,
     @DecimalMin("0") BigDecimal portions,
-    @Valid @Size(min = 2, max = 10) List<GroupPortion> grupos,
+    @JsonProperty("grupos") @Valid @Size(min = 2, max = 10) List<GroupPortion> groups,
     Boolean saveAsRule
 ) {
     boolean savesRule() { return Boolean.TRUE.equals(saveAsRule); }
 
-    record GroupPortion(@NotNull Long foodGroupId, @NotNull @Positive BigDecimal porciones) {}
+    record GroupPortion(@NotNull Long foodGroupId, @JsonProperty("porciones") @NotNull @Positive BigDecimal portions) {}
 }

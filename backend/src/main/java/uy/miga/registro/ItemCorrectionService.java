@@ -8,8 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
 import uy.miga.plans.PlanService;
-import uy.miga.reglas.ReglaService;
-import uy.miga.reglas.Componente;
+import uy.miga.reglas.FoodRuleService;
+import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.RuleInput;
 import uy.miga.users.UserService;
 
@@ -26,13 +26,13 @@ class ItemCorrectionService {
     private final MealNoteRepository noteRepository;
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
-    private final ReglaService ruleService;
+    private final FoodRuleService ruleService;
     private final UserService userService;
-    private final RegistroSupport support;
+    private final DailyLogSupport support;
     private final DayReadService dayReadService;
 
     ItemCorrectionService(MealNoteRepository noteRepository, FoodEntryFacade entryFacade, PlanService planService,
-            ReglaService ruleService, UserService userService, RegistroSupport support, DayReadService dayReadService) {
+            FoodRuleService ruleService, UserService userService, DailyLogSupport support, DayReadService dayReadService) {
         this.noteRepository = noteRepository;
         this.entryFacade = entryFacade;
         this.planService = planService;
@@ -43,7 +43,7 @@ class ItemCorrectionService {
     }
 
     @Transactional
-    DayRegistroDto.MealDayDto removeItem(String userEmail, LocalDate date, Long entryId, Long version) {
+    DayLogDto.MealDayDto removeItem(String userEmail, LocalDate date, Long entryId, Long version) {
         Long userId = userService.findUserIdByEmail(userEmail);
         support.lockCurrentPlanIfPresent(userId);
         var entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
@@ -63,7 +63,7 @@ class ItemCorrectionService {
         note.setText(text);
         note.touch();
         noteRepository.saveAndFlush(note);
-        return dayReadService.getDayRegistro(userEmail, date).meals().stream()
+        return dayReadService.getDayLog(userEmail, date).meals().stream()
             .filter(m -> m.mealId().equals(entry.mealId())).findFirst().orElseThrow();
     }
 
@@ -76,7 +76,7 @@ class ItemCorrectionService {
         if (Set.of(EntryOrigin.MENTION, EntryOrigin.UNKNOWN).contains(entry.origin() == null ? "" : entry.origin())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta mención no admite correcciones.");
         }
-        if (req.grupos() != null && (req.foodGroupId() != null || req.portions() != null)) {
+        if (req.groups() != null && (req.foodGroupId() != null || req.portions() != null)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Indicá un grupo o varios grupos, no ambos.");
         }
@@ -95,7 +95,7 @@ class ItemCorrectionService {
         if (req.savesRule()) {
             planService.bumpVersion(planId);
         }
-        List<DayRegistroDto.EntryItemDto> items = resultIds.stream()
+        List<DayLogDto.EntryItemDto> items = resultIds.stream()
             .map(id -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId)))
             .toList();
         return new PatchItemResultDto(List.of(entryId), items);
@@ -109,7 +109,7 @@ class ItemCorrectionService {
     }
 
     @Transactional
-    void saveRespuesta(String userEmail, LocalDate date, Long mealId, RespuestaRequest req) {
+    void saveAnswer(String userEmail, LocalDate date, Long mealId, AnswerRequest req) {
         Long userId = userService.findUserIdByEmail(userEmail);
         support.lockCurrentPlanIfPresent(userId);
         if (!planService.mealBelongsToUser(mealId, userId)) {
@@ -162,14 +162,14 @@ class ItemCorrectionService {
             PatchItemRequest req) {
         BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity());
         List<Long> resultIds;
-        if (req.grupos() != null) {
+        if (req.groups() != null) {
             Map<Long, BigDecimal> portionsByGroup = new LinkedHashMap<>();
-            req.grupos().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.porciones()));
+            req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
             resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
             if (req.savesRule()) {
-                List<Componente> components = req.grupos().stream()
-                    .map(g -> new Componente(g.foodGroupId(), null,
-                        g.porciones().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
+                List<RuleComponent> components = req.groups().stream()
+                    .map(g -> new RuleComponent(g.foodGroupId(), null,
+                        g.portions().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
                     .toList();
                 // Los componentes quedan por unidad de lo anotado: "200 g" guarda lo de 1 g.
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
@@ -198,8 +198,8 @@ class ItemCorrectionService {
     private void validateCorrectionGroups(Long planId, PatchItemRequest req) {
         Set<Long> planGroups = planService.getPlanFoodGroups(planId).stream()
             .map(PlanFoodGroupDto::id).collect(Collectors.toSet());
-        List<Long> requestedGroups = req.grupos() != null
-            ? req.grupos().stream().map(PatchItemRequest.GroupPortion::foodGroupId).toList()
+        List<Long> requestedGroups = req.groups() != null
+            ? req.groups().stream().map(PatchItemRequest.GroupPortion::foodGroupId).toList()
             : (req.foodGroupId() != null ? List.of(req.foodGroupId()) : List.of());
         if (!planGroups.containsAll(requestedGroups)
             || new HashSet<>(requestedGroups).size() != requestedGroups.size()) {

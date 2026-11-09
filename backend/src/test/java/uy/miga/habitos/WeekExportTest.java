@@ -36,7 +36,7 @@ class WeekExportTest {
         assertThat(WeekExport.safe("normal")).isEqualTo("normal");
     }
 
-    private static WeekExport.Data rangeData(java.util.Set<String> incluir) {
+    private static WeekExport.Data rangeData(java.util.Set<String> includedSections) {
         var date = LocalDate.of(2026, 11, 2);
         var week = new WeekSummaryDto(date, date.plusDays(1),
             List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1, java.util.UUID.randomUUID())),
@@ -46,16 +46,16 @@ class WeekExportTest {
                         new WeekMealData(11L, "Cena", "pizza", "REGISTRADA", 1)), List.of(1L)),
                 new WeekDayDto(date.plusDays(1), false, BigDecimal.ZERO, BigDecimal.TEN, List.of(),
                     List.of(new WeekMealData(10L, "Desayuno", null, "SIN_ANOTAR", 0)), List.of(1L))));
-        return new WeekExport.Data(week, incluir, List.of("Lácteos", "Frutas"),
+        return new WeekExport.Data(week, includedSections, List.of("Lácteos", "Frutas"),
             java.util.Map.of(date, java.util.Map.of("Lácteos", new BigDecimal("1.5"), "Frutas", BigDecimal.ONE)),
-            List.of(new uy.miga.registro.SinReglaDto("torta frita", date, "Desayuno")), "Facundo");
+            List.of(new uy.miga.registro.UnmatchedFoodDto("torta frita", date, "Desayuno")), "Facundo");
     }
 
     @Test
     void parsesIncluirAndRejectsUnknownSections() {
-        assertThat(WeekExport.parseIncluir(null)).isEqualTo(WeekExport.POR_DEFECTO);
-        assertThat(WeekExport.parseIncluir(" Texto , sinregla,")).containsExactlyInAnyOrder("texto", "sinregla");
-        assertThatThrownBy(() -> WeekExport.parseIncluir("texto,fotos")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(WeekExport.parseIncludedSections(null)).isEqualTo(WeekExport.DEFAULT_SECTIONS);
+        assertThat(WeekExport.parseIncludedSections(" Texto , sinregla,")).containsExactlyInAnyOrder("texto", "sinregla");
+        assertThatThrownBy(() -> WeekExport.parseIncludedSections("texto,fotos")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -95,9 +95,9 @@ class WeekExportTest {
 
     @Test
     void pdfIsGeneratedForEveryCombination() throws Exception {
-        for (var incluir : List.of(java.util.Set.of("texto"), java.util.Set.of("porciones", "habitos", "sinregla"))) {
+        for (var includedSections : List.of(java.util.Set.of("texto"), java.util.Set.of("porciones", "habitos", "sinregla"))) {
             var out = new ByteArrayOutputStream();
-            WeekExport.writePdf(rangeData(incluir), out);
+            WeekExport.writePdf(rangeData(includedSections), out);
             assertThat(new String(out.toByteArray(), 0, 5, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
         }
     }
@@ -149,7 +149,7 @@ class WeekExportTest {
     @Test
     void pdfHasLandscapePagesEmbeddedLogoTextAndClickableAttribution() throws Exception {
         var out = new ByteArrayOutputStream();
-        WeekExport.writePdf(rangeData(WeekExport.SECCIONES), out);
+        WeekExport.writePdf(rangeData(WeekExport.SECTIONS), out);
         try (var reader = new com.lowagie.text.pdf.PdfReader(out.toByteArray())) {
             var extractor = new com.lowagie.text.pdf.parser.PdfTextExtractor(reader);
             StringBuilder text = new StringBuilder();
@@ -196,7 +196,7 @@ class WeekExportTest {
     void personalizedWeekTitleAndDateRangesUseNaturalSpanish() throws Exception {
         var start = LocalDate.of(2026, 11, 2);
         var week = new WeekSummaryDto(start, start.plusDays(6), List.of(), List.of());
-        var data = new WeekExport.Data(week, WeekExport.POR_DEFECTO, List.of(), java.util.Map.of(), List.of(), "Facundo");
+        var data = new WeekExport.Data(week, WeekExport.DEFAULT_SECTIONS, List.of(), java.util.Map.of(), List.of(), "Facundo");
         assertThat(WeekExport.title(data)).isEqualTo("Semana de Facundo");
         assertThat(WeekExport.period(data)).isEqualTo("2 al 8 de noviembre 2026");
         var out = new ByteArrayOutputStream();
