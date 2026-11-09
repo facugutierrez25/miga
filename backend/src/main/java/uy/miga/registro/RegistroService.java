@@ -597,10 +597,11 @@ public class RegistroService {
             explanation = entry.food() + ("FLEXIBLE".equals(type) ? " = flexible (sin porción fija)" : " = no cuenta");
         }
         UUID ruleUid = null;
-        if (req.remembers() && currentPlan != null) {
+        if (req.remembers() && currentPlan != null
+            && !ruleService.hasUserRuleNamed(userId, currentPlan, entry.food())) {
             RuleInput input = resolveRuleInput(entry, selected, type, groups, planId, currentPlan);
             if (input != null) {
-                ruleUid = ruleService.upsertUserRule(userId, currentPlan, input).uid();
+                ruleUid = ruleService.createUserRule(userId, currentPlan, input).uid();
                 planService.bumpVersion(currentPlan);
             }
         }
@@ -615,7 +616,7 @@ public class RegistroService {
                     group.getKey(), entry.mealNoteId(), entry.originalText(), false, group.getValue(), explanation, occurrence, type, "USUARIO"));
             }
         }
-        entryFacade.markResolved(ids);
+        entryFacade.markResolved(ids, ruleUid);
         return new ResolveItemResultDto(List.of(id), ids.stream().map(i -> toEntryItemDto(entryFacade.findEntryByIdAndUserId(i, userId))).toList(),
             new ResolveItemResultDto.Undo(occurrence, ruleUid));
     }
@@ -658,13 +659,14 @@ public class RegistroService {
             }
         } else if (!groups.isEmpty()) {
             unit = entry.unit();
-            amount = BigDecimal.ONE;
+            amount = unit != null ? BigDecimal.ONE : null;
             for (var g : groups.entrySet()) {
                 Long mapped = mapRuleGroup(g.getKey(), null, planId, currentPlan);
                 if (mapped == null) return null;
                 if (groups.size() == 1) {
                     groupId = mapped;
-                    amount = quantity.divide(g.getValue(), 6, RoundingMode.HALF_UP);
+                    if (unit == null) defaultPortion = g.getValue();
+                    else amount = quantity.divide(g.getValue(), 6, RoundingMode.HALF_UP);
                 } else components.add(new Componente(mapped, null, g.getValue().divide(quantity, 6, RoundingMode.HALF_UP).doubleValue()));
             }
         }
@@ -677,15 +679,19 @@ public class RegistroService {
         Long currentPlan = lockCurrentPlanIfPresent(userId);
         var entries = entryFacade.findByUserIdAndDate(userId, date).stream()
             .filter(e -> req.occurrenceId().equals(e.occurrenceId())).toList();
-        if (entries.isEmpty() || entries.stream().anyMatch(e -> !"USUARIO".equals(e.ruleSource()) || !entryFacade.isResolved(e.id()))) {
+        if (entries.isEmpty() || entries.stream().anyMatch(e -> !"USUARIO".equals(e.ruleSource()) || !e.resolved())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        if (req.ruleUid() != null) {
-            if (currentPlan == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-            ruleService.deleteUserRule(userId, currentPlan, req.ruleUid());
+        var source = entries.getFirst();
+        UUID ruleUid = source.resolvedRuleUid();
+        if (entries.stream().anyMatch(e -> !Objects.equals(ruleUid, e.resolvedRuleUid()))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        if (ruleUid != null && currentPlan != null && ruleService.getUserRules(userId, currentPlan).stream()
+            .anyMatch(r -> ruleUid.equals(r.uid()))) {
+            ruleService.deleteUserRule(userId, currentPlan, ruleUid);
             planService.bumpVersion(currentPlan);
         }
-        var source = entries.getFirst();
         var ids = entries.stream().map(FoodEntryFacade.EntryData::id).toList();
         entryFacade.deleteEntries(ids);
         Long restored = entryFacade.createMentionEntry(userId, email, source.mealId(), date, source.food(), source.quantity(), source.unit(),

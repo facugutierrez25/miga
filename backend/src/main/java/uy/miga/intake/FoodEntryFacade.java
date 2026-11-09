@@ -18,16 +18,12 @@ public class FoodEntryFacade {
     private final FoodEntryRepository repository;
 
     @Transactional
-    public void markResolved(List<Long> ids) {
+    public void markResolved(List<Long> ids, UUID ruleUid) {
         repository.findAllById(ids).forEach(e -> {
             e.setResolved(true);
+            e.setResolvedRuleUid(ruleUid);
             if ("REGLA".equals(e.getOrigen())) e.setOrigen("USUARIO");
         });
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isResolved(Long id) {
-        return repository.findById(id).map(FoodEntry::isResolved).orElse(false);
     }
 
     public FoodEntryFacade(FoodEntryRepository repository) {
@@ -41,7 +37,7 @@ public class FoodEntryFacade {
                                 String originalText, Boolean uncertain,
                                 BigDecimal portions, String appliedRule, UUID occurrenceId,
                                 String ruleType, String ruleSource) {
-        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
+        FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit != null ? unit.strip() : null, foodGroupId);
         entry.setMealNoteId(mealNoteId);
         entry.setTextoOriginal(originalText);
         entry.setOrigen("REGLA");
@@ -200,7 +196,7 @@ public class FoodEntryFacade {
             e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
             e.getOrigen(), e.getSupuesto(), e.getPorciones(),
             e.getDate(), e.getTextoOriginal(), e.getAppliedRule(), e.getOccurrenceId(),
-            e.getRuleType(), e.getRuleSource());
+            e.getRuleType(), e.getRuleSource(), e.isResolved(), e.getResolvedRuleUid());
     }
 
     public record EntryData(
@@ -208,6 +204,6 @@ public class FoodEntryFacade {
         Long foodGroupId, boolean consumed, Long mealNoteId,
         String origin, Boolean uncertain, BigDecimal portions,
         LocalDate date, String originalText, String appliedRule, UUID occurrenceId,
-        String ruleType, String ruleSource
+        String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid
     ) {}
 }

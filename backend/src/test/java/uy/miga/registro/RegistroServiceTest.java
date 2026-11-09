@@ -191,7 +191,7 @@ class RegistroServiceTest {
     private void entryWithPortions(BigDecimal portions) {
         when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
             3L, 11L, "yogur", 2.0, "u", 7L, false, null, "USUARIO", false,
-            portions, today, null, "snapshot", null, "NORMAL", "USUARIO"));
+            portions, today, null, "snapshot", null, "NORMAL", "USUARIO", false, null));
         when(plans.getMealIds(20L)).thenReturn(List.of(11L));
     }
 
@@ -267,11 +267,11 @@ class RegistroServiceTest {
         LocalDate monday = LocalDate.of(2026, 11, 2);
         when(entries.findByUserIdAndDateRange(1L, monday, monday.plusDays(6))).thenReturn(List.of(
             new FoodEntryFacade.EntryData(2L, 11L, "chivito", 1.0, "u", null, false, 9L, "UNKNOWN", false,
-                null, monday.plusDays(1), "chivito al pan", null, null, null, null),
+                null, monday.plusDays(1), "chivito al pan", null, null, null, null, false, null),
             new FoodEntryFacade.EntryData(1L, 10L, "yogur", 1.0, "u", 7L, false, 8L, "REGLA", false,
-                BigDecimal.ONE, monday, "yogur", null, null, "NORMAL", "PLAN"),
+                BigDecimal.ONE, monday, "yogur", null, null, "NORMAL", "PLAN", false, null),
             new FoodEntryFacade.EntryData(3L, 10L, "torta frita", 1.0, "u", null, false, 8L, "UNKNOWN", false,
-                null, monday, null, null, null, null, null)));
+                null, monday, null, null, null, null, null, false, null)));
         when(plans.getMealNames(any())).thenReturn(java.util.Map.of(10L, "Desayuno", 11L, "Almuerzo"));
 
         var result = service.getSinRegla("user", monday, monday.plusDays(6));

@@ -142,6 +142,85 @@ class RegistroIntegrationTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void undoPreservesExistingNormalizedUserRule() throws Exception {
+        // Una nota de ayer: crear alimentos reinterpreta solo las de hoy.
+        String date = LocalDate.now().minusDays(1).toString();
+        long id = putNote(date, "zqxalimento").path("entries").get(0).path("id").asLong();
+        createCompound("  ZQXALIMÉNTO  ", "Cereales", "Grasas");
+        JsonNode before = planRules();
+        long group = before.path("grupos").get(0).path("id").asLong();
+        JsonNode result = resolve(date, id, """
+            {"kind":"GROUPS","groups":[{"foodGroupId":%d,"portions":2}],"remember":true}
+            """.formatted(group));
+        assertThat(result.path("undo").path("ruleUid").isNull()).isTrue();
+        assertThat(planRules()).isEqualTo(before);
+        undo(date, result.path("undo"));
+        assertThat(planRules()).isEqualTo(before);
+    }
+
+    @Test
+    void oldUndoAfterResolutionWithoutRememberPreservesRules() throws Exception {
+        // Una nota de ayer: crear alimentos reinterpreta solo las de hoy.
+        String date = LocalDate.now().minusDays(1).toString();
+        long id = putNote(date, "zqxalimento").path("entries").get(0).path("id").asLong();
+        JsonNode first = resolve(date, id, "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        JsonNode restored = undo(date, first.path("undo"));
+        resolve(date, restored.path("items").get(0).path("id").asLong(),
+            "{\"kind\":\"NOT_COUNTED\",\"remember\":false}");
+        createCompound("regla ajena", "Cereales", "Grasas");
+        JsonNode before = planRules();
+        undo(date, first.path("undo"));
+        assertThat(planRules()).isEqualTo(before);
+    }
+
+    @Test
+    void undoIgnoresClientRuleUidAndDeletesOnlyCreatedRule() throws Exception {
+        String date = LocalDate.now().toString();
+        createCompound("regla ajena", "Cereales", "Grasas");
+        UUID otherUid = jdbc.queryForObject("SELECT uid FROM food_rules WHERE alimento = ? AND plan_id = ?",
+            UUID.class, "regla ajena", planRules().path("planId").asLong());
+        long id = putNote(date, "zqxalimento").path("entries").get(0).path("id").asLong();
+        JsonNode result = resolve(date, id, "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        var forged = result.path("undo").deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) forged).put("ruleUid", otherUid.toString());
+        undo(date, forged);
+        assertThat(planRules().toString()).contains("regla ajena").doesNotContain("zqxalimento");
+    }
+
+    @Test
+    void bareGroupsRememberedRuleRoundTrips() throws Exception {
+        String date = LocalDate.now().toString();
+        long group = planRules().path("grupos").get(0).path("id").asLong();
+        JsonNode original = putNote(date, "zqxalimento").path("entries").get(0);
+        assertThat(original.path("unit").isNull()).isTrue();
+        resolve(date, original.path("id").asLong(), """
+            {"kind":"GROUPS","groups":[{"foodGroupId":%d,"portions":2}],"remember":true}
+            """.formatted(group));
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "zqxalimento").path("entries").get(0);
+        assertThat(next.path("portions").asDouble()).isEqualTo(2);
+    }
+
+    @Test
+    void bareCompoundRememberedRuleRoundTrips() throws Exception {
+        String date = LocalDate.now().toString();
+        JsonNode groups = planRules().path("grupos");
+        long id = putNote(date, "zqxalimento").path("entries").get(0).path("id").asLong();
+        resolve(date, id, """
+            {"kind":"GROUPS","groups":[{"foodGroupId":%d,"portions":2},{"foodGroupId":%d,"portions":0.5}],"remember":true}
+            """.formatted(groups.get(0).path("id").asLong(), groups.get(1).path("id").asLong()));
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "zqxalimento").path("entries");
+        assertThat(next).hasSize(2);
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
+            .containsExactlyInAnyOrder(2.0, 0.5);
+    }
+
+    private JsonNode undo(String date, JsonNode body) throws Exception {
+        return objectMapper.readTree(mockMvc.perform(post("/api/v1/registro/" + date + "/items/resolve/undo")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content(body.toString()))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
     private JsonNode resolve(String date, long id, String body) throws Exception {
         return objectMapper.readTree(mockMvc.perform(post("/api/v1/registro/" + date + "/items/" + id + "/resolve")
             .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content(body))

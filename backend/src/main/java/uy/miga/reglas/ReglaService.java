@@ -126,6 +126,12 @@ public class ReglaService {
         apply(rule, in); return toDto(repository.save(rule));
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasUserRuleNamed(Long userId, Long planId, String name) {
+        return repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()
+            .anyMatch(r -> normalize(r.getAlimento()).equals(normalize(name)));
+    }
+
     @Transactional
     public FoodRuleDto upsertUserRule(Long userId, Long planId, RuleInput in) {
         var existing = repository.findByUserIdAndPlanIdAndAlcance(userId, planId, "USUARIO").stream()

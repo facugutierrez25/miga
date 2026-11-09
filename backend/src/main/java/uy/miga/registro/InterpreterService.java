@@ -162,7 +162,7 @@ class InterpreterService {
 
         FoodRuleDto rule = findRule(foodName, rules);
         if (rule == null) return new InterpretedItem(segment, foodName, BigDecimal.valueOf(rawQty),
-            detectedUnit != null ? detectedUnit : "u", null, null, null, null, false, null, null, null);
+            detectedUnit != null ? detectedUnit : (explicitQuantity ? "u" : null), null, null, null, null, false, null, null, null);
 
         // Un número sin unidad cuenta piezas solo cuando la regla también cuenta piezas.
         // Sin medida no se inventan gramos ni tazas: se registra una estimación en porciones.

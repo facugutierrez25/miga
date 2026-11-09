@@ -31,7 +31,7 @@ class FoodEntry {
     @Column(nullable = false)
     private Double quantity;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String unit;
 
     @Column(name = "food_group_id")
@@ -73,6 +73,12 @@ class FoodEntry {
 
     @Column(nullable = false)
     private boolean resolved;
+
+    @Column(name = "resolved_rule_uid")
+    private java.util.UUID resolvedRuleUid;
+
+    java.util.UUID getResolvedRuleUid() { return resolvedRuleUid; }
+    void setResolvedRuleUid(java.util.UUID uid) { this.resolvedRuleUid = uid; }
 
     boolean isResolved() { return resolved; }
     void setResolved(boolean resolved) { this.resolved = resolved; }
