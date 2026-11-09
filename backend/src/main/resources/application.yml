@@ -23,6 +23,10 @@ spring:
 
 server:
   port: ${PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,text/csv
+    min-response-size: 1KB
 
 app:
   # Zona para el día de registro y la vigencia diaria de los planes.
