@@ -22,7 +22,7 @@ public class FoodEntryFacade {
         repository.findAllById(ids).forEach(e -> {
             e.setResolved(true);
             e.setResolvedRuleUid(ruleUid);
-            if ("REGLA".equals(e.getOrigen())) e.setOrigen("USUARIO");
+            if (EntryOrigin.RULE.equals(e.getOrigen())) e.setOrigen(EntryOrigin.USER);
         });
     }
 
@@ -40,7 +40,7 @@ public class FoodEntryFacade {
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit != null ? unit.strip() : null, foodGroupId);
         entry.setMealNoteId(mealNoteId);
         entry.setTextoOriginal(originalText);
-        entry.setOrigen("REGLA");
+        entry.setOrigen(EntryOrigin.RULE);
         entry.setSupuesto(uncertain);
         entry.setPorciones(portions);
         entry.setAppliedRule(appliedRule);
@@ -58,7 +58,7 @@ public class FoodEntryFacade {
         Long id = createNoteEntry(userId, userEmail, mealId, date, food, quantity, unit,
             null, mealNoteId, originalText, uncertain, null, appliedRule, occurrenceId,
             recognized ? ruleType : null, recognized ? ruleSource : null);
-        repository.findById(id).orElseThrow().setOrigen(recognized ? "MENTION" : "UNKNOWN");
+        repository.findById(id).orElseThrow().setOrigen(recognized ? EntryOrigin.MENTION : EntryOrigin.UNKNOWN);
         return id;
     }
 
@@ -118,9 +118,9 @@ public class FoodEntryFacade {
             if (portions != null) e.setPorciones(portions);
             e.setAppliedRule("Corrección del usuario: " + e.getPorciones() + " " + uy.miga.reglas.RuleText.portionUnit(e.getPorciones()));
             e.setSupuesto(false);
-            e.setOrigen("USUARIO");
+            e.setOrigen(EntryOrigin.USER);
             e.setRuleType("NORMAL");
-            e.setRuleSource("USUARIO");
+            e.setRuleSource(EntryOrigin.USER);
             repository.save(e);
         });
     }
@@ -137,9 +137,9 @@ public class FoodEntryFacade {
             entry.setTextoOriginal(source.getTextoOriginal());
             entry.setOccurrenceId(source.getOccurrenceId());
             entry.setConsumed(source.isConsumed());
-            entry.setOrigen("USUARIO");
+            entry.setOrigen(EntryOrigin.USER);
             entry.setRuleType("COMPUESTO");
-            entry.setRuleSource("USUARIO");
+            entry.setRuleSource(EntryOrigin.USER);
             entry.setSupuesto(false);
             entry.setPorciones(portions);
             ids.add(repository.save(entry).getId());
@@ -152,8 +152,8 @@ public class FoodEntryFacade {
     public Long createUserEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                 String food, Long foodGroupId) {
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
-        entry.setOrigen("USUARIO");
-        entry.setRuleSource("USUARIO");
+        entry.setOrigen(EntryOrigin.USER);
+        entry.setRuleSource(EntryOrigin.USER);
         entry.setPorciones(BigDecimal.ONE);
         return repository.save(entry).getId();
     }
@@ -162,9 +162,9 @@ public class FoodEntryFacade {
     public void createResponseEntry(Long userId, String userEmail, Long mealId, LocalDate date,
                                     String food, Long foodGroupId) {
         if (repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
-            userId, date, mealId, foodGroupId, "RESPUESTA")) return;
+            userId, date, mealId, foodGroupId, EntryOrigin.RESPONSE)) return;
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), 1.0, "u", foodGroupId);
-        entry.setOrigen("RESPUESTA");
+        entry.setOrigen(EntryOrigin.RESPONSE);
         // La respuesta viene de un grupo del plan marcado para preguntar si falta.
         entry.setRuleType("PREGUNTAR");
         entry.setRuleSource("PLAN");
@@ -175,7 +175,7 @@ public class FoodEntryFacade {
     @Transactional
     public void deleteResponseEntries(Long userId, LocalDate date, Long mealId, Long foodGroupId) {
         repository.deleteByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigen(
-            userId, date, mealId, foodGroupId, "RESPUESTA");
+            userId, date, mealId, foodGroupId, EntryOrigin.RESPONSE);
     }
 
     // Borra todo lo registrado en una comida de un día: ítems de la nota, respuestas y cargas manuales.

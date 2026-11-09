@@ -60,8 +60,8 @@ class FoodEntryService {
         BigDecimal porciones = calculatePortions(food, foodGroupId, quantity, planId, userId);
 
         FoodEntry entry = new FoodEntry(userId, userEmail, mealId, date, food.strip(), quantity, unit.strip(), foodGroupId);
-        entry.setOrigen("USUARIO");
-        entry.setRuleSource("USUARIO");
+        entry.setOrigen(EntryOrigin.USER);
+        entry.setRuleSource(EntryOrigin.USER);
         entry.setPorciones(porciones);
         return toDto(repository.save(entry));
     }
