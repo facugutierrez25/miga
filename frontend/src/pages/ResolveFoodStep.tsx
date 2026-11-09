@@ -63,7 +63,7 @@ export default function ResolveFoodStep({ item, token, date, groups, onBack, onR
       {!loading && query === debouncedQuery && !searchError && query.trim().length >= 2 && response.query === query && results.length === 0 && <p>No encontré nada parecido.</p>}
       {results.map(result => <article key={result.uid}>
         <strong>{result.alimento}</strong><p>{result.textoRegla}</p>
-        {result.alcance && <p>{result.alcance === 'USUARIO' ? 'Tus alimentos' : 'Catálogo'}</p>}
+        {result.alcance && <p>{result.alcance === 'USUARIO' ? 'Tus alimentos' : result.alcance === 'PLAN' ? 'De tu plan' : 'Catálogo'}</p>}
         <button type="button" className="resolve-primary" onClick={() => void save({ kind: 'SAME_AS', ruleUid: result.uid }, result.alimento)}>Es esto</button>
       </article>)}
       <p>¿No está? Elegí cómo cuenta</p>
