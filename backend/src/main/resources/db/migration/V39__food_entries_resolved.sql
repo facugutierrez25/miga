@@ -1,0 +1,3 @@
+ALTER TABLE food_entries ADD COLUMN resolved BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE food_entries ADD COLUMN resolved_rule_uid UUID;
+ALTER TABLE food_entries ALTER COLUMN unit DROP NOT NULL;

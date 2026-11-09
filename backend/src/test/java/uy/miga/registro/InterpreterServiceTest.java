@@ -4,15 +4,87 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import uy.miga.reglas.Componente;
 import uy.miga.reglas.FoodRuleDto;
+import uy.miga.reglas.RuleInput;
+import uy.miga.reglas.ReglaService;
+import uy.miga.intake.FoodEntryFacade;
+import uy.miga.plans.PlanService;
+import uy.miga.plans.PlanFoodGroupDto;
+import uy.miga.users.UserService;
+import org.mockito.ArgumentCaptor;
+import java.time.LocalDate;
+import java.time.Clock;
+import java.util.UUID;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 class InterpreterServiceTest {
 
     private InterpreterService interpreter;
+
+    @Test
+    void unknownMentionPreservesWrittenMeasureForResolution() {
+        var item = new InterpreterService().interpret("200 g de zqxalimento", List.of()).getFirst();
+        assertThat(item.recognized()).isFalse();
+        assertThat(item.foodName()).isEqualTo("zqxalimento");
+        assertThat(item.quantity()).isEqualByComparingTo("200");
+        assertThat(item.unit()).isEqualTo("g");
+        var resolved = new InterpreterService().computePortions(item.originalText(), item.quantity().doubleValue(), item.unit(),
+            normal(1L, "equivalente", 1L, new BigDecimal("50"), "g"));
+        assertThat(resolved.portions()).isEqualByComparingTo("4");
+    }
+
+    @Test
+    void bareSameAsUsesDefaultPortion() {
+        var item = interpreter.interpret("zqxalimento", List.of()).getFirst();
+        assertThat(item.unit()).isNull();
+        assertThat(item.quantity()).isEqualByComparingTo("1");
+        var equivalent = rule(1L, "equivalente", List.of(), "NORMAL", 7L, null,
+            new BigDecimal("50"), "u", new BigDecimal("3"), List.of());
+        var resolved = interpreter.computePortions(item.originalText(), item.quantity().doubleValue(), item.unit(), equivalent);
+        assertThat(resolved.portions()).isEqualByComparingTo("3");
+        assertThat(resolved.portions()).isEqualByComparingTo(interpreter.interpret("equivalente", List.of(equivalent)).getFirst().portions());
+    }
+
+    @Test
+    void bareGroupsRememberedRuleRoundTrips() {
+        var entries = mock(FoodEntryFacade.class);
+        var plans = mock(PlanService.class);
+        var rules = mock(ReglaService.class);
+        var users = mock(UserService.class);
+        var date = LocalDate.now();
+        var entry = new FoodEntryFacade.EntryData(3L, 10L, "zqxalimento", 1.0, null,
+            null, false, null, "UNKNOWN", false, null, date, "zqxalimento", null,
+            UUID.randomUUID(), null, null, false, null);
+        when(users.findUserIdByEmail("user")).thenReturn(1L);
+        when(plans.lockCurrentPlan(1L)).thenReturn(20L);
+        when(plans.getPlanIdForDate(1L, date)).thenReturn(20L);
+        when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(
+            new PlanFoodGroupDto(7L, "Cereales", "CER", 0, null, "CER", false, false, UUID.randomUUID())));
+        when(entries.findEntryByIdAndUserId(anyLong(), eq(1L))).thenReturn(entry);
+        when(rules.createUserRule(eq(1L), eq(20L),
+            any(RuleInput.class))).thenAnswer(invocation -> {
+                RuleInput input = invocation.getArgument(2);
+                return rule(1L, input.alimento(), input.sinonimos(), input.tipo(), input.foodGroupId(), null,
+                    input.cantidadPorPorcion(), input.unidad(), input.porcionPorDefecto(), input.componentes());
+            });
+        var service = new RegistroService(mock(MealNoteRepository.class), interpreter,
+            mock(ComparisonService.class), entries, plans, rules, users, Clock.systemUTC());
+        service.resolveItem("user", date, 3L, new ResolveItemRequest(ResolveItemRequest.Kind.GROUPS, null,
+            List.of(new ResolveItemRequest.GroupPortion(7L, new BigDecimal("2"))), true));
+        var capture = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).createUserRule(eq(1L), eq(20L), capture.capture());
+        var input = capture.getValue();
+        assertThat(input.cantidadPorPorcion()).isNull();
+        assertThat(input.unidad()).isNull();
+        var created = rule(1L, input.alimento(), input.sinonimos(), input.tipo(), input.foodGroupId(), null,
+            input.cantidadPorPorcion(), input.unidad(), input.porcionPorDefecto(), input.componentes());
+        assertThat(interpreter.interpret("zqxalimento", List.of(created)).getFirst().portions()).isEqualByComparingTo("2");
+    }
 
     private static FoodRuleDto rule(Long id, String name, List<String> synonyms,
                                     String type, Long groupId, String groupKey,

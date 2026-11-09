@@ -17,6 +17,20 @@ class RegistroController {
 
     private final RegistroService service;
 
+    @PostMapping("/{date}/items/{id}/resolve")
+    ResolveItemResultDto resolveItem(Authentication auth,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @PathVariable Long id, @RequestBody @Valid ResolveItemRequest req) {
+        return service.resolveItem(auth.getName(), date, id, req);
+    }
+
+    @PostMapping("/{date}/items/resolve/undo")
+    PatchItemResultDto undoResolve(Authentication auth,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestBody @Valid UndoResolveRequest req) {
+        return service.undoResolve(auth.getName(), date, req);
+    }
+
     RegistroController(RegistroService service) {
         this.service = service;
     }
