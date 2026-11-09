@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { Suspense, useState } from 'react'
 import { Link, Outlet, useMatch } from 'react-router-dom'
 import Brand from './Brand'
+import { LoadingSkeleton } from './Skeleton'
 import './AppLayout.css'
 
 function IcHoy() {
@@ -107,7 +108,7 @@ export default function AppLayout() {
         </nav>
 
         <main className="app-layout__main" tabIndex={-1}>
-          <Outlet />
+          <Suspense fallback={<LoadingSkeleton label="Cargando…" />}><Outlet /></Suspense>
         </main>
 
       </div>

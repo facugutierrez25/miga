@@ -1,18 +1,21 @@
+import { lazy, Suspense } from 'react'
+import { LoadingSkeleton } from './components/Skeleton'
 import { createBrowserRouter, createRoutesFromElements, RouterProvider, Outlet, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/authTypes'
 import AppLayout from './components/AppLayout'
 import LandingPage from './pages/LandingPage'
-import RegisterPage from './pages/RegisterPage'
-import LoginPage from './pages/LoginPage'
-import HoyPage from './pages/HoyPage'
-import SemanaPage from './pages/SemanaPage'
-import PerfilPage from './pages/PerfilPage'
-import MiPlanPage from './pages/MiPlanPage'
-import OnboardingPage from './pages/OnboardingPage'
-import PrivacidadPage from './pages/PrivacidadPage'
-import VerificarEmailPage from './pages/VerificarEmailPage'
 import ScrollToTop from './components/ScrollToTop'
+
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const HoyPage = lazy(() => import('./pages/HoyPage'))
+const SemanaPage = lazy(() => import('./pages/SemanaPage'))
+const PerfilPage = lazy(() => import('./pages/PerfilPage'))
+const MiPlanPage = lazy(() => import('./pages/MiPlanPage'))
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
+const PrivacidadPage = lazy(() => import('./pages/PrivacidadPage'))
+const VerificarEmailPage = lazy(() => import('./pages/VerificarEmailPage'))
 
 function AuthLayout() {
   const { token, restoring } = useAuth()
@@ -22,7 +25,7 @@ function AuthLayout() {
 }
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route element={<><ScrollToTop /><Outlet /></>}>
+  <Route element={<><ScrollToTop /><Suspense fallback={<LoadingSkeleton label="Cargando…" />}><Outlet /></Suspense></>}>
     <Route path="/" element={<LandingPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/login" element={<LoginPage />} />
