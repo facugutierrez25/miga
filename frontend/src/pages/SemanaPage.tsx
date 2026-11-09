@@ -1,3 +1,4 @@
+import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
 import { mealStatus } from '../lib/mealStatus'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -321,7 +322,11 @@ export default function SemanaPage() {
 
       <div className="semana-body">
         {exportError && <p className="semana-error" role="alert">{exportError}</p>}
-        {loading && <p className="semana-estado">Cargando…</p>}
+        {loading && <LoadingSkeleton label="Cargando…">
+          <Skeleton />
+          <div className="loading-skeleton__strip">{Array.from({ length: 7 }, (_, i) => <Skeleton key={i} shape="block" />)}</div>
+          {Array.from({ length: 7 }, (_, i) => <div key={i} className="loading-skeleton__row"><Skeleton /><Skeleton shape="block" /></div>)}
+        </LoadingSkeleton>}
 
         {error && (
           <div className="semana-estado semana-estado--error">

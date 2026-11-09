@@ -1,3 +1,4 @@
+import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
 import { mealStatus, type MealStateKind } from '../lib/mealStatus'
 import { displayUnit } from '../lib/displayUnit'
 import { groupColor } from '../groupColors'
@@ -1255,7 +1256,11 @@ function HoyContent() {
           <h1 className="hoy-desktop-saludo__titulo">{titulo}</h1>
         </div>
         {cargando ? (
-          <p className="hoy-loading">Cargando tu día…</p>
+          <LoadingSkeleton label="Cargando tu día…">
+            <Skeleton />
+            <div className="loading-skeleton__card"><Skeleton /><Skeleton shape="block" /><Skeleton /></div>
+            {Array.from({ length: 3 }, (_, i) => <div key={i} className="loading-skeleton__row"><Skeleton /><Skeleton shape="block" /></div>)}
+          </LoadingSkeleton>
         ) : planLoad.status === 'error' ? (
           <p role="alert">No se pudo cargar el plan. <button onClick={planLoad.retry}>Reintentar</button></p>
         ) : sinPlan ? (
