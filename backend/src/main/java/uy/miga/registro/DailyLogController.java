@@ -106,11 +106,11 @@ class DailyLogController {
     // POST /api/v1/registro/{date}/comidas/{mealId}/respuestas — responder preguntar_si_falta
     @PostMapping("/{date}/comidas/{mealId}/respuestas")
     @ResponseStatus(HttpStatus.CREATED)
-    void saveAnswer(Authentication auth,
+    DayLogDto.MealDayDto saveAnswer(Authentication auth,
                        @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                        @PathVariable Long mealId,
                        @RequestBody AnswerRequest req) {
-        service.saveAnswer(auth.getName(), date, mealId, req);
+        return service.saveAnswer(auth.getName(), date, mealId, req);
     }
 
     // GET  /api/v1/registro/sugerencias?mealId= — top 5 textos frecuentes de esa comida

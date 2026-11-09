@@ -104,7 +104,7 @@ class NoteService {
             DayLogDto.MealDayDto meal = dayReadService.getDayLog(userEmail, date).meals().stream()
                 .filter(m -> m.mealId().equals(mealId)).findFirst().orElseThrow();
             return new NoteInterpretationDto(note.getId(), note.getVersion(), note.getText(), date, mealId,
-                List.of(), meal.items(), meal.comparison());
+                List.of(), meal.items(), meal.comparison(), meal.status());
         }
         List<FoodRuleDto> rules = ruleService.findApplicable(planId, userId);
 
@@ -119,7 +119,7 @@ class NoteService {
 
         createNoteEntries(userId, userEmail, mealId, date, saved, items, rules, planId, groupNames);
 
-        return noteResult(userId, date, mealId, planId, saved, items);
+        return noteResult(userEmail, date, mealId, saved, items);
     }
 
     private List<InterpretedItem> expandCompound(List<InterpretedItem> items,
@@ -239,24 +239,11 @@ class NoteService {
         );
     }
 
-    private NoteInterpretationDto noteResult(Long userId, LocalDate date, Long mealId, Long planId, MealNote saved,
+    private NoteInterpretationDto noteResult(String email, LocalDate date, Long mealId, MealNote saved,
             List<InterpretedItem> items) {
-        List<FoodEntryFacade.EntryData> mealEntries = entryFacade.findByUserIdAndDate(userId, date).stream()
-            .filter(e -> mealId.equals(e.mealId())).toList();
-        Map<Long, BigDecimal> portionsByGroup = mealEntries.stream()
-            .filter(e -> e.foodGroupId() != null && e.portions() != null)
-            .collect(Collectors.groupingBy(FoodEntryFacade.EntryData::foodGroupId,
-                Collectors.reducing(BigDecimal.ZERO, FoodEntryFacade.EntryData::portions, BigDecimal::add)));
-        List<ComparisonService.GroupStatus> statuses = comparison.compare(planId, mealId, portionsByGroup);
-
-        return new NoteInterpretationDto(
-            saved.getId(), saved.getVersion(), saved.getText(), date, mealId,
-            items.stream().map(this::toItemDto).toList(),
-            mealEntries.stream().map(support::toEntryItemDto).toList(),
-            statuses.stream().map(s -> new GroupStatusDto(
-                s.foodGroupId(), s.name(), s.expected(), s.recorded(), s.status()
-            )).toList()
-        );
+        var meal = dayReadService.getMealLog(email, date, mealId);
+        return new NoteInterpretationDto(saved.getId(), saved.getVersion(), saved.getText(), date, mealId,
+            items.stream().map(this::toItemDto).toList(), meal.items(), meal.comparison(), meal.status());
     }
 
     private void createNoteEntries(Long userId, String userEmail, Long mealId, LocalDate date, MealNote saved,

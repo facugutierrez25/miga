@@ -11,5 +11,6 @@ record NoteInterpretationDto(
     Long mealId,
     List<InterpretedItemDto> items,
     List<DayLogDto.EntryItemDto> entries,
-    List<GroupStatusDto> comparison
+    List<GroupStatusDto> comparison,
+    String status
 ) {}

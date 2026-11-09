@@ -98,7 +98,7 @@ class ItemCorrectionService {
         List<DayLogDto.EntryItemDto> items = resultIds.stream()
             .map(id -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId)))
             .toList();
-        return new PatchItemResultDto(List.of(entryId), items);
+        return new PatchItemResultDto(List.of(entryId), items, dayReadService.getMealLog(userEmail, date, entry.mealId()).status());
     }
 
     // Al cambiar solo la cantidad, las porciones se ajustan en la misma proporción.

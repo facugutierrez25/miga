@@ -30,15 +30,17 @@ class ItemResolutionService {
     private final FoodRuleService ruleService;
     private final UserService userService;
     private final DailyLogSupport support;
+    private final DayReadService dayReadService;
 
     ItemResolutionService(InterpreterService interpreter, FoodEntryFacade entryFacade, PlanService planService,
-            FoodRuleService ruleService, UserService userService, DailyLogSupport support) {
+            FoodRuleService ruleService, UserService userService, DailyLogSupport support, DayReadService dayReadService) {
         this.interpreter = interpreter;
         this.entryFacade = entryFacade;
         this.planService = planService;
         this.ruleService = ruleService;
         this.userService = userService;
         this.support = support;
+        this.dayReadService = dayReadService;
     }
 
     @Transactional
@@ -69,7 +71,8 @@ class ItemResolutionService {
         List<Long> ids = replaceUnknown(id, userId, email, date, entry, occurrence, groups, type, explanation);
         entryFacade.markResolved(ids, ruleUid);
         var items = ids.stream().map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList();
-        return new ResolveItemResultDto(List.of(id), items, new ResolveItemResultDto.Undo(occurrence, ruleUid));
+        return new ResolveItemResultDto(List.of(id), items, new ResolveItemResultDto.Undo(occurrence, ruleUid),
+            dayReadService.getMealLog(email, date, entry.mealId()).status());
     }
 
     private ResponseStatusException missingResolveGroup() {
@@ -146,7 +149,8 @@ class ItemResolutionService {
         Long restored = entryFacade.createMentionEntry(userId, email, source.mealId(), date, source.food(),
             source.quantity(), source.unit(), source.mealNoteId(), source.originalText(), false, null,
             req.occurrenceId(), false, null, null);
-        return new PatchItemResultDto(ids, List.of(support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(restored, userId))));
+        return new PatchItemResultDto(ids, List.of(support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(restored, userId))),
+            dayReadService.getMealLog(email, date, source.mealId()).status());
     }
 
     private Resolution selectResolution(ResolveItemRequest req, FoodEntryFacade.EntryData entry, Long userId,

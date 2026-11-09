@@ -160,8 +160,9 @@ final class WeekExport {
     }
 
     static String statusLabel(WeekMealData meal) {
-        if (meal.flexibleCount() > 0) return "Flexible";
         return switch (meal.status() == null ? "" : meal.status()) {
+            case "MIXED" -> "Faltó y de más";
+            case "FLEXIBLE" -> "Flexible";
             case "EN_PLAN" -> "Como el plan";
             case "CASI" -> "Faltó algo";
             case "DE_MAS" -> "De más";

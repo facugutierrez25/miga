@@ -55,7 +55,7 @@ class DayReadService {
         plans.forEach((date, plan) -> {
             var notes = notesByDate.getOrDefault(date, List.of());
             var byMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
-            var day = buildDay(date, plan, entriesByDate.getOrDefault(date, List.of()), notes);
+            var day = buildDay(date, plan, entriesByDate.getOrDefault(date, List.of()), notes, rules);
             var names = plan.meals().stream().collect(Collectors.toMap(PlanReadData.MealData::id,
                 PlanReadData.MealData::name));
             var applies = plan.meals().stream().collect(Collectors.toMap(PlanReadData.MealData::id,
@@ -64,7 +64,7 @@ class DayReadService {
             result.put(date, day.meals().stream().filter(meal -> applies.getOrDefault(meal.mealId(), true)
                 || (byMeal.get(meal.mealId()) != null && !byMeal.get(meal.mealId()).getText().isBlank())
                 || !meal.items().isEmpty()).map(meal -> {
-                return weekMeal(meal, byMeal.get(meal.mealId()), names.get(meal.mealId()), plan.id(), userId, rules);
+                return weekMeal(meal, byMeal.get(meal.mealId()), names.get(meal.mealId()), plan, date, rules);
             }).toList());
         });
         return result;
@@ -79,19 +79,6 @@ class DayReadService {
         if (!plans.containsKey(date)) throw new PlanNotFoundException();
         return getWeekMealsForRange(userId, date, date, plans,
             entryFacade.findByUserIdAndDate(userId, date)).get(date);
-    }
-
-    // Estado de una comida con registro: un grupo sin porciones no la vuelve «sin anotar»,
-    // cuenta como «casi»; si algún grupo se pasa, el estado es «de más».
-    private static String recordedMealStatus(List<GroupStatusDto> groups) {
-        if (groups.isEmpty()) return "REGISTRADA";
-        List<String> statuses = groups.stream().map(GroupStatusDto::status).toList();
-        if (statuses.contains(ComparisonService.OVER)) return ComparisonService.OVER;
-        if (statuses.contains(ComparisonService.CLOSE) || statuses.contains(ComparisonService.MISSING)) {
-            return ComparisonService.CLOSE;
-        }
-        if (statuses.contains(ComparisonService.ASK)) return ComparisonService.ASK;
-        return ComparisonService.ON_PLAN;
     }
 
     @Transactional(readOnly = true)
@@ -135,11 +122,16 @@ class DayReadService {
 
         List<FoodEntryFacade.EntryData> entries = entryFacade.findByUserIdAndDate(userId, date);
         return buildDay(date, planService.getReadData(planId), entries,
-            noteRepository.findByUserIdAndDate(userId, date));
+            noteRepository.findByUserIdAndDate(userId, date), new HashMap<>());
+    }
+
+    DayLogDto.MealDayDto getMealLog(String email, LocalDate date, Long mealId) {
+        return getDayLog(email, date).meals().stream()
+            .filter(meal -> meal.mealId().equals(mealId)).findFirst().orElseThrow();
     }
 
     private DayLogDto buildDay(LocalDate date, PlanReadData plan,
-                                    List<FoodEntryFacade.EntryData> entries, List<MealNote> notes) {
+                                    List<FoodEntryFacade.EntryData> entries, List<MealNote> notes, Map<Long, List<FoodRuleDto>> rules) {
         var byMeal = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));
         var noteByMeal = notes.stream().collect(Collectors.toMap(MealNote::getMealId, n -> n));
         var planMealIds = plan.meals().stream().map(PlanReadData.MealData::id).toList();
@@ -150,7 +142,7 @@ class DayReadService {
 
         for (Long mealId : planMealIds) {
             mealDtos.add(buildMeal(plan, mealId, noteByMeal.get(mealId),
-                byMeal.getOrDefault(mealId, List.of()), totalByGroup));
+                byMeal.getOrDefault(mealId, List.of()), totalByGroup, rules));
         }
 
         List<DayLogDto.DailySummaryDto> summary = groups.stream()
@@ -191,29 +183,30 @@ class DayReadService {
         }
     }
 
-    private WeekMealData weekMeal(DayLogDto.MealDayDto meal, MealNote note, String mealName, Long planId,
-            Long userId, Map<Long, List<FoodRuleDto>> rules) {
-        long flexible = 0;
-        if (note != null && !note.getText().isBlank()) {
-            // Los alimentos se editan en el lugar: se cuenta con el tipo guardado en cada ítem.
-            // Solo los registros anteriores a rule_type se reinterpretan.
-            var noteItems = meal.items().stream().filter(item -> !EntryOrigin.RESPONSE.equals(item.origin())).toList();
-            if (noteItems.stream().anyMatch(item -> item.ruleType() != null)) {
-                flexible = noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType())).count();
-            } else {
-                Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
-                flexible = interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
-                    id -> ruleService.findApplicable(id, userId))).stream()
-                    .filter(item -> "FLEXIBLE".equals(item.type())).count();
-            }
+    private WeekMealData weekMeal(DayLogDto.MealDayDto meal, MealNote note, String mealName, PlanReadData plan,
+            LocalDate date, Map<Long, List<FoodRuleDto>> rules) {
+        long flexible = flexibleCount(meal.items(), note, plan.id(), rules);
+        boolean planned = plan.meals().stream().anyMatch(m -> m.id().equals(meal.mealId())
+            && m.appliesOn(date.getDayOfWeek()) && m.portions().stream().anyMatch(p -> p.portions().signum() > 0));
+        return new WeekMealData(meal.mealId(), mealName, meal.noteText(), meal.status(), flexible, planned);
+    }
+
+    private long flexibleCount(List<DayLogDto.EntryItemDto> items, MealNote note, Long planId,
+            Map<Long, List<FoodRuleDto>> rules) {
+        if (note == null || note.getText().isBlank()) return 0;
+        var noteItems = items.stream().filter(item -> !EntryOrigin.RESPONSE.equals(item.origin())).toList();
+        if (noteItems.stream().anyMatch(item -> item.ruleType() != null)) {
+            return noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType())).count();
         }
-        String status = (note != null && !note.getText().isBlank()) || !meal.items().isEmpty()
-            ? recordedMealStatus(meal.comparison()) : ComparisonService.MISSING;
-        return new WeekMealData(meal.mealId(), mealName, meal.noteText(), status, flexible);
+        Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
+        return interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
+            id -> ruleService.findApplicable(id, note.getUserId()))).stream()
+            .filter(item -> "FLEXIBLE".equals(item.type())).count();
     }
 
     private DayLogDto.MealDayDto buildMeal(PlanReadData plan, Long mealId, MealNote note,
-            List<FoodEntryFacade.EntryData> mealEntries, Map<Long, BigDecimal> totalByGroup) {
+            List<FoodEntryFacade.EntryData> mealEntries, Map<Long, BigDecimal> totalByGroup,
+            Map<Long, List<FoodRuleDto>> rules) {
 
         List<DayLogDto.EntryItemDto> itemDtos = mealEntries.stream()
             .map(support::toEntryItemDto)
@@ -240,7 +233,10 @@ class DayReadService {
             note != null ? note.getText() : null,
             note != null ? note.getVersion() : null,
             itemDtos,
-            compDtos
+            compDtos,
+            ComparisonService.mealStatus((note != null && !note.getText().isBlank()) || !itemDtos.isEmpty(),
+                itemDtos.stream().anyMatch(item -> "FLEXIBLE".equals(item.ruleType()))
+                    || flexibleCount(itemDtos, note, plan.id(), rules) > 0, compDtos)
         );
     }
 }

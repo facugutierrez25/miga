@@ -63,6 +63,9 @@ class InterpreterServiceTest {
         when(users.findUserIdByEmail("user")).thenReturn(1L);
         when(plans.lockCurrentPlan(1L)).thenReturn(20L);
         when(plans.getPlanIdForDate(1L, date)).thenReturn(20L);
+        when(plans.getReadData(20L)).thenReturn(new uy.miga.plans.PlanReadData(20L, date, null,
+            "PORCIONES", BigDecimal.ZERO, List.of(), List.of(
+                new uy.miga.plans.PlanReadData.MealData(10L, "Desayuno", List.of()))));
         when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(
             new PlanFoodGroupDto(7L, "Cereales", "CER", 0, null, "CER", false, false, UUID.randomUUID())));
         when(entries.findEntryByIdAndUserId(anyLong(), eq(1L))).thenReturn(entry);

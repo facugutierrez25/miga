@@ -18,6 +18,21 @@ class ComparisonService {
     static final String MISSING  = "SIN_ANOTAR";
     static final String ASK      = "PREGUNTAR";
 
+    static final String MIXED = "MIXED";
+    static final String FLEXIBLE = "FLEXIBLE";
+
+    static String mealStatus(boolean recorded, boolean flexible, List<GroupStatusDto> groups) {
+        if (flexible) return FLEXIBLE;
+        if (!recorded) return MISSING;
+        if (groups.isEmpty()) return "REGISTRADA";
+        var statuses = groups.stream().map(GroupStatusDto::status).toList();
+        boolean shortfall = statuses.contains(CLOSE) || statuses.contains(MISSING);
+        if (statuses.contains(OVER)) return shortfall ? MIXED : OVER;
+        if (shortfall) return CLOSE;
+        if (statuses.contains(ASK)) return ASK;
+        return ON_PLAN;
+    }
+
     private final PlanService planService;
 
     ComparisonService(PlanService planService) {
