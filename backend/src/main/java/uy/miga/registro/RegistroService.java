@@ -82,7 +82,7 @@ public class RegistroService {
     @Transactional(readOnly = true)
     public boolean planHasNotes(Long planId) { return noteRepository.existsByPlanId(planId); }
 
-    // El fork ya trasladó las referencias; las reglas deben aplicarse después de la edición.
+    // Se llama después de editar la configuración del plan, con las referencias de hoy ya en planId.
     @Transactional
     public void reinterpretTodayNotes(String email, Long planId) {
         Long userId = userService.findUserIdByEmail(email);

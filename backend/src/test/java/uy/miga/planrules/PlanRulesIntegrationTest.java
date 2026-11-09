@@ -157,6 +157,29 @@ class PlanRulesIntegrationTest {
         state=request(delete(BASE+resource+"/"+uid).param("planVersion",state.path("planVersion").asText()),null,200);
         for(JsonNode remaining:state.path(array)) assertThat(remaining.path("uid").asText()).isNotEqualTo(uid);
     }
+    @Test void foodCreateUpdateDeleteOnUsedPlanKeepsIdAndBumpsRevision() throws Exception {
+        long plan = state.path("planId").asLong();
+        note(meals().getFirst(), LocalDate.now(clock), "1 manzana");
+        long count = jdbc.queryForObject("select count(*) from plans", Long.class);
+        long revision = state.path("planVersion").asLong();
+        ObjectNode create = body(Map.of("alimento", "sintetico", "tipo", "LIBRE"));
+        state = request(post(BASE + "alimentos"), create, 201);
+        String uid = state.path("alimentos").get(0).path("uid").asText();
+        assertThat(state.path("planVersion").asLong()).isEqualTo(++revision);
+        request(post(BASE + "alimentos"), create, 409);
+        ObjectNode update = body(Map.of("alimento", "sintetico editado", "tipo", "LIBRE"));
+        state = request(put(BASE + "alimentos/" + uid), update, 200);
+        assertThat(state.path("planVersion").asLong()).isEqualTo(++revision);
+        request(put(BASE + "alimentos/" + uid), update, 409);
+        request(delete(BASE + "alimentos/" + uid).param("planVersion", update.path("planVersion").asText()), null, 409);
+        state = request(delete(BASE + "alimentos/" + uid).param("planVersion", Long.toString(revision)), null, 200);
+        assertThat(state.path("planVersion").asLong()).isEqualTo(++revision);
+        assertThat(state.path("planId").asLong()).isEqualTo(plan);
+        assertThat(jdbc.queryForObject("select count(*) from plans", Long.class)).isEqualTo(count);
+        state = request(put(BASE + "grupos/" + state.path("grupos").get(0).path("uid").asText()), body(Map.of("name", "Editado")), 200);
+        assertThat(state.path("planId").asLong()).isNotEqualTo(plan);
+    }
+
     @Test void groupOrderAndUniqueness() throws Exception {
         addGroup("Árbol", Map.of()); addGroup("Arbolito", Map.of());
         assertThat(group("Árbol").path("abbreviation").asText()).isEqualTo("ARB");
@@ -283,9 +306,11 @@ class PlanRulesIntegrationTest {
         long meal=meals().getFirst(); note(meal,LocalDate.now(clock),"1 "+synonym);
         assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,meal)).isEqualTo(cereals);
         state=request(delete(BASE+"alimentos/"+adjustment).param("planVersion",state.path("planVersion").asText()),null,200);
+        assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,meal)).isEqualTo(protein);
+        noteVersions.clear();
         long newMeal=meals().getFirst(); note(newMeal,LocalDate.now(clock),"2 "+synonym);
         long newProtein=group("Proteínas").path("id").asLong();
-        assertThat(newProtein).isNotEqualTo(protein);
+        assertThat(newProtein).isEqualTo(protein);
         assertThat(jdbc.queryForObject("select food_group_id from food_entries where meal_id=?",Long.class,newMeal)).isEqualTo(newProtein);
     }
     @Test void habitContinuityAndArchival() throws Exception {
@@ -461,7 +486,7 @@ class PlanRulesIntegrationTest {
     }
 
     @Test
-    void twoRuleEditsReinterpretTodayAndPreserveYesterday() throws Exception {
+    void twoRuleEditsReinterpretTodayInPlaceAndPreserveYesterday() throws Exception {
         LocalDate today = LocalDate.now(clock);
         long oldPlan = state.path("planId").asLong();
         long meal = meals().getFirst();
@@ -496,10 +521,8 @@ class PlanRulesIntegrationTest {
         }
         assertThat(jdbc.queryForList("select * from meal_notes where plan_id=? and fecha=?", oldPlan, today.minusDays(1))).isEqualTo(yesterdayNotes);
         assertThat(jdbc.queryForList("select * from food_entries where meal_id=? and date=?", meal, today.minusDays(1))).isEqualTo(yesterdayEntries);
-        request(put("/api/v1/registro/" + today.plusDays(1) + "/comidas/" + meal + "/nota"),
-            Map.of("text", "1 sintetico"), 409);
-        request(put("/api/v1/registro/" + today + "/comidas/" + meals().getFirst() + "/nota"),
-            Map.of("text", "1 sintetico", "version", saved.path("version").asLong()), 409);
+        assertThat(state.path("planId").asLong()).isEqualTo(oldPlan);
+        assertThat(note(meal, today.minusDays(1), "3 sintetico u").path("entries").get(0).path("portions").asDouble()).isEqualTo(0.75);
     }
 
     @Test
