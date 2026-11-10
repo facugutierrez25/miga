@@ -84,7 +84,13 @@ function TodayContent() {
     })
   }, [setDayRecord, groupsMap, drafts])
 
-  const handleNoteDeleted = useCallback((mealId: number, version: number | null) => {
+  const handleNoteDeleted = useCallback((mealId: number, version: number | null, submittedText: string) => {
+    // El panel puede haberse desmontado mientras se borraba la nota.
+    const key = `${date}-${mealId}`
+    const current = drafts.get(key)
+    drafts.set(key, current && current.text !== submittedText
+      ? { ...current, baseVersion: version, dirty: true }
+      : { text: '', baseVersion: version, dirty: false, conflict: false })
     setDayRecord(prev => {
       if (!prev) return prev
       const previous = prev.meals.find(m => m.mealId === mealId)
@@ -94,7 +100,7 @@ function TodayContent() {
         summary: adjustSummary(prev.summary, previous?.items ?? [], [], groupsMap),
       }
     })
-  }, [setDayRecord, groupsMap])
+  }, [setDayRecord, groupsMap, drafts, date])
 
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRecord(prev => {

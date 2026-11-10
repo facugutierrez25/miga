@@ -82,6 +82,37 @@ test.each([false, true])('conserva las ediciones al volver a una comida con un g
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
+test.each([false, true])('reconcilia el borrador si el borrado termina con otra comida abierta (edición posterior: %s)', async editAfterDelete => {
+  mockGetDayRecord.mockResolvedValue({ ...dayWithNote, date: '2026-11-09', meals: [{ ...dayWithNote.meals[0], mealId: 4 }] })
+  let resolveDelete!: (version: number) => void
+  mockDeleteNote.mockReturnValueOnce(new Promise(resolve => { resolveDelete = resolve }))
+  setup()
+  fireEvent.click(await screen.findByRole('button', { name: /^Cena, 23:00:/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'edición antes de borrar' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Borrar lo anotado' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Borrar$/ }))
+  expect(mockDeleteNote).toHaveBeenLastCalledWith('tok', '2026-11-09', 4, 3)
+  if (editAfterDelete) {
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'edición posterior' } })
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+  await act(async () => { resolveDelete(4) })
+  fireEvent.click(screen.getByRole('button', { name: /^Cena, 23:00:/ }))
+  expect(screen.getByRole('textbox')).toHaveValue(editAfterDelete ? 'edición posterior' : '')
+  if (!editAfterDelete) {
+    // La edición anterior no resucita como borrador sin guardar al remontar.
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+    expect(screen.queryByText('leche y pan')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'nota nueva' } })
+  }
+  const text = editAfterDelete ? 'edición posterior' : 'nota nueva'
+  mockSaveNote.mockResolvedValueOnce({ status: 'REGISTRADA', noteId: 1, version: 5, text, date: '2026-11-09', mealId: 4, items: [], entries: [], comparison: [] })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(mockSaveNote).toHaveBeenLastCalledWith('tok', '2026-11-09', 4, text, 4)
+  await screen.findByRole('button', { name: 'Editar' })
+})
+
 function setup(path = '/hoy', time = '19:04') {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(`2026-11-09T${time}:00`))

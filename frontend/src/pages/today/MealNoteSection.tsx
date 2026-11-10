@@ -39,7 +39,7 @@ export interface MealNoteSectionProps {
   groupsMap: Record<number, GroupInfo>
   onNoteSaved: (interp: NoteInterpretationDto, mealId: number, submittedText?: string) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
-  onNoteDeleted: (mealId: number, version: number | null) => void
+  onNoteDeleted: (mealId: number, version: number | null, submittedText: string) => void
   onReload: () => Promise<DayRecordDto>
   onAnswerSaved: (mealId: number) => Promise<void>
 }
@@ -170,6 +170,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     setError(null)
     setSavedMessage(null)
     const submittedRevision = draftRevision.current
+    const submittedText = text
     try {
       const version = await deleteNote(token, date, meal.id, baseVersion.current)
       baseVersion.current = version
@@ -183,7 +184,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       setConfirming(false)
       setSavedMessage(`Borraste lo anotado en ${meal.name}.`)
       pendingFocus.current = 'textarea'
-      onNoteDeleted(meal.id, version)
+      onNoteDeleted(meal.id, version, submittedText)
     } catch (err) {
       setConfirming(false)
       setConflict(err instanceof NoteConflictError)

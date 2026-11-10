@@ -20,7 +20,7 @@ export interface MealProps {
   groupsMap: Record<number, GroupInfo>
   onNoteSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
-  onNoteDeleted: (mealId: number, version: number | null) => void
+  onNoteDeleted: (mealId: number, version: number | null, submittedText: string) => void
   onReload: () => Promise<DayRecordDto>
   onAnswerSaved: (mealId: number) => Promise<void>
 }
