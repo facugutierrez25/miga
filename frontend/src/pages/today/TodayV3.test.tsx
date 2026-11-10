@@ -1,0 +1,120 @@
+import { readFileSync } from 'node:fs'
+import { mockGetMyPlan, mockGetDayRecord, mockGetSuggestions, mockSaveNote, mockDeleteNote, proteinGroups, emptyDay, dayWithNote } from './test-utils'
+import { render, screen, fireEvent, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { expect, test, vi, afterEach } from 'vitest'
+import TodayPage from '../TodayPage'
+
+const meals = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Extra'].map((name, index) => ({
+  id: index + 1, name, displayOrder: index, suggestedTime: ['08:00', '13:00', '17:00', '23:00', undefined][index],
+  portions: index === 4 ? [] : [{ foodGroupId: 1, portions: 1 }],
+}))
+function setup(path = '/hoy', time = '19:04') {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(`2026-11-09T${time}:00`))
+  mockGetMyPlan.mockResolvedValue({ foodGroups: proteinGroups, meals })
+  render(<MemoryRouter initialEntries={[path]}><TodayPage /></MemoryRouter>)
+}
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers() })
+
+test('tira ordenada, banda, punto Sigue y Extra con más; resumen cerrado dentro de la tarjeta', async () => {
+  setup()
+  const strip = await screen.findByRole('group', { name: 'Comidas del día' })
+  const buttons = within(strip).getAllByRole('button')
+  expect(buttons.map(button => button.textContent?.replace('+', ''))).toEqual(['Desayuno08:00', 'Almuerzo13:00', 'Merienda17:00', 'Cena23:00', 'Extra'])
+  expect(buttons[3]).toHaveAttribute('aria-pressed', 'true')
+  expect(buttons[3]).toHaveAttribute('data-sigue')
+  expect(buttons[3]).toHaveAccessibleName('Cena, 23:00: sin anotar')
+  expect(buttons[4]).not.toHaveAttribute('data-sigue')
+  expect(within(buttons[4]).getByText('+')).toBeInTheDocument()
+  expect(strip.querySelector('.banda')).toHaveStyle({ transform: 'translateX(300%)' })
+  const summary = screen.getByRole('button', { name: /Tu día por grupo/ })
+  expect(summary).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(summary)
+  expect(summary).toHaveAttribute('aria-expanded', 'true')
+  expect(document.getElementById('hoy-grupos')?.parentElement).toBe(strip.parentElement)
+  expect(screen.queryByText(/^(Ahora|Antes|Después)$/)).not.toBeInTheDocument()
+  expect(document.querySelector('.meal-card')).not.toBeInTheDocument()
+})
+
+test('escribir y guardar sin toque previo, sugerencias y dictado; conserva el borrador al cambiar de miga', async () => {
+  vi.stubGlobal('SpeechRecognition', class { start() {} abort() {} })
+  mockGetSuggestions.mockResolvedValue(['leche con pan'])
+  mockSaveNote.mockResolvedValue({ status: 'REGISTRADA', noteId: 1, version: 1, text: 'leche', date: emptyDay.date, mealId: 4, items: [], entries: [], comparison: [] })
+  setup()
+  const input = await screen.findByRole('textbox', { name: '¿Qué comiste?' })
+  expect(screen.getByLabelText('Te toca')).toHaveTextContent('1 Proteínas')
+  expect(await screen.findByRole('heading', { name: 'Lo de siempre' })).toBeVisible()
+  expect(screen.getByRole('button', { name: /Dictar/ })).toBeInTheDocument()
+  fireEvent.change(input, { target: { value: 'leche' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cena, 23:00: sin anotar' }))
+  expect(screen.getByRole('textbox')).toHaveValue('leche')
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(mockSaveNote).toHaveBeenCalledWith('tok', expect.any(String), 4, 'leche', null)
+})
+
+test('nota guardada con estado y diferencias; editar, cancelar y confirmar borrado', async () => {
+  mockGetDayRecord.mockResolvedValue({ ...dayWithNote, meals: [{ ...dayWithNote.meals[0], mealId: 4, status: 'CASI', comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'CASI' }] }] })
+  setup()
+  fireEvent.click(await screen.findByRole('button', { name: 'Cena, 23:00: faltó algo' }))
+  expect(screen.getByText('leche y pan')).toBeVisible()
+  expect(screen.getByText('Faltó algo')).toBeVisible()
+  expect(screen.getByText('Faltó 1 porción de Proteínas')).toBeVisible()
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'otra cosa' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  expect(screen.getByRole('textbox')).toHaveValue('leche y pan')
+  fireEvent.click(screen.getByRole('button', { name: 'Borrar lo anotado' }))
+  expect(mockDeleteNote).not.toHaveBeenCalled()
+  mockDeleteNote.mockResolvedValue(4)
+  fireEvent.click(screen.getByRole('button', { name: /^Borrar$/ }))
+  expect(mockDeleteNote).toHaveBeenCalledWith('tok', expect.any(String), 4, 3)
+})
+
+test.each(['2026-11-10', '2026-02-30', 'invalida'])('fecha %s abre hoy y deshabilita siguiente', async value => {
+  setup(`/hoy?fecha=${value}`)
+  await screen.findByRole('group', { name: 'Comidas del día' })
+  expect(mockGetDayRecord).toHaveBeenCalledWith('tok', '2026-11-09', expect.anything())
+  expect(screen.getAllByRole('button', { name: 'Día siguiente' }).every(button => button.hasAttribute('disabled'))).toBe(true)
+})
+
+test('fecha pasada desde URL, título largo y navegación', async () => {
+  setup('/hoy?fecha=2026-11-06')
+  await screen.findByRole('group', { name: 'Comidas del día' })
+  expect(mockGetDayRecord).toHaveBeenCalledWith('tok', '2026-11-06', expect.anything())
+  expect(screen.getAllByRole('heading', { level: 1 })[0]).toHaveTextContent('viernes, 6 de noviembre')
+  expect(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.queryByText('Sigue')).not.toBeInTheDocument()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Día siguiente' })[0])
+  expect((await screen.findAllByRole('heading', { name: /sábado, 7 de noviembre/ }))[0]).toBeInTheDocument()
+})
+
+test('el reloj no cambia el panel mientras existe un borrador sin guardar', async () => {
+  setup('/hoy', '09:00')
+  const breakfast = await screen.findByRole('button', { name: 'Desayuno, 08:00: sin anotar' })
+  expect(breakfast).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'borrador pendiente' } })
+  vi.setSystemTime(new Date('2026-11-09T10:00:00'))
+  fireEvent.focus(window)
+  expect(screen.getByRole('button', { name: 'Almuerzo, 13:00: sin anotar' })).toHaveAttribute('data-sigue')
+  expect(breakfast).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('textbox')).toHaveValue('borrador pendiente')
+})
+
+test('la tira mantiene blancos de 44 px y la pantalla una columna de hasta 480 px', async () => {
+  const style = document.createElement('style')
+  style.textContent = readFileSync('src/pages/TodayPage.css', 'utf8') + readFileSync('src/pages/today/DayStrip.css', 'utf8')
+  document.head.append(style)
+  try {
+    setup()
+    const meal = await screen.findByRole('button', { name: 'Cena, 23:00: sin anotar' })
+    expect(Number.parseFloat(getComputedStyle(meal).minWidth)).toBeGreaterThanOrEqual(44)
+    expect(Number.parseFloat(getComputedStyle(meal).minHeight)).toBeGreaterThanOrEqual(44)
+    expect(getComputedStyle(document.querySelector('.hoy-page')!).maxWidth).toBe('480px')
+  } finally {
+    style.remove()
+  }
+})

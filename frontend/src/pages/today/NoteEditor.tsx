@@ -1,7 +1,7 @@
 import DictationButton from '../../components/DictationButton'
-import { ActionsMenu } from './ActionsMenu'
 
 interface Props {
+  onCancelEdit: () => void
   meal: { id?: number; name: string }
   textareaId: string
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
@@ -22,7 +22,7 @@ interface Props {
   handleDelete: () => Promise<void>
 }
 
-export function NoteEditor({ meal, textareaId, textareaRef, text, editDraft, error, loadingSuggestions,
+export function NoteEditor({ onCancelEdit, meal, textareaId, textareaRef, text, editDraft, error, loadingSuggestions,
   suggestions, hasNote, saving, conflict, handleSave, deleteRef, onConfirmDelete, onCancelDelete,
   confirming, confirmRef, handleDelete }: Props) {
   return <>
@@ -70,8 +70,10 @@ export function NoteEditor({ meal, textareaId, textareaRef, text, editDraft, err
       <DictationButton iconOnly disabled={saving} onTranscript={transcript => {
         editDraft(current => current.trim() ? `${current.trimEnd()} ${transcript}` : transcript)
       }} />
-      {hasNote && <ActionsMenu label={`Más opciones de ${meal.name}`} buttonRef={deleteRef} disabled={saving}
-        actions={[{ label: 'Borrar lo anotado', onClick: onConfirmDelete }]} />}
+      {hasNote && !confirming && <>
+        <button type="button" className="nota-btn-cancelar" disabled={saving} onClick={onCancelEdit}>Cancelar</button>
+        <button type="button" className="nota-btn-cancelar" ref={deleteRef} disabled={saving} onClick={onConfirmDelete}>Borrar lo anotado</button>
+      </>}
 
     </div>
 

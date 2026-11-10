@@ -62,25 +62,27 @@ export function formatName(email: string | undefined): string {
     .trim()
 }
 
-export function findCurrentMealIndex(meals: MealDto[], now: Date): number {
-  if (meals.length === 0) return -1
-  const nowMin = now.getHours() * 60 + now.getMinutes()
+export function findCurrentMealIndex(meals: MealDto[], now: Date, records: MealDayDto[] = []): number {
+  const pending = meals.map((meal, index) => ({ meal, index }))
+    .filter(({ meal }) => meal.suggestedTime && meal.portions.some(p => p.portions > 0)
+      && !records.some(record => record.mealId === meal.id && record.status !== 'SIN_ANOTAR'))
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  return (pending.find(({ meal }) => {
+    const [hours, mins] = meal.suggestedTime!.split(':').map(Number)
+    return hours * 60 + mins >= minutes - 90
+  }) ?? pending.at(-1))?.index ?? -1
+}
 
-  const byTime = meals
-    .map((m, i) => ({ m, i }))
-    .find(({ m }) => {
-      if (!m.suggestedTime) return false
-      const [h, min] = m.suggestedTime.split(':').map(Number)
-      const mealMin = h * 60 + min
-      return mealMin >= nowMin - 90 && mealMin <= nowMin + 180
-    })
+export function findInitialMealIndex(meals: MealDto[], records: MealDayDto[] = []): number {
+  const index = meals.findIndex(meal => meal.suggestedTime && meal.portions.some(p => p.portions > 0)
+    && !records.some(record => record.mealId === meal.id && record.status !== 'SIN_ANOTAR'))
+  return index >= 0 ? index : meals.length ? 0 : -1
+}
 
-  if (byTime) return byTime.i
-
-  const firstWithoutNote = meals.map((m, i) => ({ m, i })).find(({ m }) =>
-    m.id === undefined
-  )
-  return firstWithoutNote ? firstWithoutNote.i : meals.length - 1
+export function resolveDate(value: string | null, today: string): string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value > today) return today
+  const parsed = new Date(`${value}T12:00:00`)
+  return !Number.isNaN(parsed.getTime()) && toISO(parsed) === value ? value : today
 }
 
 export function fmt(n: number): string {

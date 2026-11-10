@@ -108,7 +108,9 @@ export function barEntry(id: number, foodGroupId: number) {
 }
 
 export async function openNote() {
-  await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Desayuno', level: 2 })).toBeInTheDocument())
+  const edit = screen.queryByRole('button', { name: 'Editar' })
+  if (edit) fireEvent.click(edit)
   await waitFor(() => expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toBeInTheDocument())
 }
 
