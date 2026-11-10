@@ -1,7 +1,7 @@
 import Segmented from '../components/Segmented'
 import { useState, type FormEvent } from 'react'
 import { deleteMe } from '../api/users'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import { useTheme, type Theme } from '../hooks/useTheme'
 import Brand from '../components/Brand'
@@ -16,7 +16,7 @@ const THEMES: { value: Theme; label: string }[] = [
 
 export default function ProfilePage() {
   useTitle('Perfil | Miga')
-  const { token, email, logout } = useAuth()
+  const { token, email, firstName, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
 
@@ -50,30 +50,40 @@ export default function ProfilePage() {
   return (
     <div className="perfil-page">
       <header className="perfil-header">
-        <Brand size={26} />
+        <Brand size={22} />
         <h1 className="perfil-title">Perfil</h1>
       </header>
 
       <div className="perfil-body">
-        <div className="perfil-card">
-          <p className="perfil-card__label">Email</p>
-          <p className="perfil-card__value">{email}</p>
-        </div>
+        <ul className="perfil-card perfil-list">
+          <li><span><strong>{firstName || 'Tu cuenta'}</strong><br />
+            <span className="perfil-muted">{email}</span></span></li>
+        </ul>
 
-        <div className="perfil-card">
-          <p className="perfil-card__label">Tema</p>
-          <Segmented label="Tema de la aplicación" options={THEMES} value={theme} onChange={setTheme} />
-        </div>
+        <h2>Tema</h2>
+        <Segmented label="Tema de la aplicación" options={THEMES} value={theme} onChange={setTheme} />
+
+        <h2>Tus datos</h2>
+        <ul className="perfil-card perfil-list">
+          <li><Link to="/semana?exportar=1">
+            <span><strong>Exportar para tu nutri</strong><br />
+              <span className="perfil-muted">Se hace por semana, desde Semana</span></span>
+            <span className="perfil-arrow" aria-hidden="true">›</span>
+          </Link></li>
+          <li><Link to="/privacidad"><strong>Privacidad</strong>
+            <span className="perfil-arrow" aria-hidden="true">›</span>
+          </Link></li>
+        </ul>
 
         <button disabled={deleting} className="btn-cerrar-sesion" onClick={logOut}>
           Cerrar sesión
         </button>
 
-        <section className="perfil-card account-deletion" aria-labelledby="delete-account-title">
-          <h2 id="delete-account-title"><button type="button" className="btn-cerrar-sesion"
+        <section className="account-deletion" aria-labelledby="delete-account-title">
+          <h2 id="delete-account-title"><button type="button" className="perfil-delete-link"
             aria-expanded={deletionOpen} aria-controls="delete-account-panel" disabled={deleting}
             onClick={() => { setDeletionOpen(!deletionOpen); setPassword(''); setDeletionError('') }}>
-            Eliminar mi cuenta…
+            Eliminar mi cuenta
           </button></h2>
           {deletionOpen && <div id="delete-account-panel">
 
