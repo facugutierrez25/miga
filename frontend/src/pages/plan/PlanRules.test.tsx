@@ -67,16 +67,16 @@ test('grupos suma las porciones de las comidas y no pide una meta diaria', () =>
     { portions: [{ foodGroupId: 1, portions: 1.5 }] },
     { portions: [{ foodGroupId: 1, portions: 2 }, { foodGroupId: 2, portions: 1 }] },
   ]} />)
-  expect(screen.getByText('Total del día: 3,5')).toBeInTheDocument()
-  expect(screen.getByText('Total del día: 1')).toBeInTheDocument()
-  expect(screen.getByText('No está en ninguna comida')).toBeInTheDocument()
+  expect(screen.getByText('3,5 por día')).toBeInTheDocument()
+  expect(screen.getByText('1 por día')).toBeInTheDocument()
+  expect(screen.getByText('0 por día')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Editar Proteínas' }))
   expect(screen.queryByLabelText('Meta diaria')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
   fireEvent.click(screen.getByRole('button', { name: 'Agregar grupo' }))
   expect(screen.queryByLabelText('Meta diaria')).not.toBeInTheDocument()
   rerender(<GroupsEditor token="tok" plan={plan} mutate={vi.fn()} meals={[]} />)
-  expect(screen.getAllByText('No está en ninguna comida')).toHaveLength(3)
+  expect(screen.getAllByText('0 por día')).toHaveLength(3)
 })
 
 async function open() {
@@ -386,8 +386,8 @@ test('una sola búsqueda muestra el plan y el catálogo y exige dos caracteres',
   }])
   await open()
   fireEvent.click(screen.getByRole('button', { name: 'Alimentos' }))
-  expect(screen.getAllByRole('textbox')).toHaveLength(1)
-  const search = screen.getByRole('textbox', { name: 'Buscar alimentos' })
+  expect(screen.getAllByRole('searchbox')).toHaveLength(1)
+  const search = screen.getByRole('searchbox', { name: 'Buscar alimentos' })
   fireEvent.change(search, { target: { value: 'm' } })
   expect(screen.getByText(/al menos 2 caracteres/)).toBeInTheDocument()
   expect(api.searchCatalog).not.toHaveBeenCalled()
@@ -452,4 +452,142 @@ test('grupos y hábitos vacíos explican su uso y permiten agregar', async () =>
   expect(screen.getByText(/Todavía no tenés hábitos/)).toHaveTextContent('Agregar hábito')
   fireEvent.click(screen.getByRole('button', { name: 'Agregar hábito' }))
   expect(screen.getByLabelText('Nombre del hábito')).toBeInTheDocument()
+})
+
+
+test('hábitos muestran meta, paso, período y destino según D11 y P2', async () => {
+  vi.mocked(api.getPlanRules).mockResolvedValue({ ...plan, habitos: [
+    plan.habitos[0],
+    { ...plan.habitos[0], uid: 'weekly', name: 'Entrenar', period: 'SEMANA' },
+    { ...plan.habitos[0], uid: 'auto', name: 'Flexibles', countsFlexibleMeals: true, period: 'SEMANA' },
+  ] })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  expect(screen.getByRole('button', { name: 'Editar Agua' })).toHaveTextContent('Meta 8 vasos · de a 0,5 vasos · por día')
+  expect(screen.getByRole('button', { name: 'Editar Entrenar' })).toHaveTextContent('por semanaSe anota en Hoy')
+  expect(screen.getByRole('button', { name: 'Editar Flexibles' })).toHaveTextContent('Se ve en Semana')
+})
+
+test('la hoja anticipa migas, más de seis pasos, sin meta y período semanal en vivo', async () => {
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Agua' }))
+  const dialog = screen.getByRole('dialog', { name: 'Editar Agua' })
+  const preview = within(dialog).getByRole('region', { name: 'Vista previa en Hoy' })
+  expect(preview).toHaveTextContent('más de 6 pasos')
+  expect(within(preview).getAllByRole('button')).toHaveLength(2)
+  fireEvent.change(screen.getByLabelText('Meta'), { target: { value: '3' } })
+  expect(within(preview).getAllByRole('button')).toHaveLength(7)
+  fireEvent.click(within(preview).getByRole('button', { name: 'Agua: 0,5 vasos' }))
+  expect(preview).toHaveTextContent('0,5 de 3 vasos')
+  fireEvent.change(screen.getByLabelText('Paso'), { target: { value: '1' } })
+  expect(within(preview).getAllByRole('button')).toHaveLength(4)
+  fireEvent.change(screen.getByLabelText('Meta'), { target: { value: '' } })
+  expect(within(preview).getAllByRole('button')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('radio', { name: 'Por semana' }))
+  expect(within(preview).getAllByRole('button')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+  expect(screen.getByText(/Tenés cambios sin guardar/)).toBeInTheDocument()
+})
+
+test('el hábito automático permite guardar únicamente otra meta', async () => {
+  const automatic = { ...plan.habitos[0], countsFlexibleMeals: true, period: 'SEMANA' as const }
+  vi.mocked(api.getPlanRules).mockResolvedValue({ ...plan, habitos: [automatic] })
+  vi.mocked(api.updateHabit).mockResolvedValue(plan)
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Agua' }))
+  for (const label of ['Nombre del hábito', 'Cuenta comidas flexibles', 'Tipo', 'Unidad', 'Paso']) {
+    expect(screen.getByLabelText(label)).toBeDisabled()
+  }
+  expect(screen.getByRole('radio', { name: 'Por día' })).toBeDisabled()
+  expect(screen.queryByRole('region', { name: 'Vista previa en Hoy' })).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Meta'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar hábito' }))
+  await waitFor(() => expect(api.updateHabit).toHaveBeenCalledWith('tok', 'habit', { ...automatic, goal: 4, planVersion: 3 }))
+})
+
+test('sí o no oculta meta y paso y guarda sin meta con una sola miga', async () => {
+  vi.mocked(api.updateHabit).mockResolvedValue(plan)
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Agua' }))
+  fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'SI_NO' } })
+  expect(screen.queryByLabelText('Meta')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Paso')).not.toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: 'Vista previa en Hoy' })).getAllByRole('button')).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar hábito' }))
+  await waitFor(() => expect(api.updateHabit).toHaveBeenCalledWith('tok', 'habit', expect.objectContaining({ habitType: 'SI_NO', goal: null, step: 1 })))
+})
+
+test('alimentos abre con buscador y cada fila muestra conteo y origen', async () => {
+  vi.mocked(api.getPlanRules).mockResolvedValue({ ...plan, alimentos: [
+    plan.alimentos[0], { ...plan.alimentos[0], uid: 'imported', alcance: 'PLAN', alimento: 'Pera' },
+  ] })
+  vi.mocked(api.searchCatalog).mockResolvedValue([{ uid: 'catalog', alcance: 'GLOBAL', alimento: 'Manzana verde', sinonimos: [], tipo: 'LIBRE', groupUid: null, textoRegla: 'Libre', ajustadoPorUid: null }])
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Alimentos' }))
+  const search = screen.getByRole('searchbox', { name: 'Buscar alimentos' })
+  expect(search.compareDocumentPosition(screen.getByRole('button', { name: 'Editar Manzana' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Editar Manzana' })).toHaveTextContent('Se anota pero no sumaTuyo')
+  expect(screen.getByRole('button', { name: 'Editar Pera' })).toHaveTextContent('De tu plan')
+  fireEvent.change(search, { target: { value: 'manzana' } })
+  const item = (await screen.findByText('Manzana verde')).closest('article')!
+  expect(item).toHaveTextContent('LibreCatálogo')
+})
+
+test('grupos muestran color, total por día incluso cero y pregunta si falta', () => {
+  render(<GroupsEditor token="tok" plan={{ ...plan, grupos: [{ ...groups[0], color: '#123456', preguntarSiFalta: true }] }} mutate={vi.fn()} />)
+  const row = screen.getByRole('button', { name: 'Editar Proteínas' })
+  expect(row).toHaveTextContent('0 por día')
+  expect((row.querySelector('.rules-dot') as HTMLElement).style.background).toBe('rgb(18, 52, 86)')
+  expect(screen.getByText('Pregunta si falta')).toBeInTheDocument()
+})
+
+
+test.each(['Recargar', 'Cancelar', 'Cerrar', 'Escape', 'Fondo'])('el conflicto de hábito permite salir desde la hoja con %s', async (action) => {
+  vi.mocked(api.updateHabit).mockRejectedValue({ code: 'VERSION_CONFLICT' })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Agua' }))
+  fireEvent.change(screen.getByLabelText('Meta'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar hábito' }))
+  const dialog = screen.getByRole('dialog')
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('El plan cambió en otra sesión.')
+  expect(within(dialog).getByLabelText('Meta')).toBeDisabled()
+  expect(within(dialog).getByRole('button', { name: 'Guardar hábito' })).toBeDisabled()
+  expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeEnabled()
+  expect(within(dialog).getByRole('button', { name: 'Recargar' })).toBeEnabled()
+  if (action === 'Escape') fireEvent.keyDown(document, { key: 'Escape' })
+  else if (action === 'Fondo') fireEvent.click(dialog.parentElement!)
+  else fireEvent.click(within(dialog).getByRole('button', { name: action }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(screen.queryByText(/Tenés cambios sin guardar/)).not.toBeInTheDocument()
+  if (action === 'Recargar') {
+    await waitFor(() => expect(api.getPlanRules).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('button', { name: 'Editar Agua' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Agua' }))
+    expect(screen.getByLabelText('Meta')).toHaveValue(8)
+  }
+})
+
+test.each(['crear', 'editar', 'borrar'])('el error al %s un hábito aparece dentro de la hoja y permite reintentar sin perder el borrador', async (action) => {
+  const operation = action === 'crear' ? api.createHabit : action === 'editar' ? api.updateHabit : api.deleteHabit
+  vi.mocked(operation).mockRejectedValueOnce({ error: 'No se pudo guardar el hábito.' }).mockResolvedValue(plan)
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: 'Hábitos' }))
+  fireEvent.click(screen.getByRole('button', { name: action === 'crear' ? 'Agregar hábito' : 'Editar Agua' }))
+  fireEvent.change(screen.getByLabelText('Nombre del hábito'), { target: { value: 'Agua con limón' } })
+  const dialog = screen.getByRole('dialog')
+  if (action === 'borrar') fireEvent.click(within(dialog).getByRole('button', { name: 'Borrar Agua' }))
+  const retry = () => fireEvent.click(within(dialog).getByRole('button', { name: action === 'borrar' ? 'Confirmar borrado' : 'Guardar hábito' }))
+  retry()
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('No se pudo guardar el hábito.')
+  expect(within(dialog).getByLabelText('Nombre del hábito')).toHaveValue('Agua con limón')
+  expect(within(dialog).getByLabelText('Nombre del hábito')).toBeEnabled()
+  expect(within(dialog).getByRole('button', { name: action === 'borrar' ? 'Confirmar borrado' : 'Guardar hábito' })).toBeEnabled()
+  retry()
+  await waitFor(() => expect(operation).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  if (action !== 'borrar') expect(vi.mocked(operation).mock.calls[1]).toContainEqual(expect.objectContaining({ name: 'Agua con limón' }))
 })
