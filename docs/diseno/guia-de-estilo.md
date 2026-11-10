@@ -1,6 +1,6 @@
 # Guía de estilo — Miga
 
-Estilo: **natural, cercano y de calidad**. Papel salvia, tinta negra, oliva para el logo y el
+Estilo: **natural, cercano y de calidad**. Papel salvia, tinta negra, verde bosque para el logo y el
 amarillo del punto de la i para marcar dónde estás. Funciona en modo claro y oscuro.
 
 ## Principios
@@ -52,19 +52,19 @@ Se definen como variables CSS en `frontend/src/index.css`. Nunca usar hex suelto
 | `--surface` | Tarjetas, listas, hojas | `#FBFAF5` | `#1C1C1C` |
 | `--surface-2` / `--surface-3` | Banda de selección, chips, controles segmentados / su hover | `#E8E6DA` / `#DEDBCB` | `#262626` / `#303030` |
 | `--ink` | Texto principal y migas de la semana | `#040200` | `#F3EFE6` |
-| `--muted` / `--text-secondary` | Texto secundario | `#5E5A2E` | `#ADA89D` |
+| `--muted` / `--text-secondary` | Texto secundario | `#3F5E3A` | `#ADA89D` |
 | `--primary` / `--on-primary` | Acción principal | `#040200` / `#F2F1EA` | `#F3EFE6` / `#121212` |
-| `--brand` | Logo | `#7C773F` | `#F3EFE6` |
+| `--brand` | Logo | `#2F6336` | `#F3EFE6` |
 | `--accent` / `--on-accent` | «Sigue», «Hoy», punto del logo | `#F6C344` / `#3A2A00` | igual |
 | `--line` | Divisores | `#E2E0D3` | `#2C2C2C` |
-| `--control-border` / `--miga-empty` | Bordes de campos y migas vacías (3:1) | `#857F62` | `#8A867C` |
+| `--control-border` / `--miga-empty` | Bordes de campos y migas vacías (3:1) | `#6B8066` | `#8A867C` |
 | `--ok` | "Como el plan" | `#2F6B45` | `#7CC79A` |
 | `--warn` / `--warn-soft` | Faltantes y excesos | `#A9431B` / `#F8E6DB` | `#F4A57E` / `#38271F` |
 | `--error` / `--error-bg` | Errores | `#B42318` / `#FDEDEB` | `#F97066` / `#3A1C1A` |
 
 - **El oscuro es neutro:** grises casi negros, sin verde. La elevación se marca con grises más claros, no con color.
 - **El amarillo nunca es color de texto** y siempre acompaña a una palabra («Sigue», «Hoy»). Lleva `--on-accent` encima, nunca blanco.
-- **Se evita juntar naranja y verde.** El oliva queda solo para el logo.
+- **Se evita juntar naranja y verde.** El verde bosque queda solo para el logo.
 - Contrastes verificados: texto ≥ 4,5:1 y migas, bordes de control e indicadores ≥ 3:1, en ambos temas.
 
 ### Grupos de alimentos
