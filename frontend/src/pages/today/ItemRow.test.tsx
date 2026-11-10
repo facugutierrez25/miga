@@ -16,6 +16,26 @@ import { ItemOrigin } from '../../api/records'
 import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { vi, test, expect } from 'vitest'
 
+test.each(['NO_CUENTA', 'LIBRE'])('un item %s sin grupo permite corregir, repartir y cerrar', async rule => {
+  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}` }
+  setupRemoval([item])
+  vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [item.id], items: [item] })
+  renderToday()
+  await openDetails()
+
+  expect(screen.queryByRole('button', { name: 'Quitar leche' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeEnabled()
+  expect(screen.queryByRole('button', { name: 'Menos porciones de leche' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
+  expect(screen.getByRole('group', { name: 'Repartir leche en grupos' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
+  expect(await screen.findByRole('button', { name: 'Corregir leche' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Listo' })).not.toBeInTheDocument()
+  expect(recordsApi.patchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), item.id, { saveAsRule: false })
+})
+
 test('Listo solo envía las porciones tocadas y saveAsRule', async () => {
   setupRemoval([removableItems[0]])
   const mockPatchItem = vi.mocked(recordsApi.patchItem)

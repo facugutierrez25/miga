@@ -100,16 +100,18 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
             {item.appliedRule ? readableRule(item.appliedRule) : 'Sin regla: queda anotado para tu nutri.'}
           </p>
         </div>
-      {editing && !splitting && item.foodGroupId !== null && (
+      {editing && !splitting && (
         <span className="understood-correction fin">
+          {item.foodGroupId !== null && <>
           <button type="button" className="paso" autoFocus aria-label={`Menos porciones de ${item.food}`} disabled={busy || portions <= minimumPortions} onClick={() => { setPortions(value => Math.max(minimumPortions, value - 0.5)); setPortionsTouched(true) }}>−</button>
           <b className="num" aria-label={`Porciones de ${item.food}`}>{fmt(portions)}</b>
           <button type="button" className="paso" aria-label={`Más porciones de ${item.food}`} disabled={saving} onClick={() => { setPortions(value => value + 0.5); setPortionsTouched(true) }}>+</button>
+          </>}
           <button type="button" className="link" disabled={busy} onClick={saveCorrection}>Listo</button>
         </span>
       )}
         {!editing && <>
-            {item.foodGroupId === null && item.origin !== ItemOrigin.UNKNOWN && removable ? (
+            {!editable && item.origin !== ItemOrigin.UNKNOWN && removable ? (
               <button type="button" className="nota-item__edit" disabled={busy} onClick={onRemove} aria-label={`Quitar ${item.food}`}>
                 Quitar
               </button>
