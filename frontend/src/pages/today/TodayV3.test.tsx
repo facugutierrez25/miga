@@ -31,6 +31,33 @@ test('reconcilia el borrador si el guardado termina con otra comida abierta', as
   expect(mockSaveNote).toHaveBeenLastCalledWith('tok', saved.date, 4, 'leche y pan', 4)
   await screen.findByRole('button', { name: 'Editar' })
 })
+test.each([false, true])('conserva las ediciones al volver a una comida con un guardado pendiente (remontar: %s)', async remount => {
+  const saved = { status: 'REGISTRADA' as const, noteId: 1, version: 4, text: 'A', date: '2026-11-09', mealId: 4, items: [], entries: [], comparison: [] }
+  let resolveSave!: (value: typeof saved) => void
+  mockSaveNote.mockReturnValueOnce(new Promise(resolve => { resolveSave = resolve }))
+  setup()
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'A' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(mockSaveNote).toHaveBeenLastCalledWith('tok', saved.date, 4, 'A', null)
+  fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Cena, 23:00:/ }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'AB' } })
+  await act(async () => { resolveSave(saved) })
+  expect(screen.getByRole('textbox')).toHaveValue('AB')
+  expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
+  if (remount) {
+    // El borrador compartido también debe seguir sucio al volver a montar.
+    fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Cena, 23:00:/ }))
+    expect(screen.getByRole('textbox')).toHaveValue('AB')
+  }
+  mockSaveNote.mockResolvedValueOnce({ ...saved, version: 5, text: 'AB' })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  expect(mockSaveNote).toHaveBeenLastCalledWith('tok', saved.date, 4, 'AB', 4)
+  await screen.findByRole('button', { name: 'Editar' })
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
 function setup(path = '/hoy', time = '19:04') {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(`2026-11-09T${time}:00`))

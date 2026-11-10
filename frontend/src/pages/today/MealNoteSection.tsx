@@ -37,7 +37,7 @@ export interface MealNoteSectionProps {
   date: string
   token: string
   groupsMap: Record<number, GroupInfo>
-  onNoteSaved: (interp: NoteInterpretationDto, mealId: number, draft?: Draft) => void
+  onNoteSaved: (interp: NoteInterpretationDto, mealId: number, submittedText?: string) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onNoteDeleted: (mealId: number, version: number | null) => void
   onReload: () => Promise<DayRecordDto>
@@ -92,12 +92,15 @@ export const MealNoteSection = memo(function MealNoteSection({
   const unknownCount = items.filter(item => item.origin === ItemOrigin.UNKNOWN).length
   const estimatedCount = items.filter(item => item.uncertain).length
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!dirty.current) {
       setText(mealDay?.noteText ?? '')
       baseVersion.current = mealDay?.noteVersion ?? null
+    } else if (drafts.get(draftKey)?.baseVersion === mealDay?.noteVersion) {
+      // Adoptar la reconciliación antes de persistir las refs de este editor.
+      baseVersion.current = mealDay?.noteVersion ?? null
     }
-  }, [mealDay?.noteText, mealDay?.noteVersion])
+  }, [mealDay?.noteText, mealDay?.noteVersion, drafts, draftKey])
 
   useEffect(() => {
     if (!meal.id) return
@@ -202,12 +205,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       baseVersion.current = interp.version
       setConflict(false)
       if (!dirty.current) setEditing(false)
-      onNoteSaved(interp, meal.id, {
-        text: dirty.current ? drafts.get(draftKey)?.text ?? value : interp.text,
-        baseVersion: interp.version,
-        dirty: dirty.current,
-        conflict: false,
-      })
+      onNoteSaved(interp, meal.id, value.trim())
       const status = mealStatus({
         status: interp.status, noteText: interp.text, comparison: interp.comparison,
       })
