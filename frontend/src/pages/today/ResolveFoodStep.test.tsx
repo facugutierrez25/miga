@@ -22,7 +22,7 @@ test('cuenta y separa los alimentos sin reconocer del resumen', async () => {
   expect(await screen.findByRole('button', { name: 'Así lo entendí · 1 sin reconocer · 1 estimados' })).toBeInTheDocument()
   await openDetails()
   expect(screen.getByRole('heading', { name: 'No reconocí 1 cosa' })).toBeInTheDocument()
-  expect(screen.getByText('«milanesa rara»')).toBeInTheDocument()
+  expect(screen.getAllByText('«milanesa rara»')[0]).toBeInTheDocument()
   expect(screen.getByText(/^Entendí:/)).not.toHaveTextContent('milanesa rara')
 })
 
@@ -30,7 +30,7 @@ test('resuelve por catálogo y deshace restaurando el aviso', async () => {
   const resolved = mockResolution()
   vi.mocked(searchCatalog).mockResolvedValue([{ uid: 'milanesa', alcance: 'CATALOGO', alimento: 'Milanesa', sinonimos: [], tipo: 'NORMAL', groupUid: null, textoRegla: '1 porción', ajustadoPorUid: null }])
   await openResolution()
-  expect(screen.getByRole('heading', { name: '¿Qué es «milanesa rara»?' })).toHaveFocus()
+  expect(screen.getByRole('heading', { name: '¿Qué es «milanesa rara»?' })).toBeVisible()
   fireEvent.click(await screen.findByRole('button', { name: 'Es esto' }))
   await waitFor(() => expect(recordsApi.resolveItem).toHaveBeenCalledWith('tok', expect.any(String), 501, { kind: 'SAME_AS', ruleUid: 'milanesa', remember: true }))
   expect(await screen.findByText(/Listo:.*Milanesa/)).toHaveTextContent('Lo voy a reconocer la próxima vez.')
@@ -72,7 +72,7 @@ test('muestra error y vuelve con foco mediante volver y Escape', async () => {
 })
 
 
-test.each([['Comida flexible', 'FLEXIBLE'], ['No cuenta para el plan', 'NOT_COUNTED']])('resuelve %s sin recordar', async (label, kind) => {
+test.each([['Comida flexible', 'FLEXIBLE'], ['No cuenta', 'NOT_COUNTED']])('resuelve %s sin recordar', async (label, kind) => {
   mockResolution()
   await openResolution()
   fireEvent.click(screen.getByRole('checkbox', { name: 'Reconocerlo siempre que lo escriba' }))

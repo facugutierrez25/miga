@@ -11,6 +11,7 @@ import { ItemActions } from './ItemActions'
 import { type GroupInfo, fmt } from './helpers'
 import { displayUnit } from '../../lib/displayUnit'
 import { useEffect, useRef, useState } from 'react'
+import { readableRule } from '../readableRule'
 
 export interface ItemRowProps {
   item: EntryItemDto
@@ -33,6 +34,9 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
   }, [editing])
   const [splitting, setSplitting] = useState(false)
   const [qty, setQty] = useState(String(item.quantity ?? ''))
+  const [portions, setPortions] = useState(item.portions ?? 1)
+  const [portionsTouched, setPortionsTouched] = useState(false)
+  const [saveAsRule, setSaveAsRule] = useState(false)
   const [splitRows, setSplitRows] = useState<{ foodGroupId: string; portions: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,6 +64,11 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       { foodGroupId: '', portions: '1' },
     ])
     setSplitting(true)
+  }
+
+  function saveCorrection() {
+    submit({ quantity: qty === '' ? item.quantity : Number(qty), unit: item.unit,
+      ...(portionsTouched && item.foodGroupId !== null ? { portions } : {}), saveAsRule })
   }
 
   function saveSplit(saveAsRule: boolean) {
@@ -95,7 +104,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
             <span className="nota-item__unit">{displayUnit(item.unit, Number(qty))}</span>
             <button type="button" className="nota-item__save" aria-label="Guardar cantidad"
               disabled={saving || !(Number(qty) > 0)}
-              onClick={() => submit({ quantity: Number(qty), unit: item.unit })}>✓</button>
+              onClick={saveCorrection}>✓</button>
             <button type="button" className="nota-item__cancel" aria-label="Cancelar"
               onClick={() => { setEditing(false); setSplitting(false); setQty(String(item.quantity ?? '')) }}>✕</button>
           </>
@@ -104,12 +113,12 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
             {item.quantity !== null && (
               <span className="nota-item__qty">{item.quantity} {displayUnit(item.unit, item.quantity)}</span>
             )}
-            {label && <span className="nota-item__grupo">{label}</span>}
+            {label && item.portions === null && <span className="nota-item__grupo">{label}</span>}
             {item.portions !== null && (
-              <span className="nota-item__porciones">{fmt(item.portions)} {displayUnit('p.', item.portions)}</span>
+              <span className="nota-item__porciones">{fmt(item.portions)} {item.portions === 1 ? 'porción' : 'porciones'}{label && ` de ${label}`}</span>
             )}
             {editable && (
-              <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => setEditing(true)} aria-label={`Corregir ${item.food}`}>
+              <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => { setPortions(item.portions ?? 1); setPortionsTouched(false); setSaveAsRule(false); setEditing(true) }} aria-label={`Corregir ${item.food}`}>
                 Corregir
               </button>
             )}
@@ -118,7 +127,17 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
         <ItemActions item={item} disabled={!!removing} onRemove={onRemove}
           resultLabel={item.portions !== null ? `${fmt(item.portions)} ${item.portions === 1 ? 'porción' : 'porciones'}${label ? ` de ${label}` : ''}` : null} />
       </div>
+      <p className="nota-item__regla">{item.appliedRule ? readableRule(item.appliedRule) : 'Sin regla: queda anotado para tu nutri.'}</p>
       {item.uncertain && <p className="nota-item__regla">cantidad estimada</p>}
+      {editing && !splitting && item.foodGroupId !== null && (
+        <div className="understood-correction">
+          <button type="button" aria-label={`Menos porciones de ${item.food}`} disabled={saving || portions <= 0.5} onClick={() => { setPortions(value => value - 0.5); setPortionsTouched(true) }}>−</button>
+          <output aria-label={`Porciones de ${item.food}`}>{fmt(portions)}</output>
+          <button type="button" aria-label={`Más porciones de ${item.food}`} disabled={saving} onClick={() => { setPortions(value => value + 0.5); setPortionsTouched(true) }}>+</button>
+          <button type="button" disabled={saving || (qty !== '' && !(Number(qty) > 0))} onClick={saveCorrection}>Listo</button>
+        </div>
+      )}
+      {editing && <label className="resolve-remember"><input type="checkbox" checked={saveAsRule} disabled={saving} onChange={event => setSaveAsRule(event.target.checked)} />Usar siempre</label>}
       {editing && !splitting && (
         <button type="button" className="nota-item__repartir" onClick={openSplit}>
           Repartir en varios grupos
@@ -134,11 +153,8 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
           }} />
           <div className="nota-reparto__acciones">
             <button type="button" className="nota-reparto__principal" disabled={saving || !validSplit}
-              onClick={() => saveSplit(false)}>
+              onClick={() => saveSplit(saveAsRule)}>
               Guardar
-            </button>
-            <button type="button" disabled={saving || !validSplit} onClick={() => saveSplit(true)}>
-              Guardar y usar siempre
             </button>
             <button type="button" onClick={() => setSplitting(false)}>Cancelar</button>
           </div>

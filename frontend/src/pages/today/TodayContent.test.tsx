@@ -9,11 +9,7 @@ import {
   renderToday,
   openNote,
   twoMealPlan,
-  removableItems,
-  setupRemoval,
-  openDetails,
 } from './test-utils'
-import { ItemOrigin } from '../../api/records'
 import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { test, expect } from 'vitest'
 test('muestra cargando mientras carga el plan', () => {
@@ -193,26 +189,6 @@ test('past dates load their plan and show its meal note', async () => {
   fireEvent.click(await screen.findByRole('button', { name: /Desayuno/ }))
   expect(await screen.findByText('Historical note')).toBeInTheDocument()
   expect(mockGetMyPlan.mock.calls.some(([, , date]) => date !== today)).toBe(true)
-})
-
-test('cómo lo calculé muestra cada cosa escrita con su tipo de regla y aclara que corregir no cambia el plan', async () => {
-  setupRemoval([
-    { ...removableItems[0], appliedRule: '1.000 u de leche = 1 porcion' },
-    { id: 104, food: 'pizza', quantity: 1, unit: 'u', foodGroupId: null, portions: 0, origin: ItemOrigin.RULE, uncertain: false, occurrenceId: 'pizza', appliedRule: 'pizza = flexible (sin porción fija)' },
-    { id: 105, food: 'algo raro', quantity: null, unit: null, foodGroupId: null, portions: null, origin: ItemOrigin.UNKNOWN, uncertain: false, occurrenceId: 'raro' },
-  ])
-  renderToday()
-  await openDetails()
-  fireEvent.click(await screen.findByRole('button', { name: 'Cómo lo calculé' }))
-  const dialog = screen.getByRole('dialog', { name: 'Cómo lo calculé' })
-  expect(dialog).toHaveTextContent('no cambia el plan de tu nutri')
-  expect(within(dialog).getByText('Por porción · 1 porción de Proteínas')).toBeInTheDocument()
-  expect(within(dialog).getByText('1 u de leche = 1 porción')).toBeInTheDocument()
-  expect(within(dialog).getByText('Comida flexible')).toBeInTheDocument()
-  expect(within(dialog).getByText('Sin regla')).toBeInTheDocument()
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
-  expect(screen.queryByRole('dialog', { name: 'Cómo lo calculé' })).not.toBeInTheDocument()
-  expect(screen.getByRole('dialog', { name: 'Así lo entendí' })).toBeInTheDocument()
 })
 
 test('meal renders stay isolated while typing and toggling the daily summary', async () => {

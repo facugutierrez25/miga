@@ -15,6 +15,39 @@ import * as recordsApi from '../../api/records'
 import { ItemOrigin } from '../../api/records'
 import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { vi, test, expect } from 'vitest'
+
+test.each(['Listo', 'Guardar cantidad'])('envía solo las porciones editadas al guardar desde %s', async action => {
+  setupRemoval([removableItems[0]])
+  const mockPatchItem = vi.mocked(recordsApi.patchItem)
+  mockPatchItem.mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [101], items: [removableItems[0]] })
+  renderToday()
+  await openDetails()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(mockPatchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 101, {
+    quantity: 3, unit: 'u', saveAsRule: false,
+  }))
+  expect(mockPatchItem.mock.calls[0][3]).not.toHaveProperty('portions')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Más porciones de leche' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
+    quantity: 4, unit: 'u', portions: 1.5, saveAsRule: true,
+  }))
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
+    quantity: 5, unit: 'u', saveAsRule: false,
+  }))
+})
+
 test('muestra un compuesto en una fila con su regla bajo el título Así lo entendí', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
   mockSaveNote.mockResolvedValue({
@@ -29,9 +62,7 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
   expect(await screen.findByRole('button', { name: /^Así lo entendí/ })).toHaveAttribute('aria-haspopup', 'dialog')
   await openDetails()
   expect(screen.getByRole('dialog', { name: 'Así lo entendí' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de barrita' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
-  expect(screen.getAllByText(barRule)).toHaveLength(1)
+  expect(screen.getAllByText(barRule).filter(node => !node.closest('[hidden]'))).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: 'Corregir grupos de barrita' }))
   expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
 })
@@ -57,12 +88,34 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
   fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar y usar siempre' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
   await waitFor(() => expect(mockPatchItem).toHaveBeenCalledWith('tok', expect.any(String), 21, {
     quantity: 1,
     grupos: [{ foodGroupId: 1, porciones: 1 }, { foodGroupId: 3, porciones: 1 }],
     saveAsRule: true,
+  }))
+})
+
+test.each(['3', '0', '-1', ''])('el reparto conserva la cantidad original aunque se edite a «%s»', async quantity => {
+  setupRemoval([removableItems[0]])
+  mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
+  const mockPatchItem = vi.mocked(recordsApi.patchItem)
+  mockPatchItem.mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [101], items: [] })
+  renderToday()
+  await openDetails()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: quantity } })
+  fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
+  fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
+  const save = screen.getByRole('button', { name: 'Guardar' })
+  expect(save).toBeEnabled()
+  fireEvent.click(save)
+  await waitFor(() => expect(mockPatchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 101, {
+    quantity: 1,
+    grupos: [{ foodGroupId: 1, porciones: 1 }, { foodGroupId: 3, porciones: 1 }],
+    saveAsRule: false,
   }))
 })
 
@@ -82,8 +135,6 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
   await openDetails()
-  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de mate' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
   expect(screen.getByText('mate = libre (sin porción asignada)')).toBeInTheDocument()
   expect(screen.queryByText('Sin grupo en tu plan')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Corregir mate' })).not.toBeInTheDocument()
@@ -108,9 +159,7 @@ test('no duplica las menciones que ya generaron ítems', async () => {
   await screen.findByRole('button', { name: /^Así lo entendí/ })
   expect(screen.queryByText('barrita (compuesto)')).not.toBeInTheDocument()
   await openDetails()
-  fireEvent.click(screen.getByRole('button', { name: 'Más opciones de barrita' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Cómo lo calculé' }))
-  expect(screen.getAllByText(barRule)).toHaveLength(1)
+  expect(screen.getAllByText(barRule).filter(node => !node.closest('[hidden]'))).toHaveLength(1)
 })
 
 test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', async () => {
@@ -144,7 +193,7 @@ test('un compuesto resume cuatro grupos y despliega las correcciones por grupo',
   const section = screen.getByRole('region', { name: 'Así lo entendí' })
   expect(within(section).getAllByRole('listitem')).toHaveLength(1)
   expect(within(section).getAllByText('Chivito', { exact: false }).length).toBeGreaterThan(0)
-  expect(screen.getByText('1 Proteínas · 1 Cereales · 1 Verduras · 1 Grasas')).toBeInTheDocument()
+  expect(screen.getByText('1 porción de Proteínas · 1 porción de Cereales · 1 porción de Verduras · 1 porción de Grasas')).toBeInTheDocument()
   expect(screen.queryByRole('list', { name: 'Grupos de Chivito' })).not.toBeInTheDocument()
   fireEvent.click(button)
   expect(button).toHaveAttribute('aria-expanded', 'true')
@@ -157,7 +206,7 @@ test('un ítem de un grupo sin nombre nunca muestra el identificador', async () 
   setupRemoval([{ ...removableItems[0], portions: 1, foodGroupId: 987654 }])
   renderToday()
   await openDetails()
-  expect(screen.getByText('Grupo del plan')).toBeInTheDocument()
+  expect(screen.getByText(/de Grupo del plan/)).toBeInTheDocument()
   expect(document.body).not.toHaveTextContent('987654')
 })
 

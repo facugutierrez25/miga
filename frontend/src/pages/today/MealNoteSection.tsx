@@ -14,8 +14,7 @@ import {
   type PatchItemResultDto,
 } from '../../api/records'
 import { NoteEditor } from './NoteEditor'
-import { UnderstoodItems } from './UnderstoodItems'
-import { UnderstoodDialog } from './UnderstoodDialog'
+import { UnderstoodSheet, UnderstoodItems } from './UnderstoodSheet'
 import { fmt, type GroupInfo } from './helpers'
 import { mealStatus } from '../../lib/mealStatus'
 import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react'
@@ -49,7 +48,7 @@ export const MealNoteSection = memo(function MealNoteSection({
   onNoteSaved, onItemPatched, onNoteDeleted, onAnswerSaved, onReload,
 }: MealNoteSectionProps) {
   const [detailOpen, setDetailOpen] = useState(false)
-  const [rulesOpen, setRulesOpen] = useState(false)
+  const [resolveTarget, setResolveTarget] = useState<EntryItemDto | null>(null)
   const [expandedMentions, setExpandedMentions] = useState<Set<string>>(() => new Set())
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
@@ -298,24 +297,27 @@ export const MealNoteSection = memo(function MealNoteSection({
 
       {!detailOpen && feedback}
 
+      {items.filter(item => item.origin === ItemOrigin.UNKNOWN).map(item => <div className="pregunta" key={item.id}>
+        <span>No reconocí <strong>«{item.originalText || item.food}»</strong></span>
+        <button type="button" className="nota-link" onClick={() => { setResolveTarget(item); setDetailOpen(true) }}>Decime qué es</button>
+      </div>)}
       <MealQuestions questions={questions} answerSaving={answerSaving} handleAnswer={handleAnswer} />
 
       {(hasNote || items.length > 0) && (
         <>
           <button type="button" className="nota-revisar" aria-haspopup="dialog"
             aria-expanded={detailOpen} aria-controls={`entendido-dialog-${meal.id}`}
-            onClick={event => { event.currentTarget.focus(); setDetailOpen(true) }}>
+            onClick={event => { event.currentTarget.focus(); setResolveTarget(null); setDetailOpen(true) }}>
             Así lo entendí{unknownCount > 0 && ` · ${unknownCount} sin reconocer`}{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
           </button>
-          <UnderstoodDialog open={detailOpen} onClose={() => setDetailOpen(false)}
-            headingRef={understoodRef} mealId={meal.id} items={items} token={token} date={date} groups={groupsMap}
+          <UnderstoodSheet open={detailOpen} onClose={() => { setDetailOpen(false); setResolveTarget(null) }}
+            selected={resolveTarget} onSelect={setResolveTarget} headingRef={understoodRef} mealId={meal.id} items={items} token={token} date={date} groups={groupsMap}
             onPatched={result => onItemPatched(meal.id!, result)}>
             <UnderstoodItems meal={meal} mealDay={mealDay} items={items} date={date} token={token}
               groupsMap={groupsMap} detailOpen={detailOpen} feedback={feedback}
-              rulesOpen={rulesOpen} setRulesOpen={setRulesOpen}
               expandedMentions={expandedMentions} setExpandedMentions={setExpandedMentions} understoodSummary={understoodSummary}
               saving={saving} conflict={conflict} handleRemove={handleRemove} onItemPatched={onItemPatched} />
-          </UnderstoodDialog>
+          </UnderstoodSheet>
         </>
       )}
     </div>
