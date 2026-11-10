@@ -152,7 +152,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
             add: '+ Agregar grupo', placeholder: 'Elegí un grupo',
           }} />
           <div className="nota-reparto__acciones">
-            <button type="button" className="nota-reparto__principal" disabled={saving || !validSplit}
+            <button type="button" className="nota-reparto__principal" disabled={saving || !validSplit || (qty !== '' && !(Number(qty) > 0))}
               onClick={() => saveSplit(saveAsRule)}>
               Guardar
             </button>
