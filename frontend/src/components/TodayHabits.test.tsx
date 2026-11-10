@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, test, expect, afterEach } from 'vitest'
-import TodayHabits from '../components/TodayHabits'
+import TodayHabits, { HabitCrumbs } from '../components/TodayHabits'
 import * as api from '../api/week'
 import { useWeek } from '../hooks/useWeek'
 
@@ -44,7 +44,7 @@ test.each([['CANTIDAD', 1.5, false], ['CANTIDAD', 2, true], ['CONTADOR', 3, true
     renderProgress({ habitType }, [value])
     const row = screen.getByRole('group', { name: new RegExp(`Agua: ${String(value).replace('.', ',')} de 2 lt, lunes`) })
     expect(row.classList.contains('hoy-habito--ok')).toBe(done)
-    expect(row.querySelectorAll('svg')).toHaveLength(done ? 1 : 0)
+    expect(row.querySelectorAll('.meal-crumb--full')).toHaveLength(Math.min(Math.round(value / 0.5), 4))
   }
 )
 
@@ -55,15 +55,15 @@ test.each([[0, false], [0.5, true]])('sin meta conserva la marca con valor %s', 
   expect(row.classList.contains('hoy-habito--ok')).toBe(done)
 })
 
-test('flexibles muestra el progreso sin permitir edición', () => {
+test('flexibles no aparece en Hoy', () => {
   renderProgress({ habitType: 'CONTADOR', countsFlexibleMeals: true }, [1.5])
-  expect(screen.getByRole('button', { name: /Agua: 1,5 de 2 lt, lunes/ })).toBeDisabled()
+  expect(screen.queryByText('Agua')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /Sumar/ })).not.toBeInTheDocument()
 })
 
 test('sí/no conserva su comportamiento aunque tenga una meta configurada', () => {
   renderProgress({ habitType: 'SI_NO', dailyGoal: 5, period: 'SEMANA', unit: null }, [1])
-  expect(screen.getByRole('button', { name: /Agua: completado, 1, lunes/ })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: /Agua: Sin hacer/ })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.queryByRole('region', { name: 'Metas semanales' })).not.toBeInTheDocument()
 })
 
@@ -121,4 +121,101 @@ test.each([true, false])('actualiza el hábito antes de guardar y reconcilia o r
   expect(screen.getByText(success ? '800 ml' : '500 ml')).toBeInTheDocument()
   if (!success) expect(screen.getByRole('alert')).toHaveTextContent('No se pudo registrar')
   expect(button).toBeEnabled()
+})
+
+
+function renderCrumbs(overrides: Partial<api.HabitDto> = {}, initialValue = 0) {
+  const change = vi.fn()
+  const habit: api.HabitDto = { id: 3, name: 'Agua', habitType: 'CANTIDAD', dailyGoal: 2,
+    unit: 'Lt', step: 0.5, period: 'DIA', displayOrder: 1, ...overrides }
+  function Preview() {
+    const [value, setValue] = useState(initialValue)
+    return <HabitCrumbs habit={habit} value={value} onChange={next => { setValue(next); change(next) }} />
+  }
+  render(<Preview />)
+  return change
+}
+
+test('agua muestra cuatro migas y +; la tercera deja 1,5 y luego 1', () => {
+  const change = renderCrumbs()
+  const buttons = screen.getAllByRole('button')
+  expect(buttons).toHaveLength(5)
+  expect(buttons[2]).toHaveAccessibleName('Agua: 1,5 Lt')
+  fireEvent.click(buttons[2])
+  expect(change).toHaveBeenLastCalledWith(1.5)
+  expect(buttons[2]).toHaveAccessibleName('Agua: 1 Lt')
+  fireEvent.click(buttons[2])
+  expect(change).toHaveBeenLastCalledWith(1)
+})
+
+test('el exceso suma pasos y la cuarta miga vuelve a la meta', () => {
+  const change = renderCrumbs({}, 2)
+  const buttons = screen.getAllByRole('button')
+  fireEvent.click(buttons[4])
+  expect(change).toHaveBeenLastCalledWith(2.5)
+  expect(screen.getByText('+1')).toBeInTheDocument()
+  fireEvent.click(buttons[3])
+  expect(change).toHaveBeenLastCalledWith(2)
+  expect(screen.queryByText('+1')).not.toBeInTheDocument()
+})
+
+test('sí o no usa una sola miga y dice Hecho', () => {
+  const change = renderCrumbs({ habitType: 'SI_NO' })
+  expect(screen.getAllByRole('button')).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button'))
+  expect(screen.getByText('Hecho')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button'))
+  expect(change).toHaveBeenLastCalledWith(0)
+})
+
+test.each([3, 3.5, null])('meta %s usa migas hasta seis pasos y luego controles numéricos', goal => {
+  renderCrumbs({ dailyGoal: goal })
+  expect(screen.getAllByRole('button')).toHaveLength(goal === 3 ? 7 : 2)
+  if (goal !== 3) expect(screen.getByRole('button', { name: /Restar/ })).toBeDisabled()
+})
+
+test('el + desde cero supera la meta en un paso', () => {
+  const change = renderCrumbs()
+  fireEvent.click(screen.getByRole('button', { name: /Sumar/ }))
+  expect(change).toHaveBeenLastCalledWith(2.5)
+})
+
+test('la meta semanal de tres usa controles numéricos y suma uno desde cero', () => {
+  const change = renderCrumbs({ period: 'SEMANA', dailyGoal: 3, step: 1 })
+  expect(screen.getAllByRole('button')).toHaveLength(2)
+  expect(screen.queryByRole('button', { pressed: false })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Restar 1/ })).toBeDisabled()
+  expect(screen.getByText('0 Lt')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Sumar 1/ }))
+  expect(change).toHaveBeenLastCalledWith(1)
+  expect(screen.getByText('1 Lt')).toBeInTheDocument()
+})
+
+test('una meta de 2,2 con paso 0,5 usa controles numéricos', () => {
+  renderCrumbs({ dailyGoal: 2.2, step: 0.5 })
+  expect(screen.getAllByRole('button')).toHaveLength(2)
+  expect(screen.queryByRole('button', { pressed: false })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Restar 0,5/ })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /Sumar 0,5/ })).toBeEnabled()
+})
+
+test('una cantidad entera de pasos tolera errores de punto flotante', () => {
+  renderCrumbs({ dailyGoal: 0.3, step: 0.1 })
+  expect(screen.getAllByRole('button')).toHaveLength(4)
+  expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(3)
+})
+
+test('el contador redondea decimales y no baja de cero', () => {
+  const change = renderCrumbs({ dailyGoal: null, step: 0.1 }, 0.2)
+  fireEvent.click(screen.getByRole('button', { name: /Sumar/ }))
+  expect(change).toHaveBeenLastCalledWith(0.3)
+  for (let i = 0; i < 4; i++) fireEvent.click(screen.getByRole('button', { name: /Restar/ }))
+  expect(change).toHaveBeenLastCalledWith(0)
+})
+
+
+test('la vista previa sin onChange deshabilita los controles', () => {
+  render(<HabitCrumbs habit={{ id: 3, name: 'Agua', habitType: 'CANTIDAD', dailyGoal: 2,
+    unit: 'Lt', step: 0.5, period: 'DIA', displayOrder: 1 }} />)
+  for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled()
 })
