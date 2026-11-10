@@ -37,7 +37,9 @@ export function HabitCrumbs({ habit, value = 0, disabled = false, date, onChange
   habit: HabitDto; value?: number; disabled?: boolean; date?: string; onChange?: (value: number) => void
 }) {
   const yesNo = habit.habitType === 'SI_NO'
-  const slots = yesNo ? 1 : habit.dailyGoal != null && habit.step > 0 ? Math.round(habit.dailyGoal / habit.step) : 0
+  const ratio = habit.period === 'DIA' && habit.dailyGoal != null && habit.step > 0
+    ? habit.dailyGoal / habit.step : 0
+  const slots = yesNo ? 1 : Math.abs(ratio - Math.round(ratio)) < 1e-9 ? Math.round(ratio) : 0
   const filled = yesNo ? Number(value > 0) : Math.round(value / habit.step)
   const done = habitDone(habit, value)
   const progress = habitProgress(habit, value)

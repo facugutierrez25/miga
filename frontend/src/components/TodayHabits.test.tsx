@@ -180,6 +180,31 @@ test('el + desde cero supera la meta en un paso', () => {
   expect(change).toHaveBeenLastCalledWith(2.5)
 })
 
+test('la meta semanal de tres usa controles numéricos y suma uno desde cero', () => {
+  const change = renderCrumbs({ period: 'SEMANA', dailyGoal: 3, step: 1 })
+  expect(screen.getAllByRole('button')).toHaveLength(2)
+  expect(screen.queryByRole('button', { pressed: false })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Restar 1/ })).toBeDisabled()
+  expect(screen.getByText('0 Lt')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Sumar 1/ }))
+  expect(change).toHaveBeenLastCalledWith(1)
+  expect(screen.getByText('1 Lt')).toBeInTheDocument()
+})
+
+test('una meta de 2,2 con paso 0,5 usa controles numéricos', () => {
+  renderCrumbs({ dailyGoal: 2.2, step: 0.5 })
+  expect(screen.getAllByRole('button')).toHaveLength(2)
+  expect(screen.queryByRole('button', { pressed: false })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Restar 0,5/ })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /Sumar 0,5/ })).toBeEnabled()
+})
+
+test('una cantidad entera de pasos tolera errores de punto flotante', () => {
+  renderCrumbs({ dailyGoal: 0.3, step: 0.1 })
+  expect(screen.getAllByRole('button')).toHaveLength(4)
+  expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(3)
+})
+
 test('el contador redondea decimales y no baja de cero', () => {
   const change = renderCrumbs({ dailyGoal: null, step: 0.1 }, 0.2)
   fireEvent.click(screen.getByRole('button', { name: /Sumar/ }))
