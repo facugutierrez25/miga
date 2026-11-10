@@ -108,7 +108,7 @@ function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
 
 function daySummary(day: WeekDayDto, future: boolean): string {
   if (future) return 'todavía no'
-  const meals = (day.meals ?? []).filter(meal => meal.planned !== false || Boolean(meal.noteText))
+  const meals = (day.meals ?? []).filter(meal => meal.planned !== false)
   if (meals.length === 0) return 'sin comidas en el plan'
   const inPlan = meals.filter(m => m.status === 'EN_PLAN').length
   const loggedMeals = meals.filter(m => m.status !== 'SIN_ANOTAR').length
