@@ -153,7 +153,7 @@ test('al recargar muestra menciones persistidas sin corrección ni porciones', a
   renderToday()
   await openNote()
   expect(screen.getByText('mate')).toBeInTheDocument()
-  expect(screen.getByText('«algo raro»')).toBeInTheDocument()
+  expect(screen.getAllByText('«algo raro»')[0]).toBeVisible()
   expect(screen.queryByRole('button', { name: /Corregir/ })).not.toBeInTheDocument()
 })
 

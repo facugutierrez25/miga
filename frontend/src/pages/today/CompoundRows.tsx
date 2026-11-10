@@ -3,6 +3,7 @@ import { displayUnit } from '../../lib/displayUnit'
 import { type GroupInfo, groupByMention, fmt } from './helpers'
 import { ItemRow } from './ItemRow'
 import { ItemActions } from './ItemActions'
+import { readableRule } from '../readableRule'
 
 interface Props {
   meal: { id?: number }
@@ -53,8 +54,10 @@ export function CompoundRows({ meal, items, date, token, groupsMap, saving, conf
                   {first.quantity !== null && <> · {fmt(first.quantity)} {displayUnit(first.unit, first.quantity)}</>}
                 </p>
                 <p className="nota-compuesto__grupos">{mention.map(item =>
-                  `${item.portions !== null ? fmt(item.portions) + ' ' : ''}${(item.foodGroupId !== null ? groupsMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
+                  `${item.portions !== null ? `${fmt(item.portions)} ${item.portions === 1 ? 'porción' : 'porciones'} de ` : ''}${(item.foodGroupId !== null ? groupsMap[item.foodGroupId]?.name : null) || 'Grupo del plan'}`
                 ).join(' · ')}</p>
+                {first.appliedRule && <p className="nota-item__regla">{readableRule(first.appliedRule)}</p>}
+                {mention.some(item => item.uncertain) && <span className="understood-tag">cantidad estimada</span>}
               </div>
               <button type="button" className="nota-item__edit" aria-label={`Corregir grupos de ${first.food}`}
                 aria-expanded={expanded} aria-controls={detailId} onClick={() => setExpandedMentions(previous => {
