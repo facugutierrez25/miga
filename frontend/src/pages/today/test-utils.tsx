@@ -16,7 +16,7 @@ vi.mock('react/jsx-dev-runtime', async importOriginal => {
   const wrappers = new Map<unknown, React.ElementType>()
   function instrument(type: React.ElementType): React.ElementType {
     const component = typeof type === 'function' ? type : (type as { type?: unknown }).type
-    if (typeof component !== 'function' || !['MealNoteSection', 'MealDetail', 'MealRow', 'CurrentMeal'].includes(component.name)) return type
+    if (typeof component !== 'function' || !['MealNoteSection'].includes(component.name)) return type
     if (!wrappers.has(type)) {
       const counted = (props: { meal: { id: number } }) => {
         const key = `${component.name}-${props.meal.id}`

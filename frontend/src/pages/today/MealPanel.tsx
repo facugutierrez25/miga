@@ -1,4 +1,4 @@
-import type { MealProps } from './MealDetail'
+import type { MealProps } from './MealProps'
 import { MealNoteSection } from './MealNoteSection'
 import StatusChip from '../../components/StatusChip'
 import { mealStatus } from '../../lib/mealStatus'

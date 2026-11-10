@@ -30,13 +30,6 @@
   color: var(--accent);
 }
 
-.hoy-plan-fecha {
-  font-size: var(--fs-sm);
-  line-height: 20px;
-  color: var(--text-secondary);
-  margin-top: calc(-1 * var(--s3));
-}
-
 /* ── Navegación por fecha ── */
 
 .hoy-fecha-nav {
@@ -95,12 +88,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--s4);
-}
-
-.hoy-loading {
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 48px 0;
 }
 
 .hoy-intake-error {
@@ -166,208 +153,6 @@
 .btn-cargar-plan-manual {
   color: var(--primary);
 }
-
-/* ── Comida de ahora ── */
-
-.hoy-ahora {
-  background: var(--surface);
-  border-radius: 20px;
-  padding: var(--s4);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  box-shadow: var(--shadow-card);
-}
-
-.hoy-ahora__head {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-}
-
-.hoy-ahora__nombre {
-  font-size: var(--fs-h3);
-  line-height: 24px;
-  font-weight: 600;
-}
-
-/* El amarillo del logo marca la comida de ahora, siempre con la palabra */
-.hoy-ahora__etiqueta {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: var(--radius-chip);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: var(--fs-cap);
-  font-weight: 700;
-}
-
-.hoy-ahora__hora {
-  margin-left: auto;
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Tu día por grupo ── */
-
-.hoy-dia {
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  border-radius: var(--radius-card);
-  padding: 0 var(--s3);
-}
-
-.hoy-dia[open] {
-  padding-bottom: var(--s3);
-}
-
-.hoy-dia__summary {
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  min-height: 48px;
-  cursor: pointer;
-}
-
-.hoy-dia__summary::-webkit-details-marker {
-  display: none;
-}
-
-.hoy-dia__titulo {
-  flex: 1;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.hoy-dia__total {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.hoy-dia__chevron,
-.hoy-fila__chevron {
-  width: 18px;
-  height: 18px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  transition: transform 0.15s;
-}
-
-.hoy-dia[open] .hoy-dia__chevron {
-  transform: rotate(90deg);
-}
-
-.hoy-dia__explicacion {
-  font-size: var(--fs-sm);
-  line-height: 20px;
-  color: var(--ink);
-  margin-bottom: var(--s3);
-}
-
-/* ── Resto del día ── */
-
-.hoy-resto {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-}
-
-.hoy-resto__titulo {
-  font-size: var(--fs-h3);
-  line-height: 24px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.hoy-filas {
-  list-style: none;
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  border-radius: var(--radius-card);
-}
-
-.hoy-fila + .hoy-fila {
-  border-top: 1px solid var(--line);
-}
-
-.hoy-fila__titulo {
-  font-size: inherit;
-}
-
-.hoy-fila__btn {
-  width: 100%;
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: var(--s2) var(--s2) var(--s2) var(--s3);
-  background: none;
-  border: none;
-  border-radius: var(--radius-card);
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.hoy-fila__nombre {
-  font-weight: 600;
-}
-
-.hoy-fila__hora {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-  margin-right: auto;
-}
-
-.hoy-fila__btn[aria-expanded="true"] .hoy-fila__chevron {
-  transform: rotate(90deg);
-}
-
-.hoy-fila__detalle {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-  padding: 0 var(--s3) var(--s3);
-}
-
-/* Estado de una comida en texto, con un ícono que no depende del color */
-.hoy-estado {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  line-height: 20px;
-  font-weight: 500;
-  text-align: right;
-}
-
-.hoy-fila__nombre + .hoy-estado {
-  margin-left: auto;
-}
-
-.hoy-estado svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-}
-
-.hoy-estado--ok { color: var(--ok); }
-.hoy-estado--warn,
-.hoy-estado--ask {
-  color: var(--warn);
-  background: var(--warn-soft);
-  border-radius: var(--radius-sm);
-  padding: var(--s1);
-}
-.hoy-estado--noted,
-.hoy-estado--none { color: var(--text-secondary); }
 
 /* ── Nota de una comida ── */
 
@@ -495,23 +280,6 @@
   cursor: default;
 }
 
-.nota-btn-borrar {
-  min-height: 44px;
-  padding: 0 var(--s3);
-  margin-left: auto;
-  border: none;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--error);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.nota-btn-borrar:hover {
-  background: var(--error-bg);
-}
-
 .nota-confirmar {
   display: flex;
   flex-direction: column;
@@ -549,7 +317,6 @@
   background: var(--surface);
   color: var(--ink);
 }
-
 
 .nota-guardado:empty {
   display: none;
@@ -610,14 +377,6 @@
   background: var(--primary);
   border-color: var(--primary);
   color: var(--on-primary);
-}
-
-/* ── Así lo entendí ── */
-
-.nota-entendido__titulo {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  margin: var(--s1) 0;
 }
 
 .nota-items {
@@ -729,8 +488,6 @@
 .nota-compuesto {
   list-style: none;
 }
-
-
 
 .nota-compuesto__titulo {
   overflow-wrap: anywhere;
@@ -941,63 +698,6 @@
   border: 1px solid var(--line);
   color: var(--ink);
 }
-
-/* "Cómo lo calculé": hoja inferior en celular, diálogo centrado en escritorio. */
-.regla-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: var(--scrim);
-  animation: hoy-scrim-in var(--dur-slow) var(--ease-out);
-}
-.regla-dialog {
-  width: 100%;
-  max-width: 420px;
-  max-height: 86dvh;
-  overflow-y: auto;
-  padding: var(--s5) var(--s5) calc(var(--s6) + env(safe-area-inset-bottom));
-  border-radius: 24px 24px 0 0;
-  background: var(--surface);
-  box-shadow: var(--shadow-float);
-  color: var(--ink);
-  animation: hoy-sheet-in var(--dur-slow) var(--ease-out);
-}
-.regla-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--s3);
-}
-.regla-dialog__title { margin: 0; font-size: var(--fs-h3); }
-.regla-dialog__close {
-  min-width: 44px;
-  min-height: 44px;
-  border: none;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--fs-body);
-  cursor: pointer;
-}
-.regla-dialog__item { margin: 0; font-size: var(--fs-body); }
-.regla-dialog__resultado { margin: var(--s1) 0 0; font-size: var(--fs-body); font-weight: 600; }
-.regla-dialog__label {
-  margin: var(--s4) 0 var(--s1);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-.regla-dialog__regla {
-  margin: 0;
-  padding: var(--s3);
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
-  font-size: var(--fs-sm);
-}
-.regla-dialog__ayuda { margin: var(--s4) 0 var(--s2); font-size: var(--fs-sm); color: var(--text-secondary); }
 .regla-dialog__link {
   display: inline-flex;
   align-items: center;
@@ -1009,10 +709,6 @@
   font-weight: 600;
   text-decoration: none;
 }
-@media (min-width: 640px) {
-  .regla-overlay { align-items: center; }
-  .regla-dialog { border-radius: 20px; padding-bottom: var(--s5); animation-name: hoy-dialog-in; }
-}
 
 /* El texto puede crecer sin achicar las acciones táctiles. */
 .nota-item__edit,
@@ -1020,14 +716,6 @@
 .nota-item__cancel,
 .nota-menu {
   flex-shrink: 0;
-}
-
-/* ── Cómo lo calculé (toda la comida) ── */
-.nota-entendido__acciones {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s2) var(--s4);
 }
 .nota-link {
   min-height: 44px;
@@ -1042,21 +730,11 @@
   text-underline-offset: 3px;
   cursor: pointer;
 }
-.regla-dialog__ayuda--arriba { margin-top: 0; text-wrap: pretty; }
-.regla-lista { list-style: none; margin: 0 0 var(--s4); }
-.regla-lista__item { padding: var(--s3) 0; border-top: 1px solid var(--line); }
-.regla-lista__alimento { margin: 0; overflow-wrap: anywhere; }
-.regla-lista__tipo { margin: 2px 0 0; font-size: var(--fs-sm); font-weight: 600; }
-.regla-lista__regla { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
 
 /* La hoja sube al abrirse (transitions.dev: panel reveal); al cerrar se va sin demora. */
 @keyframes hoy-scrim-in { from { opacity: 0; } }
 @keyframes hoy-sheet-in { from { transform: translateY(24px); opacity: 0; } }
 @keyframes hoy-dialog-in { from { transform: scale(0.96); opacity: 0; } }
-
-/* El detalle de interpretación se abre en una hoja, con espacio para corregir cada alimento. */
-.entendido-overlay[hidden] { display: none; }
-.entendido-dialog { max-width: 640px; overscroll-behavior: contain; }
 .entendido-dialog .nota-entendido { display: flex; flex-direction: column; gap: var(--s3); }
 .entendido-dialog .nota-items { gap: var(--s3); }
 .entendido-dialog .nota-entendido__resumen { margin: 0; }
@@ -1072,7 +750,6 @@
 .resolve-group { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .resolve-group label { flex: 1 1 110px; }
 .resolve-food .resolve-remember { display: flex; align-items: center; min-height: 44px; }
-.entendido-dialog .regla-dialog__title { min-width: 0; overflow-wrap: anywhere; }
 
 .resolve-food button:not(.resolve-primary):not(.nota-link), .resolve-notice button:not(.resolve-primary) {
   padding: var(--s2) var(--s3);
