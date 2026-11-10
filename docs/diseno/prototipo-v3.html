@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Miga · prototipo completo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: la app entera dentro de un teléfono navegable; al costado, las decisiones de diseño de la pantalla abierta. En celular la app ocupa la página. */
+:root {
+  --bg: #F2F1EA; --surface: #FBFAF5; --surface-2: #E8E6DA; --surface-3: #DEDBCB;
+  --ink: #040200; --muted: #5E5A2E; --line: #E2E0D3; --control: #857F62;
+  --accent: #F6C344; --on-accent: #3A2A00; --accent-soft: #FBEBB8; --on-accent-soft: #5C4300;
+  --ok: #2F6B45; --warn: #A9431B; --warn-soft: #F8E6DB; --miga-empty: #857F62;
+  --g-prot: #C8553D; --g-cer: #9A7420; --g-frut: #B04A72; --g-gras: #6F63B8; --g-verd: #2E8B6E;
+  --nav-glass: rgba(251, 250, 245, 0.88); --scrim: rgba(4, 2, 0, 0.32);
+  --shadow-card: 0 1px 2px rgba(40, 38, 20, 0.06), 0 6px 18px -6px rgba(40, 38, 20, 0.12);
+  --shadow-float: 0 1px 2px rgba(40, 38, 20, 0.08), 0 10px 30px -8px rgba(40, 38, 20, 0.24);
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Onest', system-ui, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121212; --surface: #1C1C1C; --surface-2: #262626; --surface-3: #303030;
+    --ink: #F3EFE6; --muted: #ADA89D; --line: #2C2C2C; --control: #8A867C;
+    --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
+    --ok: #7CC79A; --warn: #F4A57E; --warn-soft: #38271F; --miga-empty: #8A867C;
+    --g-prot: #E6707B; --g-cer: #E3B04F; --g-frut: #E07AA0; --g-gras: #9C91E0; --g-verd: #7CC277;
+    --nav-glass: rgba(28, 28, 28, 0.86); --scrim: rgba(0, 0, 0, 0.55);
+    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -8px rgba(0, 0, 0, 0.8);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121212; --surface: #1C1C1C; --surface-2: #262626; --surface-3: #303030;
+  --ink: #F3EFE6; --muted: #ADA89D; --line: #2C2C2C; --control: #8A867C;
+  --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
+  --ok: #7CC79A; --warn: #F4A57E; --warn-soft: #38271F; --miga-empty: #8A867C;
+  --g-prot: #E6707B; --g-cer: #E3B04F; --g-frut: #E07AA0; --g-gras: #9C91E0; --g-verd: #7CC277;
+  --nav-glass: rgba(28, 28, 28, 0.86); --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -8px rgba(0, 0, 0, 0.8);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  padding-block: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { background: none; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+ul, ol { list-style: none; }
+h1 { font-family: var(--font-display); font-size: 28px; line-height: 1.12; letter-spacing: -0.01em; text-wrap: balance; }
+h1 b { color: var(--accent); }
+h2 { font-size: 19px; line-height: 1.25; font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.sm { font-size: 14px; }
+
+/* Marco */
+.wrap { display: flex; flex-direction: column; gap: 12px; }
+.phone { position: relative; }
+.scr { display: flex; flex-direction: column; gap: 16px; padding: 12px 0 112px; }
+.scr > * { flex-shrink: 0; }
+.nav { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20;
+  display: flex; padding: 3px; border-radius: 999px; background: var(--nav-glass); backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--line); box-shadow: var(--shadow-float); }
+.nav button { width: 66px; height: 54px; border-radius: 999px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.nav button[aria-current] { color: var(--ink); background: var(--surface-2); font-weight: 600; }
+.nav svg { width: 22px; height: 22px; }
+.ovl { position: fixed; inset: 0; z-index: 30; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 480px; max-height: 88%; overflow-y: auto; background: var(--surface); border-radius: 24px 24px 0 0; box-shadow: var(--shadow-float);
+  padding: 20px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 14px; animation: sube 400ms var(--ease); }
+@keyframes sube { from { transform: translateY(24px); opacity: 0; } }
+.sheet__cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.x { width: 40px; height: 40px; border-radius: 12px; color: var(--muted); font-size: 18px; flex: none; }
+.notas { order: -1; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-card); margin-top: 12px; }
+.notas summary { list-style: none; cursor: pointer; padding: 12px 16px; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; border-radius: 16px; }
+.notas summary::-webkit-details-marker { display: none; }
+.notas summary::after { content: "Ver"; color: var(--muted); font-weight: 500; }
+.notas[open] summary::after { content: "Ocultar"; }
+.notas__c { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.notas ol { display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--muted); }
+.notas li strong { color: var(--ink); font-weight: 600; }
+.notas p { font-size: 12px; color: var(--muted); }
+@media (min-width: 760px) {
+  body { padding-block: 24px; }
+  .wrap { flex-direction: row; gap: 40px; justify-content: center; align-items: flex-start; }
+  .phone { flex: none; width: 392px; height: min(844px, calc(100dvh - 48px)); min-height: 560px; border: 1px solid var(--surface-3); border-radius: 36px; overflow: hidden; }
+  .scr { position: absolute; inset: 0; overflow-y: auto; padding: 22px 16px 112px; scrollbar-width: none; }
+  .scr::-webkit-scrollbar { display: none; }
+  .nav { position: absolute; bottom: 14px; }
+  .ovl { position: absolute; }
+  .notas { order: 0; flex: 0 1 400px; min-width: 0; margin-top: 8px; background: none; box-shadow: none; }
+  .notas summary { padding: 0 0 12px; font-family: var(--font-display); font-size: 22px; pointer-events: none; }
+  .notas summary::after, .notas[open] summary::after { content: none; }
+  .notas__c { padding: 0; }
+}
+
+/* Piezas comunes */
+.top { display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
+.brand { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.02em; position: relative; }
+.brand i { position: absolute; left: 1.02em; top: 0.2em; width: 0.2em; height: 0.2em; border-radius: 50%; background: var(--accent); }
+.card { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-card); }
+.btn { height: 48px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn--pri { background: var(--ink); color: var(--bg); }
+.btn--pri:disabled { opacity: 0.4; cursor: default; }
+.btn--sec { border: 1px solid var(--control); }
+.btn--mini { height: 40px; padding: 0 14px; font-size: 14px; }
+.link { font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; min-height: 40px; display: inline-flex; align-items: center; }
+.chip { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.chip--sigue { background: var(--accent); color: var(--on-accent); }
+.chip--warn { background: var(--warn-soft); color: var(--warn); }
+.chip--ok { color: var(--ok); box-shadow: inset 0 0 0 1px currentColor; }
+.chip--flex { background: var(--accent-soft); color: var(--on-accent-soft); }
+.chip--noted { background: var(--surface-2); color: var(--muted); }
+.miga { display: block; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--miga-empty); flex: none; }
+.miga--full { background: var(--ink); border-color: var(--ink); }
+.miga--half { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); border-color: var(--ink); }
+.miga--noted { background: var(--miga-empty); }
+.miga--flex { background: var(--accent); border-color: var(--accent); }
+.miga--futuro { border-style: dashed; }
+.miga--na { width: 10px; height: 2px; border: none; border-radius: 2px; background: var(--surface-3); }
+.miga--mas { display: grid; place-items: center; border-style: dashed; color: var(--muted); font-style: normal; font-size: 13px; font-weight: 700; line-height: 1; }
+.miga--mas-on { background: var(--ink); border: 1.5px solid var(--ink); color: var(--bg); font-size: 11px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
+.dots { display: flex; gap: 4px; flex-wrap: wrap; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; }
+.dots i.on { background: currentColor; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface-2); border-radius: 12px; padding: 3px; }
+.seg button { height: 40px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
+.lista > li, .lista > button { display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 56px; width: 100%; text-align: left; font-size: 15px; }
+.lista > * + * { border-top: 1px solid var(--line); }
+.lista .fin { margin-left: auto; color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 8px; flex: none; }
+.campo { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
+.campo input, textarea { width: 100%; font-size: 16px; font-weight: 400; background: transparent; border: 1px solid var(--control); border-radius: 12px; padding: 10px 12px; }
+textarea { min-height: 72px; resize: vertical; display: block; }
+textarea::placeholder, input::placeholder { color: var(--muted); }
+.paso { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--control); font-size: 18px; flex: none; }
+.paso:disabled { opacity: 0.35; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 92px; z-index: 25; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 14px; font-size: 14px; box-shadow: var(--shadow-float); }
+@media (max-width: 759px) { .toast { position: fixed; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Hoy */
+.fecha { display: flex; align-items: center; gap: 2px; font-weight: 600; font-size: 14px; }
+.fecha button { width: 40px; height: 40px; border-radius: 12px; font-size: 20px; }
+.fecha button:disabled { opacity: 0.3; }
+.fecha span { min-width: 68px; text-align: center; }
+.tira { padding: 8px 8px 0; }
+.tira__grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); position: relative; }
+.banda { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 12px; background: var(--surface-2); transition: transform 250ms var(--ease); pointer-events: none; }
+.tira__dia { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0 8px; border-radius: 12px; min-width: 0; }
+.tira__nom { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tira__hora { font-size: 12px; color: var(--muted); min-height: 17px; }
+.tira__sigue { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); visibility: hidden; }
+.tira__dia[data-sigue] .tira__sigue { visibility: visible; }
+.tira__pie { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 8px; margin-top: 4px; border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+.tira__pie span { margin-left: auto; font-weight: 400; color: var(--muted); }
+.tira__pie::after { content: "›"; color: var(--muted); font-size: 18px; line-height: 1; transition: transform 150ms var(--ease); }
+.tira__pie[aria-expanded="true"]::after { transform: rotate(90deg); }
+.grupos { padding: 0 8px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.grupos > div { display: flex; align-items: center; gap: 8px; }
+.grupos .n { width: 84px; color: var(--muted); flex: none; }
+.grupos .dots { flex: 1; min-width: 0; }
+.grupos .c--over { color: var(--warn); font-weight: 600; }
+.comida { padding: 16px; display: flex; flex-direction: column; gap: 12px; border-radius: 20px; }
+.comida__cab { display: flex; align-items: center; gap: 8px; }
+.comida__cab h2 { font-family: var(--font-display); font-weight: 700; }
+.comida__cab .chip { margin-left: auto; }
+.toca { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.toca span { display: inline-flex; align-items: center; gap: 6px; }
+.siempre { display: flex; flex-direction: column; gap: 6px; }
+.siempre h3 { font-size: 12px; font-weight: 600; color: var(--muted); }
+.siempre button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 14px; text-align: left; }
+.siempre button::before { content: "+"; font-weight: 700; color: var(--muted); }
+.acciones { display: flex; gap: 8px; }
+.acciones .btn--pri { flex: 1; }
+.cuadrado { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line); display: grid; place-items: center; flex: none; }
+.cuadrado svg { width: 20px; height: 20px; }
+.ficha { display: flex; background: var(--surface-2); border-radius: 16px; padding: 12px 8px; }
+.ficha__mitad { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ficha__rot { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ficha__pips { display: grid; grid-template-columns: repeat(3, 16px); gap: 6px; }
+.ficha__pips--g { grid-template-columns: repeat(4, 16px); }
+.ficha__pips i { width: 16px; height: 16px; border-radius: 50%; }
+.ficha__pips i.p { border: 2px solid currentColor; }
+.ficha__pips i.on { background: currentColor; }
+.ficha__pips i.fuera { opacity: 0.3; border-style: dotted; }
+.ficha__pips i.nuevo { animation: pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+@keyframes pop { from { transform: scale(0.25); opacity: 0; } }
+.ficha__num { font-family: var(--font-display); font-size: 19px; line-height: 1; }
+.ficha__lomo { width: 1px; background: var(--surface-3); position: relative; margin: 4px 0; }
+.ficha__lomo::after { content: ""; position: absolute; left: -4px; top: calc(50% - 4px); width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.dif { font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.dif li { display: flex; align-items: center; gap: 8px; }
+.pregunta { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border-radius: 12px; padding: 8px 8px 8px 12px; font-size: 14px; }
+.pregunta span { flex: 1; min-width: 0; }
+.fila-links { display: flex; gap: 20px; flex-wrap: wrap; }
+.hab { padding: 6px 8px 6px 16px !important; }
+.hab__nom { font-weight: 600; }
+.hab__val { color: var(--muted); font-size: 14px; }
+.hab--ok .hab__val { color: var(--ok); }
+.hab__migas { margin-left: auto; display: flex; align-items: center; flex: none; }
+.hab__migas button { width: 38px; height: 44px; display: grid; place-items: center; border-radius: 10px; }
+.hab .miga { width: 24px; height: 24px; }
+
+/* Semana */
+.cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resumen { display: flex; align-items: baseline; gap: 10px; }
+.resumen strong { white-space: nowrap; font-family: var(--font-display); font-size: 44px; line-height: 1; }
+.resumen small { font-size: 22px; color: var(--muted); }
+.sellos { padding: 10px 8px 12px; overflow: hidden; }
+.sellos__grid { display: grid; grid-template-columns: 100px repeat(7, minmax(0, 1fr)); position: relative; align-items: center; row-gap: 2px; }
+.sellos__grid .banda { width: calc((100% - 100px) / 7); }
+.sellos__d { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 8px; font-size: 12px; color: var(--muted); border-radius: 12px; }
+.sellos__d b { font-size: 15px; color: var(--ink); width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; }
+.sellos__d[aria-current] b { background: var(--accent); color: var(--on-accent); }
+.sellos__d.fut b { color: var(--muted); font-weight: 500; }
+.sellos__n { font-size: 12px; font-weight: 600; padding-left: 8px; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sellos__c { position: relative; display: grid; place-items: center; height: 32px; }
+.sellos__c .miga { width: 22px; height: 22px; }
+.sellos__c .miga--na { width: 10px; height: 2px; }
+.sellos__sep { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 6px 8px; position: relative; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); padding: 0 4px; }
+.leyenda li { display: flex; align-items: center; gap: 6px; }
+.leyenda .miga { width: 12px; height: 12px; }
+.detalle__cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.detalle__cab .fin { margin-left: auto; font-size: 14px; color: var(--muted); }
+.dia li { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
+.dia__l { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.dia__l .chip, .dia__l .muted { margin-left: auto; font-weight: 400; }
+.planilla { overflow-x: auto; border-radius: 16px; }
+.planilla table { border-collapse: collapse; font-size: 13px; min-width: 640px; }
+.planilla th, .planilla td { text-align: left; vertical-align: top; padding: 10px; border-bottom: 1px solid var(--line); }
+.planilla thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.planilla tbody th { white-space: nowrap; font-weight: 600; }
+.planilla tr:last-child > * { border-bottom: none; }
+
+/* Mi plan y Perfil */
+.atras { align-self: flex-start; font-size: 14px; font-weight: 600; min-height: 40px; color: var(--muted); }
+.plan-comida { flex-wrap: wrap; row-gap: 6px !important; }
+.plan-comida .nom { font-weight: 600; }
+.plan-comida .dots { width: 100%; }
+.plan-comida .txt { width: 100%; font-size: 14px; color: var(--muted); }
+.stepper { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.stepper .n { display: inline-flex; align-items: center; gap: 8px; flex: 1; }
+.stepper b { min-width: 28px; text-align: center; }
+.tag { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.peligro { color: var(--warn); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="phone">
+    <main class="scr" id="scr"></main>
+    <nav class="nav" id="nav" aria-label="Secciones"></nav>
+    <div id="capa"></div>
+  </div>
+  <details class="notas" id="notas"></details>
+</div>
+
+<script>
+/* ───────── Datos de ejemplo: el plan de Facu, su lunes y una semana anterior inventada ───────── */
+const G = [
+  { id: 'P', name: 'Proteínas', c: '--g-prot' }, { id: 'C', name: 'Cereales', c: '--g-cer' },
+  { id: 'F', name: 'Frutas', c: '--g-frut' }, { id: 'G', name: 'Grasas', c: '--g-gras' }, { id: 'V', name: 'Verduras', c: '--g-verd' },
+];
+const gById = Object.fromEntries(G.map(g => [g.id, g]));
+const plan = { loaded: '9 de noviembre de 2026', meals: [
+  { id: 'des', name: 'Desayuno', time: '09:00', p: { P: 2, C: 1, F: 1, G: 1 } },
+  { id: 'alm', name: 'Almuerzo', time: '13:00', p: { P: 1, C: 1, G: 1, V: 2 } },
+  { id: 'mer', name: 'Merienda', time: '17:00', p: { P: 2, C: 1, F: 1, G: 1 } },
+  { id: 'cen', name: 'Cena', time: '23:00', p: { P: 1, C: 1, G: 1, V: 2 } },
+  { id: 'ext', name: 'Extra', time: '', p: {} },
+] };
+const habits = [
+  { id: 'agua', name: 'Agua', type: 'Cantidad', unit: 'Lt', goal: 2, step: 0.5, period: 'DIA' },
+  { id: 'entr', name: 'Entrenamiento', type: 'Sí o no', unit: '', goal: 1, step: 1, period: 'DIA', yesNo: true },
+  { id: 'flex', name: 'Flexibles', type: 'Contador', unit: 'comidas', goal: 2, step: 1, period: 'SEMANA', auto: true },
+];
+const TODAY = '2026-11-09', NOW_MIN = 19 * 60 + 4, FIRST = '2026-11-02';
+const it = (food, g, n, rule, extra) => ({ food, g, n, rule, ...extra });
+const days = { [TODAY]: { habits: { agua: 1, entr: 1 }, meals: {
+  des: { note: '2 huevos duros, 2 galletas de garbanzo, 2 mandarinas, mermelada sin azúcar', items: [
+    it('Huevo duro · 2 unidades', 'P', 2, '1 unidad = 1 porción'), it('Galletas de garbanzo · 2 unidades', 'C', 1, '2 unidades = 1 porción'),
+    it('Mandarina · 2 unidades', 'F', 1, '2 unidades = 1 porción'), it('Mermelada sin azúcar', null, 0, 'Libre: se anota y no suma') ] },
+  alm: { note: 'Pollo con arroz y huevo duro. Queso crema', ask: 'V', items: [
+    it('Pollo', 'P', 1, 'Sin cantidad: supuse 1 porción', { est: true }), it('Arroz', 'C', 1, 'Sin cantidad: supuse 1 porción', { est: true }),
+    it('Huevo duro · 1 unidad', 'P', 1, '1 unidad = 1 porción'), it('Queso crema', 'G', 1, '1 cucharada = 1 porción', { est: true }) ] },
+  mer: { note: 'Yogur con granola, una banana y un puñado de mix', items: [
+    it('Yogur · 1 pote', 'P', 1, '1 pote = 1 porción'), it('Granola', 'C', 1, 'Sin cantidad: supuse 1 porción', { est: true }),
+    it('Banana · 1 unidad', 'F', 1, '1 unidad = 1 porción'), it('mix', null, 0, '', { unknown: true }) ] },
+} } };
+const OK = { des: 'Huevos revueltos, tostada, naranja y palta', alm: 'Pollo con arroz, ensalada y aceite de oliva', mer: 'Yogur con granola, banana y nueces', cen: 'Pescado con verduras al horno y papa' };
+const PREV = [ // [agua, entrenó, {comida: [nota, desvío | 'flex' | 'noted'] | null}]
+  [2, 1, { cen: ['Tortilla de verduras con pan', { G: -1 }] }],
+  [1.5, 0, { alm: ['Pollo con puré', { V: -2 }] }],
+  [2, 1, { des: ['Café con leche y tostadas', { P: -2, F: -1 }], mer: null }],
+  [2, 0, {}],
+  [1, 1, { mer: ['Licuado de banana', { P: -1, C: -1, G: -1 }], cen: ['Pizza con amigos', 'flex'] }],
+  [2, 0, { alm: ['Asado con ensalada', { P: 1, C: -1 }], ext: ['Helado', 'noted'] }],
+  [1.5, 0, { alm: ['Pastas con tuco', 'flex'], cen: null }],
+];
+const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+PREV.forEach(([agua, entr, over], i) => {
+  const meals = {};
+  plan.meals.forEach(m => {
+    if (m.id in over) {
+      const o = over[m.id]; if (!o) return;
+      const [note, dev] = o;
+      if (dev === 'flex') meals[m.id] = { note, flex: true, got: {} };
+      else if (dev === 'noted') meals[m.id] = { note, got: {} };
+      else { const got = { ...m.p }; for (const k in dev) got[k] = (got[k] || 0) + dev[k]; meals[m.id] = { note, got }; }
+    } else if (OK[m.id]) meals[m.id] = { note: OK[m.id], got: { ...m.p } };
+  });
+  days[addDays(FIRST, i)] = { habits: { agua, entr }, meals };
+});
+const SIEMPRE = {
+  cen: [['Pollo con ensalada y arroz', [it('Pollo', 'P', 1, 'Sin cantidad: supuse 1 porción', { est: true }), it('Ensalada', 'V', 2, '1 plato = 2 porciones'), it('Arroz', 'C', 1, 'Sin cantidad: supuse 1 porción', { est: true })]],
+        ['Tarta de zapallitos y ensalada', [it('Tarta de zapallitos · 1 porción', 'C', 1, 'Compuesto: masa'), it('Tarta de zapallitos · 1 porción', 'P', 1, 'Compuesto: huevo y queso'), it('Tarta de zapallitos · 1 porción', 'G', 1, 'Compuesto: aceite'), it('Ensalada', 'V', 2, '1 plato = 2 porciones')]]],
+  ext: [['Café con leche', [it('Café con leche', null, 0, 'No cuenta para el plan')]]],
+};
+const FOODS = [
+  ['Huevo duro', '1 unidad = 1 porción de Proteínas', 'De tu plan'], ['Galletas de garbanzo', '2 unidades = 1 porción de Cereales', 'Tuyo'],
+  ['Mandarina', '2 unidades = 1 porción de Frutas', 'De tu plan'], ['Mermelada sin azúcar', 'Libre: se anota y no suma', 'De tu plan'],
+  ['Queso crema', '1 cucharada = 1 porción de Grasas', 'De tu plan'], ['Milanesa al horno', 'Compuesto: 1 Proteínas + 1 Cereales', 'Tuyo'],
+  ['Pizza', 'Comida flexible', 'Tuyo'], ['Café', 'No cuenta para el plan', 'De tu plan'],
+];
+
+/* ───────── Reglas ───────── */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = n => String(Math.round(n * 100) / 100).replace('.', ',');
+const por = n => (n === 1 ? 'porción' : 'porciones');
+const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
+const day = d => days[d] || (days[d] = { habits: {}, meals: {} });
+const dateObj = d => new Date(d + 'T12:00:00Z');
+const fmtDate = (d, o) => dateObj(d).toLocaleDateString('es-UY', { timeZone: 'UTC', ...o }).toLowerCase();
+const gotOf = rec => rec.items ? rec.items.reduce((a, x) => (x.g ? { ...a, [x.g]: (a[x.g] || 0) + x.n } : a), {}) : rec.got || {};
+function cmp(meal, rec) {
+  const base = { miss: [], extra: [] };
+  if (!rec || !rec.note) return { ...base, s: 'empty', label: 'Sin anotar' };
+  if (rec.flex) return { ...base, s: 'flex', label: 'Flexible' };
+  if (!sum(meal.p)) return { ...base, s: 'noted', label: 'Anotada' };
+  const got = gotOf(rec);
+  G.forEach(g => { const d = (got[g.id] || 0) - (meal.p[g.id] || 0); if (d < 0) base.miss.push([g, -d]); if (d > 0) base.extra.push([g, d]); });
+  if (rec.ask) return { ...base, s: 'half', label: 'Por confirmar' };
+  if (!base.miss.length && !base.extra.length) return { ...base, s: 'full', label: 'Como el plan' };
+  return { ...base, s: 'half', label: base.miss.length && base.extra.length ? 'Faltó y de más' : base.miss.length ? 'Faltó algo' : 'De más' };
+}
+// En la tira y en la tarjeta, una comida sin porciones en el plan (Extra) no es una tarea pendiente.
+const migaClass = (meal, rec, future) => { const c = cmp(meal, rec); return future ? (sum(meal.p) ? 'futuro' : 'na') : c.s === 'empty' && !sum(meal.p) ? 'na' : c.s; };
+const chipClass = { full: 'ok', half: 'warn', flex: 'flex', noted: 'noted' };
+const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+// La que sigue: la primera comida con horario sin anotar que no pasó hace más de 90 minutos; si todas pasaron, la última sin anotar.
+function nextMeal(d) {
+  if (d !== TODAY) return null;
+  const open = plan.meals.filter(m => m.time && !day(d).meals[m.id]?.note);
+  return (open.find(m => mins(m.time) >= NOW_MIN - 90) || open[open.length - 1] || {}).id || null;
+}
+const dayTotals = d => G.map(g => ({ g, total: plan.meals.reduce((a, m) => a + (m.p[g.id] || 0), 0),
+  done: plan.meals.reduce((a, m) => { const r = day(d).meals[m.id]; return a + (r && r.note && !r.flex ? gotOf(r)[g.id] || 0 : 0); }, 0) }));
+const weekOf = d => { const wd = (dateObj(d).getUTCDay() + 6) % 7; const start = addDays(d, -wd); return Array.from({ length: 7 }, (_, i) => addDays(start, i)); };
+const flexCount = dates => dates.reduce((a, d) => a + Object.values(day(d).meals).filter(r => r.flex).length, 0);
+
+/* ───────── Estado ───────── */
+const S = { view: 'hoy', sub: null, date: TODAY, sel: null, editing: false, draft: '', grupos: false, justSaved: null, confirmDel: false,
+  week: TODAY, wsel: TODAY, wview: 'tarjeta', sheet: null, toast: '', q: '', delOpen: false, fix: null };
+const themeAtStart = document.documentElement.getAttribute('data-theme');
+S.theme = 'auto';
+
+/* ───────── Piezas ───────── */
+const dots = (c, total, done) => `<span class="dots" style="color:var(${c})" aria-hidden="true">${Array.from({ length: Math.max(total, done) }, (_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('')}</span>`;
+const DICE = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8], 7: [0, 2, 3, 4, 5, 6, 8], 8: [0, 1, 2, 3, 5, 6, 7, 8], 9: [0, 1, 2, 3, 4, 5, 6, 7, 8] };
+function ficha(meal, rec, pop) {
+  const got = gotOf(rec), pips = [];
+  G.forEach(g => { const t = meal.p[g.id] || 0, d = got[g.id] || 0; for (let i = 0; i < Math.max(t, d); i++) pips.push({ c: g.c, plan: i < t, got: i < d }); });
+  const big = pips.length > 9, n = big ? 12 : 9;
+  const cells = Array.from({ length: n }, (_, i) => big ? pips[i] : pips[(DICE[pips.length] || []).indexOf(i)]);
+  const half = k => `<span class="ficha__pips${big ? ' ficha__pips--g' : ''}">${cells.map((p, i) => !p ? '<i></i>'
+    : `<i class="p${p[k] ? ' on' : ''}${k === 'plan' && !p.plan ? ' fuera' : ''}${k === 'got' && p.got && pop ? ' nuevo' : ''}" style="color:var(${p.c});animation-delay:${i * 60}ms"></i>`).join('')}</span>`;
+  const tp = sum(meal.p), tg = sum(got);
+  return `<div class="ficha" role="img" aria-label="${meal.name}: el plan pide ${num(tp)} ${por(tp)}, anotaste ${num(tg)}">
+    <div class="ficha__mitad"><span class="ficha__rot">Tu plan</span>${half('plan')}<span class="ficha__num num">${num(tp)}</span></div>
+    <span class="ficha__lomo"></span>
+    <div class="ficha__mitad"><span class="ficha__rot">Anotaste</span>${half('got')}<span class="ficha__num num">${num(tg)}</span></div></div>`;
+}
+const topBar = right => `<div class="top"><span class="brand" aria-label="miga">mıga<i></i></span>${right || ''}</div>`;
+const MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+
+/* ───────── Hoy ───────── */
+function viewHoy() {
+  const d = S.date, isToday = d === TODAY, sigue = nextMeal(d);
+  if (!S.sel || !plan.meals.some(m => m.id === S.sel)) S.sel = sigue || (plan.meals.find(m => m.time && !day(d).meals[m.id]?.note) || plan.meals[0]).id;
+  const idx = plan.meals.findIndex(m => m.id === S.sel);
+  const label = isToday ? 'Hoy' : d === addDays(TODAY, -1) ? 'Ayer' : fmtDate(d, { weekday: 'short', day: 'numeric' }).replace('.', '');
+  const totals = dayTotals(d), done = totals.reduce((a, t) => a + t.done, 0), total = totals.reduce((a, t) => a + t.total, 0);
+  const title = isToday ? 'Buenas tardes, Facundo<b>.</b>' : esc(fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase()));
+  return topBar(`<span class="fecha"><button type="button" data-act="dia" data-n="-1" aria-label="Día anterior" ${d <= FIRST ? 'disabled' : ''}>‹</button><span>${label}</span><button type="button" data-act="dia" data-n="1" aria-label="Día siguiente" ${isToday ? 'disabled' : ''}>›</button></span>`) +
+  `<h1>${title}</h1>
+  <section class="card tira" aria-label="Tu día">
+    <div class="tira__grid" role="group" aria-label="Comidas del día">
+      <span class="banda" style="width:${100 / plan.meals.length}%;transform:translateX(${idx * 100}%)"></span>
+      ${plan.meals.map(m => { const rec = day(d).meals[m.id], c = cmp(m, rec), cls = migaClass(m, rec, false);
+        return `<button type="button" class="tira__dia" data-act="sel" data-id="${m.id}" ${m.id === sigue ? 'data-sigue' : ''} aria-pressed="${m.id === S.sel}" aria-label="${m.name}${m.time ? ', ' + m.time : ''}: ${c.label}">
+          <i class="miga miga--${cls === 'na' ? 'mas' : cls}">${cls === 'na' ? '+' : ''}</i><span class="tira__nom">${esc(m.name)}</span><span class="tira__hora num">${m.time}</span><span class="tira__sigue"></span></button>`; }).join('')}
+    </div>
+    <button type="button" class="tira__pie" data-act="grupos" aria-expanded="${S.grupos}">Tu día por grupo<span class="num">${num(done)} de ${num(total)} porciones</span></button>
+    ${S.grupos ? `<div class="grupos">${totals.map(t => `<div><span class="n">${t.g.name}</span>${dots(t.g.c, t.total, t.done)}<span class="num${t.done > t.total ? ' c--over' : ''}">${num(t.done)} de ${num(t.total)}</span></div>`).join('')}</div>` : ''}
+  </section>
+  ${mealPanel(d, sigue)}
+  <h2>Hábitos${isToday ? ' de hoy' : ''}</h2>
+  <ul class="card lista">${habits.filter(h => !h.auto).map(h => habitRow(h, d)).join('')}</ul>`;
+}
+function mealPanel(d, sigue) {
+  const m = plan.meals.find(x => x.id === S.sel), rec = day(d).meals[m.id], c = cmp(m, rec), has = sum(m.p) > 0;
+  const chip = !rec?.note ? (m.id === sigue ? '<span class="chip chip--sigue">Sigue</span>' : '') : `<span class="chip chip--${chipClass[c.s]}">${c.label}</span>`;
+  const head = `<div class="comida__cab"><h2>${esc(m.name)}</h2>${m.time ? `<span class="muted sm num">${m.time}</span>` : ''}${chip}</div>`;
+  if (!rec?.note || S.editing) {
+    const sug = !rec?.note && SIEMPRE[m.id] || [];
+    return `<section class="card comida">${head}
+      ${has ? `<p class="toca" aria-label="Te toca">${G.filter(g => m.p[g.id]).map(g => `<span><i class="dot" style="color:var(${g.c})"></i>${num(m.p[g.id])} ${g.name}</span>`).join('')}</p>` : '<p class="muted sm">Para lo que comas fuera de las comidas de tu plan.</p>'}
+      <label class="campo" for="nota">¿Qué comiste?</label>
+      <textarea id="nota" placeholder="Por ejemplo: tarta de zapallitos y ensalada">${esc(S.draft)}</textarea>
+      ${sug.length ? `<div class="siempre"><h3>Lo de siempre</h3>${sug.map((s, i) => `<button type="button" data-act="siempre" data-i="${i}" aria-label="Anotar: ${esc(s[0])}">${esc(s[0])}</button>`).join('')}</div>` : ''}
+      <div class="acciones"><button type="button" class="btn btn--pri" id="guardar" data-act="guardar" ${S.draft.trim() ? '' : 'disabled'}>${rec?.note ? 'Guardar cambios' : 'Guardar'}</button>
+        <button type="button" class="cuadrado" data-act="dictar" aria-label="Dictar">${MIC}</button></div>
+      ${S.editing ? (S.confirmDel
+        ? `<div class="pregunta"><span>¿Borrar lo anotado en ${esc(m.name)}?</span><button type="button" class="btn btn--sec btn--mini" data-act="borrar">Borrar</button><button type="button" class="btn btn--mini" data-act="no-borrar">Cancelar</button></div>`
+        : `<div class="fila-links"><button type="button" class="link" data-act="cancelar">Cancelar</button><button type="button" class="link peligro" data-act="pedir-borrar">Borrar lo anotado</button></div>`) : ''}
+    </section>`;
+  }
+  const unknown = (rec.items || []).filter(x => x.unknown);
+  const pop = S.justSaved === m.id;
+  return `<section class="card comida">${head}
+    <p>${esc(rec.note)}</p>
+    ${c.miss.length || c.extra.length ? `<ul class="dif">${c.miss.map(([g, n]) => `<li><i class="dot" style="color:var(${g.c})"></i>Faltó ${num(n)} ${por(n)} de ${g.name}</li>`).join('')}${c.extra.map(([g, n]) => `<li><i class="dot" style="color:var(${g.c})"></i>De más: ${num(n)} ${por(n)} de ${g.name}</li>`).join('')}</ul>` : ''}
+    ${rec.flex ? '<p class="muted sm">Cuenta como comida flexible: no se compara con el plan.</p>' : ''}
+    ${rec.ask ? `<div class="pregunta"><span>¿Comiste <strong>${gById[rec.ask].name}</strong>?</span><button type="button" class="btn btn--sec btn--mini" data-act="resp" data-v="1">Sí</button><button type="button" class="btn btn--sec btn--mini" data-act="resp" data-v="0">No</button></div>` : ''}
+    ${unknown.map(x => `<div class="pregunta"><span>No reconocí <strong>«${esc(x.food)}»</strong></span><button type="button" class="btn btn--sec btn--mini" data-act="sheet" data-s="resolver">Decime qué es</button></div>`).join('')}
+    <div class="fila-links"><button type="button" class="link" data-act="editar">Editar</button>${rec.items ? '<button type="button" class="link" data-act="sheet" data-s="entendi">Así lo entendí</button>' : ''}</div>
+  </section>`;
+}
+function habitRow(h, d) {
+  const v = day(d).habits[h.id] || 0, slots = Math.round(h.goal / h.step), filled = Math.round(v / h.step);
+  const val = h.yesNo ? (v ? 'Hecho' : '') : `${num(v)} de ${num(h.goal)} ${h.unit}`;
+  const ok = v >= h.goal;
+  if (slots > 6) return `<li class="hab${ok ? ' hab--ok' : ''}"><span class="hab__nom">${esc(h.name)}</span><span class="hab__val num">${val}</span><span class="hab__migas" style="gap:6px;padding-right:8px">
+    <button type="button" class="paso" style="width:40px;height:40px" data-act="hab-paso" data-h="${h.id}" data-n="-1" ${v <= 0 ? 'disabled' : ''} aria-label="Restar ${num(h.step)} ${h.unit}">−</button><button type="button" class="paso" style="width:40px;height:40px" data-act="hab-paso" data-h="${h.id}" data-n="1" aria-label="Sumar ${num(h.step)} ${h.unit}">+</button></span></li>`;
+  return `<li class="hab${ok ? ' hab--ok' : ''}"><span class="hab__nom">${esc(h.name)}</span><span class="hab__val num">${val}</span><span class="hab__migas">
+    ${Array.from({ length: slots }, (_, i) => `<button type="button" data-act="hab" data-h="${h.id}" data-i="${i}" aria-pressed="${i < filled}" aria-label="${h.name}: ${h.yesNo ? 'hecho' : num((i + 1) * h.step) + ' ' + h.unit}"><i class="miga ${i < filled ? 'miga--full' : ''}"></i></button>`).join('')}
+    ${h.yesNo ? '' : `<button type="button" data-act="hab-mas" data-h="${h.id}" aria-label="Sumar ${num(h.step)} ${h.unit} a ${h.name}"><i class="miga miga--mas${filled > slots ? ' miga--mas-on' : ''}">+${filled > slots ? filled - slots : ''}</i></button>`}</span></li>`;
+}
+
+/* ───────── Semana ───────── */
+function viewSemana() {
+  const dates = weekOf(S.week), isCurrent = dates.includes(TODAY), isFirst = dates[0] <= FIRST;
+  if (!dates.includes(S.wsel)) S.wsel = isCurrent ? TODAY : dates[0];
+  const range = `${dateObj(dates[0]).getUTCDate()} al ${dateObj(dates[6]).getUTCDate()} de ${fmtDate(dates[6], { month: 'long' })}`;
+  const past = dates.filter(d => d <= TODAY);
+  const timed = plan.meals.filter(m => sum(m.p));
+  const all = past.flatMap(d => timed.map(m => cmp(m, day(d).meals[m.id])));
+  const full = all.filter(c => c.s === 'full').length;
+  const idx = dates.indexOf(S.wsel);
+  const daily = habits.filter(h => h.period === 'DIA'), weekly = habits.filter(h => h.period === 'SEMANA');
+  const cell = (d, inner) => `<button type="button" class="sellos__c" data-act="wsel" data-d="${d}" tabindex="-1" aria-hidden="true">${inner}</button>`;
+  const card = `<section class="card sellos" aria-label="Tarjeta de la semana"><div class="sellos__grid">
+      <span class="banda" style="left:100px;transform:translateX(${idx * 100}%)"></span>
+      <span></span>${dates.map(d => { const fut = d > TODAY; return `<button type="button" class="sellos__d${fut ? ' fut' : ''}" data-act="wsel" data-d="${d}" aria-pressed="${d === S.wsel}" ${d === TODAY ? 'aria-current="date"' : ''} aria-label="${fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' })}">${'DLMMJVS'[dateObj(d).getUTCDay()]}<b class="num">${dateObj(d).getUTCDate()}</b></button>`; }).join('')}
+      <span class="sellos__sep"></span>
+      ${plan.meals.map(m => `<span class="sellos__n">${esc(m.name)}</span>${dates.map(d => cell(d, `<i class="miga miga--${migaClass(m, day(d).meals[m.id], d > TODAY)}"></i>`)).join('')}`).join('')}
+      ${daily.length ? '<span class="sellos__sep"></span>' : ''}
+      ${daily.map(h => `<span class="sellos__n">${esc(h.name)}</span>${dates.map(d => { const v = day(d).habits[h.id] || 0; return cell(d, `<i class="miga miga--${d > TODAY ? 'futuro' : v >= h.goal ? 'full' : v > 0 ? 'half' : 'empty'}"></i>`); }).join('')}`).join('')}
+    </div></section>
+    <ul class="leyenda" aria-hidden="true"><li><i class="miga miga--full"></i>Como el plan o meta cumplida</li><li><i class="miga miga--half"></i>Faltó o sobró algo</li><li><i class="miga miga--flex"></i>Flexible</li><li><i class="miga miga--noted"></i>Anotada</li><li><i class="miga"></i>Sin anotar</li><li><i class="miga miga--futuro"></i>Todavía no</li></ul>`;
+  const sd = S.wsel, fut = sd > TODAY, tot = dayTotals(sd);
+  const detail = `<div class="detalle__cab"><h2>${esc(fmtDate(sd, { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>${sd === TODAY ? '<span class="chip chip--sigue">Hoy</span>' : ''}${fut ? '' : `<span class="fin num">${num(tot.reduce((a, t) => a + t.done, 0))} de ${num(tot.reduce((a, t) => a + t.total, 0))} porciones</span>`}</div>
+    ${fut ? '<p class="muted sm">Este día todavía no llegó.</p>' : `<ul class="card lista dia">${plan.meals.filter(m => sum(m.p) || day(sd).meals[m.id]?.note).map(m => { const rec = day(sd).meals[m.id], c = cmp(m, rec);
+      return `<li><span class="dia__l">${esc(m.name)}${c.s === 'empty' ? '<span class="muted sm">Sin anotar</span>' : `<span class="chip chip--${chipClass[c.s]}">${c.label}</span>`}</span>${rec?.note ? `<span class="sm muted">${esc(rec.note)}</span>` : ''}</li>`; }).join('')}
+      <li><span class="dia__l">Hábitos</span><span class="sm muted">${daily.map(h => { const v = day(sd).habits[h.id] || 0; return h.yesNo ? `${h.name}: ${v ? 'hecho' : 'no'}` : `${h.name}: ${num(v)} de ${num(h.goal)} ${h.unit}`; }).join(' · ')}</span></li></ul>
+      <button type="button" class="btn btn--sec" data-act="abrir-dia">${sd === TODAY ? 'Ir a Hoy' : 'Abrir este día para anotar o corregir'}</button>`}`;
+  const sheet = `<div class="card planilla"><table><caption class="sm muted" style="text-align:left;padding:10px">Lo que escribiste en cada comida</caption><thead><tr><th scope="col">Fecha</th>${plan.meals.map(m => `<th scope="col">${esc(m.name)}</th>`).join('')}</tr></thead>
+    <tbody>${dates.map(d => `<tr><th scope="row">${fmtDate(d, { weekday: 'short' }).replace('.', '')} ${dateObj(d).getUTCDate()}${d === TODAY ? ' · Hoy' : ''}</th>${plan.meals.map(m => `<td>${esc(day(d).meals[m.id]?.note || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return topBar() + `<div class="cab"><h1>Semana</h1><button type="button" class="btn btn--sec btn--mini" data-act="sheet" data-s="exportar">Exportar</button></div>
+    <div class="cab"><span class="fecha"><button type="button" data-act="sem" data-n="-1" aria-label="Semana anterior" ${isFirst ? 'disabled' : ''}>‹</button></span><strong class="sm">${range}</strong><span class="fecha"><button type="button" data-act="sem" data-n="1" aria-label="Semana siguiente" ${isCurrent ? 'disabled' : ''}>›</button></span></div>
+    ${all.length ? `<p class="resumen"><strong class="num">${full}<small> de ${all.length}</small></strong><span class="muted sm">comidas como el plan ${isCurrent ? 'esta semana' : 'esa semana'}</span></p>` : ''}
+    <div class="seg" role="group" aria-label="Vista de la semana"><button type="button" data-act="wview" data-v="tarjeta" aria-pressed="${S.wview === 'tarjeta'}">Tarjeta</button><button type="button" data-act="wview" data-v="planilla" aria-pressed="${S.wview === 'planilla'}">Planilla</button></div>
+    ${S.wview === 'tarjeta' ? card + detail : sheet}
+    ${weekly.length ? `<h2>Metas de la semana</h2><ul class="card lista">${weekly.map(h => { const v = h.auto ? flexCount(dates) : 0; return `<li><span class="hab__nom">${esc(h.name)}</span><span class="fin num">${dots('--accent', h.goal, v)}${num(v)} de ${num(h.goal)}</span></li>`; }).join('')}</ul>` : ''}`;
+}
+
+/* ───────── Mi plan ───────── */
+function viewPlan() {
+  if (S.sub === 'alimentos') {
+    const q = S.q.trim().toLowerCase(), list = FOODS.filter(f => !q || f[0].toLowerCase().includes(q));
+    return topBar() + `<button type="button" class="atras" data-act="sub" data-s="">‹ Mi plan</button><div class="cab"><h1>Tus alimentos</h1><button type="button" class="btn btn--sec btn--mini" data-act="demo" data-m="Abre el formulario de alimento: nombre, cómo cuenta y cantidad.">Agregar</button></div>
+      <label class="campo" for="buscar">Buscar<input id="buscar" type="search" placeholder="Huevo, milanesa, yogur…" value="${esc(S.q)}"></label>
+      <ul class="card lista" id="foods">${foodRows(list)}</ul><p class="muted sm">Se muestran 8 de 62 como ejemplo.</p>`;
+  }
+  if (S.sub === 'habitos') return topBar() + `<button type="button" class="atras" data-act="sub" data-s="">‹ Mi plan</button><div class="cab"><h1>Hábitos</h1><button type="button" class="btn btn--sec btn--mini" data-act="demo" data-m="Abre el mismo formulario, vacío.">Agregar</button></div>
+      <ul class="card lista">${habits.map(h => `<button type="button" data-act="sheet" data-s="habito" data-id="${h.id}" aria-label="Editar ${esc(h.name)}"><span><strong>${esc(h.name)}</strong><br><span class="muted sm">${h.yesNo ? 'Sí o no' : `Meta ${num(h.goal)} ${h.unit}${h.auto ? '' : ` · de a ${num(h.step)}`}`} · ${h.period === 'DIA' ? 'por día' : 'por semana'}${h.auto ? ' · se cuenta sola' : ''}</span></span><span class="fin">${h.period === 'DIA' ? 'Se anota en Hoy' : 'Se ve en Semana'} ›</span></button>`).join('')}</ul>`;
+  if (S.sub === 'grupos') return topBar() + `<button type="button" class="atras" data-act="sub" data-s="">‹ Mi plan</button><h1>Grupos</h1>
+      <ul class="card lista">${G.map(g => { const t = plan.meals.reduce((a, m) => a + (m.p[g.id] || 0), 0); return `<li><i class="dot" style="color:var(${g.c})"></i><strong>${g.name}</strong>${g.id === 'V' ? '<span class="tag">Pregunta si falta</span>' : ''}<span class="fin num">${num(t)} por día</span></li>`; }).join('')}</ul>
+      <p class="muted sm">El color y el orden de cada grupo se usan en toda la app.</p>`;
+  const tot = G.map(g => ({ g, t: plan.meals.reduce((a, m) => a + (m.p[g.id] || 0), 0) }));
+  return topBar() + `<div class="cab"><h1>Mi plan</h1></div>
+    <p class="muted sm">Actualizado el ${plan.loaded}. Tocá una comida para cambiarla.</p>
+    <ul class="card lista">${plan.meals.map(m => { const n = sum(m.p); return `<button type="button" class="plan-comida" data-act="sheet" data-s="comida" data-id="${m.id}" aria-label="Editar ${esc(m.name)}">
+      <span class="nom">${esc(m.name)}</span>${m.time ? `<span class="muted sm num">${m.time}</span>` : ''}<span class="fin num">${n ? `${num(n)} ${por(n)}` : 'Sin porciones'} ›</span>
+      ${n ? `<span class="dots" aria-hidden="true">${G.map(g => Array.from({ length: m.p[g.id] || 0 }, () => `<i class="on" style="color:var(${g.c})"></i>`).join('')).join('')}</span>
+      <span class="txt">${G.filter(g => m.p[g.id]).map(g => `${num(m.p[g.id])} ${g.name}`).join(' · ')}</span>` : ''}</button>`; }).join('')}</ul>
+    <h2>Tu día completo</h2>
+    <div class="card grupos" style="padding:14px 16px">${tot.map(({ g, t }) => `<div><span class="n">${g.name}</span>${dots(g.c, t, t)}<span class="num">${num(t)}</span></div>`).join('')}</div>
+    <ul class="card lista">
+      <button type="button" data-act="sub" data-s="alimentos"><strong>Tus alimentos</strong><span class="fin num">62 ›</span></button>
+      <button type="button" data-act="sub" data-s="habitos"><strong>Hábitos</strong><span class="fin num">${habits.length} ›</span></button>
+      <button type="button" data-act="sub" data-s="grupos"><strong>Grupos</strong><span class="fin num">${G.length} ›</span></button>
+      <button type="button" data-act="demo" data-m="Abre la lista de versiones anteriores del plan, solo para consultar."><strong>Planes anteriores</strong><span class="fin">›</span></button>
+    </ul>`;
+}
+const foodRows = list => list.length ? list.map(f => `<li><span style="min-width:0"><strong>${esc(f[0])}</strong><br><span class="muted sm">${esc(f[1])}</span></span><span class="fin"><span class="tag">${f[2]}</span></span></li>`).join('') : '<li class="muted sm">No encontré nada con ese nombre.</li>';
+
+/* ───────── Perfil ───────── */
+function viewPerfil() {
+  return topBar() + `<h1>Perfil</h1>
+    <ul class="card lista"><li><span><strong>Facundo</strong><br><span class="muted sm">facundo@ejemplo.com</span></span></li></ul>
+    <h2>Tema</h2>
+    <div class="seg" role="group" aria-label="Tema">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([v, l]) => `<button type="button" data-act="tema" data-v="${v}" aria-pressed="${S.theme === v}">${l}</button>`).join('')}</div>
+    <h2>Tus datos</h2>
+    <ul class="card lista">
+      <button type="button" data-act="ir-exportar"><span><strong>Exportar para tu nutri</strong><br><span class="muted sm">Se hace por semana, desde Semana</span></span><span class="fin">›</span></button>
+      <button type="button" data-act="demo" data-m="Abre la página de privacidad."><strong>Privacidad</strong><span class="fin">›</span></button>
+    </ul>
+    <button type="button" class="btn btn--sec" data-act="demo" data-m="Cierra la sesión y vuelve al inicio.">Cerrar sesión</button>
+    <button type="button" class="link peligro" data-act="del" aria-expanded="${S.delOpen}">Eliminar mi cuenta</button>
+    ${S.delOpen ? `<div class="card comida"><p class="sm">Se borran tu cuenta, tus planes, tus alimentos, lo que anotaste y tus hábitos. No se puede deshacer.</p>
+      <label class="campo" for="clave">Contraseña actual<input id="clave" type="text" placeholder="En la app va tu contraseña" disabled></label>
+      <button type="button" class="btn btn--sec peligro" disabled>Eliminar definitivamente</button></div>` : ''}`;
+}
+
+/* ───────── Hojas ───────── */
+function sheetHtml() {
+  const s = S.sheet; if (!s) return '';
+  const wrap = (title, body) => `<div class="ovl" data-act="cerrar-ovl"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet__cab"><h2>${esc(title)}</h2><button type="button" class="x" data-act="cerrar" aria-label="Cerrar">✕</button></div>${body}</div></div>`;
+  const m = plan.meals.find(x => x.id === S.sel), rec = day(S.date).meals[S.sel];
+  if (s.k === 'entendi') return wrap('Así lo entendí', `<p class="muted sm">Cada cosa que escribiste, cómo la conté y con qué regla. Si corregís algo, vale para esta comida. Con «Usar siempre» queda como regla tuya en Mi plan: el plan de tu nutri no cambia.</p>
+    <ul class="lista" style="margin:0 -16px">${rec.items.map((x, i) => `<li style="flex-wrap:wrap"><i class="dot" style="color:${x.g ? `var(${gById[x.g].c})` : 'var(--muted)'}"></i>
+      <span style="flex:1;min-width:0"><strong>${esc(x.food)}</strong>${x.est ? ' <span class="tag">cantidad estimada</span>' : ''}<br><span class="muted sm">${x.unknown ? 'Sin reconocer: no cuenta hasta que me digas qué es' : x.g ? `${num(x.n)} ${por(x.n)} de ${gById[x.g].name} · ${esc(x.rule)}` : esc(x.rule)}</span></span>
+      ${x.unknown ? '<button type="button" class="btn btn--sec btn--mini" data-act="sheet" data-s="resolver">Decime qué es</button>'
+        : x.g ? (S.fix === i ? `<span class="fin"><button type="button" class="paso" data-act="fix-n" data-n="-0.5" ${x.n <= 0.5 ? 'disabled' : ''} aria-label="Menos">−</button><b class="num">${num(x.n)}</b><button type="button" class="paso" data-act="fix-n" data-n="0.5" aria-label="Más">+</button><button type="button" class="link" data-act="fix" data-i="-1">Listo</button></span><label class="sm" style="display:flex;gap:10px;align-items:center;min-height:44px;width:100%;padding-left:22px"><input type="checkbox" id="usar-siempre" style="width:20px;height:20px">Usar siempre</label>`
+          : `<button type="button" class="link" data-act="fix" data-i="${i}">Corregir</button>`) : ''}</li>`).join('')}</ul>`);
+  if (s.k === 'resolver') { const u = rec.items.find(x => x.unknown); return wrap(`¿Qué es «${u ? u.food : ''}»?`, `<p class="muted sm">Mientras tanto no cuenta para tu plan.</p>
+    <ul class="card lista" style="background:var(--surface-2);box-shadow:none"><li><span style="flex:1"><strong>Mix de frutos secos</strong><br><span class="muted sm">1 puñado = 1 porción de Grasas · Catálogo</span></span><button type="button" class="btn btn--pri btn--mini" data-act="res" data-v="G">Es esto</button></li>
+      <li><span style="flex:1"><strong>Mix de semillas</strong><br><span class="muted sm">1 cucharada = 1 porción de Grasas · Catálogo</span></span><button type="button" class="btn btn--sec btn--mini" data-act="res" data-v="G">Es esto</button></li></ul>
+    <p class="sm" style="font-weight:600">¿No está? Elegí cómo cuenta</p>
+    <div class="dos"><button type="button" class="btn btn--sec btn--mini" data-act="res" data-v="flex">Comida flexible</button><button type="button" class="btn btn--sec btn--mini" data-act="res" data-v="no">No cuenta</button></div>
+    <button type="button" class="btn btn--sec btn--mini" data-act="demo" data-m="Abre el selector de grupos y porciones.">Elegir grupos y porciones</button>
+    <label class="sm" style="display:flex;gap:10px;align-items:center;min-height:44px"><input type="checkbox" id="recordar" checked style="width:20px;height:20px">Reconocerlo siempre que lo escriba</label>
+    <button type="button" class="link" data-act="cerrar">Dejarlo así para mi nutri</button>`); }
+  if (s.k === 'exportar') { const dates = weekOf(S.week); return wrap('Exportar para tu nutri', `<p class="muted sm">La semana del ${dateObj(dates[0]).getUTCDate()} al ${dateObj(dates[6]).getUTCDate()} de ${fmtDate(dates[6], { month: 'long' })}: lo que escribiste en cada comida, cómo quedó y tus hábitos. Se descarga en tu celular y lo mandás vos: Miga no lo comparte con nadie.</p>
+    <button type="button" class="btn btn--pri" data-act="demo" data-m="En la app se descarga la planilla de Excel.">Descargar planilla de Excel</button>
+    <button type="button" class="btn btn--sec" data-act="demo" data-m="En la app se abre la impresión para guardar el PDF.">Descargar PDF</button>`); }
+  if (s.k === 'comida') { const e = s.edit, n = sum(e.p); return wrap(`Editar ${e.name}`, `<div class="dos"><label class="campo" for="pc-nom">Nombre<input id="pc-nom" value="${esc(e.name)}"></label><label class="campo" for="pc-hora">Hora sugerida<input id="pc-hora" type="time" value="${e.time}"></label></div>
+    <div><div class="cab"><span class="sm" style="font-weight:600">Porciones por grupo</span><span class="sm num ${n >= 12 ? 'peligro' : 'muted'}">${num(n)} de 12</span></div>
+    ${G.map(g => `<div class="stepper"><span class="n"><i class="dot" style="color:var(${g.c})"></i>${g.name}</span><button type="button" class="paso" data-act="pc" data-g="${g.id}" data-n="-1" ${!(e.p[g.id] > 0) ? 'disabled' : ''} aria-label="Reducir ${g.name}">−</button><b class="num">${num(e.p[g.id] || 0)}</b><button type="button" class="paso" data-act="pc" data-g="${g.id}" data-n="1" ${n >= 12 ? 'disabled' : ''} aria-label="Aumentar ${g.name}">+</button></div>`).join('')}</div>
+    <p class="muted sm">Cargá lo que te indicó tu nutricionista: Miga no cambia el plan por su cuenta.</p>
+    <button type="button" class="btn btn--pri" data-act="pc-guardar">Guardar cambios</button>`); }
+  if (s.k === 'habito') { const h = s.edit; const slots = Math.round(h.goal / h.step); return wrap(`Editar ${h.name}`, h.auto
+    ? `<p class="muted sm">Se cuenta sola con las comidas que marcás como flexibles. Solo se cambia la meta.</p><div class="stepper"><span class="n">Meta por semana</span><button type="button" class="paso" data-act="hb" data-f="goal" data-n="-1" ${h.goal <= 1 ? 'disabled' : ''} aria-label="Menos">−</button><b class="num">${num(h.goal)}</b><button type="button" class="paso" data-act="hb" data-f="goal" data-n="1" aria-label="Más">+</button></div><button type="button" class="btn btn--pri" data-act="hb-guardar">Guardar cambios</button>`
+    : h.yesNo ? `<p class="muted sm">Es de sí o no: en Hoy se anota con una sola miga.</p><button type="button" class="btn btn--pri" data-act="cerrar">Listo</button>`
+    : `<div class="stepper"><span class="n">Meta por día (${h.unit})</span><button type="button" class="paso" data-act="hb" data-f="goal" data-n="-0.5" ${h.goal <= h.step ? 'disabled' : ''} aria-label="Menos">−</button><b class="num">${num(h.goal)}</b><button type="button" class="paso" data-act="hb" data-f="goal" data-n="0.5" aria-label="Más">+</button></div>
+      <div class="stepper"><span class="n">Se anota de a (${h.unit})</span><button type="button" class="paso" data-act="hb" data-f="step" data-n="-0.25" ${h.step <= 0.25 ? 'disabled' : ''} aria-label="Menos">−</button><b class="num">${num(h.step)}</b><button type="button" class="paso" data-act="hb" data-f="step" data-n="0.25" aria-label="Más">+</button></div>
+      <p class="muted sm">Así se va a ver en Hoy${slots > 6 ? ': son más de seis pasos, así que va con número y botones' : ''}.</p>
+      <ul class="card lista" style="background:var(--surface-2);box-shadow:none;pointer-events:none">${habitRow(h, '_demo')}</ul>
+      <button type="button" class="btn btn--pri" data-act="hb-guardar">Guardar cambios</button>`); }
+  return '';
+}
+
+/* ───────── Notas de diseño ───────── */
+const NOTAS = {
+  hoy: ['Hoy', [
+    ['La tira del día.', 'Una miga por comida, en orden, con el mismo dibujo que Semana. Reemplaza las listas Antes y Después: tocás una miga y ves esa comida.'],
+    ['La comida que sigue abre sola.', 'Es la próxima con horario sin anotar, así que a las 19 es la Cena y no Extra. Anotar sigue siendo escribir y guardar.'],
+    ['Te toca.', 'Antes de anotar, una línea dice qué pide el plan en esa comida. Después de guardar se ve lo que escribiste y, en palabras, qué faltó o sobró. La ficha de dominó ya no se usa.'],
+    ['Lo de siempre.', 'Un toque anota una comida habitual. Probá las dos de la Cena: una queda como el plan y la otra no.'],
+    ['Preguntas y cosas sin reconocer, a la vista.', 'Almuerzo pregunta por las verduras y Merienda no reconoció «mix». Antes había que abrir Así lo entendí para enterarse.'],
+    ['Una sola hoja de detalle.', 'Así lo entendí muestra el alimento, cómo contó y la regla en la misma fila, y ahí mismo se corrige. Hoy son dos diálogos.'],
+    ['Extra no es una tarea.', 'Como no tiene porciones en el plan, se dibuja con un + y no como una miga vacía pendiente.'],
+    ['Tu día por grupo vive en la tarjeta del día.', 'Es el pie de la tira y se abre ahí mismo, en vez de ser otro bloque.'],
+    ['Hábitos como migas.', 'Se toca hasta donde llegaste, el + suma por encima de la meta, y los semanales que se cuentan solos van en Semana.'],
+  ]],
+  semana: ['Semana', [
+    ['La tarjeta de sellos queda igual.', 'Es lo que mejor funciona. Solo le sumé filas.'],
+    ['Los hábitos diarios entran en la tarjeta.', 'Agua y Entrenamiento son filas más, con la misma miga: llena si cumpliste la meta, media si hiciste algo.'],
+    ['Toda la columna elige el día.', 'Hoy solo responde el número de arriba, que es un blanco chico.'],
+    ['Del día a anotarlo en un toque.', 'El detalle tiene un botón que abre ese día en Hoy. Ahora hay que ir a Hoy y retroceder con la flecha día por día.'],
+    ['Metas de la semana.', 'Flexibles se muestra acá, con su conteo, y las comidas flexibles se ven amarillas en la tarjeta.'],
+    ['Extra sin anotar es un guion.', 'Así la fila no parece siete olvidos.'],
+    ['Planilla y Exportar no cambian.', 'La planilla es tu hoja de siempre y Exportar sigue siendo Excel o PDF.'],
+  ]],
+  plan: ['Mi plan', [
+    ['El plan se lee con migas.', 'Cada comida muestra sus porciones con los colores de los grupos y el texto al lado, igual que la ficha. Hoy son chips que se cortan en el borde.'],
+    ['Editar deja de ser el botón principal.', 'El plan cambia pocas veces. Tocás la comida que querés cambiar y se edita esa sola, con el tope de 12 a la vista.'],
+    ['Tu día completo.', 'El total por grupo que hoy solo aparece dentro de Grupos pasa a la portada: es lo que uno compara con el papel de la nutri.'],
+    ['Cada hábito dice dónde aparece.', 'Los diarios se anotan en Hoy y los semanales se ven en Semana. Al cambiar la meta o el paso se ve cómo va a quedar.'],
+    ['Tus alimentos empieza por buscar.', 'Con 62 reglas, la lista sola no sirve. Cada una dice cómo cuenta y de dónde salió.'],
+    ['No está armado en el prototipo:', 'los formularios de alimento y de grupo, y planes anteriores.'],
+  ]],
+  perfil: ['Perfil', [
+    ['Tema como control segmentado.', 'El mismo de Semana. Probalo: cambia toda la página.'],
+    ['Exportar se encuentra desde acá.', 'Lleva a Semana, que es donde se exporta.'],
+    ['Eliminar cuenta queda al final y cerrado.', 'Es un enlace y no un botón del mismo peso que Cerrar sesión.'],
+  ]],
+};
+function notasHtml() {
+  const [t, items] = NOTAS[S.view];
+  return `<summary>Por qué ${t} está así</summary><div class="notas__c"><ol>${items.map(([a, b]) => `<li><strong>${a}</strong> ${b}</li>`).join('')}</ol>
+    <p>Prototipo con datos de ejemplo sobre tu plan real. Tu lunes está aproximado y la semana anterior es inventada. Guardar no interpreta el texto de verdad: lo que escribas a mano queda como el plan. No incluye la landing, el ingreso ni la carga inicial del plan.</p></div>`;
+}
+
+/* ───────── Render y eventos ───────── */
+const ICON = { hoy: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>', semana: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/>', plan: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>', perfil: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>' };
+const VIEWS = { hoy: viewHoy, semana: viewSemana, plan: viewPlan, perfil: viewPerfil };
+let lastKey = '';
+function render() {
+  const scr = document.getElementById('scr'), key = S.view + '/' + (S.sub || ''), y = scr.scrollTop;
+  scr.innerHTML = VIEWS[S.view]();
+  if (key !== lastKey) { scr.scrollTop = 0; if (lastKey && getComputedStyle(scr).position !== 'absolute') window.scrollTo(0, 0); lastKey = key; document.getElementById('notas').innerHTML = notasHtml(); } else scr.scrollTop = y;
+  document.getElementById('nav').innerHTML = [['hoy', 'Hoy'], ['semana', 'Semana'], ['plan', 'Mi plan'], ['perfil', 'Perfil']].map(([v, l]) => `<button type="button" data-act="ir" data-v="${v}" ${S.view === v ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[v]}</svg>${l}</button>`).join('');
+  document.getElementById('capa').innerHTML = sheetHtml() + (S.toast ? `<p class="toast" role="status">${esc(S.toast)}</p>` : '');
+  S.justSaved = null;
+}
+let toastT;
+function toast(m) { S.toast = m; clearTimeout(toastT); toastT = setTimeout(() => { S.toast = ''; render(); }, 3200); }
+function saveNote(text, items) {
+  const m = plan.meals.find(x => x.id === S.sel), prev = day(S.date).meals[m.id];
+  const same = prev && prev.note === text;
+  day(S.date).meals[m.id] = same ? prev : { note: text, items: items || G.filter(g => m.p[g.id]).map(g => it('Lo que escribiste', g.id, m.p[g.id], 'Interpretación simulada en el prototipo', { est: true })) };
+  S.editing = false; S.confirmDel = false; S.draft = ''; S.justSaved = m.id;
+  const c = cmp(m, day(S.date).meals[m.id]);
+  toast(`Guardado. ${c.miss.length || c.extra.length ? [...c.miss.map(([g, n]) => `Faltó ${num(n)} de ${g.name}`), ...c.extra.map(([g, n]) => `De más: ${num(n)} de ${g.name}`)].join(' · ') : c.label}.`);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act, D = b.dataset, rec = day(S.date).meals[S.sel];
+  if (a === 'cerrar-ovl') { if (e.target !== b) return; S.sheet = null; S.fix = null; }
+  else if (a === 'cerrar') { S.sheet = null; S.fix = null; }
+  else if (a === 'ir') { S.view = D.v; S.sub = null; S.sheet = null; if (D.v === 'hoy') { S.date = TODAY; S.sel = null; S.editing = false; S.draft = ''; } }
+  else if (a === 'dia') { S.date = addDays(S.date, Number(D.n)); S.sel = null; S.editing = false; S.draft = ''; }
+  else if (a === 'sel') { S.sel = D.id; S.editing = false; S.confirmDel = false; S.draft = ''; }
+  else if (a === 'grupos') S.grupos = !S.grupos;
+  else if (a === 'guardar') saveNote(S.draft.trim());
+  else if (a === 'siempre') { const s = SIEMPRE[S.sel][Number(D.i)]; saveNote(s[0], s[1].map(x => ({ ...x }))); }
+  else if (a === 'dictar') toast('En la app, dictás y el texto aparece en el campo.');
+  else if (a === 'editar') { S.editing = true; S.draft = rec.note; }
+  else if (a === 'cancelar') { S.editing = false; S.draft = ''; }
+  else if (a === 'pedir-borrar') S.confirmDel = true;
+  else if (a === 'no-borrar') S.confirmDel = false;
+  else if (a === 'borrar') { delete day(S.date).meals[S.sel]; S.editing = false; S.confirmDel = false; S.draft = ''; toast('Borraste lo anotado.'); }
+  else if (a === 'resp') { if (D.v === '1') rec.items.push(it('Verduras · lo respondiste vos', rec.ask, plan.meals.find(m => m.id === S.sel).p[rec.ask] || 1, 'Respuesta tuya')); rec.ask = null; S.justSaved = S.sel; }
+  else if (a === 'sheet') { const k = D.s; S.sheet = { k };
+    if (k === 'comida') { const m = plan.meals.find(x => x.id === D.id); S.sheet.edit = { id: m.id, name: m.name, time: m.time, p: { ...m.p } }; }
+    if (k === 'habito') S.sheet.edit = { ...habits.find(h => h.id === D.id) }; }
+  else if (a === 'fix') S.fix = Number(D.i) < 0 ? null : Number(D.i);
+  else if (a === 'fix-n') rec.items[S.fix].n += Number(D.n);
+  else if (a === 'res') { const u = rec.items.find(x => x.unknown), keep = document.getElementById('recordar')?.checked;
+    if (D.v === 'flex') { rec.flex = true; u.unknown = false; u.rule = 'Comida flexible'; }
+    else if (D.v === 'no') { u.unknown = false; u.rule = 'No cuenta para el plan'; }
+    else { u.unknown = false; u.g = D.v; u.n = 1; u.food = 'Mix de frutos secos · 1 puñado'; u.rule = '1 puñado = 1 porción'; }
+    S.sheet = null; S.justSaved = S.sel; toast(`Listo${keep ? ': lo voy a reconocer la próxima vez' : ''}.`); }
+  else if (a === 'hab') { const h = habits.find(x => x.id === D.h), n = Number(D.i) + 1, hs = day(S.date).habits; hs[h.id] = Math.round((hs[h.id] || 0) / h.step) === n ? (n - 1) * h.step : n * h.step; }
+  else if (a === 'hab-mas') { const h = habits.find(x => x.id === D.h), hs = day(S.date).habits; hs[h.id] = Math.max(hs[h.id] || 0, h.goal) + h.step; }
+  else if (a === 'hab-paso') { const h = habits.find(x => x.id === D.h), hs = day(S.date).habits; hs[h.id] = Math.max(0, (hs[h.id] || 0) + Number(D.n) * h.step); }
+  else if (a === 'sem') { S.week = addDays(S.week, 7 * Number(D.n)); S.wsel = ''; }
+  else if (a === 'wsel') S.wsel = D.d;
+  else if (a === 'wview') S.wview = D.v;
+  else if (a === 'abrir-dia') { S.view = 'hoy'; S.date = S.wsel; S.sel = null; S.editing = false; S.draft = ''; }
+  else if (a === 'sub') { S.sub = D.s || null; S.q = ''; }
+  else if (a === 'pc') { const e2 = S.sheet.edit; e2.name = document.getElementById('pc-nom').value; e2.time = document.getElementById('pc-hora').value; e2.p[D.g] = Math.max(0, (e2.p[D.g] || 0) + Number(D.n)); if (!e2.p[D.g]) delete e2.p[D.g]; }
+  else if (a === 'pc-guardar') { const e2 = S.sheet.edit, m = plan.meals.find(x => x.id === e2.id); m.name = document.getElementById('pc-nom').value.trim() || m.name; m.time = document.getElementById('pc-hora').value; m.p = e2.p; S.sheet = null; toast('Plan guardado. Hoy y Semana ya usan el cambio.'); }
+  else if (a === 'hb') { const h = S.sheet.edit; h[D.f] = Math.max(D.f === 'step' ? 0.25 : h.step, h[D.f] + Number(D.n)); if (h.goal < h.step) h.goal = h.step; days._demo = { habits: { [h.id]: h.step }, meals: {} }; }
+  else if (a === 'hb-guardar') { Object.assign(habits.find(x => x.id === S.sheet.edit.id), S.sheet.edit); S.sheet = null; toast('Hábito guardado.'); }
+  else if (a === 'tema') { S.theme = D.v; const r = document.documentElement; if (D.v === 'auto') { themeAtStart ? r.setAttribute('data-theme', themeAtStart) : r.removeAttribute('data-theme'); } else r.setAttribute('data-theme', D.v); }
+  else if (a === 'ir-exportar') { S.view = 'semana'; S.sheet = { k: 'exportar' }; }
+  else if (a === 'del') S.delOpen = !S.delOpen;
+  else if (a === 'demo') toast(D.m);
+  render();
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'nota') { S.draft = e.target.value; const g = document.getElementById('guardar'); if (g) g.disabled = !S.draft.trim(); }
+  if (e.target.id === 'buscar') { S.q = e.target.value; const q = S.q.trim().toLowerCase(); document.getElementById('foods').innerHTML = foodRows(FOODS.filter(f => !q || f[0].toLowerCase().includes(q))); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.sheet) { S.sheet = null; S.fix = null; render(); } });
+days._demo = { habits: {}, meals: {} };
+const wide = matchMedia('(min-width: 760px)');
+const syncNotas = () => { document.getElementById('notas').open = wide.matches; };
+wide.addEventListener('change', syncNotas);
+render();
+syncNotas();
+</script>
+
+</body>
+</html>
