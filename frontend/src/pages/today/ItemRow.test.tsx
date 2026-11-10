@@ -30,8 +30,8 @@ test.each(['NO_CUENTA', 'LIBRE'])('Quitar en Corregir llama a onRemove para un i
   expect(onRemove).toHaveBeenCalledTimes(1)
 })
 
-test.each(['NO_CUENTA', 'LIBRE'])('un item %s sin grupo permite corregir, repartir y cerrar', async rule => {
-  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}` }
+test.each(['NO_CUENTA', 'LIBRE', 'FLEXIBLE'] as const)('un item %s sin grupo permite corregir, repartir y cerrar', async rule => {
+  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}`, ruleType: rule }
   setupRemoval([item])
   vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [item.id], items: [item] })
   renderToday()
@@ -47,26 +47,34 @@ test.each(['NO_CUENTA', 'LIBRE'])('un item %s sin grupo permite corregir, repart
   fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
   expect(await screen.findByRole('button', { name: 'Corregir leche' })).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Listo' })).not.toBeInTheDocument()
-  expect(recordsApi.patchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), item.id, { saveAsRule: false })
+  expect(recordsApi.patchItem).not.toHaveBeenCalled()
+  expect(recordsApi.removeItem).not.toHaveBeenCalled()
 })
 
-test('Listo solo envía las porciones tocadas y saveAsRule', async () => {
+test.each([
+  { touched: false, saveAsRule: false },
+  { touched: true, saveAsRule: false },
+  { touched: false, saveAsRule: true },
+  { touched: true, saveAsRule: true },
+])('Listo con grupo: %j', async ({ touched, saveAsRule }) => {
   setupRemoval([removableItems[0]])
   const mockPatchItem = vi.mocked(recordsApi.patchItem)
   mockPatchItem.mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [101], items: [removableItems[0]] })
   renderToday()
   await openDetails()
-  for (const touched of [false, true, false]) {
+  for (const edit of [{ touched, saveAsRule }, { touched: false, saveAsRule: false }]) {
+    const previousCalls = mockPatchItem.mock.calls.length
     fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
-    if (touched) {
-      fireEvent.click(screen.getByRole('button', { name: 'M\u00e1s porciones de leche' }))
-      fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
-    }
+    if (edit.touched) fireEvent.click(screen.getByRole('button', { name: 'M\u00e1s porciones de leche' }))
+    if (edit.saveAsRule) fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
     fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
-    await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
-      ...(touched ? { portions: 1.5 } : {}), saveAsRule: touched,
-    }))
     await screen.findByRole('button', { name: 'Corregir leche' })
+    expect(mockPatchItem).toHaveBeenCalledTimes(previousCalls + (edit.touched || edit.saveAsRule ? 1 : 0))
+    if (edit.touched || edit.saveAsRule) {
+      expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
+        ...(edit.touched ? { portions: 1.5 } : {}), saveAsRule: edit.saveAsRule,
+      })
+    }
   }
 })
 

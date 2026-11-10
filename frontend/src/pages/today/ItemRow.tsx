@@ -72,6 +72,10 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       onRemove?.()
       return
     }
+    if (!portionsTouched && !saveAsRule) {
+      setEditing(false)
+      return
+    }
     submit({ ...(portionsTouched && item.foodGroupId !== null ? { portions } : {}), saveAsRule })
   }
 
