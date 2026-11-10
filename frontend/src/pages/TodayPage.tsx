@@ -17,7 +17,7 @@ import {
   adjustSummary,
 } from './today/helpers'
 import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
@@ -35,6 +35,13 @@ export default function TodayPage() {
 
 function TodayContent() {
   useTitle('Hoy | Miga')
+  const [toast, setToast] = useState<{ message: string } | null>(null)
+  const showToast = useCallback((message: string | null) => setToast(message ? { message } : null), [])
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 3200)
+    return () => clearTimeout(timer)
+  }, [toast])
   const now = useNow()
   const TODAY = toISO(now)
   const { token, email, firstName } = useAuth()
@@ -182,6 +189,7 @@ function TodayContent() {
 
   const mealProps = {
     drafts,
+    onToast: showToast,
     date,
     token: token!,
     groupsMap,
@@ -195,6 +203,7 @@ function TodayContent() {
 
   return (
     <div className="hoy-page">
+      {toast && <p className="toast" role="status">{toast.message}</p>}
       <header className="hoy-header">
         <div className="hoy-header__top">
           <Brand size={20} />

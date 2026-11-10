@@ -165,6 +165,11 @@ test('nota guardada con estado y diferencias; editar, cancelar y confirmar borra
   expect(screen.getByText('leche y pan')).toBeVisible()
   expect(screen.getByText('Faltó algo')).toBeVisible()
   expect(screen.getByText('Faltó 1 porción de Proteínas')).toBeVisible()
+  const difference = screen.getByText('Faltó 1 porción de Proteínas')
+  expect(difference.tagName).toBe('LI')
+  expect(difference.parentElement).toHaveClass('dif')
+  expect(difference.querySelector('i.nota-item__dot')).toHaveAttribute('aria-hidden', 'true')
+
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'otra cosa' } })
@@ -241,4 +246,21 @@ test('la tira mantiene blancos de 44 px y la pantalla una columna de hasta 480 p
   } finally {
     style.remove()
   }
+})
+
+test('save toast stays at page level while the understood sheet is open and expires', async () => {
+  const saved = { status: 'REGISTRADA' as const, noteId: 1, version: 4, text: 'leche', date: '2026-11-09', mealId: 4, items: [], entries: [], comparison: [] }
+  mockSaveNote.mockResolvedValueOnce(saved)
+  setup()
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'leche' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  const toast = await screen.findByText('Guardado. Anotada.')
+  expect(toast).toHaveClass('toast')
+  expect(toast).toHaveAttribute('role', 'status')
+  expect(toast.parentElement).toHaveClass('hoy-page')
+  expect(toast.closest('.comida')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Así lo entendí' }))
+  expect(within(screen.getByRole('dialog')).queryByText('Guardado. Anotada.')).toBeNull()
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 3300)) })
+  expect(screen.queryByText('Guardado. Anotada.')).toBeNull()
 })

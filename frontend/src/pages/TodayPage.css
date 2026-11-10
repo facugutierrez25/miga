@@ -318,19 +318,6 @@
   color: var(--ink);
 }
 
-.nota-guardado:empty {
-  display: none;
-}
-
-.nota-guardado {
-  font-size: var(--fs-sm);
-  line-height: 20px;
-  color: var(--ink);
-  background: var(--surface-2);
-  border-radius: var(--radius-control);
-  padding: var(--s2) var(--s3);
-}
-
 .nota-error {
   font-size: var(--fs-sm);
   color: var(--error);
@@ -419,8 +406,6 @@
   overflow-wrap: anywhere;
 }
 
-.nota-item__qty,
-.nota-item__unit,
 .nota-item__grupo {
   flex-shrink: 0;
   font-size: var(--fs-cap);
@@ -447,9 +432,7 @@
   color: var(--text-secondary);
 }
 
-.nota-item__edit,
-.nota-item__save,
-.nota-item__cancel {
+.nota-item__edit {
   flex-shrink: 0;
   min-width: 44px;
   min-height: 44px;
@@ -463,26 +446,9 @@
   cursor: pointer;
 }
 
-.nota-item__edit:hover,
-.nota-item__cancel:hover {
+.nota-item__edit:hover {
   color: var(--ink);
   background: var(--surface-2);
-}
-
-.nota-item__save {
-  color: var(--primary);
-}
-
-.nota-item__qty-input {
-  flex-shrink: 0;
-  width: 64px;
-  min-height: 36px;
-  padding: 0 var(--s2);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: var(--fs-sm);
 }
 
 .nota-compuesto {
@@ -574,7 +540,6 @@
 }
 
 @media (max-width: 639px) {
-  .nota-item__qty-input,
   .nota-reparto select,
   .nota-reparto input {
     font-size: 16px;
@@ -712,8 +677,6 @@
 
 /* El texto puede crecer sin achicar las acciones táctiles. */
 .nota-item__edit,
-.nota-item__save,
-.nota-item__cancel,
 .nota-menu {
   flex-shrink: 0;
 }
@@ -785,6 +748,14 @@
 .comida__sigue { background: var(--accent); color: var(--on-accent); border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; }
 .comida__texto { white-space: pre-wrap; overflow-wrap: anywhere; }
 .comida__diferencias { font-size: var(--fs-sm); }
-.comida .nota-body { padding: 0; border: 0; }
+.comida .nota-body { padding: 0; border: 0; gap: 12px; }
 .comida .nota-acciones { flex-wrap: wrap; }
 @media (min-width: 1024px) { .hoy-page .hoy-body { max-width: 480px; margin-inline: auto; } }
+
+.dif { font-size: 14px; display: flex; flex-direction: column; gap: 4px; color: var(--ink); list-style: none; }
+.dif li { display: flex; align-items: center; gap: 8px; }
+.dif .nota-item__dot { width: 10px; height: 10px; }
+.fila-links { display: flex; gap: 20px; flex-wrap: wrap; }
+.fila-links .nota-link { min-height: 40px; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 100; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 14px; font-size: 14px; box-shadow: var(--shadow-float); }
+.nota-mini { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 600; }

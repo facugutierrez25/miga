@@ -9,6 +9,7 @@ import {
   openNote,
   dayWithNote,
   setupRemoval,
+  removableItems,
   openDetails,
 } from './test-utils'
 import * as recordsApi from '../../api/records'
@@ -171,12 +172,17 @@ test('si la nota cambió en otro dispositivo, no la borra y ofrece recargar', as
 })
 
 test('quitar con conflicto ofrece Recargar', async () => {
-  setupRemoval()
+  setupRemoval(removableItems.map(item => ({ ...item, origin: recordsApi.ItemOrigin.RULE, foodGroupId: 1, portions: 1 })))
   vi.mocked(recordsApi.removeItem).mockRejectedValue(new recordsApi.NoteConflictError('La nota cambió.'))
   renderToday()
   await openDetails()
-  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de manzana' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Quitar' }))
+  expect(screen.queryByRole('button', { name: 'Más opciones de manzana' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir manzana' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menos porciones de manzana' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Menos porciones de manzana' }))
+  expect(screen.getByLabelText('Porciones de manzana')).toHaveTextContent('0')
+  expect(screen.queryByRole('checkbox', { name: 'Usar siempre' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
   expect(await screen.findByRole('button', { name: 'Recargar' })).toBeInTheDocument()
   expect(screen.getByText('La nota cambió.')).toBeInTheDocument()
 })

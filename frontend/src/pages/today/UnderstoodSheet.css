@@ -1,15 +1,31 @@
-.understood-sheet .nota-item__linea { flex-wrap: wrap; }
-.understood-sheet .nota-item__food { min-width: 0; overflow-wrap: anywhere; }
-.understood-sheet .nota-item__regla { color: var(--muted); overflow-wrap: anywhere; }
-.understood-correction { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.understood-correction button { min-width: 44px; min-height: 44px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
-.understood-sheet .nota-items > li { padding: 12px 0; min-height: 56px; font-size: 15px; }
+.understood-sheet .sm { font-size: 14px; }
+.understood-sheet .muted { color: var(--muted); }
+.understood-sheet .nota-items { margin: 0 -16px; gap: 0; }
+.understood-sheet .nota-items > li { padding: 12px 16px; min-height: 56px; font-size: 15px; }
 .understood-sheet .nota-items > li + li { border-top: 1px solid var(--line); }
-.understood-sheet .nota-item__dot { width: 10px; height: 10px; }
+.understood-sheet .nota-item__linea { flex-wrap: wrap; align-items: center; gap: 12px; width: 100%; }
+.understood-sheet .nota-item__contenido { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.understood-sheet .nota-item__food { min-width: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .understood-sheet .nota-item--dudoso .nota-item__food { font-style: normal; }
-.understood-sheet .nota-item__porciones { flex-shrink: 1; overflow-wrap: anywhere; }
-.understood-tag { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 999px; }
-.understood-sheet .resolve-remember { display: flex; gap: 10px; align-items: center; min-height: 44px; }
+.understood-sheet .nota-item__dot { width: 10px; height: 10px; }
+.understood-sheet .nota-item__regla { margin: 0; font-size: 14px; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.understood-sheet .nota-item__edit { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; font-weight: 600; min-height: 40px; padding: 0; }
+.understood-tag { font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.understood-correction { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto; color: var(--muted); font-size: 14px; }
+.understood-correction .paso { width: 40px; height: 40px; flex: none; color: var(--ink); background: transparent; border: 1px solid var(--control); border-radius: 12px; font-size: 18px; }
+.understood-correction .paso:disabled { opacity: .35; }
+.understood-correction .num { font-variant-numeric: tabular-nums; }
+.understood-correction .link { min-height: 40px; color: var(--ink); cursor: pointer; padding: 0; background: none; border: none; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.understood-sheet .resolve-remember { display: flex; gap: 10px; align-items: center; min-height: 44px; width: 100%; padding-left: 22px; font-size: 14px; }
 .understood-sheet .resolve-remember input { width: 20px; height: 20px; }
+.understood-sheet .lista > li { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pregunta { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border-radius: 12px; padding: 8px 8px 8px 12px; font-size: 14px; margin: 12px 0; }
 .pregunta > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.understood-sheet .nota-compuesto__header { flex-wrap: nowrap; gap: 12px; }
+.understood-sheet .nota-compuesto__contenido { flex: 1; min-width: 0; }
+.understood-sheet .nota-compuesto__titulo { margin: 0; font-size: 15px; }
+.understood-sheet .nota-compuesto__grupos { margin: 0; color: var(--muted); font-size: 14px; }
+
+.nota-item__secondary { display: flex; align-items: center; flex-wrap: wrap; gap: 0 16px; min-height: 44px; padding-left: 22px; width: 100%; }
+.understood-sheet .nota-item__secondary .resolve-remember { width: auto; padding-left: 0; }
+.nota-item__secondary button { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

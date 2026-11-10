@@ -151,7 +151,7 @@ test('un grupo por confirmar muestra la pregunta y el estado', async () => {
   const renderRow = await screen.findByRole('button', { name: /Desayuno: por confirmar/ })
   expect(renderRow).toHaveAccessibleName('Desayuno: por confirmar')
   fireEvent.click(renderRow)
-  expect(screen.getByText(/¿Consumiste/)).toHaveTextContent('¿Consumiste Proteínas?')
+  expect(screen.getByText(/¿Comiste/)).toHaveTextContent('¿Comiste Proteínas?')
 })
 
 test('al guardar suma al día también los grupos que esa comida no tenía previstos', async () => {

@@ -19,11 +19,11 @@ import * as recordsApi from '../../api/records'
 test('cuenta y separa los alimentos sin reconocer del resumen', async () => {
   setupRemoval([unknownFood, { ...removableItems[0], uncertain: true }])
   renderToday()
-  expect(await screen.findByRole('button', { name: 'Así lo entendí · 1 sin reconocer · 1 estimados' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Así lo entendí' })).toBeInTheDocument()
   await openDetails()
-  expect(screen.getByRole('heading', { name: 'No reconocí 1 cosa' })).toBeInTheDocument()
+  expect(screen.getByText('Sin reconocer: no cuenta hasta que me digas qué es')).toBeVisible()
   expect(screen.getAllByText('«milanesa rara»')[0]).toBeInTheDocument()
-  expect(screen.getByText(/^Entendí:/)).not.toHaveTextContent('milanesa rara')
+  expect(screen.getByText('cantidad estimada')).toHaveClass('tag')
 })
 
 test('resuelve por catálogo y deshace restaurando el aviso', async () => {

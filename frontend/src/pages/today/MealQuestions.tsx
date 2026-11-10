@@ -9,9 +9,9 @@ interface Props {
 export function MealQuestions({ questions, answerSaving, handleAnswer }: Props) {
   return <>
     {questions.map(p => (
-      <div key={p.foodGroupId} className="nota-pregunta">
+      <div key={p.foodGroupId} className="nota-pregunta pregunta">
         <span className="nota-pregunta__texto">
-          ¿Consumiste <strong>{p.name}</strong>?
+          ¿Comiste <strong>{p.name}</strong>?
         </span>
         <div className="nota-pregunta__acciones">
           <button disabled={answerSaving} className="nota-pregunta__si" onClick={() => handleAnswer(p.foodGroupId, true)}>Sí</button>
