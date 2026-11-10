@@ -72,7 +72,7 @@ class ItemResolutionService {
         entryFacade.markResolved(ids, ruleUid);
         var items = ids.stream().map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList();
         return new ResolveItemResultDto(List.of(id), items, new ResolveItemResultDto.Undo(occurrence, ruleUid),
-            dayReadService.getMealLog(email, date, entry.mealId()).status());
+            dayReadService.getMealLog(email, date, entry.mealId(), planId).status());
     }
 
     private ResponseStatusException missingResolveGroup() {
@@ -135,6 +135,7 @@ class ItemResolutionService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         var source = entries.getFirst();
+        Long planId = support.entryPlanId(userId, source);
         UUID ruleUid = source.resolvedRuleUid();
         if (entries.stream().anyMatch(e -> !Objects.equals(ruleUid, e.resolvedRuleUid()))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
@@ -150,7 +151,7 @@ class ItemResolutionService {
             source.quantity(), source.unit(), source.mealNoteId(), source.originalText(), false, null,
             req.occurrenceId(), false, null, null);
         return new PatchItemResultDto(ids, List.of(support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(restored, userId))),
-            dayReadService.getMealLog(email, date, source.mealId()).status());
+            dayReadService.getMealLog(email, date, source.mealId(), planId).status());
     }
 
     private Resolution selectResolution(ResolveItemRequest req, FoodEntryFacade.EntryData entry, Long userId,

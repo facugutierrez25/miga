@@ -26,6 +26,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class DayReadIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
+    void originalMealCanBeCorrectedResolvedAndUndoneAfterReplacingPlan() throws Exception {
+        String date = LocalDate.now().toString();
+        var saved = putNote(date, "leche, zqxunknown");
+        long itemId = saved.path("entries").get(0).path("id").asLong();
+        long unknownId = saved.path("entries").get(1).path("id").asLong();
+        mockMvc.perform(put("/api/v1/my-plan").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(uy.miga.PlanVersions.withCurrentVersion(mockMvc, token,
+                PLAN_JSON.replace("Desayuno", "Cena"))))
+            .andExpect(status().isOk());
+        assertThat(getDay(date).path("meals").get(0).path("mealId").asLong()).isNotEqualTo(mealId);
+
+        patchItem(date, itemId, "{\"portions\":10}")
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").isNotEmpty());
+        var resolved = resolve(date, unknownId, "{\"kind\":\"FLEXIBLE\",\"remember\":false}");
+        assertThat(resolved.path("status").asText()).isEqualTo("FLEXIBLE");
+        var restored = undo(date, resolved.path("undo"));
+        assertThat(restored.path("status").asText()).isEqualTo("MIXED");
+    }
+
+    @Test
     void dayAndWeekShareEveryMealStatus() throws Exception {
         String date = LocalDate.now().toString();
         assertDayAndWeekStatuses(date);

@@ -130,6 +130,14 @@ class DayReadService {
             .filter(meal -> meal.mealId().equals(mealId)).findFirst().orElseThrow();
     }
 
+    @Transactional(readOnly = true)
+    DayLogDto.MealDayDto getMealLog(String email, LocalDate date, Long mealId, Long planId) {
+        Long userId = userService.findUserIdByEmail(email);
+        return buildDay(date, planService.getReadData(planId), entryFacade.findByUserIdAndDate(userId, date),
+            noteRepository.findByUserIdAndDate(userId, date), new HashMap<>()).meals().stream()
+            .filter(meal -> meal.mealId().equals(mealId)).findFirst().orElseThrow();
+    }
+
     private DayLogDto buildDay(LocalDate date, PlanReadData plan,
                                     List<FoodEntryFacade.EntryData> entries, List<MealNote> notes, Map<Long, List<FoodRuleDto>> rules) {
         var byMeal = entries.stream().collect(Collectors.groupingBy(FoodEntryFacade.EntryData::mealId));

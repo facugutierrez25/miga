@@ -101,8 +101,7 @@ class NoteService {
         Long planId = selectNotePlan(note, userId, date, mealId);
 
         if (checkVersion && existing.isPresent() && text.strip().equals(note.getText())) {
-            DayLogDto.MealDayDto meal = dayReadService.getDayLog(userEmail, date).meals().stream()
-                .filter(m -> m.mealId().equals(mealId)).findFirst().orElseThrow();
+            DayLogDto.MealDayDto meal = dayReadService.getMealLog(userEmail, date, mealId, planId);
             return new NoteInterpretationDto(note.getId(), note.getVersion(), note.getText(), date, mealId,
                 List.of(), meal.items(), meal.comparison(), meal.status());
         }
@@ -241,7 +240,7 @@ class NoteService {
 
     private NoteInterpretationDto noteResult(String email, LocalDate date, Long mealId, MealNote saved,
             List<InterpretedItem> items) {
-        var meal = dayReadService.getMealLog(email, date, mealId);
+        var meal = dayReadService.getMealLog(email, date, mealId, saved.getPlanId());
         return new NoteInterpretationDto(saved.getId(), saved.getVersion(), saved.getText(), date, mealId,
             items.stream().map(this::toItemDto).toList(), meal.items(), meal.comparison(), meal.status());
     }
