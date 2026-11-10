@@ -31,6 +31,30 @@ test('reconcilia el borrador si el guardado termina con otra comida abierta', as
   expect(mockSaveNote).toHaveBeenLastCalledWith('tok', saved.date, 4, 'leche y pan', 4)
   await screen.findByRole('button', { name: 'Editar' })
 })
+test('limpia el borrador al volver sin editar antes de que termine el guardado', async () => {
+  const saved = { status: 'REGISTRADA' as const, noteId: 1, version: 4, text: 'A', date: '2026-11-09', mealId: 4, items: [], entries: [], comparison: [] }
+  let resolveSave!: (value: typeof saved) => void
+  mockSaveNote.mockReturnValueOnce(new Promise(resolve => { resolveSave = resolve }))
+  setup()
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'A' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Cena, 23:00:/ }))
+  expect(screen.getByRole('textbox')).toHaveValue('A')
+  await act(async () => { resolveSave(saved) })
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Guardar/ })).not.toBeInTheDocument()
+  expect(screen.getByText('A')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Editar' })).toBeVisible()
+
+  // Al remontar, el borrador compartido también debe seguir limpio.
+  fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Cena, 23:00:/ }))
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.getByText('A')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Editar' })).toBeVisible()
+})
+
 test.each([false, true])('conserva las ediciones al volver a una comida con un guardado pendiente (remontar: %s)', async remount => {
   const saved = { status: 'REGISTRADA' as const, noteId: 1, version: 4, text: 'A', date: '2026-11-09', mealId: 4, items: [], entries: [], comparison: [] }
   let resolveSave!: (value: typeof saved) => void

@@ -98,7 +98,11 @@ export const MealNoteSection = memo(function MealNoteSection({
       baseVersion.current = mealDay?.noteVersion ?? null
     } else if (drafts.get(draftKey)?.baseVersion === mealDay?.noteVersion) {
       // Adoptar la reconciliación antes de persistir las refs de este editor.
-      baseVersion.current = mealDay?.noteVersion ?? null
+      const shared = drafts.get(draftKey)!
+      baseVersion.current = shared.baseVersion
+      dirty.current = shared.dirty
+      setText(shared.text)
+      setEditing(shared.dirty)
     }
   }, [mealDay?.noteText, mealDay?.noteVersion, drafts, draftKey])
 
