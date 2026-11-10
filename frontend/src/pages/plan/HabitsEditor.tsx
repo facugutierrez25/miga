@@ -16,7 +16,12 @@ import {
 } from '../../api/planRules'
 import type { EditorProps } from './GroupsEditor'
 
-export default function HabitsEditor({ token, plan, mutate, onDirtyChange, disabled }: EditorProps) {
+interface HabitErrorProps {
+  error?: { code?: string; message: string } | null
+  onReload?: () => void
+}
+
+export default function HabitsEditor({ token, plan, mutate, onDirtyChange, disabled, error, onReload }: EditorProps & HabitErrorProps) {
   const [editing, setEditing] = useState<Habit | 'new' | null>(null)
   const { rememberTrigger, restoreFocus } = useEditorFocus()
   function openEditor(value: Habit | 'new') {
@@ -52,8 +57,10 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange, disab
           <span className="rules-secondary">{habitSummary(habit)}</span><span className="rules-secondary">{habit.countsFlexibleMeals ? 'Se ve en Semana' : 'Se anota en Hoy'}</span></button>
           {editing !== 'new' && editing?.uid === habit.uid && (
             <HabitForm
+              error={error}
+              onReload={onReload}
               disabled={disabled}
-          onDirtyChange={onDirtyChange}
+              onDirtyChange={onDirtyChange}
               habit={editing}
               onCancel={closeEditor}
               deleteAction={<InlineDelete name={habit.name} onDelete={() => confirmDelete(habit.uid)} hint="Si ya tiene registros, se archiva y deja de mostrarse; sus registros se conservan." />}
@@ -69,7 +76,9 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange, disab
       </button>
       {editing === 'new' && (
         <HabitForm
-              disabled={disabled}
+          error={error}
+          onReload={onReload}
+          disabled={disabled}
           onDirtyChange={onDirtyChange}
           habit={editing === 'new' ? undefined : editing}
           onCancel={closeEditor}
@@ -84,11 +93,13 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange, disab
 function HabitForm({
   habit,
   disabled = false,
+  error,
+  onReload,
   onSave,
   onCancel,
   deleteAction,
   onDirtyChange,
-}: {
+}: HabitErrorProps & {
   habit?: Habit
   disabled?: boolean
   onSave: (input: HabitInput) => Promise<void>
@@ -103,9 +114,11 @@ function HabitForm({
   const automatic = habit?.countsFlexibleMeals === true
   const yesNo = value.habitType === 'SI_NO'
   const draft = useDraftGuard(value, onDirtyChange, disabled)
-  const cancel = () => draft.cancel(onCancel)
+  const conflict = error?.code === 'VERSION_CONFLICT'
+  const cancel = () => conflict ? onCancel() : draft.cancel(onCancel)
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    if (disabled) return
     void onSave(automatic ? { ...habit, goal: value.goal } : { ...value, name: value.name.trim(), ...(yesNo ? { goal: null, step: 1 } : {}) })
   }
 
@@ -113,6 +126,10 @@ function HabitForm({
     <BottomSheet title={habit ? `Editar ${habit.name}` : 'Agregar hábito'} onClose={cancel}>
     <div className="plan-rules">
     <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}>
+      {error && <div role="alert" className="plan-error">
+        <p>{error.message}</p>
+        {conflict && <button type="button" onClick={onReload}>Recargar</button>}
+      </div>}
       <fieldset className="rules-editor" disabled={disabled}>
       {automatic && <p>Se cuenta sola con las comidas que marcás como flexibles. Solo se cambia la meta.</p>}
       <fieldset disabled={automatic}>
@@ -197,11 +214,11 @@ function HabitForm({
         <button type="submit" disabled={!value.name.trim()}>
           Guardar hábito
         </button>
-        <button type="button" onClick={cancel}>
-          Cancelar
-        </button>
       </div>
       </fieldset>
+      <button type="button" disabled={disabled && !conflict} onClick={cancel}>
+        Cancelar
+      </button>
     </form>
     </div>
     </BottomSheet>
