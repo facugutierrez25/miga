@@ -1,11 +1,17 @@
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter, createMemoryRouter, RouterProvider, Link } from 'react-router-dom'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import TodayPage from './TodayPage'
+import WeekPage from './WeekPage'
+import { getWeek } from '../api/week'
+import { MemoryRouter, Routes, Route, Link } from 'react-router-dom'
 import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MyPlanPage from './MyPlanPage'
 import * as plansApi from '../api/plans'
 import * as AuthContext from '../auth/authTypes'
 import * as rulesApi from '../api/planRules'
 
+vi.mock('../api/week')
+vi.mock('../hooks/useDayRecord', () => ({ useDayRecord: () => ({ data: { meals: [], summary: [] }, status: 'success', retry: vi.fn(), reload: vi.fn(), setData: vi.fn() }) }))
+vi.mock('../components/TodayHabits', () => ({ default: () => null }))
 vi.mock('../api/plans')
 vi.mock('../auth/authTypes')
 vi.mock('../api/planRules')
@@ -24,8 +30,10 @@ const defaultGroups = [
 ]
 
 const planWithGroups = {
+  version: 4,
+  createdAt: '2026-11-09',
   foodGroups: defaultGroups,
-  meals: [{ name: 'Desayuno', displayOrder: 1, portions: defaultGroups.map(g => ({ foodGroupId: g.id, portions: 0 })) }],
+  meals: [{ name: 'Desayuno', displayOrder: 1, suggestedTime: '08:00:00', weekdays: [1, 3], portions: [{ foodGroupId: 1, portions: 2 }, { foodGroupId: 2, portions: 1 }] }],
 }
 
 beforeEach(() => {
@@ -40,372 +48,133 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-test('muestra cargando mientras carga el plan', () => {
-  mockGetMyPlan.mockReturnValue(new Promise(() => {}))
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  expect(screen.getByText('Cargando tu plan…')).toBeInTheDocument()
-})
 
-test('muestra las comidas minimizadas al cargar el plan', async () => {
-  mockGetMyPlan.mockResolvedValue({
-    foodGroups: defaultGroups,
-    meals: [{
-      name: 'Desayuno',
-      displayOrder: 1,
-      portions: [
-        { foodGroupId: 1, portions: 1 },
-        { foodGroupId: 2, portions: 2 },
-        { foodGroupId: 3, portions: 0 },
-        { foodGroupId: 4, portions: 0 },
-        { foodGroupId: 5, portions: 0 },
-        { foodGroupId: 6, portions: 0 },
-      ],
-    }],
-  })
+function setup() {
+  mockGetMyPlan.mockResolvedValue(planWithGroups)
   render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
-  expect(screen.queryByPlaceholderText('Nombre de la comida')).not.toBeInTheDocument()
-})
-
-test('expande una comida al hacer clic en editar', async () => {
-  mockGetMyPlan.mockResolvedValue({
-    foodGroups: defaultGroups,
-    meals: [{ name: 'Almuerzo', displayOrder: 1, portions: [] }],
-  })
+}
+test('carga, error y reintento', async () => {
+  mockGetMyPlan.mockRejectedValueOnce(new Error('error')).mockResolvedValue(planWithGroups)
   render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  expect(screen.getByDisplayValue('Almuerzo')).toBeInTheDocument()
+  fireEvent.click(await screen.findByText('Reintentar'))
+  expect(await screen.findByText('Desayuno')).toBeInTheDocument()
 })
-
-test('minimiza una comida al guardarla', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+test('portada con fecha, porciones, migas por grupo, totales y accesos con cantidades', async () => {
+  setup()
+  const meal = await screen.findByRole('button', { name: 'Editar Desayuno' })
+  expect(meal).toHaveTextContent('08:00')
+  expect(meal).toHaveTextContent('3 porciones')
+  expect(meal).toHaveTextContent('2 Proteínas · 1 Cereales')
+  expect(meal.querySelectorAll('.meal-crumb')).toHaveLength(3)
+  expect(meal.querySelectorAll('[style]')[0].getAttribute('style')).toContain('--crumb-color')
+  expect(screen.getByText(/Actualizado el/)).toHaveTextContent('9 de noviembre de 2026')
+  expect(screen.getByText('Tu día completo')).toBeInTheDocument()
+  expect(document.querySelector('.plan-totals')).toHaveTextContent('Proteínas2')
+  for (const label of ['Tus alimentos', 'Hábitos', 'Grupos', 'Planes anteriores']) {
+    expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toHaveTextContent(/\d/)
+  }
+  expect(screen.queryByRole('button', { name: 'Editar plan' })).not.toBeInTheDocument()
+})
+test('guarda el plan completo con versión, días y las otras comidas intactas', async () => {
+  const other = { name: 'Cena', displayOrder: 2, weekdays: [2], portions: [{ foodGroupId: 1, portions: 1 }] }
+  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, meals: [...planWithGroups.meals, other] })
+  mockSaveMyPlan.mockResolvedValue({ ...planWithGroups, version: 5 })
   render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  await screen.findByText('Agregar comida')
-  fireEvent.click(screen.getByText('Agregar comida'))
-  fireEvent.change(screen.getByPlaceholderText('Nombre de la comida'), { target: { value: 'Merienda' } })
-  fireEvent.click(screen.getByText('Listo'))
-  expect(screen.getByText('Merienda')).toBeInTheDocument()
-  expect(screen.queryByPlaceholderText('Nombre de la comida')).not.toBeInTheDocument()
-})
-
-test('deshabilita guardar comida si el nombre está vacío', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  await screen.findByText('Agregar comida')
-  fireEvent.click(screen.getByText('Agregar comida'))
-  expect(screen.getByText('Listo')).toBeDisabled()
-})
-
-test('agrega una comida expandida al hacer clic en agregar', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  await screen.findByText('Agregar comida')
-  fireEvent.click(screen.getByText('Agregar comida'))
-  expect(screen.getByPlaceholderText('Nombre de la comida')).toBeInTheDocument()
-})
-
-test('elimina una comida expandida', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  await screen.findByText('Agregar comida')
-  fireEvent.click(screen.getByText('Agregar comida'))
-  fireEvent.click(screen.getByLabelText('Eliminar comida'))
-  await waitFor(() => expect(screen.getByText('Eliminar')).toBeInTheDocument())
-  fireEvent.click(screen.getByText('Eliminar'))
-  expect(screen.queryByPlaceholderText('Nombre de la comida')).not.toBeInTheDocument()
-})
-
-test('confirma el plan y muestra mensaje de éxito', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  mockSaveMyPlan.mockResolvedValue({ foodGroups: [], meals: [] })
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  await screen.findByText('Guardar cambios')
-  fireEvent.click(screen.getByText('Guardar cambios'))
-  await waitFor(() => expect(screen.getByText('¡Plan guardado!')).toBeInTheDocument())
-})
-
-test('muestra error si falla el confirmar', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  mockSaveMyPlan.mockRejectedValue(new Error('error de red'))
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  await screen.findByText('Guardar cambios')
-  fireEvent.click(screen.getByText('Guardar cambios'))
-  await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
-})
-
-test('abre el modal al hacer click en un plan del historial', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  mockGetPlanHistory.mockResolvedValue([{
-    createdAt: '2026-09-01',
-    supersededAt: '2026-10-01',
-    mealCount: 2,
-    foodGroups: defaultGroups,
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar Desayuno' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Aumentar Proteínas' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await waitFor(() => expect(mockSaveMyPlan).toHaveBeenCalledWith('tok', expect.objectContaining({
+    clientVersion: 4,
     meals: [
-      { name: 'Desayuno', portions: [{ foodGroupId: 1, portions: 1 }] },
-      { name: 'Almuerzo', portions: [{ foodGroupId: 2, portions: 2 }] },
+      expect.objectContaining({ name: 'Desayuno', weekdays: [1, 3], portions: expect.arrayContaining([{ foodGroupAbbr: 'PRO', portions: 2.5 }]) }),
+      expect.objectContaining({ name: 'Cena', weekdays: [2] }),
     ],
-  }])
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('2 comidas'))
-  fireEvent.click(screen.getByText('2 comidas'))
-  expect(screen.getByRole('dialog')).toBeInTheDocument()
-  expect(screen.getByText('Desayuno')).toBeInTheDocument()
-  expect(screen.getByText('Almuerzo')).toBeInTheDocument()
+  })))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
-
-test('cierra el modal al hacer click en el overlay', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  mockGetPlanHistory.mockResolvedValue([{
-    createdAt: '2026-09-01',
-    supersededAt: '2026-10-01',
-    mealCount: 1,
-    foodGroups: defaultGroups,
-    meals: [{ name: 'Cena', portions: [] }],
-  }])
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('1 comidas'))
-  fireEvent.click(screen.getByText('1 comidas'))
-  expect(screen.getByRole('dialog')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('dialog').parentElement!)
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-})
-
-test('el detalle del plan enfoca su primer control, cierra con Escape y devuelve el foco', async () => {
-  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
-  mockGetPlanHistory.mockResolvedValue([{
-    createdAt: '2026-09-01',
-    supersededAt: '2026-10-01',
-    mealCount: 1,
-    foodGroups: defaultGroups,
-    meals: [{ name: 'Cena', portions: [] }],
-  }])
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  await waitFor(() => screen.getByText('1 comidas'))
-  const trigger = screen.getByText('1 comidas').closest('button') ?? screen.getByText('1 comidas')
-  ;(trigger as HTMLElement).focus()
-  fireEvent.click(trigger)
-
-  const dialog = screen.getByRole('dialog')
-  expect(dialog.contains(document.activeElement)).toBe(true)
-  fireEvent.keyDown(document, { key: 'Escape' })
-
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(trigger).toHaveFocus()
-})
-
-test('abre Tus alimentos desde el resumen y recarga las comidas al cambiar reglas', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Ver tus alimentos, 0' }))
-  await screen.findByRole('button', { name: 'Agregar alimento' })
-  await waitFor(() => expect(mockGetMyPlan).toHaveBeenCalledTimes(2))
-})
-
-test('cargar Mi plan no mueve el foco y editar lo lleva al nombre de la comida', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  await screen.findByRole('button', { name: 'Editar plan' })
+test('agrega una comida desde la hoja vacía y elimina con confirmación', async () => {
+  setup()
   await screen.findByText('Desayuno')
-  expect(document.activeElement).toBe(document.body)
-
-  fireEvent.click(screen.getByRole('button', { name: 'Editar plan' }))
-
-  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Nombre de la comida' })).toHaveFocus())
-})
-
-test('cancelar con cambios pide aviso inline y descarta el borrador', async () => {
-  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, version: 3, createdAt: '2026-10-01' })
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  expect(await screen.findByText(/Cargado el/)).toBeInTheDocument()
-  const edit = screen.getByRole('button', { name: 'Editar plan' })
-  edit.focus()
-  fireEvent.click(edit)
-  fireEvent.change(await screen.findByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
-  expect(screen.getByRole('alert')).toHaveTextContent('cambios sin guardar')
-  fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
-  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }))
-  expect(screen.getByText('Desayuno')).toBeInTheDocument()
-  expect(mockSaveMyPlan).not.toHaveBeenCalled()
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Editar plan' })).toHaveFocus())
-})
-
-test('guardar cambios envía la versión y vuelve al resumen', async () => {
-  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, version: 3 })
-  mockSaveMyPlan.mockResolvedValue({ ...planWithGroups, version: 4 })
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-  await screen.findByRole('button', { name: 'Editar plan' })
-  expect(mockSaveMyPlan).toHaveBeenCalledWith('tok', expect.objectContaining({ clientVersion: 3 }))
-  expect(screen.queryByRole('button', { name: 'Guardar cambios' })).not.toBeInTheDocument()
-})
-
-test('resumen muestra fecha, hora, porciones y color del grupo sin controles de edición', async () => {
-  mockGetMyPlan.mockResolvedValue({
-    ...planWithGroups, createdAt: '2026-10-01',
-    foodGroups: [{ ...defaultGroups[0], color: '#B5627A' }],
-    meals: [{ name: 'Desayuno', suggestedTime: '08:30:00', displayOrder: 1, portions: [{ foodGroupId: 1, portions: 1.5 }] }],
-  })
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  await screen.findByText('Desayuno')
-  expect(screen.getByText('08:30')).toBeInTheDocument()
-  expect(screen.getByText('1,5')).toBeInTheDocument()
-  expect(screen.getByText('Proteínas').closest('.porcion-chip')).toHaveStyle({ '--chip-dot': 'var(--g-frut)' })
-  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Eliminar comida' })).not.toBeInTheDocument()
-  expect(await screen.findByRole('button', { name: 'Ver hábitos, 0' })).toBeInTheDocument()
-})
-
-test('un conflicto conserva el borrador y permite recargar la versión actual', async () => {
-  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, version: 3 })
-  mockSaveMyPlan.mockRejectedValue(new plansApi.PlanConflictError())
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('otro dispositivo')
-  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar comida' }))
+  expect(screen.getByLabelText('Nombre de la comida')).toHaveValue('')
   expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled()
-  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, version: 4 })
-  fireEvent.click(screen.getByRole('button', { name: 'Recargar plan' }))
-  await screen.findByText('Desayuno')
-  expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Desayuno' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar comida' }))
+  expect(mockSaveMyPlan).not.toHaveBeenCalled()
+  mockSaveMyPlan.mockResolvedValue({ ...planWithGroups, meals: [], version: 5 })
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
+  await waitFor(() => expect(mockSaveMyPlan).toHaveBeenCalledWith('tok', { clientVersion: 4, meals: [] }))
 })
-
-
-test('back protects a modified food draft and discard returns to summary', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Ver tus alimentos, 0' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Agregar alimento' }))
-  fireEvent.change(screen.getByLabelText('Alimento'), { target: { value: 'Manzana' } })
-  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
-  expect(screen.getByRole('alert')).toHaveTextContent('cambios sin guardar')
-  fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
-  expect(screen.getByDisplayValue('Manzana')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }))
-  expect(screen.getByRole('button', { name: 'Editar plan' })).toBeInTheDocument()
-})
-
-test('pending save disables cancellation and failure keeps the draft open', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  let rejectSave!: (error: Error) => void
-  mockSaveMyPlan.mockReturnValue(new Promise((_, reject) => { rejectSave = reject }))
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('button', { name: '‹ Mi plan' }))
+test('un conflicto conserva la hoja y permite recargar', async () => {
+  setup()
+  mockSaveMyPlan.mockRejectedValue(new plansApi.PlanConflictError())
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar Desayuno' }))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-  expect(screen.getByRole('button', { name: '‹ Mi plan' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Descartar cambios' })).toBeDisabled()
-  rejectSave(new Error('network'))
-  await screen.findByText(/No se pudo guardar el plan/)
-  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '‹ Mi plan' })).toBeEnabled()
+  expect(await screen.findByText(/modificado en otro dispositivo/)).toBeInTheDocument()
+  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, meals: [{ ...planWithGroups.meals[0], name: 'Nuevo desayuno' }] })
+  fireEvent.click(screen.getAllByRole('button', { name: 'Recargar plan' }).at(-1)!)
+  expect(await screen.findByText('Nuevo desayuno')).toBeInTheDocument()
 })
-
-test('navigation and browser unload protect meal drafts', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  const router = createMemoryRouter([
-    { path: '/', element: <><Link to="/other">Salir</Link><MyPlanPage /></> },
-    { path: '/other', element: <p>Other page</p> },
-  ], { initialEntries: ['/other', '/'], initialIndex: 1 })
-  render(<RouterProvider router={router} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  const unload = new Event('beforeunload', { cancelable: true })
-  window.dispatchEvent(unload)
-  expect(unload.defaultPrevented).toBe(true)
-  fireEvent.click(screen.getByRole('link', { name: 'Salir' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Seguir editando' }))
-  expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
-  await act(async () => { await router.navigate(-1) })
-  fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }, { timeout: 3000 }))
-  expect(await screen.findByText('Other page', {}, { timeout: 3000 })).toBeInTheDocument()
-  await waitFor(() => {
-    const cleanUnload = new Event('beforeunload', { cancelable: true })
-    window.dispatchEvent(cleanUnload)
-    expect(cleanUnload.defaultPrevented).toBe(false)
-  })
-})
-
-test('a navigation blocked during a save continues once the save succeeds', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  let resolveSave!: (plan: typeof planWithGroups) => void
-  mockSaveMyPlan.mockReturnValue(new Promise(resolve => { resolveSave = resolve }))
-  const router = createMemoryRouter([
-    { path: '/', element: <><Link to="/other">Salir</Link><MyPlanPage /></> },
-    { path: '/other', element: <p>Other page</p> },
-  ], { initialEntries: ['/'] })
-  render(<RouterProvider router={router} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-  fireEvent.click(screen.getByRole('link', { name: 'Salir' }))
-  expect(await screen.findByRole('alert', { name: 'Cambios sin guardar' })).toBeInTheDocument()
-  resolveSave(planWithGroups)
-  expect(await screen.findByText('Other page')).toBeInTheDocument()
-})
-
-test('los accesos del resumen anuncian su destino y cantidad', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  const foods = await screen.findByRole('button', { name: 'Ver tus alimentos, 0' })
-  expect(foods.querySelector('[aria-hidden="true"]')).toHaveTextContent('›')
-  expect(screen.getByRole('button', { name: 'Ver hábitos, 0' })).toBeInTheDocument()
-  fireEvent.click(foods)
-  expect(await screen.findByRole('region', { name: 'Alimentos' })).toBeInTheDocument()
-})
-
-test('volver está en el encabezado y alimentos explica cómo agregar', async () => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Ver tus alimentos, 0' }))
-  expect(screen.getByRole('button', { name: '‹ Mi plan' }).closest('header')).toBeInTheDocument()
-  expect(await screen.findByText(/Todavía no tenés alimentos/)).toHaveTextContent('Agregar alimento')
-})
-
-test.each([false, true])('tocar Mi plan vuelve al resumen con borrador %s', async dirty => {
-  mockGetMyPlan.mockResolvedValue(planWithGroups)
-  const router = createMemoryRouter([
-    { path: '/mi-plan', element: <><Link to="/mi-plan">Mi plan</Link><MyPlanPage /></> },
-  ], { initialEntries: ['/mi-plan'] })
-  render(<RouterProvider router={router} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  if (dirty) fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Cena' } })
-  fireEvent.click(screen.getByRole('link', { name: 'Mi plan' }))
-  if (dirty) {
-    expect(await screen.findByRole('alert', { name: 'Cambios sin guardar' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
-    expect(screen.getByDisplayValue('Cena')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('link', { name: 'Mi plan' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Descartar cambios' }))
-  }
-  expect(await screen.findByRole('button', { name: 'Editar plan' })).toBeInTheDocument()
-  expect(screen.getByText('Desayuno')).toBeInTheDocument()
-  expect(screen.queryByLabelText('Nombre de la comida')).not.toBeInTheDocument()
-})
-
-test('una comida admite hasta 12 porciones: al llegar, no deja sumar más', async () => {
+test('sin plan permite agregar una comida', async () => {
   mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
   render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }))
-  fireEvent.click(await screen.findByText('Agregar comida'))
-  const sum = (name: string, times: number) => {
-    for (let k = 0; k < times; k++) fireEvent.click(screen.getAllByRole('button', { name: `Aumentar ${name}` }).at(-1)!)
-  }
-  sum('Proteínas', 12)
-  sum('Cereales', 12)
-  expect(screen.getAllByText(/de 12 porciones: una comida tiene hasta 12/).at(-1)).toHaveTextContent('12 de 12 porciones')
-  expect(screen.getAllByRole('button', { name: 'Aumentar Verduras' }).at(-1)).toBeDisabled()
+  fireEvent.click(await screen.findByRole('button', { name: 'Agregar comida' }))
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+})
+test('los planes anteriores conservan el detalle de solo lectura', async () => {
+  mockGetPlanHistory.mockResolvedValue([{ ...planWithGroups, createdAt: '2026-10-01', supersededAt: '2026-11-01', mealCount: 1 }])
+  setup()
+  fireEvent.click(await screen.findByRole('button', { name: /Planes anteriores/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /1 comidas/ }))
+  expect(screen.getByRole('dialog', { name: 'Detalle del plan' })).toBeInTheDocument()
+})
+
+test('navegar a Hoy y Semana tras guardar consulta la versión nueva sin recargar la página', async () => {
+  let current = planWithGroups
+  mockGetMyPlan.mockImplementation(async () => current)
+  mockSaveMyPlan.mockImplementation(async (_token, input) => {
+    current = { ...planWithGroups, version: 5, meals: input.meals.map((meal, index) => ({
+      ...meal, id: index + 1, suggestedTime: meal.suggestedTime ?? '', weekdays: meal.weekdays ?? [],
+      portions: meal.portions.map(p => ({ foodGroupId: defaultGroups.find(g => g.abbreviation === p.foodGroupAbbr)!.id, portions: p.portions })),
+    })) }
+    return current
+  })
+  vi.mocked(getWeek).mockImplementation(async () => ({
+    weekStart: '2026-11-09', weekEnd: '2026-11-15', habits: [],
+    days: [{ date: '2026-11-09', hasData: false, totalRecorded: 0, totalGoal: 3, habitLogs: [],
+      meals: current.meals.map((meal, index) => ({ mealId: index + 1, name: meal.name, status: 'SIN_ANOTAR', planned: true, noteText: null })) }],
+  }))
+  render(<MemoryRouter initialEntries={['/mi-plan']}>
+    <nav><Link to="/hoy">Ir a Hoy</Link><Link to="/semana">Ir a Semana</Link><Link to="/mi-plan">Ir a Mi plan</Link></nav>
+    <Routes><Route path="/mi-plan" element={<MyPlanPage />} /><Route path="/hoy" element={<TodayPage />} /><Route path="/semana" element={<WeekPage />} /></Routes>
+  </MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar Desayuno' }))
+  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Desayuno nuevo' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await screen.findByText('¡Plan guardado!')
+  fireEvent.click(screen.getByText('Ir a Hoy'))
+  expect((await screen.findAllByText('Desayuno nuevo')).length).toBeGreaterThan(0)
+  fireEvent.click(screen.getByText('Ir a Semana'))
+  expect((await screen.findAllByText('Desayuno nuevo')).length).toBeGreaterThan(0)
+  expect(getWeek).toHaveBeenCalled()
+})
+
+test('el PUT real invalida la caché GET del plan y de Semana', async () => {
+  const plans = await vi.importActual<typeof import('../api/plans')>('../api/plans')
+  const week = await vi.importActual<typeof import('../api/week')>('../api/week')
+  let version = 4
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === 'PUT') version = 5
+    return new Response(JSON.stringify(String(input).includes('semana') ? { version } : { ...planWithGroups, version }), { status: 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  try {
+    await plans.getMyPlan('cache-plan-359')
+    await week.getWeek('cache-plan-359', '2026-11-09')
+    await plans.saveMyPlan('cache-plan-359', { clientVersion: 4, meals: [] })
+    expect((await plans.getMyPlan('cache-plan-359')).version).toBe(5)
+    expect(await week.getWeek('cache-plan-359', '2026-11-09')).toMatchObject({ version: 5 })
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+  } finally { vi.unstubAllGlobals() }
 })

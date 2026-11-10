@@ -1,0 +1,15 @@
+ .meal-sheet { color: var(--ink); }
+.meal-sheet__fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.meal-sheet label { display: grid; gap: 8px; margin-bottom: 16px; }
+.meal-sheet input { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 10px; min-height: 44px; font: inherit; }
+.meal-sheet button { min-height: 44px; min-width: 44px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: var(--radius-control); font: inherit; cursor: pointer; }
+.meal-sheet button:disabled { opacity: .5; cursor: default; }
+.meal-sheet button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.meal-sheet__days { display: flex; flex-wrap: wrap; gap: 4px; }
+.meal-sheet__days button[aria-pressed=true] { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+.meal-sheet__portion { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.meal-sheet__portion > span:nth-child(2) { flex: 1; }
+.meal-sheet__portion output { min-width: 28px; text-align: center; }
+.meal-sheet__dot { width: 8px; height: 8px; border-radius: 50%; }
+.meal-sheet .meal-sheet__save { width: 100%; margin-top: 16px; background: var(--primary); color: var(--on-primary); }
+.meal-sheet .meal-sheet__delete { width: 100%; margin-top: 8px; background: transparent; color: var(--error); }
