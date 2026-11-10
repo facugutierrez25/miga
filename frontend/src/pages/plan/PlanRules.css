@@ -169,3 +169,11 @@
 .plan-rules button[hidden] { display: none; }
 .plan-rules summary { min-height: 44px; cursor: pointer; padding-block: 12px; }
 .plan-rules details[open] { display: grid; gap: 12px; }
+
+.rules-item strong { display: flex; align-items: center; gap: 8px; }
+.rules-form .hoy-habito { padding: 12px; background: var(--surface); border-radius: var(--radius-card); }
+.plan-rules .segmented label { display: block; min-height: 0; }
+.plan-rules .segmented input[type='radio'] { width: 1px; height: 1px; }
+
+.plan-rules .hoy-habito__migas button { padding: 0; border: none; background: transparent; color: var(--ink); }
+.plan-rules .hoy-habito__migas .hoy-habito__paso { border: 1px solid var(--line); background: var(--surface); }

@@ -44,6 +44,11 @@ export default function FoodRulesEditor(props: EditorProps) {
 
   return (
     <section aria-label="Alimentos" onKeyDown={e => { if (e.key === 'Escape') closeEditor() }}>
+      <h2>Tus alimentos</h2>
+      <label>
+        Buscar alimentos
+        <input type="search" placeholder="Huevo, milanesa, yogur…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </label>
       <button type="button" data-add-rule onClick={() => openEditor('new')}>
         Agregar alimento
       </button>
@@ -56,10 +61,6 @@ export default function FoodRulesEditor(props: EditorProps) {
           onSave={save}
         />
       )}
-      <label>
-        Buscar alimentos
-        <input value={query} onChange={(e) => setQuery(e.target.value)} />
-      </label>
       <h3>En tu plan</h3>
       {plan.alimentos.length === 0 && <p>Todavía no tenés alimentos en tu plan. Acá podés indicar sus porciones y equivalencias. Usá Agregar alimento o buscá uno en el catálogo para ajustarlo.</p>}
       {plan.alimentos
@@ -71,7 +72,7 @@ export default function FoodRulesEditor(props: EditorProps) {
         .map((rule) => (
           <article className="rules-card" key={rule.uid}>
             <button type="button" className="rules-item" aria-label={`Editar ${rule.alimento}`} onClick={() => openEditor(rule)}><strong>{rule.alimento}</strong>
-            <span className="rules-secondary">{rule.textoRegla}</span></button>
+            <span className="rules-secondary">{rule.textoRegla}</span><span className="rules-secondary">{rule.alcance === 'USUARIO' ? 'Tuyo' : rule.alcance === 'GLOBAL' ? 'Catálogo' : 'De tu plan'}</span></button>
             {editing !== 'new' && editing?.uid === rule.uid && rule.alcance === 'USUARIO' && (
               <FoodRuleForm
           onDirtyChange={onDirtyChange}

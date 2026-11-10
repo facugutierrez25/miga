@@ -93,7 +93,7 @@ export default function PlanRulesSection({
     setReload((value) => value + 1)
   }
 
-  const props = plan && token ? { token, plan, mutate, onDirtyChange: reportDirty } : null
+  const props = plan && token ? { token, plan, mutate, onDirtyChange: reportDirty, disabled: busy || error?.code === 'VERSION_CONFLICT' } : null
 
   return (
     <div className="plan-rules">
