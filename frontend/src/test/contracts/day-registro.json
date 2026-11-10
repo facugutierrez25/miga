@@ -5,6 +5,7 @@
     "noteId" : 1,
     "noteText" : "Sintético",
     "noteVersion" : 1,
+    "status" : "EN_PLAN",
     "items" : [ {
       "id" : 1,
       "food" : "Sintético",
@@ -25,7 +26,7 @@
       "name" : "Sintético",
       "expected" : 1.5,
       "recorded" : 1.5,
-      "status" : "OK"
+      "status" : "EN_PLAN"
     } ]
   } ],
   "summary" : [ {

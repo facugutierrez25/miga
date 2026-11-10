@@ -4,10 +4,11 @@ export interface MealStatus {
   kind: MealStateKind
   label: string
   text: string
-  crumb: 'full' | 'half' | 'noted' | 'empty'
+  crumb: 'full' | 'half' | 'noted' | 'empty' | 'flexible'
 }
 
 const STATUS_LABELS: Record<string, { kind: MealStateKind; label: string; crumb: MealStatus['crumb'] }> = {
+  FLEXIBLE: { kind: 'noted', label: 'Flexible', crumb: 'flexible' },
   EN_PLAN: { kind: 'ok', label: 'Como el plan', crumb: 'full' },
   CASI: { kind: 'warn', label: 'Faltó algo', crumb: 'half' },
   DE_MAS: { kind: 'warn', label: 'De más', crumb: 'half' },
@@ -39,21 +40,22 @@ function describeGroups(groups: GroupStatusDto[], diff: (s: GroupStatusDto) => n
 
 export function mealStatus(mealDay: { noteText: string | null; comparison?: GroupStatusDto[]; status?: string } | undefined): MealStatus {
   if (!mealDay) return statusFromCode('SIN_ANOTAR')
+  const status = statusFromCode(mealDay.status ?? 'SIN_ANOTAR')
   const comparison = mealDay.comparison
-  // Semana manda el estado ya calculado, que puede existir aunque la comida no tenga nota.
-  if (!comparison) return statusFromCode(mealDay.status ?? (mealDay.noteText ? 'REGISTRADA' : 'SIN_ANOTAR'))
-  if (!mealDay.noteText) return statusFromCode('SIN_ANOTAR')
-  if (comparison.some(s => s.status === 'PREGUNTAR')) return statusFromCode('PREGUNTAR')
-  if (comparison.length === 0) return statusFromCode('REGISTRADA')
-  // El backend ya aplica el margen del plan: solo CASI y SIN_ANOTAR faltan, solo DE_MAS sobra.
+  if (!comparison || !['CASI', 'DE_MAS', 'MIXED'].includes(mealDay.status ?? '')) return status
   const missing = comparison.filter(s => s.status === 'CASI' || s.status === 'SIN_ANOTAR')
   const extra = comparison.filter(s => s.status === 'DE_MAS')
   const parts = [
     missing.length > 0 ? `Faltó ${describeGroups(missing, s => s.expected - s.recorded)}` : '',
     extra.length > 0 ? `De más: ${describeGroups(extra, s => s.recorded - s.expected)}` : '',
   ].filter(Boolean)
-  return parts.length > 0
-    ? { ...statusFromCode(missing.length && extra.length ? 'MIXED' : missing.length ? 'CASI' : 'DE_MAS'), text: parts.join(' · ') }
-    : statusFromCode('EN_PLAN')
+  return { ...status, text: parts.length > 0 ? parts.join(' · ') : status.text }
 }
 
+export type MigaAspect = 'full' | 'half' | 'flexible' | 'noted' | 'empty' | 'future' | 'plus' | 'dash'
+
+export function mealAspect(status = 'SIN_ANOTAR', { planned = true, future = false, week = false } = {}): MigaAspect {
+  if (!planned && status === 'SIN_ANOTAR') return week ? 'dash' : 'plus'
+  if (future) return 'future'
+  return mealStatus({ status, noteText: null }).crumb
+}

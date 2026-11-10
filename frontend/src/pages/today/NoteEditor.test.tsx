@@ -19,7 +19,7 @@ test('muestra nota guardada si el día tiene texto', async () => {
     date: '2025-01-01',
     meals: [{
       mealId: 1,
-      noteId: 5, noteVersion: 0,
+      status: 'REGISTRADA' as const, noteId: 5, noteVersion: 0,
       noteText: 'leche con pan',
       items: [],
       comparison: [],
@@ -27,13 +27,14 @@ test('muestra nota guardada si el día tiene texto', async () => {
     summary: [],
   })
   renderToday()
+  await openNote()
   await waitFor(() => expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche con pan'))
 })
 
 test('el botón guardar envía la nota al backend', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0,
+    status: 'REGISTRADA' as const, noteId: 1, version: 0,
     text: 'leche',
     date: '2025-01-01',
     mealId: 1,
@@ -42,8 +43,9 @@ test('el botón guardar envía la nota al backend', async () => {
     comparison: [],
   })
   renderToday()
-  await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Desayuno', level: 2 })).toBeInTheDocument())
 
+  await openNote()
   await waitFor(() => expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toBeInTheDocument())
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'leche' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
@@ -67,7 +69,8 @@ test('lo de siempre guarda en un toque, bloquea doble envío y permite editar de
   expect(suggestion).toBeDisabled()
   expect(mockSaveNote).toHaveBeenCalledTimes(1)
   expect(mockSaveNote).toHaveBeenCalledWith('tok', expect.any(String), 1, 'leche con pan', null)
-  finish({ noteId: 1, version: 1, text: 'leche con pan', date: emptyDay.date, mealId: 1, items: [], entries: [], comparison: [] })
+  finish({ status: 'REGISTRADA' as const, noteId: 1, version: 1, text: 'leche con pan', date: emptyDay.date, mealId: 1, items: [], entries: [], comparison: [] })
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
   await screen.findByRole('button', { name: 'Guardar cambios' })
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'otra nota' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
@@ -93,7 +96,7 @@ test('lo dictado mientras se guarda no se pierde al terminar el guardado', async
 
   act(() => result({ results: [[{ transcript: 'con pan' }]] }))
   await act(async () => {
-    finishSaving({ noteId: 1, text: 'mate', date: '2025-01-01', mealId: 1, version: 1, items: [], entries: [], comparison: [] })
+    finishSaving({ status: 'REGISTRADA' as const, noteId: 1, text: 'mate', date: '2025-01-01', mealId: 1, version: 1, items: [], entries: [], comparison: [] })
   })
 
   await waitFor(() => expect(draft).toHaveValue('mate con pan'))
@@ -105,7 +108,7 @@ test('si falla una respuesta a la pregunta, se muestra el error', async () => {
   mockGetDayRecord.mockResolvedValue({
     date: '2025-01-01', summary: [],
     meals: [{
-      mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
+      mealId: 1, status: 'PREGUNTAR' as const, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }],
     }],
   })
@@ -120,17 +123,18 @@ test('si falla una respuesta a la pregunta, se muestra el error', async () => {
 test('al guardar dice qué faltó y suma lo anotado al día', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0, text: 'un huevo', date: '2025-01-01', mealId: 1, items: [],
+    status: 'CASI' as const, noteId: 1, version: 0, text: 'un huevo', date: '2025-01-01', mealId: 1, items: [],
     entries: [{ id: 7, food: 'huevo', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE,
       uncertain: false, originalText: 'un huevo', appliedRule: null, occurrenceId: null }],
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'CASI' }],
   })
   renderToday()
-  const textarea = await screen.findByRole('textbox', { name: '¿Qué comiste?' })
-  fireEvent.change(textarea, { target: { value: 'un huevo' } })
+  await openNote()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'un huevo' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   expect(await screen.findByRole('status')).toHaveTextContent('Guardado. Faltó 1 porción de Proteínas.')
   expect(screen.getByText('1 de 2 porciones')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Tu d.a por grupo/ }))
   expect(screen.getAllByRole('img', { name: 'Proteínas: 1 de 2 porciones' }).length).toBeGreaterThan(0)
 })
 
@@ -139,21 +143,21 @@ test('un grupo por confirmar muestra la pregunta y el estado', async () => {
   mockGetDayRecord.mockResolvedValue({
     ...emptyDay,
     meals: [{
-      mealId: 1, noteId: 3, noteVersion: 0, noteText: 'tostadas', items: [],
+      mealId: 1, status: 'PREGUNTAR' as const, noteId: 3, noteVersion: 0, noteText: 'tostadas', items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }],
     }],
   })
   renderToday()
-  const renderRow = await screen.findByRole('button', { name: /Desayuno/, expanded: false })
-  expect(renderRow).toHaveTextContent('Por confirmar')
+  const renderRow = await screen.findByRole('button', { name: /Desayuno: por confirmar/ })
+  expect(renderRow).toHaveAccessibleName('Desayuno: por confirmar')
   fireEvent.click(renderRow)
-  expect(screen.getByText(/¿Consumiste/)).toHaveTextContent('¿Consumiste Proteínas?')
+  expect(screen.getByText(/¿Comiste/)).toHaveTextContent('¿Comiste Proteínas?')
 })
 
 test('al guardar suma al día también los grupos que esa comida no tenía previstos', async () => {
   mockGetMyPlan.mockResolvedValue(twoMealPlan)
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0, text: 'pollo y una manzana', date: '2025-01-01', mealId: 2, items: [],
+    status: 'EN_PLAN' as const, noteId: 1, version: 0, text: 'pollo y una manzana', date: '2025-01-01', mealId: 2, items: [],
     entries: [
       { id: 8, food: 'pollo', quantity: 1, unit: 'u', foodGroupId: 1, portions: 2, origin: ItemOrigin.RULE,
         uncertain: false, originalText: 'pollo', appliedRule: null, occurrenceId: null },
@@ -163,10 +167,11 @@ test('al guardar suma al día también los grupos que esa comida no tenía previ
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN' }],
   })
   renderToday()
-  const textarea = await screen.findByRole('textbox', { name: '¿Qué comiste?' })
-  fireEvent.change(textarea, { target: { value: 'pollo y una manzana' } })
+  fireEvent.click(await screen.findByRole('button', { name: /Cena:/ }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'pollo y una manzana' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   expect(await screen.findByText('3 de 4 porciones')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Tu d.a por grupo/ }))
   expect(screen.getAllByRole('img', { name: 'Frutas: 1 de 1 porciones' }).length).toBeGreaterThan(0)
 })
 
@@ -175,7 +180,7 @@ test('una respuesta guardada no se reporta como error si falla la recarga del d�
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   const day = {
     date: '2025-01-01', summary: [],
-    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
+    meals: [{ mealId: 1, status: 'PREGUNTAR' as const, noteId: 1, noteText: 'leche', noteVersion: 1, items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }] }],
   }
   mockGetDayRecord.mockResolvedValue(day)

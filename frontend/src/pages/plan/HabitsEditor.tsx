@@ -1,3 +1,7 @@
+import BottomSheet from '../../components/BottomSheet'
+import Segmented from '../../components/Segmented'
+import Miga from '../../components/Miga'
+import { HabitCrumbs } from '../../components/TodayHabits'
 import { useDraftGuard } from './useDraftGuard'
 import InlineDelete from './InlineDelete'
 import { useEditorFocus } from './useEditorFocus'
@@ -12,7 +16,12 @@ import {
 } from '../../api/planRules'
 import type { EditorProps } from './GroupsEditor'
 
-export default function HabitsEditor({ token, plan, mutate, onDirtyChange }: EditorProps) {
+interface HabitErrorProps {
+  error?: { code?: string; message: string } | null
+  onReload?: () => void
+}
+
+export default function HabitsEditor({ token, plan, mutate, onDirtyChange, disabled, error, onReload }: EditorProps & HabitErrorProps) {
   const [editing, setEditing] = useState<Habit | 'new' | null>(null)
   const { rememberTrigger, restoreFocus } = useEditorFocus()
   function openEditor(value: Habit | 'new') {
@@ -40,15 +49,18 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange }: Edi
   }
 
   return (
-    <section aria-label="Hábitos" onKeyDown={e => { if (e.key === 'Escape') closeEditor() }}>
+    <section aria-label="Hábitos">
       {plan.habitos.length === 0 && <p>Todavía no tenés hábitos. Sirven para registrar acciones y metas de tu día o semana. Tocá Agregar hábito para crear uno.</p>}
       {plan.habitos.map((habit) => (
         <article className="rules-card" key={habit.uid}>
-          <button type="button" className="rules-item" aria-label={`Editar ${habit.name}`} onClick={() => openEditor(habit)}><strong>{habit.name}</strong>
-          <span className="rules-secondary">{habitSummary(habit)}</span></button>
+          <button type="button" className="rules-item" aria-label={`Editar ${habit.name}`} onClick={() => openEditor(habit)}><strong><Miga aspect="empty" /> {habit.name}</strong>
+          <span className="rules-secondary">{habitSummary(habit)}</span><span className="rules-secondary">{habit.countsFlexibleMeals ? 'Se ve en Semana' : 'Se anota en Hoy'}</span></button>
           {editing !== 'new' && editing?.uid === habit.uid && (
             <HabitForm
-          onDirtyChange={onDirtyChange}
+              error={error}
+              onReload={onReload}
+              disabled={disabled}
+              onDirtyChange={onDirtyChange}
               habit={editing}
               onCancel={closeEditor}
               deleteAction={<InlineDelete name={habit.name} onDelete={() => confirmDelete(habit.uid)} hint="Si ya tiene registros, se archiva y deja de mostrarse; sus registros se conservan." />}
@@ -64,6 +76,9 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange }: Edi
       </button>
       {editing === 'new' && (
         <HabitForm
+          error={error}
+          onReload={onReload}
+          disabled={disabled}
           onDirtyChange={onDirtyChange}
           habit={editing === 'new' ? undefined : editing}
           onCancel={closeEditor}
@@ -77,12 +92,16 @@ export default function HabitsEditor({ token, plan, mutate, onDirtyChange }: Edi
 }
 function HabitForm({
   habit,
+  disabled = false,
+  error,
+  onReload,
   onSave,
   onCancel,
   deleteAction,
   onDirtyChange,
-}: {
+}: HabitErrorProps & {
   habit?: Habit
+  disabled?: boolean
   onSave: (input: HabitInput) => Promise<void>
   onCancel: () => void
   onDirtyChange?: (dirty: boolean) => void
@@ -91,15 +110,29 @@ function HabitForm({
   const [value, setValue] = useState<HabitInput>(
     habit ?? { name: '', habitType: 'CONTADOR', unit: null, goal: null, period: 'DIA', step: 1 }
   )
-  const draft = useDraftGuard(value, onDirtyChange)
-  const cancel = () => draft.cancel(onCancel)
+  const [previewValue, setPreviewValue] = useState(0)
+  const automatic = habit?.countsFlexibleMeals === true
+  const yesNo = value.habitType === 'SI_NO'
+  const draft = useDraftGuard(value, onDirtyChange, disabled)
+  const conflict = error?.code === 'VERSION_CONFLICT'
+  const cancel = () => conflict ? onCancel() : draft.cancel(onCancel)
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    void onSave({ ...value, name: value.name.trim() })
+    if (disabled) return
+    void onSave(automatic ? { ...habit, goal: value.goal } : { ...value, name: value.name.trim(), ...(yesNo ? { goal: null, step: 1 } : {}) })
   }
 
   return (
+    <BottomSheet title={habit ? `Editar ${habit.name}` : 'Agregar hábito'} onClose={cancel}>
+    <div className="plan-rules">
     <form className="rules-form" onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}>
+      {error && <div role="alert" className="plan-error">
+        <p>{error.message}</p>
+        {conflict && <button type="button" onClick={onReload}>Recargar</button>}
+      </div>}
+      <fieldset className="rules-editor" disabled={disabled}>
+      {automatic && <p>Se cuenta sola con las comidas que marcás como flexibles. Solo se cambia la meta.</p>}
+      <fieldset disabled={automatic}>
       <label>
         Nombre del hábito
         <input
@@ -136,7 +169,8 @@ function HabitForm({
           onChange={(e) => setValue({ ...value, unit: e.target.value || null })}
         />
       </label>
-      <label>
+      </fieldset>
+      {!yesNo && <label>
         Meta
         <input
           type="number"
@@ -148,17 +182,15 @@ function HabitForm({
           }
         />
       </label>
-      <label>
-        Período
-        <select
-          value={value.period}
-          onChange={(e) => setValue({ ...value, period: e.target.value as HabitInput['period'] })}
-        >
-          <option value="DIA">Por día</option>
-          <option value="SEMANA">Por semana</option>
-        </select>
-      </label>
-      <label>
+      }
+      <fieldset disabled={automatic}>
+      <div>
+        <span>Período</span>
+        <Segmented label="Período" value={value.period}
+          options={[{ value: 'DIA', label: 'Por día' }, { value: 'SEMANA', label: 'Por semana' }]}
+          onChange={period => setValue({ ...value, period })} />
+      </div>
+      {!yesNo && <label>
         Paso
         <input
           type="number"
@@ -169,24 +201,34 @@ function HabitForm({
           onChange={(e) => setValue({ ...value, step: Number(e.target.value) })}
         />
       </label>
+      }
+      </fieldset>
+      {!automatic && <section aria-label="Vista previa en Hoy" aria-live="polite">
+        <p>Así se va a ver en Hoy{!yesNo && value.goal != null && value.goal / value.step > 6 ? ': son más de 6 pasos, así que va con número y botones' : ''}.</p>
+        <HabitCrumbs habit={{ ...value, id: habit?.id ?? 0, displayOrder: habit?.displayOrder ?? 0, dailyGoal: value.goal }}
+          value={previewValue} onChange={setPreviewValue} />
+      </section>}
       {draft.notice(onCancel)}
       {deleteAction}
       <div className="rules-row">
         <button type="submit" disabled={!value.name.trim()}>
           Guardar hábito
         </button>
-        <button type="button" onClick={cancel}>
-          Cancelar
-        </button>
       </div>
+      </fieldset>
+      <button type="button" disabled={disabled && !conflict} onClick={cancel}>
+        Cancelar
+      </button>
     </form>
+    </div>
+    </BottomSheet>
   )
 }
 
 function habitSummary(habit: Habit) {
-  const type = { CANTIDAD: 'Cantidad', CONTADOR: 'Contador', SI_NO: 'Sí o no' }[habit.habitType]
   const period = habit.period === 'DIA' ? 'por día' : 'por semana'
-  if (habit.habitType === 'SI_NO') return `${type} · ${period}`
-  if (habit.goal == null) return `${type} · Sin meta`
-  return `${type} · ${formatNumber(habit.goal)}${habit.unit ? ` ${habit.unit}` : ''} ${period}`
+  if (habit.habitType === 'SI_NO') return `Sí o no · ${period}`
+  const unit = habit.unit ? ` ${habit.unit}` : ''
+  const goal = habit.goal == null ? 'Sin meta' : `Meta ${formatNumber(habit.goal)}${unit}`
+  return `${goal} · de a ${formatNumber(habit.step)}${unit} · ${period}${habit.countsFlexibleMeals ? ' · se cuenta sola' : ''}`
 }

@@ -7,7 +7,7 @@ export interface CrumbRow {
   status?: string
 }
 
-// Un plan admite hasta 12 porciones por comida: es lo que entra en la ficha de dominó.
+// El editor permite hasta 12 porciones por comida.
 export const MAX_CARD_PORTIONS = 12
 
 export function formatPortions(n: number): string {
@@ -27,15 +27,4 @@ export function crumbSlots(done: number, total: number): { capacity: number; fil
 export function crumbsLabel(row: CrumbRow): string {
   const extra = row.done > row.total ? `, ${formatPortions(row.done - row.total)} de más` : ''
   return `${row.name}: ${formatPortions(row.done)} de ${formatPortions(row.total)} porciones${extra}`
-}
-
-// Lo que falta o sobra en una comida, según el estado que calcula el backend con el margen del plan.
-export function crumbDifference(row: CrumbRow): string {
-  return (row.status === 'CASI' || row.status === 'SIN_ANOTAR') ? `falta ${formatPortions(row.total - row.done)}`
-    : row.status === 'DE_MAS' ? `${formatPortions(row.done - row.total)} de más` : ''
-}
-
-export function crumbDifferenceLabel(row: CrumbRow): string {
-  const difference = crumbDifference(row)
-  return `${row.name}: ${formatPortions(row.done)} de ${formatPortions(row.total)}${row.status === 'PREGUNTAR' ? ', por confirmar' : ''}${difference ? `, ${difference}` : ''}`
 }

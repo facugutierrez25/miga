@@ -82,8 +82,9 @@ public class DailyLogService {
         return noteService.deleteNote(userEmail, date, mealId, version);
     }
 
-    void saveAnswer(String userEmail, LocalDate date, Long mealId, AnswerRequest req) {
+    DayLogDto.MealDayDto saveAnswer(String userEmail, LocalDate date, Long mealId, AnswerRequest req) {
         itemCorrectionService.saveAnswer(userEmail, date, mealId, req);
+        return dayReadService.getMealLog(userEmail, date, mealId);
     }
 
     public List<UnmatchedFoodDto> getUnmatchedFoods(Long userId, LocalDate from, LocalDate to) {

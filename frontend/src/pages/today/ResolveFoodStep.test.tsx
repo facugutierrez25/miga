@@ -19,24 +19,24 @@ import * as recordsApi from '../../api/records'
 test('cuenta y separa los alimentos sin reconocer del resumen', async () => {
   setupRemoval([unknownFood, { ...removableItems[0], uncertain: true }])
   renderToday()
-  expect(await screen.findByRole('button', { name: 'Así lo entendí · 1 sin reconocer · 1 estimados' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Así lo entendí' })).toBeInTheDocument()
   await openDetails()
-  expect(screen.getByRole('heading', { name: 'No reconocí 1 cosa' })).toBeInTheDocument()
-  expect(screen.getByText('«milanesa rara»')).toBeInTheDocument()
-  expect(screen.getByText(/^Entendí:/)).not.toHaveTextContent('milanesa rara')
+  expect(screen.getByText('Sin reconocer: no cuenta hasta que me digas qué es')).toBeVisible()
+  expect(screen.getAllByText('«milanesa rara»')[0]).toBeInTheDocument()
+  expect(screen.getByText('cantidad estimada')).toHaveClass('tag')
 })
 
 test('resuelve por catálogo y deshace restaurando el aviso', async () => {
   const resolved = mockResolution()
   vi.mocked(searchCatalog).mockResolvedValue([{ uid: 'milanesa', alcance: 'CATALOGO', alimento: 'Milanesa', sinonimos: [], tipo: 'NORMAL', groupUid: null, textoRegla: '1 porción', ajustadoPorUid: null }])
   await openResolution()
-  expect(screen.getByRole('heading', { name: '¿Qué es «milanesa rara»?' })).toHaveFocus()
+  expect(screen.getByRole('heading', { name: '¿Qué es «milanesa rara»?' })).toBeVisible()
   fireEvent.click(await screen.findByRole('button', { name: 'Es esto' }))
   await waitFor(() => expect(recordsApi.resolveItem).toHaveBeenCalledWith('tok', expect.any(String), 501, { kind: 'SAME_AS', ruleUid: 'milanesa', remember: true }))
   expect(await screen.findByText(/Listo:.*Milanesa/)).toHaveTextContent('Lo voy a reconocer la próxima vez.')
   vi.mocked(recordsApi.undoResolveItem).mockImplementation(async () => {
-    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, noteId: 3, noteVersion: 7, noteText: 'nota', items: [unknownFood], comparison: [] }] })
-    return { replacedItemIds: [resolved.id], items: [unknownFood] }
+    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 3, noteVersion: 7, noteText: 'nota', items: [unknownFood], comparison: [] }] })
+    return { status: 'REGISTRADA' as const, replacedItemIds: [resolved.id], items: [unknownFood] }
   })
   fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }))
   expect(await screen.findByText('Listo, quedó como antes.')).toBeInTheDocument()
@@ -72,7 +72,7 @@ test('muestra error y vuelve con foco mediante volver y Escape', async () => {
 })
 
 
-test.each([['Comida flexible', 'FLEXIBLE'], ['No cuenta para el plan', 'NOT_COUNTED']])('resuelve %s sin recordar', async (label, kind) => {
+test.each([['Comida flexible', 'FLEXIBLE'], ['No cuenta', 'NOT_COUNTED']])('resuelve %s sin recordar', async (label, kind) => {
   mockResolution()
   await openResolution()
   fireEvent.click(screen.getByRole('checkbox', { name: 'Reconocerlo siempre que lo escriba' }))

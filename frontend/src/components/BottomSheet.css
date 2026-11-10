@@ -1,0 +1,9 @@
+.bottom-sheet-overlay { position: fixed; inset: 0; z-index: 100; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
+.bottom-sheet { width: 100%; max-width: 480px; max-height: 88dvh; overflow-y: auto; background: var(--surface); border-radius: 24px 24px 0 0; box-shadow: var(--shadow-float);
+  padding: 20px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 14px; animation: sheet-rise 400ms var(--ease-out); }
+.bottom-sheet__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bottom-sheet__header h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.bottom-sheet__close { width: 40px; height: 40px; border: none; background: none; border-radius: 12px; color: var(--muted); font-size: 18px; flex: none; cursor: pointer; }
+@keyframes sheet-rise { from { transform: translateY(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .bottom-sheet { animation: none; } }

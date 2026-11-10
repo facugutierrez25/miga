@@ -58,7 +58,7 @@ export default function ResolveFoodStep({ item, token, date, groups, onBack, onR
         <button type="button" className="resolve-primary" disabled={!validGroups} onClick={() => void save({ kind: 'GROUPS', groups: rows.map(row => ({ foodGroupId: Number(row.foodGroupId), portions: Number(row.portions) })) }, 'lo que elegiste')}>Guardar</button>
       </div>}
       <button type="button" onClick={() => void save({ kind: 'FLEXIBLE' }, 'comida flexible')}>Comida flexible</button>
-      <button type="button" onClick={() => void save({ kind: 'NOT_COUNTED' }, 'algo que no cuenta para el plan')}>No cuenta para el plan</button>
+      <button type="button" onClick={() => void save({ kind: 'NOT_COUNTED' }, 'algo que no cuenta para el plan')}>No cuenta</button>
       <label className="resolve-remember"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} />Reconocerlo siempre que lo escriba</label>
       <button type="button" className="nota-link" onClick={onBack}>Dejarlo así para mi nutri</button>
     </fieldset>

@@ -76,6 +76,22 @@ class WeekIntegrationTest {
     @Autowired private jakarta.persistence.EntityManager entityManager;
 
     @Test
+    void habitValueMayExceedItsDailyGoal() throws Exception {
+        long habitId = objectMapper.readTree(mockMvc.perform(post("/api/v1/habitos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"Agua\",\"habitType\":\"CANTIDAD\",\"unit\":\"vasos\",\"dailyGoal\":2,\"step\":1,\"displayOrder\":1}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).path("id").asLong();
+        String date = LocalDate.now().toString();
+        assertThat(logHabit(habitId, date, 3).path("value").asInt()).isEqualTo(3);
+        var week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode today = null;
+        for (JsonNode day : week.path("days")) if (date.equals(day.path("date").asText())) today = day;
+        assertThat(today).isNotNull();
+        assertThat(today.path("habitLogs").get(0).path("value").asInt()).isEqualTo(3);
+    }
+
+    @Test
     void sqlCounterIncludesJdbcTemplateAndNativeJpa() {
         try (var count = uy.miga.SqlRequestCounter.start()) {
             jdbc.queryForObject("SELECT 1", Integer.class);

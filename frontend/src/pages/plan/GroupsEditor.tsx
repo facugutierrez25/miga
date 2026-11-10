@@ -9,6 +9,7 @@ import * as api from '../../api/planRules'
 
 export interface EditorProps {
   token: string
+  disabled?: boolean
   plan: api.PlanRules
   onDirtyChange?: (dirty: boolean) => void
   mutate: (operation: () => Promise<api.PlanRules>) => Promise<api.PlanRules | null>
@@ -93,10 +94,10 @@ export default function GroupsEditor({ token, plan, mutate, onDirtyChange, meals
               {group.name}
             </strong>
             <span className="rules-secondary">
-              {groupTotals[group.id] ? `Total del día: ${formatNumber(groupTotals[group.id])}` : 'No está en ninguna comida'}
+              {formatNumber(groupTotals[group.id] ?? 0)} por día
             </span></button>
             <div className="rules-row">
-              {group.preguntarSiFalta && <span className="rules-chip">Preguntar si falta</span>}
+              {group.preguntarSiFalta && <span className="rules-chip">Pregunta si falta</span>}
               {group.opcional && <span className="rules-chip">Opcional</span>}
             </div>
             <div className="rules-row">

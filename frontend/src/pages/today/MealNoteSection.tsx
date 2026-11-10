@@ -14,13 +14,12 @@ import {
   type PatchItemResultDto,
 } from '../../api/records'
 import { NoteEditor } from './NoteEditor'
-import { UnderstoodItems } from './UnderstoodItems'
-import { UnderstoodDialog } from './UnderstoodDialog'
-import { type GroupInfo } from './helpers'
+import { UnderstoodSheet, UnderstoodItems } from './UnderstoodSheet'
+import { fmt, type GroupInfo } from './helpers'
 import { mealStatus } from '../../lib/mealStatus'
 import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react'
 import { type MealDto } from '../../api/plans'
-// El borrador vive fuera del editor para conservarse al cerrar una fila o cambiar la comida de ahora.
+// El borrador vive fuera del editor para conservarse al cambiar de comida.
 export interface Draft {
   text: string
   baseVersion: number | null
@@ -37,24 +36,26 @@ export interface MealNoteSectionProps {
   date: string
   token: string
   groupsMap: Record<number, GroupInfo>
-  onNoteSaved: (interp: NoteInterpretationDto, mealId: number) => void
+  onToast?: (message: string | null) => void
+  onNoteSaved: (interp: NoteInterpretationDto, mealId: number, submittedText?: string) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
-  onNoteDeleted: (mealId: number, version: number | null) => void
+  onNoteDeleted: (mealId: number, version: number | null, submittedText: string) => void
   onReload: () => Promise<DayRecordDto>
   onAnswerSaved: (mealId: number) => Promise<void>
 }
 
 export const MealNoteSection = memo(function MealNoteSection({
   meal, drafts, mealDay, date, token, groupsMap,
-  onNoteSaved, onItemPatched, onNoteDeleted, onAnswerSaved, onReload,
+  onNoteSaved, onItemPatched, onNoteDeleted, onAnswerSaved, onReload, onToast,
 }: MealNoteSectionProps) {
   const [detailOpen, setDetailOpen] = useState(false)
-  const [rulesOpen, setRulesOpen] = useState(false)
+  const [resolveTarget, setResolveTarget] = useState<EntryItemDto | null>(null)
   const [expandedMentions, setExpandedMentions] = useState<Set<string>>(() => new Set())
   const draftKey = `${date}-${meal.id}`
   const [saved] = useState(() => drafts.get(draftKey))
   const [text, setText] = useState(saved?.dirty ? saved.text : mealDay?.noteText ?? '')
   const dirty = useRef(saved?.dirty ?? false)
+  const [editing, setEditing] = useState(saved?.dirty ?? false)
   const draftRevision = useRef(0)
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
@@ -67,7 +68,7 @@ export const MealNoteSection = memo(function MealNoteSection({
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const showToast = (message: string | null) => onToast?.(message)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [confirming, setConfirming] = useState(false)
@@ -85,18 +86,25 @@ export const MealNoteSection = memo(function MealNoteSection({
   const answerPending = useRef(false)
   const [answerSaving, setAnswerSaving] = useState(false)
   const questions = comparison.filter(s => s.status === 'PREGUNTAR' && !answeredGroups.includes(s.foodGroupId))
-  const understoodFoods = [...new Set(items.filter(item => item.origin !== ItemOrigin.UNKNOWN).map(item => item.food))]
-  const understoodSummary = understoodFoods.slice(0, 3).join(', ')
-    + (understoodFoods.length > 3 ? ' y otros alimentos' : '')
-  const unknownCount = items.filter(item => item.origin === ItemOrigin.UNKNOWN).length
-  const estimatedCount = items.filter(item => item.uncertain).length
+  const differences = comparison.filter(group =>
+    (['CASI', 'SIN_ANOTAR'].includes(group.status) && group.expected > group.recorded)
+    || (group.status === 'DE_MAS' && group.recorded > group.expected))
+    .sort((a, b) => Number(a.status === 'DE_MAS') - Number(b.status === 'DE_MAS'))
 
-  useEffect(() => {
+
+  useLayoutEffect(() => {
     if (!dirty.current) {
       setText(mealDay?.noteText ?? '')
       baseVersion.current = mealDay?.noteVersion ?? null
+    } else if (drafts.get(draftKey)?.baseVersion === mealDay?.noteVersion) {
+      // Adoptar la reconciliación antes de persistir las refs de este editor.
+      const shared = drafts.get(draftKey)!
+      baseVersion.current = shared.baseVersion
+      dirty.current = shared.dirty
+      setText(shared.text)
+      setEditing(shared.dirty)
     }
-  }, [mealDay?.noteText, mealDay?.noteVersion])
+  }, [mealDay?.noteText, mealDay?.noteVersion, drafts, draftKey])
 
   useEffect(() => {
     if (!meal.id) return
@@ -112,9 +120,10 @@ export const MealNoteSection = memo(function MealNoteSection({
   // Cada edición del borrador (teclado o dictado) sube la revisión: si cambia mientras se
   // guarda, el borrador sigue marcado como modificado y la respuesta no lo reemplaza.
   function editDraft(update: (current: string) => string) {
+    setEditing(true)
     dirty.current = true
     draftRevision.current += 1
-    setSavedMessage(null)
+    showToast(null)
     setText(update)
   }
 
@@ -134,7 +143,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     saveInFlight.current = true
     setSaving(true)
     setError(null)
-    setSavedMessage(null)
+    showToast(null)
     try {
       const updated = await removeItem(token, date, item.id, baseVersion.current)
       baseVersion.current = updated.noteVersion
@@ -142,9 +151,9 @@ export const MealNoteSection = memo(function MealNoteSection({
       setConflict(false)
       pendingFocus.current = updated.items.length ? 'understood' : 'textarea'
       if (updated.items.length === 0) setDetailOpen(false)
-      onNoteSaved({ noteId: updated.noteId!, version: updated.noteVersion!, text: updated.noteText ?? '',
+      onNoteSaved({ status: updated.status, noteId: updated.noteId!, version: updated.noteVersion!, text: updated.noteText ?? '',
         date, mealId: updated.mealId, items: [], entries: updated.items, comparison: updated.comparison }, updated.mealId)
-      setSavedMessage(`Quitaste ${item.food}.`)
+      showToast(`Quitaste ${item.food}.`)
     } catch (err) {
       setConflict(err instanceof NoteConflictError)
       setError(err instanceof NoteConflictError ? err.message : 'No se pudo quitar. Intentá de nuevo.')
@@ -159,8 +168,9 @@ export const MealNoteSection = memo(function MealNoteSection({
     saveInFlight.current = true
     setSaving(true)
     setError(null)
-    setSavedMessage(null)
+    showToast(null)
     const submittedRevision = draftRevision.current
+    const submittedText = text
     try {
       const version = await deleteNote(token, date, meal.id, baseVersion.current)
       baseVersion.current = version
@@ -172,9 +182,9 @@ export const MealNoteSection = memo(function MealNoteSection({
       }
       setConflict(false)
       setConfirming(false)
-      setSavedMessage(`Borraste lo anotado en ${meal.name}.`)
+      showToast(`Borraste lo anotado en ${meal.name}.`)
       pendingFocus.current = 'textarea'
-      onNoteDeleted(meal.id, version)
+      onNoteDeleted(meal.id, version, submittedText)
     } catch (err) {
       setConfirming(false)
       setConflict(err instanceof NoteConflictError)
@@ -192,18 +202,19 @@ export const MealNoteSection = memo(function MealNoteSection({
     const submittedRevision = draftRevision.current
     setText(value)
     setSaving(true)
-    setSavedMessage(null)
+    showToast(null)
     setError(null)
     try {
       const interp = await saveNote(token, date, meal.id, value.trim(), baseVersion.current)
       dirty.current = draftRevision.current !== submittedRevision
       baseVersion.current = interp.version
       setConflict(false)
-      onNoteSaved(interp, meal.id)
+      if (!dirty.current) setEditing(false)
+      onNoteSaved(interp, meal.id, value.trim())
       const status = mealStatus({
-        noteText: interp.text, comparison: interp.comparison,
+        status: interp.status, noteText: interp.text, comparison: interp.comparison,
       })
-      setSavedMessage(`Guardado. ${status.text}.`)
+      showToast(`Guardado. ${status.text}.`)
     } catch (err) {
       setConflict(err instanceof NoteConflictError)
       setError(err instanceof NoteConflictError ? err.message : 'No se pudo guardar. Intentá de nuevo.')
@@ -233,7 +244,6 @@ export const MealNoteSection = memo(function MealNoteSection({
     await onAnswerSaved(meal.id).catch(() => {})
   }
   const feedback = (<>
-      <p className="nota-guardado" role="status">{savedMessage}</p>
       {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
       {conflict && (
         <button type="button" className="nota-btn-recargar" disabled={saving}
@@ -261,34 +271,68 @@ export const MealNoteSection = memo(function MealNoteSection({
 
   return (
     <div className="nota-body">
-      <NoteEditor meal={meal} textareaId={textareaId} textareaRef={textareaRef} text={text}
+      {(!hasNote || editing) && <p className="toca" aria-label="Te toca">
+        {meal.portions.some(p => p.portions > 0) ? meal.portions.filter(p => p.portions > 0).map(p =>
+          <span key={p.foodGroupId}>
+            <i className="nota-item__dot" style={{ background: groupsMap[p.foodGroupId]?.token }} aria-hidden="true" />
+            {fmt(p.portions)} {groupsMap[p.foodGroupId]?.name}
+          </span>)
+          : 'Para lo que comas fuera de las comidas de tu plan.'}
+      </p>}
+      {hasNote && !editing ? <>
+        <p className="comida__texto">{mealDay?.noteText}</p>
+        {mealDay?.status !== 'FLEXIBLE' && differences.length > 0 && <ul className="dif">
+          {differences.map(group => {
+            const extra = group.status === 'DE_MAS'
+            const amount = extra ? group.recorded - group.expected : group.expected - group.recorded
+            return <li key={group.foodGroupId}>
+              <i className="nota-item__dot" style={{ background: groupsMap[group.foodGroupId]?.token ?? 'var(--muted)' }} aria-hidden="true" />
+              {extra ? 'De más: ' : 'Faltó '}{fmt(amount)} {amount === 1 ? 'porción' : 'porciones'} de {group.name.trim() || groupsMap[group.foodGroupId]?.name || 'un grupo del plan'}
+            </li>
+          })}
+        </ul>}
+        {mealDay?.status === 'FLEXIBLE' && <p className="muted sm">Cuenta como comida flexible: no se compara con el plan.</p>}
+      </> : <NoteEditor onCancelEdit={() => {
+        dirty.current = false
+        setText(mealDay?.noteText ?? '')
+        baseVersion.current = mealDay?.noteVersion ?? null
+        setConflict(false)
+        setError(null)
+        setConfirming(false)
+        setEditing(false)
+      }} meal={meal} textareaId={textareaId} textareaRef={textareaRef} text={text}
         editDraft={editDraft} error={error} loadingSuggestions={loadingSuggestions} suggestions={suggestions}
         hasNote={hasNote} saving={saving} conflict={conflict} handleSave={handleSave}
         deleteRef={deleteRef} confirming={confirming}
         onConfirmDelete={() => { setConfirming(true); pendingFocus.current = 'confirmar' }}
         onCancelDelete={() => { setConfirming(false); pendingFocus.current = 'borrar' }}
-        confirmRef={confirmRef} handleDelete={handleDelete} />
+        confirmRef={confirmRef} handleDelete={handleDelete} />}
 
       {!detailOpen && feedback}
 
       <MealQuestions questions={questions} answerSaving={answerSaving} handleAnswer={handleAnswer} />
-
+      {items.filter(item => item.origin === ItemOrigin.UNKNOWN).map(item => <div className="pregunta" key={item.id}>
+        <span>No reconocí <strong>«{item.originalText || item.food}»</strong></span>
+        <button type="button" className="nota-mini" onClick={() => { setResolveTarget(item); setDetailOpen(true) }}>Decime qué es</button>
+      </div>)}
       {(hasNote || items.length > 0) && (
         <>
-          <button type="button" className="nota-revisar" aria-haspopup="dialog"
+          <div className="fila-links">
+          {hasNote && !editing && <button type="button" className="nota-link" onClick={() => { setEditing(true); pendingFocus.current = 'textarea' }}>Editar</button>}
+          <button type="button" className="nota-link" aria-haspopup="dialog"
             aria-expanded={detailOpen} aria-controls={`entendido-dialog-${meal.id}`}
-            onClick={event => { event.currentTarget.focus(); setDetailOpen(true) }}>
-            Así lo entendí{unknownCount > 0 && ` · ${unknownCount} sin reconocer`}{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
+            onClick={event => { event.currentTarget.focus(); setResolveTarget(null); setDetailOpen(true) }}>
+            Así lo entendí
           </button>
-          <UnderstoodDialog open={detailOpen} onClose={() => setDetailOpen(false)}
-            headingRef={understoodRef} mealId={meal.id} items={items} token={token} date={date} groups={groupsMap}
+          </div>
+          <UnderstoodSheet open={detailOpen} onClose={() => { setDetailOpen(false); setResolveTarget(null) }}
+            selected={resolveTarget} onSelect={setResolveTarget} headingRef={understoodRef} mealId={meal.id} items={items} token={token} date={date} groups={groupsMap}
             onPatched={result => onItemPatched(meal.id!, result)}>
-            <UnderstoodItems meal={meal} mealDay={mealDay} items={items} date={date} token={token}
+            <UnderstoodItems meal={meal} items={items} date={date} token={token}
               groupsMap={groupsMap} detailOpen={detailOpen} feedback={feedback}
-              rulesOpen={rulesOpen} setRulesOpen={setRulesOpen}
-              expandedMentions={expandedMentions} setExpandedMentions={setExpandedMentions} understoodSummary={understoodSummary}
+              expandedMentions={expandedMentions} setExpandedMentions={setExpandedMentions}
               saving={saving} conflict={conflict} handleRemove={handleRemove} onItemPatched={onItemPatched} />
-          </UnderstoodDialog>
+          </UnderstoodSheet>
         </>
       )}
     </div>

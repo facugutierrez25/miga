@@ -1,8 +1,9 @@
+import MealSheet from './plan/MealSheet'
+import Miga from '../components/Miga'
 import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
-import { MAX_CARD_PORTIONS } from '../components/crumbSlots'
 import { groupColor } from '../groupColors'
 import { useContext, useCallback, useEffect, useRef, useState } from 'react'
-import { useDialogFocus } from './useDialogFocus'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { UNSAFE_DataRouterContext, useBlocker, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
@@ -31,12 +32,7 @@ interface LocalMeal {
   name: string
   time: string
   portions: Portions
-  collapsed: boolean
-}
-
-// Cada porción es una miga de la ficha (media porción también ocupa una): el plan admite hasta 12.
-function mealCrumbCount(portions: Portions): number {
-  return Object.values(portions).reduce((total, p) => total + Math.ceil(p ?? 0), 0)
+  weekdays?: number[] | null
 }
 
 function emptyPortions(groups: PlanFoodGroupDto[]): Portions {
@@ -51,7 +47,7 @@ function planToLocal(dto: PlanDto): LocalMeal[] {
       const portions: Portions = {}
       meal.portions.forEach(p => { portions[p.foodGroupId] = p.portions })
       const time = meal.suggestedTime ? meal.suggestedTime.slice(0, 5) : ''
-      return { name: meal.name, time, portions, collapsed: true }
+      return { name: meal.name, time, portions, weekdays: meal.weekdays }
     })
 }
 
@@ -59,6 +55,7 @@ function localToPlan(meals: LocalMeal[], groups: PlanFoodGroupDto[]) {
   return {
     meals: meals.map((c, i) => ({
       name: c.name,
+      weekdays: c.weekdays,
       suggestedTime: c.time ? c.time + ':00' : undefined,
       displayOrder: i + 1,
       portions: groups.map(g => ({ foodGroupAbbr: g.abbreviation, portions: c.portions[g.id] ?? 0 })),
@@ -73,24 +70,6 @@ function formatPortion(value: number) {
 
 function formatDate(iso: string) {
   return new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function ConfirmDeleteModal({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
-  const dialogRef = useDialogFocus<HTMLDivElement>(onCancel)
-  return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="confirm-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Confirmar eliminación"
-        onClick={e => e.stopPropagation()}>
-        <p className="confirm-modal__msg">
-          ¿Eliminar <strong>{name}</strong>?
-        </p>
-        <div className="confirm-modal__actions">
-          <button type="button" className="confirm-modal__cancel" onClick={onCancel}>Cancelar</button>
-          <button type="button" className="confirm-modal__confirm" onClick={onConfirm}>Eliminar</button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function PlanDetailModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: () => void }) {
@@ -137,11 +116,12 @@ function PlanDetailModal({ plan, onClose }: { plan: PlanSummaryDto; onClose: () 
           ))}
         </div>
       </div>
+
     </div>
   )
 }
 
-type Tab = 'resumen' | 'comidas' | 'rules'
+type Tab = 'resumen' | 'rules'
 
 export default function MyPlanPage() {
   const { token, email } = useAuth()
@@ -188,7 +168,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   const [rulesDirty, setRulesDirty] = useState(false)
   const [rulesBusy, setRulesBusy] = useState(false)
   const [discard, setDiscard] = useState(false)
-  const summaryTrigger = useRef('edit')
+  const summaryTrigger = useRef('groups')
   useEffect(() => {
     if (!token) return
     let active = true
@@ -212,51 +192,34 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       setDiscard(true)
     } else returnToSummary()
   }
-  function startEditing() {
-    summaryTrigger.current = 'edit'
-    setTab('comidas')
-    setConfirmed(false)
-    if (meals.length) editMeal(0)
-  }
+  const [sheetDirty, setSheetDirty] = useState(false)
   const [groups, setGroups] = useState<PlanFoodGroupDto[]>(initialPlan?.foodGroups ?? DEFAULT_GROUPS)
   const [meals, setMeals] = useState<LocalMeal[]>(() => initialPlan ? planToLocal(initialPlan) :
     ((location.state as { meals?: { name: string; suggestedTime: string | null }[] } | null)?.meals ?? []).map(meal => ({
       name: meal.name, time: meal.suggestedTime?.slice(0, 5) ?? '',
-      portions: emptyPortions(DEFAULT_GROUPS), collapsed: false,
+      portions: emptyPortions(DEFAULT_GROUPS),
     })))
   const hasChanges = JSON.stringify(localToPlan(meals, groups)) !== JSON.stringify(localToPlan(savedPlan ? planToLocal(savedPlan) : [], groups))
-  // El foco solo se mueve por una acción de la persona: al guardar una comida vuelve a
-  // su «Editar», al editar o agregar va al nombre y al eliminar va a «Agregar comida».
-  const focusEdit = useRef<number | null>(null)
-  const focusName = useRef<number | null>(null)
-  const focusAdd = useRef(false)
-  useEffect(() => {
-    if (focusEdit.current !== null) {
-      document.querySelector<HTMLElement>(`[data-edit-index="${focusEdit.current}"]`)?.focus()
-    } else if (focusName.current !== null) {
-      document.querySelector<HTMLElement>(`[data-name-index="${focusName.current}"]`)?.focus()
-    } else if (focusAdd.current) {
-      document.querySelector<HTMLElement>('.btn-agregar')?.focus()
-    }
-    focusEdit.current = null
-    focusName.current = null
-    focusAdd.current = false
-  }, [meals])
   const [reloading, setReloading] = useState(false)
   const [confirming, setConfirming] = useState(false)
   useEffect(() => {
-    if (!hasChanges && !rulesDirty) return
+    if (!hasChanges && !rulesDirty && !sheetDirty) return
     const preventUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
     window.addEventListener('beforeunload', preventUnload)
     return () => window.removeEventListener('beforeunload', preventUnload)
-  }, [hasChanges, rulesDirty])
+  }, [hasChanges, rulesDirty, sheetDirty])
   const [planHistory, setPlanHistory] = useState<PlanSummaryDto[]>([])
   const [planDetail, setPlanDetail] = useState<PlanSummaryDto | null>(null)
   const [planVersion, setPlanVersion] = useState<number | undefined>(initialPlan?.version)
   const [confirmed, setConfirmed] = useState(false)
+  const [goToToday, setGoToToday] = useState(false)
+  useEffect(() => {
+    if (goToToday && !confirming) navigate('/hoy', { replace: true })
+  }, [goToToday, confirming, navigate])
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState(false)
-  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null)
+  const [sheetIndex, setSheetIndex] = useState<number | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
   const [loadedPlan, setLoadedPlan] = useState(initialPlan)
   if (loadedPlan !== initialPlan) {
     setLoadedPlan(initialPlan)
@@ -295,7 +258,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
         setPlanVersion(plan.version)
       })
       .catch(() => {})
-  }, [token])
+  }, [token, setGroups, setMeals])
 
   useEffect(() => {
     if (!token) return
@@ -306,61 +269,32 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
     return () => controller.abort()
   }, [token])
 
-  function updateName(i: number, name: string) {
-    setMeals(prev => prev.map((c, j) => j === i ? { ...c, name } : c))
+  function editMeal(i: number) { setSheetIndex(i); setConfirmed(false) }
+  function addMeal() { setSheetIndex(meals.length); setConfirmed(false) }
+  async function saveSheet(meal: LocalMeal | null) {
+    const next = meals.slice()
+    if (meal) next.splice(sheetIndex!, sheetIndex! < meals.length ? 1 : 0, meal)
+    else next.splice(sheetIndex!, 1)
+    await confirmPlan(next)
   }
 
-  function updateTime(i: number, time: string) {
-    setMeals(prev => prev.map((c, j) => j === i ? { ...c, time } : c))
-  }
-
-  function updatePortion(i: number, groupId: number, delta: number) {
-    setMeals(prev => prev.map((c, j) => {
-      if (j !== i) return c
-      const nextValue = Math.round(((c.portions[groupId] ?? 0) + delta) * 10) / 10
-      if (nextValue < 0 || nextValue > 10) return c
-      const portions = { ...c.portions, [groupId]: nextValue }
-      if (delta > 0 && mealCrumbCount(portions) > MAX_CARD_PORTIONS) return c
-      return { ...c, portions }
-    }))
-  }
-
-  function saveMeal(i: number) {
-    focusEdit.current = i
-    setMeals(prev => prev.map((c, j) => j === i ? { ...c, collapsed: true } : c))
-  }
-
-  function editMeal(i: number) {
-    focusName.current = i
-    setMeals(prev => prev.map((c, j) => j === i ? { ...c, collapsed: false } : c))
-  }
-
-  function addMeal() {
-    focusName.current = meals.length
-    setMeals(prev => [...prev, { name: '', time: '', portions: emptyPortions(groups), collapsed: false }])
-  }
-
-  function removeMeal(i: number) {
-    focusAdd.current = true
-    setMeals(prev => prev.filter((_, j) => j !== i))
-    setConfirmDeleteIdx(null)
-  }
-
-  async function confirmPlan() {
+  async function confirmPlan(nextMeals: LocalMeal[], goToToday = false) {
     if (!token) return
     setConfirming(true)
     setError(null)
     setConflict(false)
     try {
-      const dto = await saveMyPlan(token, { ...localToPlan(meals, groups), clientVersion: planVersion })
+      const dto = await saveMyPlan(token, { ...localToPlan(nextMeals, groups), clientVersion: planVersion })
       setSavedPlan(dto)
       setGroups(dto.foodGroups ?? DEFAULT_GROUPS)
       setMeals(planToLocal(dto))
       setPlanVersion(dto.version)
       if (token) getPlanHistory(token).then(setPlanHistory).catch(() => {})
+      setSheetIndex(null)
+      setSheetDirty(false)
       setConfirmed(true)
+      setGoToToday(goToToday)
       returnToSummary()
-      if (fromWizard) setTimeout(() => navigate('/hoy', { replace: true }), 1800)
     } catch (err) {
       if (err instanceof PlanConflictError) {
         setConflict(true)
@@ -373,6 +307,11 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
     }
   }
 
+  const today = new Date()
+  const weekday = today.getDay() || 7
+  const todayMeals = meals.filter(meal => !meal.weekdays?.length || meal.weekdays.includes(weekday))
+  const hasWeekdayRestrictions = meals.some(meal => meal.weekdays?.length && meal.weekdays.length < 7)
+
   async function reloadPlan() {
     if (!token) return
     setConflict(false)
@@ -383,6 +322,8 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       setGroups(dto.foodGroups ?? DEFAULT_GROUPS)
       setMeals(planToLocal(dto))
       setPlanVersion(dto.version)
+      setSheetIndex(null)
+      setSheetDirty(false)
     } catch {
       setError('No se pudo recargar el plan.')
     } finally {
@@ -398,19 +339,15 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
         </div>
         {tab !== 'resumen' && <button type="button" className="mi-plan-back"
           disabled={confirming || rulesBusy} onClick={cancelEditing}>‹ Mi plan</button>}
-        <h1 className="mi-plan-header__title">Tu plan</h1>
+        <h1 className="mi-plan-header__title">Mi plan</h1>
       </header>
 
       <div className="mi-plan-body" aria-busy={confirming || rulesBusy}>
-        {dataRouter && <NavigationGuard dirty={hasChanges || rulesDirty} busy={confirming || rulesBusy} />}
+        {dataRouter && sheetIndex === null && <NavigationGuard dirty={hasChanges || rulesDirty || sheetDirty} busy={confirming || rulesBusy} />}
         {tab === 'resumen' && !loading && !loadError && <>
-          <p>{savedPlan?.createdAt ? `Cargado el ${formatDate(savedPlan.createdAt)}` : 'Fecha de carga no disponible'}</p>
-          <button data-summary-target="edit" className="btn-confirmar" onClick={startEditing}>Editar plan</button>
+          <p>{savedPlan?.createdAt ? `Actualizado el ${formatDate(savedPlan.createdAt)}` : savedPlan ? 'Fecha de carga no disponible' : 'Todavía no tenés un plan'}. Tocá una comida para cambiarla.</p>
 
-        </>}
-        {tab === 'comidas' && <>
-          <button disabled={hasChanges} onClick={() => { setRulesSection('groups'); setTab('rules') }}>Grupos</button>
-          {hasChanges && <p>Guardá o descartá los cambios de comidas antes de editar grupos.</p>}
+
         </>}
           {discard && <div role="alert">
             <p>Tenés cambios sin guardar. ¿Querés descartarlos?</p>
@@ -444,140 +381,52 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
         ) : (
           <>
             <div className="meal-list">
-            {meals.map((meal, i) =>
-              (tab === 'resumen' || meal.collapsed) ? (
-                <div key={i} className="comida-card comida-card--min">
-                  <span className="comida-min__nombre">{meal.name || 'Sin nombre'}</span>
-                  {meal.time && <span className="comida-min__hora">{meal.time}</span>}
-                  <div className="comida-min__chips">
-                    {groups.filter(g => (meal.portions[g.id] ?? 0) > 0).map(g => {
-                      const color = groupColor(g, groups.indexOf(g))
-                      return (
-                        <span key={g.id} className="porcion-chip" style={{ '--chip-dot': color } as React.CSSProperties}>
-                          <span className="porcion-chip__num">{formatPortion(meal.portions[g.id])}</span>
-                          {g.name}
-                        </span>
-                      )
-                    })}
-                  </div>
-                  {tab === 'comidas' && <button
-                    className="btn-editar"
-                    data-edit-index={i}
-                    onClick={() => editMeal(i)}
-                    aria-label={`Editar ${meal.name || 'comida'}`}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                      <path d="M12.5 2.5a1.414 1.414 0 0 1 2 2L5 14H3v-2L12.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>}
-
-                </div>
-              ) : (
-                <div key={i} className="comida-card comida-card--exp" onKeyDown={e => { if (e.key === 'Escape') saveMeal(i) }}>
-                  <div className="comida-card__header">
-                    <input
-                      className="comida-card__nombre"
-                      placeholder="Nombre de la comida"
-                      value={meal.name}
-                      onChange={e => updateName(i, e.target.value)}
-                      aria-label="Nombre de la comida"
-                      data-name-index={i}
-                    />
-                    <button
-                      className="btn-eliminar-exp"
-                      onClick={() => setConfirmDeleteIdx(i)}
-                      aria-label="Eliminar comida"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                        <path d="M7 4h6M3 6h14M8 9v5M12 9v5M5 6l1 11h8l1-11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="comida-card__hora-row">
-                    <svg className="comida-card__hora-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M7 4.5V7l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <label htmlFor={`hora-${i}`} className="comida-card__hora-label">Hora sugerida</label>
-                    <input
-                      id={`hora-${i}`}
-                      type="time"
-                      className="comida-card__hora-input"
-                      value={meal.time}
-                      onChange={e => updateTime(i, e.target.value)}
-                    />
-                  </div>
-                  <p className="porcion-tope" aria-live="polite">
-                    {mealCrumbCount(meal.portions)} de {MAX_CARD_PORTIONS} porciones: una comida tiene hasta {MAX_CARD_PORTIONS}.
-                  </p>
-                  {groups.map((g, index) => {
-                    const dot = groupColor(g, index)
-                    const full = mealCrumbCount({ ...meal.portions, [g.id]: (meal.portions[g.id] ?? 0) + 0.5 }) > MAX_CARD_PORTIONS
-                    return (
-                      <div key={g.id} className="porcion-row">
-                        <span className="porcion-row__dot" style={{ background: dot }} />
-                        <span className="porcion-row__label">{g.name}</span>
-                        <div className="porcion-row__stepper">
-                          <button
-                            className="stepper-btn"
-                            onClick={() => updatePortion(i, g.id, -0.5)}
-                            disabled={(meal.portions[g.id] ?? 0) <= 0}
-                            aria-label={`Reducir ${g.name}`}
-                          >−</button>
-                          <span className="stepper-value" aria-live="polite">{formatPortion(meal.portions[g.id] ?? 0)}</span>
-                          <button
-                            className="stepper-btn"
-                            onClick={() => updatePortion(i, g.id, 0.5)}
-                            disabled={(meal.portions[g.id] ?? 0) >= 10 || full}
-                            aria-label={`Aumentar ${g.name}`}
-                          >+</button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  <button
-                    className="btn-guardar-comida"
-                    onClick={() => saveMeal(i)}
-                    disabled={!meal.name.trim()}
-                  >
-                    Listo
-                  </button>
-                </div>
-              )
-            )}
-
-            {tab === 'comidas' && <button className="btn-agregar" onClick={addMeal}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Agregar comida
-            </button>}
+            {meals.map((meal, i) => {
+              const total = Object.values(meal.portions).reduce((sum, n) => sum + n, 0)
+              return <button key={i} className="plan-comida" aria-label={'Editar ' + meal.name} onClick={() => editMeal(i)}>
+                <strong>{meal.name || 'Sin nombre'}</strong><span>{meal.time}</span>
+                <span className="plan-end">{total ? formatPortion(total) + (total === 1 ? ' porción' : ' porciones') : 'Sin porciones'} ›</span>
+                <span className="plan-dots" aria-hidden="true">{groups.flatMap((g, index) =>
+                  Array.from({ length: Math.ceil(meal.portions[g.id] ?? 0) }, (_, n) =>
+                    <span key={g.id + '-' + n} style={{ '--crumb-color': groupColor(g, index) } as React.CSSProperties}><Miga aspect={(meal.portions[g.id] ?? 0) - n < 1 ? 'half' : 'full'} /></span>))}</span>
+                <span className="plan-description">{groups.filter(g => meal.portions[g.id] > 0).map(g => formatPortion(meal.portions[g.id]) + ' ' + g.name).join(' · ')}</span>
+              </button>
+            })}
+            <button className="btn-agregar" onClick={addMeal}>Agregar comida</button>
             </div>
+            {fromWizard && <button className="btn-confirmar" onClick={() => confirmPlan(meals, true)}>Listo, ir a Hoy</button>}
 
-            {tab === 'resumen' && <>          <div className="plan-summary-links">
-            {([['foods', 'Tus alimentos', counts?.foods], ['habits', 'Hábitos', counts?.habits]] as const).map(([section, label, count]) =>
+            {tab === 'resumen' && <>
+            <h2>Tu día completo{hasWeekdayRestrictions ? ` · hoy, ${today.toLocaleDateString('es-UY', { weekday: 'long' })}` : ''}</h2>
+            <div className="plan-totals">{groups.map((g, index) => {
+              const total = todayMeals.reduce((sum, meal) => sum + (meal.portions[g.id] ?? 0), 0)
+              return <div key={g.id}><span>{g.name}</span><span className="plan-dots" aria-hidden="true">
+                {Array.from({ length: Math.ceil(total) }, (_, n) => <span key={n} style={{ '--crumb-color': groupColor(g, index) } as React.CSSProperties}><Miga aspect={total - n < 1 ? 'half' : 'full'} /></span>)}
+              </span><span>{formatPortion(total)}</span></div>
+            })}</div>
+            <div className="plan-summary-links">
+            {([['foods', 'Tus alimentos', counts?.foods], ['habits', 'Hábitos', counts?.habits], ['groups', 'Grupos', groups.length]] as const).map(([section, label, count]) =>
               <button key={section} data-summary-target={section} aria-label={`Ver ${label.toLocaleLowerCase()}, ${count ?? 'cargando'}`} onClick={() => {
                 summaryTrigger.current = section
                 setRulesSection(section)
                 setTab('rules')
               }}><span>{label} ({count ?? '…'})</span><span aria-hidden="true">›</span></button>)}
+            <button onClick={() => setShowHistory(value => !value)}><strong>Planes anteriores</strong><span>{planHistory.length} ›</span></button>
           </div></>}
-            {error && <p className="plan-error" role="alert">{error}</p>}
+            {error && sheetIndex === null && <p className="plan-error" role="alert">{error}</p>}
 
-            {conflict && (
+            {conflict && sheetIndex === null && (
               <div className="plan-conflicto" role="alert">
                 <p>El plan fue modificado en otro dispositivo. Recargá para ver la versión actual.</p>
                 <button className="btn-recargar" onClick={reloadPlan}>Recargar plan</button>
               </div>
             )}
 
-            {tab === 'comidas' && <button className="btn-confirmar" onClick={confirmPlan} disabled={confirming || conflict || meals.some(c => !c.name.trim())}>
-              {confirming ? 'Guardando…' : 'Guardar cambios'}
-            </button>}
+
 
             <p className="confirmado-msg" role="status">{confirmed ? '¡Plan guardado!' : ''}</p>
 
-            {planHistory.length > 0 && (
+            {showHistory && (
               <div className="plan-historial">
                 <p className="plan-historial__titulo">Planes anteriores</p>
                 {planHistory.map((h, i) => (
@@ -598,17 +447,20 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
               <PlanDetailModal plan={planDetail} onClose={() => setPlanDetail(null)} />
             )}
 
-            {confirmDeleteIdx !== null && meals[confirmDeleteIdx] && (
-              <ConfirmDeleteModal
-                name={meals[confirmDeleteIdx].name || 'esta comida'}
-                onCancel={() => setConfirmDeleteIdx(null)}
-                onConfirm={() => removeMeal(confirmDeleteIdx)}
-              />
-            )}
+
           </>
         )}
         </fieldset>
       </div>
+      {sheetIndex !== null && <MealSheet
+        meal={meals[sheetIndex] ?? { name: '', time: '', portions: emptyPortions(groups) }}
+        groups={groups} isNew={sheetIndex === meals.length} busy={confirming || reloading}
+        error={error} conflict={conflict} onReload={reloadPlan} onDirtyChange={setSheetDirty}
+        onClose={() => { setSheetIndex(null); setSheetDirty(false); setError(null); setConflict(false) }}
+        onSave={saveSheet} onDelete={() => saveSheet(null)}
+      >
+        {dataRouter && <NavigationGuard dirty={hasChanges || rulesDirty || sheetDirty} busy={confirming || rulesBusy} />}
+      </MealSheet>}
     </div>
   )
 }

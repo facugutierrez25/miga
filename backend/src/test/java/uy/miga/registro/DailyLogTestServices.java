@@ -14,6 +14,6 @@ final class DailyLogTestServices {
         return new DailyLogService(
             new NoteService(notes, interpreter, comparison, entries, plans, rules, users, clock, support, reads),
             reads, new ItemCorrectionService(notes, entries, plans, rules, users, support, reads),
-            new ItemResolutionService(interpreter, entries, plans, rules, users, support));
+            new ItemResolutionService(interpreter, entries, plans, rules, users, support, reads));
     }
 }

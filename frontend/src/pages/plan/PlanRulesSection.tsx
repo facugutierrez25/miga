@@ -93,7 +93,7 @@ export default function PlanRulesSection({
     setReload((value) => value + 1)
   }
 
-  const props = plan && token ? { token, plan, mutate, onDirtyChange: reportDirty } : null
+  const props = plan && token ? { token, plan, mutate, onDirtyChange: reportDirty, disabled: busy || error?.code === 'VERSION_CONFLICT' } : null
 
   return (
     <div className="plan-rules">
@@ -133,7 +133,7 @@ export default function PlanRulesSection({
           <fieldset className="rules-editor" disabled={busy || error?.code === 'VERSION_CONFLICT'}>
             {section === 'groups' && <GroupsEditor {...props} meals={meals} />}
             {section === 'foods' && <FoodRulesEditor {...props} />}
-            {section === 'habits' && <HabitsEditor {...props} />}
+            {section === 'habits' && <HabitsEditor {...props} error={error} onReload={reloadPlan} />}
           </fieldset>
         </>
       )}

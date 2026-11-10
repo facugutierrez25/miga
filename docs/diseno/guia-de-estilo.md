@@ -14,20 +14,15 @@ amarillo del punto de la i para marcar dónde estás. Funciona en modo claro y o
 7. **Pensado para el celular:** zonas táctiles de 44 px como mínimo y navegación inferior.
 8. **Tono:** voseo uruguayo, directo, como un amigo ordenado. Nada de jerga técnica, eslóganes ni frases motivacionales.
 
-## Concepto: migas y ficha de dominó
+## Concepto: migas y tira del día
 
-Cumplir el plan es juntar cosas chicas. **Cada porción del plan es una miga**, un círculo liso del color de su grupo.
+Cada porción del plan es una miga: un círculo liso del color de su grupo.
 
-**La ficha.** La comida de ahora se muestra como una ficha de dominó: a la izquierda las porciones que pide el plan, a la derecha las que se anotaron. Si las dos mitades coinciden, la comida va como el plan. El clavo del medio es el punto amarillo del logo.
+La tira del día reúne todas las comidas en una fila tocable con nombre y miga de estado. Una banda marca la selección y se desliza al elegir otra comida. Un punto amarillo con «Sigue» indica la próxima comida, independiente de la seleccionada. «Tu día por grupo» se despliega dentro de la tarjeta del día.
 
-| Ficha | Regla |
-| --- | --- |
-| Hasta 9 porciones | Se dibujan como un dado (patrón de 1 a 9 en una grilla de 3 × 3) |
-| De 10 a 12 porciones | Grilla de 4 × 3, en el orden de los grupos |
-| Más de 12 | No pasa: Mi plan no deja guardar más de 12 porciones por comida. Si un plan viejo las tuviera, se muestran filas por grupo |
-| Media porción | Medio círculo, lleno o en contorno |
+Antes de anotar, el panel muestra «Te toca» con las porciones por grupo, campo, «Lo de siempre», Guardar y Dictar. Después muestra el texto y las diferencias en palabras, Editar y una sola hoja «Así lo entendí» para revisar y corregir. Preguntas y alimentos sin reconocer quedan a la vista.
 
-Debajo de la ficha, una línea por grupo con su número ("Verduras 1 de 2"); cada línea tiene su nombre accesible con la diferencia ("Verduras: 1 de 2, falta 1").
+Los hábitos se anotan con migas tocables y un «+» final para superar la meta. Los hábitos largos o sin meta usan un número con − y +. Las casillas quedan para opciones puntuales de los formularios.
 
 **La tarjeta de la semana.** Semana es una tarjeta de sellos: una fila por comida del plan, una columna por día y una miga por comida.
 
@@ -55,12 +50,12 @@ Se definen como variables CSS en `frontend/src/index.css`. Nunca usar hex suelto
 | --- | --- | --- | --- |
 | `--bg` | Fondo de la app | `#F2F1EA` | `#121212` |
 | `--surface` | Tarjetas, listas, hojas | `#FBFAF5` | `#1C1C1C` |
-| `--surface-2` / `--surface-3` | Ficha, chips, controles segmentados / su hover | `#E8E6DA` / `#DEDBCB` | `#262626` / `#303030` |
+| `--surface-2` / `--surface-3` | Banda de selección, chips, controles segmentados / su hover | `#E8E6DA` / `#DEDBCB` | `#262626` / `#303030` |
 | `--ink` | Texto principal y migas de la semana | `#040200` | `#F3EFE6` |
 | `--muted` / `--text-secondary` | Texto secundario | `#5E5A2E` | `#ADA89D` |
 | `--primary` / `--on-primary` | Acción principal | `#040200` / `#F2F1EA` | `#F3EFE6` / `#121212` |
 | `--brand` | Logo | `#7C773F` | `#F3EFE6` |
-| `--accent` / `--on-accent` | "Ahora", "Hoy", clavo de la ficha, punto del logo | `#F6C344` / `#3A2A00` | igual |
+| `--accent` / `--on-accent` | «Sigue», «Hoy», punto del logo | `#F6C344` / `#3A2A00` | igual |
 | `--line` | Divisores | `#E2E0D3` | `#2C2C2C` |
 | `--control-border` / `--miga-empty` | Bordes de campos y migas vacías (3:1) | `#857F62` | `#8A867C` |
 | `--ok` | "Como el plan" | `#2F6B45` | `#7CC79A` |
@@ -68,7 +63,7 @@ Se definen como variables CSS en `frontend/src/index.css`. Nunca usar hex suelto
 | `--error` / `--error-bg` | Errores | `#B42318` / `#FDEDEB` | `#F97066` / `#3A1C1A` |
 
 - **El oscuro es neutro:** grises casi negros, sin verde. La elevación se marca con grises más claros, no con color.
-- **El amarillo nunca es color de texto** y siempre acompaña a una palabra ("Ahora", "Hoy"). Lleva `--on-accent` encima, nunca blanco.
+- **El amarillo nunca es color de texto** y siempre acompaña a una palabra («Sigue», «Hoy»). Lleva `--on-accent` encima, nunca blanco.
 - **Se evita juntar naranja y verde.** El oliva queda solo para el logo.
 - Contrastes verificados: texto ≥ 4,5:1 y migas, bordes de control e indicadores ≥ 3:1, en ambos temas.
 
@@ -117,7 +112,7 @@ Los colores de grupo se usan en migas y puntos, **nunca como color de texto**: e
 
 | Elemento | Radio |
 | --- | --- |
-| Tarjeta de la comida de ahora | 20 px |
+| Panel de la comida seleccionada | 20 px |
 | Tarjetas y listas | 16 px |
 | Botones, campos, controles segmentados | 12 px |
 | Hojas inferiores | 24 px arriba |
@@ -132,7 +127,6 @@ Solo se mueve lo que cambió por algo que hiciste. Anotar nunca espera a una ani
 
 | Momento | Qué se mueve | Tiempo y curva | Cómo |
 | --- | --- | --- | --- |
-| Anotar una comida | Aparecen solo las porciones nuevas de la ficha, una tras otra | 500 ms, cada 60 ms, `back.out` | GSAP con `useGSAP` en `MealCard` |
 | Abrir una hoja | Sube 24 px y aparece | 400 ms, `--ease-out` | CSS |
 | Cambiar de día o de vista | La franja o la pastilla se desliza | 250 ms ida y vuelta | CSS |
 | Tocar un botón | Se achica a 0,96 | 150 ms | CSS |
@@ -145,10 +139,34 @@ Solo se mueve lo que cambió por algo que hiciste. Anotar nunca espera a una ani
 
 | Pantalla | Puntos clave |
 | --- | --- |
-| **Hoy** | Saludo con punto final amarillo. La comida de ahora con la etiqueta "Ahora", su ficha, el campo, "Lo de siempre", Guardar y Dictar. "Así lo entendí" con "Cómo lo calculé", que abre una hoja con cada cosa escrita, el tipo de regla y el resultado. Después, "Tu día por grupo", y las comidas en "Después" y "Antes", con su hora. |
-| **Semana** | Botón "Exportar" junto al título. Número grande de comidas como el plan. Control segmentado Tarjeta / Planilla. La tarjeta de sellos con la franja del día elegido; debajo, el detalle del día y los hábitos. |
-| **Exportar** | Solo Excel y PDF (PDF por la impresión del navegador). Se descarga en el celular y la persona lo manda: no hay links ni fecha de consulta guardada. |
-| **Mi plan** | Hasta 12 porciones por comida, con el contador visible al editar. Las correcciones que hace la persona son reglas suyas: no cambian el plan de su nutricionista. |
+| **Hoy** | Saludo con punto amarillo, tira del día con banda y punto «Sigue», resumen por grupo desplegable y panel de la comida elegida. «Te toca» antes de anotar; texto y diferencias en palabras después. Una hoja «Así lo entendí». Hábitos con migas y «+». |
+| **Semana** | Exportar, resumen «N de M comidas como el plan», selector Tarjeta / Planilla, sellos de comidas y hábitos con franja del día elegido. El detalle abre esa fecha en Hoy. Metas semanales con hábitos automáticos. |
+| **Exportar** | Excel y PDF por impresión del navegador; la persona descarga y comparte el archivo. |
+| **Mi plan** | Portada con migas y «Actualizado el». Tocar una comida abre su hoja de edición, con tope visible de 12 porciones. Hábitos con vista previa, alimentos y grupos editables. |
+| **Perfil** | Datos personales, tema Automático / Claro / Oscuro, acceso a exportar y cierre de sesión. |
+
+En escritorio se conserva la barra lateral y una columna de hasta 480 px.
+
+## Definiciones D1–D14
+
+Reglas de la [épica #352](https://github.com/facugutierrez25/miga/issues/352) y el [prototipo v3](prototipo-v3.html).
+
+| N.º | Definición | Regla |
+| --- | --- | --- |
+| D1 | Miga de comida | Llena: como el plan. Media: faltó, sobró o queda una pregunta. Amarilla: flexible. Gris: anotada sin comparación. Contorno: sin anotar. Punteada: fecha futura. |
+| D2 | Extra sin porciones | No es pendiente ni cuenta en comidas como el plan. Sin anotar: «+» en Hoy y guion en Semana. |
+| D3 | Sigue | Solo hoy: primera comida con horario sin anotar cuya hora no pasó hace más de 90 minutos. Si todas pasaron, última con horario sin anotar. Si no queda ninguna, no aparece. Nunca una comida sin horario. |
+| D4 | Selección inicial | La que sigue; en otra fecha o sin próxima comida, primera con horario sin anotar y, en su defecto, primera del plan. Se conserva mientras hay un borrador sin guardar. |
+| D5 | Flexible | Estado propio de la comida, independiente de los hábitos. No se compara ni suma porciones. |
+| D6 | Antes de anotar | «Te toca», porciones por grupo, campo, «Lo de siempre», Guardar y Dictar. |
+| D7 | Comida anotada | Texto, diferencias en palabras («Faltó 1 porción de Grasas»), preguntas y alimentos sin reconocer visibles, Editar y «Así lo entendí». |
+| D8 | Así lo entendí | Una sola hoja: alimento, cómo contó, regla y Corregir en la misma fila. La corrección vale para esa comida; «Usar siempre» la guarda como regla propia. |
+| D9 | Hábito con migas | Migas = meta ÷ paso. Tocar N fija N pasos; tocar la última llena la vacía. «+» suma un paso por encima de la meta y muestra «+N». Sí o no usa una sola miga. |
+| D10 | Hábito largo | Más de 6 pasos o sin meta: número con − y +. |
+| D11 | Ubicación del hábito | Los automáticos, como flexibles, solo se ven en Semana. Los manuales, incluso semanales, se anotan en Hoy; Semana acumula el total contra la meta. |
+| D12 | Hábito en Semana | Llena: meta cumplida, o valor mayor que 0 sin meta. Media: hizo algo. Contorno: nada. |
+| D13 | Resumen semanal | «N de M comidas como el plan»: M cuenta las comidas con porciones de los días hasta hoy. |
+| D14 | Edición por comida | Tocar una comida abre la edición de esa sola, con tope visible de 12 porciones. Cada guardado crea una nueva versión del plan. |
 
 ## Implementación
 

@@ -16,7 +16,7 @@ vi.mock('react/jsx-dev-runtime', async importOriginal => {
   const wrappers = new Map<unknown, React.ElementType>()
   function instrument(type: React.ElementType): React.ElementType {
     const component = typeof type === 'function' ? type : (type as { type?: unknown }).type
-    if (typeof component !== 'function' || !['MealNoteSection', 'MealDetail', 'MealRow', 'CurrentMeal'].includes(component.name)) return type
+    if (typeof component !== 'function' || !['MealNoteSection'].includes(component.name)) return type
     if (!wrappers.has(type)) {
       const counted = (props: { meal: { id: number } }) => {
         const key = `${component.name}-${props.meal.id}`
@@ -108,7 +108,9 @@ export function barEntry(id: number, foodGroupId: number) {
 }
 
 export async function openNote() {
-  await waitFor(() => expect(screen.getByText('Desayuno')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Desayuno', level: 2 })).toBeInTheDocument())
+  const edit = screen.queryByRole('button', { name: 'Editar' })
+  if (edit) fireEvent.click(edit)
   await waitFor(() => expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toBeInTheDocument())
 }
 
@@ -126,7 +128,7 @@ export const twoMealPlan = {
 export const dayWithNote = {
   ...emptyDay,
   meals: [{
-    mealId: 1, noteId: 5, noteVersion: 3, noteText: 'leche y pan',
+    mealId: 1, status: 'EN_PLAN' as const, noteId: 5, noteVersion: 3, noteText: 'leche y pan',
     items: [
       { id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE,
         uncertain: false, originalText: 'leche', appliedRule: null, occurrenceId: 'occ-a' },
@@ -145,7 +147,7 @@ export const removableItems = [
 
 export function setupRemoval(items: recordsApi.EntryItemDto[] = removableItems) {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
-  const meal = { mealId: 1, noteId: 3, noteVersion: 7, noteText: 'leche, manzana', items, comparison: [] }
+  const meal = { mealId: 1, status: 'REGISTRADA' as const, noteId: 3, noteVersion: 7, noteText: 'leche, manzana', items, comparison: [] }
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [meal] })
   return meal
 }
@@ -170,8 +172,8 @@ export async function openResolution() {
 export function mockResolution() {
   const resolved = { ...unknownFood, id: 502, food: 'Milanesa', origin: ItemOrigin.RULE }
   vi.mocked(recordsApi.resolveItem).mockImplementation(async () => {
-    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, noteId: 3, noteVersion: 7, noteText: 'nota', items: [resolved], comparison: [] }] })
-    return { replacedItemIds: [501], items: [resolved], undo: { occurrenceId: 'occ', ruleUid: 'rule' } }
+    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 3, noteVersion: 7, noteText: 'nota', items: [resolved], comparison: [] }] })
+    return { status: 'REGISTRADA' as const, replacedItemIds: [501], items: [resolved], undo: { occurrenceId: 'occ', ruleUid: 'rule' } }
   })
   return resolved
 }

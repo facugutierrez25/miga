@@ -37,6 +37,7 @@ export default function CatalogSearch({
           <article className="rules-card" tabIndex={-1} key={item.uid}>
             <h4>{item.alimento}</h4>
             <p>{item.textoRegla}</p>
+            <span className="rules-secondary">Catálogo</span>
             <button type="button" disabled={!!adjusted} onClick={event => adjust(item, event.currentTarget.closest('article'))}>
               {adjusted ? 'Ya ajustado' : 'Ajustar para mi plan'}
             </button>

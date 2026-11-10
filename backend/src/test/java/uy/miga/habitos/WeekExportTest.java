@@ -11,13 +11,23 @@ import static org.assertj.core.api.Assertions.*;
 
 class WeekExportTest {
     @Test
+    void statusLabelsUseOnlyTheMealStatus() {
+        assertThat(WeekExport.statusLabel(new WeekMealData(1L, "Cena", "pizza", "MIXED", 0, true)))
+            .isEqualTo("Falt\u00f3 y de m\u00e1s");
+        assertThat(WeekExport.statusLabel(new WeekMealData(1L, "Cena", "pizza", "FLEXIBLE", 0, true)))
+            .isEqualTo("Flexible");
+        assertThat(WeekExport.statusLabel(new WeekMealData(1L, "Cena", "pizza", "EN_PLAN", 1, true)))
+            .isEqualTo("Como el plan");
+    }
+
+    @Test
     void csvAndXlsxContainTheSameNotesAndDecimalComma() throws Exception {
         var date = LocalDate.of(2026, 10, 26);
         var week = new WeekSummaryDto(date, date.plusDays(6),
             List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1, java.util.UUID.randomUUID())),
             List.of(new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO,
                 List.of(new HabitLogDto(1L, date, new BigDecimal("1.5"))),
-                List.of(new WeekMealData(10L, "Desayuno", "=caf\u00e9; \"pan\"\nfruta", "REGISTRADA", 0)), List.of(1L))));
+                List.of(new WeekMealData(10L, "Desayuno", "=caf\u00e9; \"pan\"\nfruta", "REGISTRADA", 0, true)), List.of(1L))));
         assertThat(WeekExport.csv(week)).startsWith("\ufeff").contains("'", "1,5", "caf\u00e9", "\"\"pan\"\"");
         var out = new ByteArrayOutputStream();
         WeekExport.writeXlsx(week, out);
@@ -42,10 +52,10 @@ class WeekExportTest {
             List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1, java.util.UUID.randomUUID())),
             List.of(
                 new WeekDayDto(date, true, new BigDecimal("2.5"), BigDecimal.TEN, List.of(),
-                    List.of(new WeekMealData(10L, "Desayuno", "yogur y banana", "EN_PLAN", 0),
-                        new WeekMealData(11L, "Cena", "pizza", "REGISTRADA", 1)), List.of(1L)),
+                    List.of(new WeekMealData(10L, "Desayuno", "yogur y banana", "EN_PLAN", 0, true),
+                        new WeekMealData(11L, "Cena", "pizza", "FLEXIBLE", 1, true)), List.of(1L)),
                 new WeekDayDto(date.plusDays(1), false, BigDecimal.ZERO, BigDecimal.TEN, List.of(),
-                    List.of(new WeekMealData(10L, "Desayuno", null, "SIN_ANOTAR", 0)), List.of(1L))));
+                    List.of(new WeekMealData(10L, "Desayuno", null, "SIN_ANOTAR", 0, true)), List.of(1L))));
         return new WeekExport.Data(week, includedSections, List.of("Lácteos", "Frutas"),
             java.util.Map.of(date, java.util.Map.of("Lácteos", new BigDecimal("1.5"), "Frutas", BigDecimal.ONE)),
             List.of(new uy.miga.registro.UnmatchedFoodDto("torta frita", date, "Desayuno")), "Facundo");
@@ -150,8 +160,8 @@ class WeekExportTest {
     void pdfHasLandscapePagesEmbeddedLogoTextAndClickableAttribution() throws Exception {
         var out = new ByteArrayOutputStream();
         WeekExport.writePdf(rangeData(WeekExport.SECTIONS), out);
-        try (var reader = new com.lowagie.text.pdf.PdfReader(out.toByteArray())) {
-            var extractor = new com.lowagie.text.pdf.parser.PdfTextExtractor(reader);
+        try (var reader = new org.openpdf.text.pdf.PdfReader(out.toByteArray())) {
+            var extractor = new org.openpdf.text.pdf.parser.PdfTextExtractor(reader);
             StringBuilder text = new StringBuilder();
             for (int page = 1; page <= reader.getNumberOfPages(); page++) {
                 var size = reader.getPageSizeWithRotation(page);
@@ -159,12 +169,12 @@ class WeekExportTest {
                 var pageText = extractor.getTextFromPage(page);
                 text.append(pageText);
                 assertThat(pageText).contains("Registrado con Miga", "miga.uy", "Página " + page);
-                var annotations = reader.getPageN(page).getAsArray(com.lowagie.text.pdf.PdfName.ANNOTS);
+                var annotations = reader.getPageN(page).getAsArray(org.openpdf.text.pdf.PdfName.ANNOTS);
                 assertThat(annotations).isNotNull();
-                assertThat(annotations.getAsDict(0).getAsDict(com.lowagie.text.pdf.PdfName.A)
-                    .getAsString(com.lowagie.text.pdf.PdfName.URI).toUnicodeString()).isEqualTo("https://miga.uy");
-                var images = reader.getPageN(page).getAsDict(com.lowagie.text.pdf.PdfName.RESOURCES)
-                    .getAsDict(com.lowagie.text.pdf.PdfName.XOBJECT);
+                assertThat(annotations.getAsDict(0).getAsDict(org.openpdf.text.pdf.PdfName.A)
+                    .getAsString(org.openpdf.text.pdf.PdfName.URI).toUnicodeString()).isEqualTo("https://miga.uy");
+                var images = reader.getPageN(page).getAsDict(org.openpdf.text.pdf.PdfName.RESOURCES)
+                    .getAsDict(org.openpdf.text.pdf.PdfName.XOBJECT);
                 assertThat(images).isNotNull();
                 assertThat(images.getKeys()).isNotEmpty();
             }
@@ -177,14 +187,14 @@ class WeekExportTest {
         var date = LocalDate.of(2026, 11, 2);
         var meals = new java.util.ArrayList<WeekMealData>();
         for (int i = 0; i < 16; i++) meals.add(new WeekMealData((long) i, "Comida " + i,
-            i == 0 ? "Alimento áéíóú ñ. ".repeat(1200) + "FIN NOTA EXTENSA" : "NOTA COLUMNA " + i, "EN_PLAN", 0));
+            i == 0 ? "Alimento áéíóú ñ. ".repeat(1200) + "FIN NOTA EXTENSA" : "NOTA COLUMNA " + i, "EN_PLAN", 0, true));
         var week = new WeekSummaryDto(date, date, List.of(), List.of(
             new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), meals, List.of())));
         var out = new ByteArrayOutputStream();
         WeekExport.writePdf(WeekExport.Data.of(week), out);
-        try (var reader = new com.lowagie.text.pdf.PdfReader(out.toByteArray())) {
+        try (var reader = new org.openpdf.text.pdf.PdfReader(out.toByteArray())) {
             assertThat(reader.getNumberOfPages()).isGreaterThan(2);
-            var extractor = new com.lowagie.text.pdf.parser.PdfTextExtractor(reader);
+            var extractor = new org.openpdf.text.pdf.parser.PdfTextExtractor(reader);
             StringBuilder text = new StringBuilder();
             for (int page = 1; page <= reader.getNumberOfPages(); page++) text.append(extractor.getTextFromPage(page));
             assertThat(text.toString().replaceAll("\\s+", " ")).contains("FIN NOTA EXTENSA", "2026-11-02");
@@ -208,8 +218,8 @@ class WeekExportTest {
         }
         out.reset();
         WeekExport.writePdf(data, out);
-        try (var reader = new com.lowagie.text.pdf.PdfReader(out.toByteArray())) {
-            assertThat(new com.lowagie.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1))
+        try (var reader = new org.openpdf.text.pdf.PdfReader(out.toByteArray())) {
+            assertThat(new org.openpdf.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1))
                 .contains("Semana de Facundo", "2 al 8 de noviembre 2026");
         }
         var crossYear = new WeekSummaryDto(LocalDate.of(2026, 12, 28), LocalDate.of(2027, 1, 3), List.of(), List.of());
@@ -264,8 +274,8 @@ class WeekExportTest {
         }
         out.reset();
         WeekExport.writePdf(WeekExport.Data.of(week), out);
-        try (var reader = new com.lowagie.text.pdf.PdfReader(out.toByteArray())) {
-            var text = new com.lowagie.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1);
+        try (var reader = new org.openpdf.text.pdf.PdfReader(out.toByteArray())) {
+            var text = new org.openpdf.text.pdf.parser.PdfTextExtractor(reader).getTextFromPage(1);
             assertThat(text).contains("Agua", "Fruta", "3,5").doesNotContain("Agua anterior", "99");
             assertThat(text.indexOf("Agua")).isEqualTo(text.lastIndexOf("Agua"));
         }
