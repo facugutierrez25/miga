@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useDialogFocus } from '../pages/useDialogFocus'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import './BottomSheet.css'
 
 export default function BottomSheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {

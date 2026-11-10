@@ -1,4 +1,4 @@
-import { formatPortions, crumbDifference, crumbDifferenceLabel, crumbSlots, crumbsLabel, type CrumbRow } from './crumbSlots'
+import { formatPortions, crumbSlots, crumbsLabel, type CrumbRow } from './crumbSlots'
 import './Crumbs.css'
 
 // Cada porción del plan es una miga: llena si se comió, contorno si falta y medio círculo
@@ -18,13 +18,12 @@ function Crumb({ color, capacity, filled }: { color: string; capacity: number; f
   )
 }
 
-export default function Crumbs({ rows, differencesOnly = false }: { rows: CrumbRow[]; differencesOnly?: boolean }) {
+export default function Crumbs({ rows }: { rows: CrumbRow[] }) {
   return (
     <div className="migas">
       {rows.map(row => {
         const count = `${formatPortions(row.done)} de ${formatPortions(row.total)}`
-        const difference = crumbDifference(row)
-        const label = differencesOnly ? crumbDifferenceLabel(row) : crumbsLabel(row)
+        const label = crumbsLabel(row)
         return <div key={row.id} className="migas__row" role="img" aria-label={label}>
           <span className="migas__name" aria-hidden="true">{row.name}</span>
           <span className="migas__dots" aria-hidden="true">
@@ -33,7 +32,7 @@ export default function Crumbs({ rows, differencesOnly = false }: { rows: CrumbR
             ))}
           </span>
           <span className={`migas__count${row.done > row.total ? ' migas__count--over' : ''}`} aria-hidden="true">
-            {differencesOnly ? difference : count}
+            {count}
           </span>
         </div>
       })}
