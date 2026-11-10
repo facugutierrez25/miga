@@ -1,3 +1,6 @@
+import { Link } from 'react-router-dom'
+import StatusChip from '../components/StatusChip'
+import { HabitCrumbs } from '../components/TodayHabits'
 import Miga from '../components/Miga'
 import BottomSheet from '../components/BottomSheet'
 import Segmented from '../components/Segmented'
@@ -74,23 +77,27 @@ function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
   }
   const habits = [...versions.values()]
     .map(vs => ({ latest: vs[vs.length - 1], ids: vs.map(v => v.id) }))
-    .filter(({ latest }) => hasGoal(latest) && latest.period === 'SEMANA')
+    .filter(({ latest }) => latest.period === 'SEMANA')
     .map(({ latest, ids }) => ({ ...latest, ids }))
   if (habits.length === 0) return null
-  return <section className="semana-habitos" aria-label="Metas semanales">
-    <h2 className="semana-habitos__titulo">Metas semanales</h2>
+  return <section className="semana-habitos" aria-label="Metas de la semana">
+    <h2 className="semana-habitos__titulo">Metas de la semana</h2>
     <ul className="semana-habitos__lista">{habits.map(h => {
       const total = round(week.days.reduce((sum, day) => sum + day.habitLogs
         .filter(log => h.ids.includes(log.habitId) && (!day.habitIds || day.habitIds.includes(log.habitId)))
         .reduce((daySum, log) => daySum + Number(log.value), 0), 0))
-      const done = total >= h.dailyGoal!
-      const progress = `${fmtN(total)} de ${fmtN(h.dailyGoal!)}${h.unit ? ` ${h.unit}` : ''} esta semana`
+      const done = hasGoal(h) ? total >= h.dailyGoal! : total > 0
+      const progress = `${fmtN(total)}${hasGoal(h) ? ` de ${fmtN(h.dailyGoal!)}` : ''}${h.unit ? ` ${h.unit}` : ''} esta semana`
       return <li key={h.id} className={`semana-habito${done ? ' semana-habito--ok' : ''}`}
         aria-label={`${h.name}: ${progress}, ${done ? 'completado' : 'pendiente'}`}>
         <span className="semana-habito__check" aria-hidden="true">{done && (
           <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         )}</span>
         <span className="semana-habito__name">{h.name}</span>
+        {h.countsFlexibleMeals && <span className="semana-habito__flexibles" aria-hidden="true">
+          {Array.from({ length: Math.min(12, Math.max(Math.ceil(h.dailyGoal ?? 0), Math.ceil(total))) }, (_, index) =>
+            <Miga key={index} aspect={index < total ? 'flexible' : 'empty'} />)}
+        </span>}
         <span className="semana-habito__val">{progress}</span>
       </li>
     })}</ul>
@@ -101,24 +108,32 @@ function WeeklyHabitSummary({ week }: { week: WeekSummaryDto }) {
 
 function daySummary(day: WeekDayDto, future: boolean): string {
   if (future) return 'todavía no'
-  const meals = day.meals ?? []
+  const meals = (day.meals ?? []).filter(meal => meal.planned !== false || Boolean(meal.noteText))
   if (meals.length === 0) return 'sin comidas en el plan'
   const inPlan = meals.filter(m => m.status === 'EN_PLAN').length
   const loggedMeals = meals.filter(m => m.status !== 'SIN_ANOTAR').length
   return `${inPlan} de ${meals.length} comidas como el plan, ${loggedMeals} anotadas`
 }
 
-function hasFlexibleHabit(week: WeekSummaryDto, day: WeekDayDto): boolean {
-  return week.habits.some(habit => habit.countsFlexibleMeals
-    && (!day.habitIds || day.habitIds.includes(habit.id)))
+function dayHabits(week: WeekSummaryDto, day: WeekDayDto) {
+  return week.habits.filter(h => !h.countsFlexibleMeals && (!day.habitIds || day.habitIds.includes(h.id)))
+}
+
+function habitValue(day: WeekDayDto, habit: HabitDto) {
+  return Number(day.habitLogs.find(log => log.habitId === habit.id)?.value ?? 0)
+}
+
+function habitAspect(habit: HabitDto, value: number) {
+  return value <= 0 ? 'empty' : !hasGoal(habit) || round(value) >= habit.dailyGoal! ? 'full' : 'half'
 }
 
 interface DayDetailProps {
   day: WeekDayDto
+  week: WeekSummaryDto
   todayISO: string
 }
 
-function DayDetail({ day, todayISO }: DayDetailProps) {
+function DayDetail({ day, week, todayISO }: DayDetailProps) {
   const d = new Date(day.date + 'T12:00:00')
   const isToday = day.date === todayISO
   const recorded = Number(day.totalRecorded)
@@ -132,19 +147,19 @@ function DayDetail({ day, todayISO }: DayDetailProps) {
           <time dateTime={day.date}>{d.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })}</time>
         </h2>
         {isToday && <span className="semana-dia__hoy">Hoy</span>}
-        {goal > 0 && (
+        {goal > 0 && day.date <= todayISO && (
           <span className="semana-dia__porciones">{fmtN(recorded)} de {fmtN(goal)} porciones</span>
         )}
       </div>
 
-      {meals.length > 0 && (
+      {day.date <= todayISO && meals.length > 0 && (
         <ul className="semana-comidas">
           {meals.map(meal => {
             const status = mealStatus(meal)
             return (
               <li key={meal.mealId} className="semana-comida">
                 <span className="semana-comida__nombre">{meal.name}</span>
-                <span className={`semana-comida__estado semana-comida__estado--${status.crumb}`}>{status.label}</span>
+                <span className={`semana-comida__estado semana-comida__estado--${status.crumb}`}><StatusChip status={meal.status} /></span>
                 {meal.noteText && <p className="semana-comida__nota">{meal.noteText}</p>}
               </li>
             )
@@ -152,9 +167,18 @@ function DayDetail({ day, todayISO }: DayDetailProps) {
         </ul>
       )}
 
-      {meals.length === 0 && (
+      {day.date <= todayISO && meals.length === 0 && (
         <p className="semana-dia__vacio">Nada para mostrar este día.</p>
       )}
+      {day.date > todayISO ? <p className="semana-dia__vacio">Este día todavía no llegó</p> : <>
+        {dayHabits(week, day).length > 0 && <section aria-label="Hábitos" className="semana-dia__habitos">
+          <h3>Hábitos</h3>
+          {dayHabits(week, day).map(habit => <HabitCrumbs key={habit.id} habit={habit} value={habitValue(day, habit)} date={day.date} />)}
+        </section>}
+        <Link className="semana-dia__abrir" to={`/hoy?fecha=${day.date}`}>
+          {isToday ? 'Ir a Hoy' : 'Abrir este día para anotar o corregir'}
+        </Link>
+      </>}
     </article>
   )
 }
@@ -170,6 +194,7 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
   onSelect: (date: string) => void
 }) {
   const names = [...new Set(week.days.flatMap(day => (day.meals ?? []).map(meal => meal.name)))]
+  const habits = [...new Map(week.days.flatMap(day => dayHabits(week, day)).map(h => [h.uid ?? String(h.id), h])).values()]
   const columns = week.days.length
   const selectedIndex = week.days.findIndex(day => day.date === selected)
   const hasNonApplicableMeals = week.days.some(day => names.some(name => !(day.meals ?? []).some(m => m.name === name)))
@@ -192,7 +217,11 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
                   className={['semana-tira__dia', isToday ? 'semana-tira__dia--hoy' : '', future ? 'semana-tira__dia--futuro' : ''].filter(Boolean).join(' ')}
                   aria-pressed={day.date === selected}
                   aria-current={isToday ? 'date' : undefined}
-                  aria-label={`${fullDate(day.date)}${isToday ? ', hoy' : ''}: ${daySummary(day, future)}`}
+                  aria-label={`${fullDate(day.date)}${isToday ? ', hoy' : ''}: ${daySummary(day, future)}${dayHabits(week, day).map(habit => {
+                    const value = habitValue(day, habit)
+                    const aspect = habitAspect(habit, value)
+                    return `; ${habit.name}: ${fmtN(value)}${habit.unit ? ` ${habit.unit}` : ''}, ${future ? 'todavía no' : aspect === 'full' ? 'meta cumplida' : aspect === 'half' ? 'hizo algo' : 'nada'}`
+                  }).join('')}`}
                   onClick={() => onSelect(day.date)}
                 >
                   <span className="semana-tira__letra" aria-hidden="true">{SHORT_WEEKDAYS[d.getDay()]}</span>
@@ -208,16 +237,28 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
               {week.days.map(day => {
                 const meal = (day.meals ?? []).find(m => m.name === name)
                 const aspect = meal ? mealAspect(meal.status, { planned: meal.planned, future: day.date > todayISO, week: true }) : 'dash'
-                return <span key={day.date} className="semana-tarjeta__celda"><Miga aspect={aspect} className={`semana-miga semana-miga--${aspect === 'dash' ? 'no-aplica' : aspect === 'future' ? 'futuro' : aspect}`} /></span>
+                return <button type="button" tabIndex={-1} onClick={() => onSelect(day.date)} key={day.date} className="semana-tarjeta__celda"><Miga aspect={aspect} className={`semana-miga semana-miga--${aspect === 'dash' ? 'no-aplica' : aspect === 'future' ? 'futuro' : aspect}`} /></button>
               })}
             </div>
           ))}
+          {habits.length > 0 && <span className="semana-tarjeta__sep" aria-hidden="true" />}
+          {habits.map(habit => <div key={habit.id} className="semana-tarjeta__fila semana-tarjeta__habito">
+            <span className="semana-tarjeta__comida">{habit.name}</span>
+            {week.days.map(day => {
+              const version = dayHabits(week, day).find(h => (h.uid ?? String(h.id)) === (habit.uid ?? String(habit.id)))
+              const value = version ? habitValue(day, version) : 0
+              const aspect = !version ? 'dash' : day.date > todayISO ? 'future' : habitAspect(version, value)
+              return <button type="button" key={day.date} tabIndex={-1} aria-hidden="true"
+                className="semana-tarjeta__celda" onClick={() => onSelect(day.date)}><Miga aspect={aspect} className="semana-miga" /></button>
+            })}
+          </div>)}
         </div>
       </section>
       <ul className="semana-leyenda" aria-hidden="true">
-        <li><Miga aspect="full" className="semana-miga semana-miga--full" />Como el plan</li>
+        <li><Miga aspect="full" className="semana-miga semana-miga--full" />Como el plan o meta cumplida</li>
         <li><Miga aspect="half" className="semana-miga semana-miga--half" />Faltó o sobró algo</li>
-        {week.days.some(day => hasFlexibleHabit(week, day) || day.meals?.some(meal => meal.status === 'FLEXIBLE')) && <li><Miga aspect="flexible" className="semana-miga semana-miga--flexible" />Flexible</li>}
+        <li><Miga aspect="flexible" className="semana-miga semana-miga--flexible" />Flexible</li>
+        <li><Miga aspect="noted" className="semana-miga semana-miga--noted" />Anotada</li>
         <li><Miga aspect="empty" className="semana-miga semana-miga--empty" />Sin anotar</li>
         <li><Miga aspect="future" className="semana-miga semana-miga--futuro" />Todavía no</li>
         {hasNonApplicableMeals && <li><Miga aspect="dash" className="semana-miga semana-miga--no-aplica" />No toca ese día</li>}
@@ -269,7 +310,7 @@ export default function WeekPage() {
     : null
   const selectedDay = week?.days.find(d => d.date === selectedDate)
   const pastDays = week?.days.filter(d => d.date <= today) ?? []
-  const pastMeals = pastDays.flatMap(d => d.meals ?? [])
+  const pastMeals = pastDays.flatMap(d => d.meals ?? []).filter(meal => meal.planned !== false)
   const mealsInPlan = pastMeals.filter(m => m.status === 'EN_PLAN').length
 
   return (
@@ -350,6 +391,7 @@ export default function WeekPage() {
                   <DayDetail
                     key={selectedDay.date}
                     day={selectedDay}
+                    week={week}
                     todayISO={today}
                   />
                 )}
