@@ -63,3 +63,17 @@ test('la hoja vacía valida nombre y no permite porciones negativas', () => {
   expect(screen.getByRole('button', { name: 'Reducir Cereales' })).toBeDisabled()
   expect(screen.queryByRole('button', { name: 'Eliminar comida' })).not.toBeInTheDocument()
 })
+
+
+test('permite completar media porción sin agregar migas cuando ya hay 12', () => {
+  const props = setup({ 1: 9.5, 2: 2 })
+  expect(screen.getByText('12 de 12')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Aumentar Cereales' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Aumentar Frutas' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Aumentar Cereales' }))
+  expect(screen.getByLabelText('Porciones de Cereales')).toHaveTextContent('10')
+  expect(screen.getByText('12 de 12')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Aumentar Cereales' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ portions: { 1: 10, 2: 2 } }))
+})

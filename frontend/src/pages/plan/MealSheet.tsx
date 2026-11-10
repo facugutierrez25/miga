@@ -47,7 +47,7 @@ export default function MealSheet({ meal, groups, isNew, busy, error, conflict, 
             <button type="button" aria-label={'Reducir ' + group.name} disabled={value <= 0} onClick={() => update(-0.5)}>−</button>
             <output aria-label={'Porciones de ' + group.name}>{String(value).replace('.', ',')}</output>
             <button type="button" aria-label={'Aumentar ' + group.name}
-              disabled={value >= 10 || count >= MAX_CARD_PORTIONS} onClick={() => update(0.5)}>+</button>
+              disabled={value >= 10 || count - Math.ceil(value) + Math.ceil(value + 0.5) > MAX_CARD_PORTIONS} onClick={() => update(0.5)}>+</button>
           </div>
         })}
         <button className="meal-sheet__save" disabled={!draft.name.trim() || conflict || count > MAX_CARD_PORTIONS} onClick={() => onSave(draft)}>{busy ? 'Guardando…' : 'Guardar cambios'}</button>

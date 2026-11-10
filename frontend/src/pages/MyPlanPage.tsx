@@ -290,7 +290,6 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       setSheetDirty(false)
       setConfirmed(true)
       returnToSummary()
-      if (fromWizard) setTimeout(() => navigate('/hoy', { replace: true }), 1800)
     } catch (err) {
       if (err instanceof PlanConflictError) {
         setConflict(true)
@@ -302,6 +301,11 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       setConfirming(false)
     }
   }
+
+  const today = new Date()
+  const weekday = today.getDay() || 7
+  const todayMeals = meals.filter(meal => !meal.weekdays?.length || meal.weekdays.includes(weekday))
+  const hasWeekdayRestrictions = meals.some(meal => meal.weekdays?.length && meal.weekdays.length < 7)
 
   async function reloadPlan() {
     if (!token) return
@@ -385,11 +389,12 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
             })}
             <button className="btn-agregar" onClick={addMeal}>Agregar comida</button>
             </div>
+            {fromWizard && <button className="btn-confirmar" onClick={() => navigate('/hoy', { replace: true })}>Listo, ir a Hoy</button>}
 
             {tab === 'resumen' && <>
-            <h2>Tu día completo</h2>
+            <h2>Tu día completo{hasWeekdayRestrictions ? ` · hoy, ${today.toLocaleDateString('es-UY', { weekday: 'long' })}` : ''}</h2>
             <div className="plan-totals">{groups.map((g, index) => {
-              const total = meals.reduce((sum, meal) => sum + (meal.portions[g.id] ?? 0), 0)
+              const total = todayMeals.reduce((sum, meal) => sum + (meal.portions[g.id] ?? 0), 0)
               return <div key={g.id}><span>{g.name}</span><span className="plan-dots" aria-hidden="true">
                 {Array.from({ length: Math.ceil(total) }, (_, n) => <span key={n} style={{ '--crumb-color': groupColor(g, index) } as React.CSSProperties}><Miga aspect={total - n < 1 ? 'half' : 'full'} /></span>)}
               </span><span>{formatPortion(total)}</span></div>

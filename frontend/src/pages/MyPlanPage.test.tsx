@@ -37,6 +37,8 @@ const planWithGroups = {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 10, 9, 12))
   mockUseAuth.mockReturnValue({ token: 'tok', email: 'u@test.com', firstName: null, login: vi.fn(), setFirstName: vi.fn(),
     sessionExpired: false, restoring: false, logout: vi.fn() })
   mockGetPlanHistory.mockResolvedValue([])
@@ -45,6 +47,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.clearAllMocks()
 })
 
@@ -68,11 +71,12 @@ test('portada con fecha, porciones, migas por grupo, totales y accesos con canti
   expect(meal.querySelectorAll('.meal-crumb')).toHaveLength(3)
   expect(meal.querySelectorAll('[style]')[0].getAttribute('style')).toContain('--crumb-color')
   expect(screen.getByText(/Actualizado el/)).toHaveTextContent('9 de noviembre de 2026')
-  expect(screen.getByText('Tu día completo')).toBeInTheDocument()
+  expect(screen.getByText('Tu día completo · hoy, lunes')).toBeInTheDocument()
   expect(document.querySelector('.plan-totals')).toHaveTextContent('Proteínas2')
   for (const label of ['Tus alimentos', 'Hábitos', 'Grupos', 'Planes anteriores']) {
     expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toHaveTextContent(/\d/)
   }
+  expect(screen.queryByRole('button', { name: 'Listo, ir a Hoy' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Editar plan' })).not.toBeInTheDocument()
 })
 test('guarda el plan completo con versión, días y las otras comidas intactas', async () => {
@@ -177,4 +181,35 @@ test('el PUT real invalida la caché GET del plan y de Semana', async () => {
     expect(await week.getWeek('cache-plan-359', '2026-11-09')).toMatchObject({ version: 5 })
     expect(fetchMock).toHaveBeenCalledTimes(5)
   } finally { vi.unstubAllGlobals() }
+})
+
+
+test('los totales de hoy incluyen solo las comidas del día y las de todos los días', async () => {
+  mockGetMyPlan.mockResolvedValue({ ...planWithGroups, meals: [
+    ...planWithGroups.meals,
+    { name: 'Martes', displayOrder: 2, weekdays: [2], portions: [{ foodGroupId: 1, portions: 8 }] },
+    { name: 'Diaria', displayOrder: 3, portions: [{ foodGroupId: 1, portions: 1 }] },
+    { name: 'Sin días', displayOrder: 4, weekdays: [], portions: [{ foodGroupId: 1, portions: 0.5 }] },
+  ] })
+  render(<MemoryRouter><MyPlanPage /></MemoryRouter>)
+  await screen.findByRole('button', { name: 'Editar Martes' })
+  expect(screen.getByRole('heading', { name: 'Tu día completo · hoy, lunes' })).toBeInTheDocument()
+  expect(document.querySelector('.plan-totals')).toHaveTextContent('Proteínas3,5')
+})
+
+test('en onboarding guarda cada comida y espera el botón final para ir a Hoy', async () => {
+  mockGetMyPlan.mockResolvedValue(planWithGroups)
+  mockSaveMyPlan.mockResolvedValue({ ...planWithGroups, version: 5 })
+  render(<MemoryRouter initialEntries={[{ pathname: '/mi-plan', state: { meals: [{ name: 'Desayuno', suggestedTime: '08:00' }] } }]}>
+    <Routes><Route path="/mi-plan" element={<MyPlanPage />} /><Route path="/hoy" element={<h1>Hoy</h1>} /></Routes>
+  </MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar Desayuno' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Aumentar Proteínas' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await screen.findByText('¡Plan guardado!')
+  await new Promise(resolve => setTimeout(resolve, 1900))
+  expect(screen.getByRole('button', { name: 'Editar Desayuno' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Hoy' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Listo, ir a Hoy' }))
+  expect(await screen.findByRole('heading', { name: 'Hoy' })).toBeInTheDocument()
 })
