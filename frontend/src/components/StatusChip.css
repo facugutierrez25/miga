@@ -1,0 +1,5 @@
+.status-chip { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.status-chip--warn, .status-chip--ask { background: var(--warn-soft); color: var(--warn); }
+.status-chip--ok { color: var(--ok); box-shadow: inset 0 0 0 1px currentColor; }
+.status-chip--flexible { background: var(--accent-soft); color: var(--on-accent-soft); }
+.status-chip--noted, .status-chip--none { background: var(--surface-2); color: var(--muted); }

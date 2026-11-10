@@ -1,3 +1,4 @@
+import Segmented from '../components/Segmented'
 import { useState, type FormEvent } from 'react'
 import { deleteMe } from '../api/users'
 import { useNavigate } from 'react-router-dom'
@@ -61,24 +62,7 @@ export default function ProfilePage() {
 
         <div className="perfil-card">
           <p className="perfil-card__label">Tema</p>
-          <div className="tema-selector" role="radiogroup" aria-label="Tema de la aplicación">
-            {THEMES.map(op => (
-              <label
-                key={op.value}
-                className={`tema-opcion${theme === op.value ? ' tema-opcion--activa' : ''}`}
-              >
-                <input
-                  type="radio"
-                  name="tema"
-                  value={op.value}
-                  checked={theme === op.value}
-                  onChange={() => setTheme(op.value)}
-                  className="sr-only"
-                />
-                {op.label}
-              </label>
-            ))}
-          </div>
+          <Segmented label="Tema de la aplicación" options={THEMES} value={theme} onChange={setTheme} />
         </div>
 
         <button disabled={deleting} className="btn-cerrar-sesion" onClick={logOut}>

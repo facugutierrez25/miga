@@ -35,15 +35,15 @@ test('Por día muestra cada comida, estado y nota; el contador flexible no se ed
 
 test('Tarjeta y Planilla se eligen con un control segmentado', () => {
   render(<WeekPage />)
-  expect(screen.getByRole('button', { name: 'Tarjeta' })).toHaveAttribute('aria-pressed', 'true')
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
-  expect(screen.getByRole('button', { name: 'Planilla' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('radio', { name: 'Tarjeta' })).toBeChecked()
+  fireEvent.click(screen.getByRole('radio', { name: 'Planilla' }))
+  expect(screen.getByRole('radio', { name: 'Planilla' })).toBeChecked()
   expect(screen.getByRole('table')).toBeInTheDocument()
 })
 
 test('Planilla muestra la grilla con el texto escrito y los hábitos', () => {
   render(<WeekPage />)
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Planilla' }))
   expect(screen.getByRole('table')).toBeInTheDocument()
   expect(screen.getByRole('columnheader', { name: 'Desayuno' })).toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '=pan y café' })).toBeInTheDocument()
@@ -56,7 +56,7 @@ test('identifica el día actual y su fecha completa en ambas vistas', () => {
   expect(screen.getByRole('heading', { name: 'lunes, 26 de octubre de 2026' }).closest('article'))
     .toHaveAttribute('aria-current', 'date')
   expect(screen.getByText('Hoy')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Planilla' }))
   expect(screen.getByRole('rowheader', { name: /lunes, 26 de octubre de 2026/ }))
     .toHaveAttribute('aria-current', 'date')
 })
@@ -110,10 +110,10 @@ test.each(['CASI', 'DE_MAS', 'PREGUNTAR'] as const)('media miga de %s usa la mar
 })
 
 
-test('la tarjeta de develop destaca la comida flexible con el acento, aunque coincida con el plan', () => {
+test('la tarjeta destaca el estado flexible de la API', () => {
   const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
   const data = { ...base.data!, days: base.data!.days.map(day => ({ ...day,
-    meals: day.meals?.map(meal => ({ ...meal, planned: true, status: 'EN_PLAN' as const, flexibleCount: 1 })) })) }
+    meals: day.meals?.map(meal => ({ ...meal, planned: true, status: 'FLEXIBLE' as const, flexibleCount: 0 })) })) }
   vi.mocked(useWeek).mockReturnValue({ ...base, data })
   const { container } = render(<WeekPage />)
   expect(container.querySelector('.semana-tarjeta__celda .semana-miga--flexible')).toBeInTheDocument()
@@ -121,7 +121,7 @@ test('la tarjeta de develop destaca la comida flexible con el acento, aunque coi
 })
 
 
-test.each([false, true])('sin hábito flexible vigente ese día no destaca la comida (otro día: %s)', otherDay => {
+test.each([false, true])('respeta EN_PLAN aunque haya conteos flexibles antiguos (otro día: %s)', otherDay => {
   const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
   const day = { ...base.data!.days[0], habitIds: [2],
     meals: [{ mealId: 10, name: 'Desayuno', planned: true, status: 'EN_PLAN' as const, noteText: 'pan', flexibleCount: 1 }] }
@@ -152,7 +152,7 @@ test('PDF descarga el documento generado sin imprimir ni cambiar la vista', asyn
   fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
   await waitFor(() => expect(exportWeek).toHaveBeenCalledWith('tok', '2026-10-26', 'pdf'))
   expect(print).not.toHaveBeenCalled()
-  expect(screen.getByRole('button', { name: 'Tarjeta' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('radio', { name: 'Tarjeta' })).toBeChecked()
 })
 
 test('PDF muestra un error y permite volver a intentar la descarga', async () => {
@@ -222,6 +222,30 @@ test('Metas semanales permanece visible tanto en Tarjeta como en Planilla', () =
   vi.mocked(useWeek).mockReturnValue({ ...base, data })
   render(<WeekPage />)
   expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeVisible()
-  fireEvent.click(screen.getByRole('button', { name: 'Planilla' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Planilla' }))
   expect(screen.getByRole('region', { name: 'Metas semanales' })).toBeVisible()
+})
+
+
+test.each([false, true])('FLEXIBLE siempre es amarilla sin depender del hábito (%s)', withHabit => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  const data = { ...base.data!, habits: withHabit ? base.data!.habits : [],
+    days: base.data!.days.map(day => ({ ...day, habitIds: [],
+      meals: day.meals?.map(meal => ({ ...meal, status: 'FLEXIBLE' as const, flexibleCount: 0 })) })) }
+  vi.mocked(useWeek).mockReturnValue({ ...base, data })
+  const { container } = render(<WeekPage />)
+  expect(container.querySelector('.semana-tarjeta__celda .meal-crumb--flexible')).toBeInTheDocument()
+  expect(screen.getAllByText('Flexible').length).toBeGreaterThan(0)
+})
+
+test('Semana muestra guion para Extra sin anotar y la etiqueta MIXED de la API', () => {
+  const base = defaultUseWeek('tok', 'user@miga.uy', '2026-10-26')
+  const data = { ...base.data!, days: [{ ...base.data!.days[0], meals: [
+    { mealId: 1, name: 'Extra', planned: false, status: 'SIN_ANOTAR' as const, noteText: null },
+    { mealId: 2, name: 'Cena', planned: true, status: 'MIXED' as const, noteText: 'pan' },
+  ] }] }
+  vi.mocked(useWeek).mockReturnValue({ ...base, data })
+  const { container } = render(<WeekPage />)
+  expect(container.querySelector('.semana-tarjeta__celda .meal-crumb--dash')).toBeInTheDocument()
+  expect(screen.getByText('Faltó y de más')).toBeInTheDocument()
 })

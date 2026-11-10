@@ -4,11 +4,11 @@ export interface MealStatus {
   kind: MealStateKind
   label: string
   text: string
-  crumb: 'full' | 'half' | 'noted' | 'empty'
+  crumb: 'full' | 'half' | 'noted' | 'empty' | 'flexible'
 }
 
 const STATUS_LABELS: Record<string, { kind: MealStateKind; label: string; crumb: MealStatus['crumb'] }> = {
-  FLEXIBLE: { kind: 'noted', label: 'Flexible', crumb: 'noted' },
+  FLEXIBLE: { kind: 'noted', label: 'Flexible', crumb: 'flexible' },
   EN_PLAN: { kind: 'ok', label: 'Como el plan', crumb: 'full' },
   CASI: { kind: 'warn', label: 'Faltó algo', crumb: 'half' },
   DE_MAS: { kind: 'warn', label: 'De más', crumb: 'half' },
@@ -50,4 +50,12 @@ export function mealStatus(mealDay: { noteText: string | null; comparison?: Grou
     extra.length > 0 ? `De más: ${describeGroups(extra, s => s.recorded - s.expected)}` : '',
   ].filter(Boolean)
   return { ...status, text: parts.length > 0 ? parts.join(' · ') : status.text }
+}
+
+export type MigaAspect = 'full' | 'half' | 'flexible' | 'noted' | 'empty' | 'future' | 'plus' | 'dash'
+
+export function mealAspect(status = 'SIN_ANOTAR', { planned = true, future = false, week = false } = {}): MigaAspect {
+  if (!planned && status === 'SIN_ANOTAR') return week ? 'dash' : 'plus'
+  if (future) return 'future'
+  return mealStatus({ status, noteText: null }).crumb
 }
