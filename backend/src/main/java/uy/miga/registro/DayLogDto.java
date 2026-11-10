@@ -18,7 +18,8 @@ record DayLogDto(
         String noteText,
         Long noteVersion,
         List<EntryItemDto> items,
-        List<GroupStatusDto> comparison
+        List<GroupStatusDto> comparison,
+        String status
     ) {}
 
     record EntryItemDto(

@@ -11,13 +11,23 @@ import static org.assertj.core.api.Assertions.*;
 
 class WeekExportTest {
     @Test
+    void statusLabelsUseOnlyTheMealStatus() {
+        assertThat(WeekExport.statusLabel(new WeekMealData(1L, "Cena", "pizza", "MIXED", 0, true)))
+            .isEqualTo("Falt\u00f3 y de m\u00e1s");
+        assertThat(WeekExport.statusLabel(new WeekMealData(1L, "Cena", "pizza", "FLEXIBLE", 0, true)))
+            .isEqualTo("Flexible");
+        assertThat(WeekExport.statusLabel(new WeekMealData(1L, "Cena", "pizza", "EN_PLAN", 1, true)))
+            .isEqualTo("Como el plan");
+    }
+
+    @Test
     void csvAndXlsxContainTheSameNotesAndDecimalComma() throws Exception {
         var date = LocalDate.of(2026, 10, 26);
         var week = new WeekSummaryDto(date, date.plusDays(6),
             List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1, java.util.UUID.randomUUID())),
             List.of(new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO,
                 List.of(new HabitLogDto(1L, date, new BigDecimal("1.5"))),
-                List.of(new WeekMealData(10L, "Desayuno", "=caf\u00e9; \"pan\"\nfruta", "REGISTRADA", 0)), List.of(1L))));
+                List.of(new WeekMealData(10L, "Desayuno", "=caf\u00e9; \"pan\"\nfruta", "REGISTRADA", 0, true)), List.of(1L))));
         assertThat(WeekExport.csv(week)).startsWith("\ufeff").contains("'", "1,5", "caf\u00e9", "\"\"pan\"\"");
         var out = new ByteArrayOutputStream();
         WeekExport.writeXlsx(week, out);
@@ -42,10 +52,10 @@ class WeekExportTest {
             List.of(new HabitDto(1L, "Agua", "CANTIDAD", "l", null, BigDecimal.ONE, "DIA", false, (short)1, java.util.UUID.randomUUID())),
             List.of(
                 new WeekDayDto(date, true, new BigDecimal("2.5"), BigDecimal.TEN, List.of(),
-                    List.of(new WeekMealData(10L, "Desayuno", "yogur y banana", "EN_PLAN", 0),
-                        new WeekMealData(11L, "Cena", "pizza", "REGISTRADA", 1)), List.of(1L)),
+                    List.of(new WeekMealData(10L, "Desayuno", "yogur y banana", "EN_PLAN", 0, true),
+                        new WeekMealData(11L, "Cena", "pizza", "FLEXIBLE", 1, true)), List.of(1L)),
                 new WeekDayDto(date.plusDays(1), false, BigDecimal.ZERO, BigDecimal.TEN, List.of(),
-                    List.of(new WeekMealData(10L, "Desayuno", null, "SIN_ANOTAR", 0)), List.of(1L))));
+                    List.of(new WeekMealData(10L, "Desayuno", null, "SIN_ANOTAR", 0, true)), List.of(1L))));
         return new WeekExport.Data(week, includedSections, List.of("Lácteos", "Frutas"),
             java.util.Map.of(date, java.util.Map.of("Lácteos", new BigDecimal("1.5"), "Frutas", BigDecimal.ONE)),
             List.of(new uy.miga.registro.UnmatchedFoodDto("torta frita", date, "Desayuno")), "Facundo");
@@ -177,7 +187,7 @@ class WeekExportTest {
         var date = LocalDate.of(2026, 11, 2);
         var meals = new java.util.ArrayList<WeekMealData>();
         for (int i = 0; i < 16; i++) meals.add(new WeekMealData((long) i, "Comida " + i,
-            i == 0 ? "Alimento áéíóú ñ. ".repeat(1200) + "FIN NOTA EXTENSA" : "NOTA COLUMNA " + i, "EN_PLAN", 0));
+            i == 0 ? "Alimento áéíóú ñ. ".repeat(1200) + "FIN NOTA EXTENSA" : "NOTA COLUMNA " + i, "EN_PLAN", 0, true));
         var week = new WeekSummaryDto(date, date, List.of(), List.of(
             new WeekDayDto(date, true, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), meals, List.of())));
         var out = new ByteArrayOutputStream();

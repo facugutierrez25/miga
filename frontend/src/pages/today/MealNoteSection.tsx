@@ -142,7 +142,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       setConflict(false)
       pendingFocus.current = updated.items.length ? 'understood' : 'textarea'
       if (updated.items.length === 0) setDetailOpen(false)
-      onNoteSaved({ noteId: updated.noteId!, version: updated.noteVersion!, text: updated.noteText ?? '',
+      onNoteSaved({ status: updated.status, noteId: updated.noteId!, version: updated.noteVersion!, text: updated.noteText ?? '',
         date, mealId: updated.mealId, items: [], entries: updated.items, comparison: updated.comparison }, updated.mealId)
       setSavedMessage(`Quitaste ${item.food}.`)
     } catch (err) {
@@ -201,7 +201,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       setConflict(false)
       onNoteSaved(interp, meal.id)
       const status = mealStatus({
-        noteText: interp.text, comparison: interp.comparison,
+        status: interp.status, noteText: interp.text, comparison: interp.comparison,
       })
       setSavedMessage(`Guardado. ${status.text}.`)
     } catch (err) {

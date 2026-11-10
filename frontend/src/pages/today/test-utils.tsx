@@ -126,7 +126,7 @@ export const twoMealPlan = {
 export const dayWithNote = {
   ...emptyDay,
   meals: [{
-    mealId: 1, noteId: 5, noteVersion: 3, noteText: 'leche y pan',
+    mealId: 1, status: 'EN_PLAN' as const, noteId: 5, noteVersion: 3, noteText: 'leche y pan',
     items: [
       { id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE,
         uncertain: false, originalText: 'leche', appliedRule: null, occurrenceId: 'occ-a' },
@@ -145,7 +145,7 @@ export const removableItems = [
 
 export function setupRemoval(items: recordsApi.EntryItemDto[] = removableItems) {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
-  const meal = { mealId: 1, noteId: 3, noteVersion: 7, noteText: 'leche, manzana', items, comparison: [] }
+  const meal = { mealId: 1, status: 'REGISTRADA' as const, noteId: 3, noteVersion: 7, noteText: 'leche, manzana', items, comparison: [] }
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [meal] })
   return meal
 }
@@ -170,8 +170,8 @@ export async function openResolution() {
 export function mockResolution() {
   const resolved = { ...unknownFood, id: 502, food: 'Milanesa', origin: ItemOrigin.RULE }
   vi.mocked(recordsApi.resolveItem).mockImplementation(async () => {
-    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, noteId: 3, noteVersion: 7, noteText: 'nota', items: [resolved], comparison: [] }] })
-    return { replacedItemIds: [501], items: [resolved], undo: { occurrenceId: 'occ', ruleUid: 'rule' } }
+    mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 3, noteVersion: 7, noteText: 'nota', items: [resolved], comparison: [] }] })
+    return { status: 'REGISTRADA' as const, replacedItemIds: [501], items: [resolved], undo: { occurrenceId: 'occ', ruleUid: 'rule' } }
   })
   return resolved
 }

@@ -23,6 +23,7 @@ export interface GroupStatusDto {
 }
 
 export interface NoteInterpretationDto {
+  status: MealStatusCode
   noteId: number
   version: number
   text: string
@@ -72,7 +73,10 @@ export interface DailySummaryDto {
   totalRecorded: number
 }
 
+export type MealStatusCode = 'EN_PLAN' | 'CASI' | 'DE_MAS' | 'MIXED' | 'PREGUNTAR' | 'REGISTRADA' | 'SIN_ANOTAR' | 'FLEXIBLE'
+
 export interface MealDayDto {
+  status: MealStatusCode
   mealId: number
   noteId: number | null
   noteVersion: number | null
@@ -102,6 +106,7 @@ export interface PatchItemRequest {
 }
 
 export interface PatchItemResultDto {
+  status: MealStatusCode
   replacedItemIds: number[]
   items: EntryItemDto[]
 }

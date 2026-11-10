@@ -48,7 +48,7 @@ class ApiContractsTest {
             case "type" -> "NORMAL";
             case "habitType" -> "CANTIDAD";
             case "period" -> "DIA";
-            case "status" -> "OK";
+            case "status" -> "EN_PLAN";
             case "ruleType" -> "NORMAL";
             case "ruleSource" -> "PLAN";
             default -> "Sintético";

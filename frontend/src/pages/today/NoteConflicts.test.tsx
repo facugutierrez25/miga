@@ -17,7 +17,7 @@ import { screen, waitFor, fireEvent } from '@testing-library/react'
 import { vi, test, expect } from 'vitest'
 test('conserva el borrador ante conflicto, recarga la versión y usa la nueva al guardar', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
-  const meal = { mealId: 1, noteId: 5, noteVersion: 2, noteText: 'leche', items: [], comparison: [] }
+  const meal = { mealId: 1, status: 'REGISTRADA' as const, noteId: 5, noteVersion: 2, noteText: 'leche', items: [], comparison: [] }
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [meal] })
   renderToday()
   await waitFor(() => expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche'))
@@ -33,7 +33,7 @@ test('conserva el borrador ante conflicto, recarga la versión y usa la nueva al
   fireEvent.click(screen.getByRole('button', { name: 'Recargar' }))
   await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   expect(textarea).toHaveValue('mi borrador')
-  mockSaveNote.mockResolvedValue({ noteId: 5, version: 4, text: 'mi borrador', date: emptyDay.date,
+  mockSaveNote.mockResolvedValue({ status: 'REGISTRADA' as const, noteId: 5, version: 4, text: 'mi borrador', date: emptyDay.date,
     mealId: 1, items: [], entries: [], comparison: [] })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
   await waitFor(() => expect(mockSaveNote).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'mi borrador', 3))
@@ -50,13 +50,13 @@ test('un borrador empezado sobre una versión vieja sigue dando conflicto tras u
   const day = (noteVersion: number) => ({
     date: '2025-01-01', summary: [],
     meals: [{
-      mealId: 1, noteId: 1, noteText: 'leche', noteVersion, items: [],
+      mealId: 1, status: 'PREGUNTAR' as const, noteId: 1, noteText: 'leche', noteVersion, items: [],
       comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 1, recorded: 0, status: 'PREGUNTAR' }],
     }],
   })
   mockGetDayRecord.mockResolvedValueOnce(day(2)).mockResolvedValue(day(3))
   mockSaveNote.mockResolvedValue({
-    noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 3,
+    status: 'REGISTRADA' as const, noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 3,
     items: [], entries: [], comparison: [],
   })
   renderToday()
@@ -74,12 +74,12 @@ test('recargar desde el conflicto adopta la versión actual aunque no haya cambi
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   const day = {
     date: '2025-01-01', summary: [],
-    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 3, items: [], comparison: [] }],
+    meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteText: 'leche', noteVersion: 3, items: [], comparison: [] }],
   }
   mockGetDayRecord.mockResolvedValue(day)
   mockSaveNote
     .mockRejectedValueOnce(new recordsApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
-    .mockResolvedValue({ noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 4, items: [], entries: [], comparison: [] })
+    .mockResolvedValue({ status: 'REGISTRADA' as const, noteId: 1, text: 'leche y pan', date: '2025-01-01', mealId: 1, version: 4, items: [], entries: [], comparison: [] })
   renderToday()
   await openNote()
 
@@ -98,7 +98,7 @@ test('si recargar falla, la versión base no cambia', async () => {
   mockGetDayRecord
     .mockResolvedValueOnce({
       date: '2025-01-01', summary: [],
-      meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 2, items: [], comparison: [] }],
+      meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteText: 'leche', noteVersion: 2, items: [], comparison: [] }],
     })
     .mockRejectedValue(new Error('sin red'))
   mockSaveNote.mockRejectedValue(new recordsApi.NoteConflictError('Esta nota cambió en otro dispositivo.'))
@@ -120,7 +120,7 @@ test('un reintento general del día no borra el borrador ni su versión base', a
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   const day = (noteVersion: number) => ({
     date: '2025-01-01', summary: [],
-    meals: [{ mealId: 1, noteId: 1, noteText: 'leche', noteVersion, items: [], comparison: [] }],
+    meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteText: 'leche', noteVersion, items: [], comparison: [] }],
   })
   mockGetDayRecord
     .mockResolvedValueOnce(day(2))
@@ -143,7 +143,7 @@ test('un reintento general del día no borra el borrador ni su versión base', a
 
 test('al recargar muestra menciones persistidas sin corrección ni porciones', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
-  mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, noteId: 5, noteVersion: 2,
+  mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 5, noteVersion: 2,
     noteText: 'mate, algo raro', comparison: [], items: [
       { id: 51, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'libre' },
       { id: 52, food: 'algo raro', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.UNKNOWN, uncertain: false },

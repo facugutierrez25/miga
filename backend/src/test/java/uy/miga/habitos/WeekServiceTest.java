@@ -14,6 +14,28 @@ import static org.mockito.Mockito.*;
 
 class WeekServiceTest {
     @Test
+    void dailyGoalDoesNotCapLoggedValues() {
+        var habits = mock(PlanHabitRepository.class);
+        var logs = mock(HabitLogRepository.class);
+        var plans = mock(PlanService.class);
+        var users = mock(UserService.class);
+        var service = new WeekService(habits, logs, mock(FoodEntryFacade.class), plans, users,
+            mock(uy.miga.registro.DailyLogService.class));
+        var date = LocalDate.of(2026, 11, 2);
+        when(users.findUserIdByEmail("user")).thenReturn(1L);
+        when(plans.getPlanIdForDate(1L, date)).thenReturn(10L);
+        var habit = new PlanHabit();
+        habit.setPlanId(10L);
+        habit.setHabitType(HabitType.CANTIDAD);
+        habit.setDailyGoal(new BigDecimal("2"));
+        when(habits.findById(3L)).thenReturn(Optional.of(habit));
+        assertThat(service.logHabit("user", 3L, date, new BigDecimal("3")).value()).isEqualByComparingTo("3");
+        var saved = org.mockito.ArgumentCaptor.forClass(HabitLog.class);
+        verify(logs).save(saved.capture());
+        assertThat(saved.getValue().getValue()).isEqualByComparingTo("3");
+    }
+
+    @Test
     void resolvesEachDayAndSkipsPortionGoalsForFreePlans() {
         var habits = mock(PlanHabitRepository.class);
         var logs = mock(HabitLogRepository.class);

@@ -27,8 +27,9 @@
       "mealId" : 1,
       "name" : "Sintético",
       "noteText" : "Sintético",
-      "status" : "OK",
-      "flexibleCount" : 1
+      "status" : "EN_PLAN",
+      "flexibleCount" : 1,
+      "planned" : true
     } ],
     "habitIds" : [ 1 ]
   } ]

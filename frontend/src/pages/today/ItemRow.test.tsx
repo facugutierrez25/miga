@@ -19,7 +19,7 @@ import { vi, test, expect } from 'vitest'
 test('muestra un compuesto en una fila con su regla bajo el título Así lo entendí', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0, text: '1 barrita', date: '2025-01-01', mealId: 1, items: [], comparison: [],
+    status: 'REGISTRADA' as const, noteId: 1, version: 0, text: '1 barrita', date: '2025-01-01', mealId: 1, items: [], comparison: [],
     entries: [barEntry(11, 1), barEntry(12, 2), barEntry(13, 3)],
   })
   renderToday()
@@ -43,12 +43,12 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   mockGetDayRecord.mockResolvedValue({
     date: '2025-01-01', summary: [],
     meals: [{
-      mealId: 1, noteId: 1, noteVersion: 0, noteText: 'leche', comparison: [],
+      mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 0, noteText: 'leche', comparison: [],
       items: [{ id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
         origin: ItemOrigin.RULE, uncertain: true, appliedRule: '1 leche = 1 Proteínas', occurrenceId: 'occ-2' }],
     }],
   })
-  mockPatchItem.mockResolvedValue({ replacedItemIds: [21], items: [] })
+  mockPatchItem.mockResolvedValue({ status: 'REGISTRADA' as const, replacedItemIds: [21], items: [] })
   renderToday()
   await openNote()
 
@@ -70,7 +70,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
 test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 99, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
+    status: 'REGISTRADA' as const, noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 99, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
     items: [{
       originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
@@ -93,7 +93,7 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
 test('no duplica las menciones que ya generaron ítems', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0, text: '1 barrita', date: '2025-01-01', mealId: 1, comparison: [],
+    status: 'REGISTRADA' as const, noteId: 1, version: 0, text: '1 barrita', date: '2025-01-01', mealId: 1, comparison: [],
     items: [{
       originalText: '1 barrita', foodName: 'barrita', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 1, appliedRule: 'barrita (compuesto)',
@@ -119,7 +119,7 @@ test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', as
   mockGetDayRecord.mockResolvedValue({
     date: '2025-01-01', summary: [],
     meals: [{
-      mealId: 1, noteId: 1, noteText: 'leche', noteVersion: 1, comparison: [],
+      mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteText: 'leche', noteVersion: 1, comparison: [],
       items: [{ id: 31, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
         origin: ItemOrigin.RULE, uncertain: false, appliedRule: null, occurrenceId: 'occ-31' }],
     }],

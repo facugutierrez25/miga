@@ -34,8 +34,50 @@ class DailyLogServiceTest {
     @BeforeEach
     void setup() {
         when(users.findUserIdByEmail("user")).thenReturn(1L);
+        when(plans.getReadData(any())).thenReturn(new uy.miga.plans.PlanReadData(20L, today, null,
+            "PORCIONES", BigDecimal.ZERO, List.of(), List.of(
+                new uy.miga.plans.PlanReadData.MealData(10L, "Desayuno", List.of()))));
         when(plans.lockCurrentPlan(1L)).thenReturn(20L);
         when(plans.getPlanIdForDate(1L, today)).thenReturn(20L);
+    }
+
+    @Test
+    void dayAndWeekUseFlexibleStatusWithoutAnyHabitConfiguration() {
+        var entry = new FoodEntryFacade.EntryData(1L, 10L, "pizza", 1.0, "u", null, false, null,
+            "MENTION", false, null, today, "pizza", null, null, "FLEXIBLE", "PLAN", false, null);
+        when(entries.findByUserIdAndDate(1L, today)).thenReturn(List.of(entry));
+        var plan = plans.getReadData(20L);
+        when(plans.getPlansForRange(1L, today, today)).thenReturn(java.util.Map.of(today, plan));
+        var dayMeal = service.getDayLog("user", today).meals().getFirst();
+        var weekMeal = service.getWeekMeals("user", today).getFirst();
+        assertThat(dayMeal.status()).isEqualTo("FLEXIBLE");
+        assertThat(weekMeal.status()).isEqualTo(dayMeal.status());
+        assertThat(weekMeal.planned()).isFalse();
+        assertThat(weekMeal.flexibleCount()).isZero();
+    }
+
+    @Test
+    void legacyFlexibleNotesUseTheSameFallbackForDayAndWeek() {
+        var interpreter = mock(InterpreterService.class);
+        var log = DailyLogTestServices.create(notes, interpreter, mock(ComparisonService.class), entries,
+            plans, rules, users, java.time.Clock.systemUTC());
+        var note = new MealNote();
+        note.setUserId(1L);
+        note.setMealId(10L);
+        note.setPlanId(20L);
+        note.setDate(today);
+        note.setText("pizza");
+        when(notes.findByUserIdAndDate(1L, today)).thenReturn(List.of(note));
+        when(notes.findByUserIdAndDateBetween(1L, today, today)).thenReturn(List.of(note));
+        when(interpreter.interpret(eq("pizza"), anyList())).thenReturn(List.of(new InterpretedItem(
+            "pizza", "pizza", BigDecimal.ONE, "u", null, null, BigDecimal.ZERO, "Flexible", false,
+            5L, null, "FLEXIBLE")));
+        var plan = plans.getReadData(20L);
+        when(plans.getPlansForRange(1L, today, today)).thenReturn(java.util.Map.of(today, plan));
+        assertThat(log.getDayLog("user", today).meals().getFirst().status()).isEqualTo("FLEXIBLE");
+        var meal = log.getWeekMeals("user", today).getFirst();
+        assertThat(meal.status()).isEqualTo("FLEXIBLE");
+        assertThat(meal.flexibleCount()).isEqualTo(1);
     }
 
     @ParameterizedTest
@@ -185,7 +227,7 @@ class DailyLogServiceTest {
         assertThat(result.version()).isEqualTo(2L);
         verify(notes, never()).saveAndFlush(any());
         verify(entries, never()).deleteNoteEntries(any());
-        verifyNoInteractions(rules);
+        verify(rules).findApplicable(20L, null);
     }
 
     private void entryWithPortions(BigDecimal portions) {
@@ -193,6 +235,9 @@ class DailyLogServiceTest {
             3L, 11L, "yogur", 2.0, "u", 7L, false, null, "USUARIO", false,
             portions, today, null, "snapshot", null, "NORMAL", "USUARIO", false, null));
         when(plans.getMealIds(20L)).thenReturn(List.of(11L));
+        when(plans.getReadData(20L)).thenReturn(new uy.miga.plans.PlanReadData(20L, today, null,
+            "PORCIONES", BigDecimal.ZERO, List.of(), List.of(
+                new uy.miga.plans.PlanReadData.MealData(11L, "Almuerzo", List.of()))));
     }
 
     @Test

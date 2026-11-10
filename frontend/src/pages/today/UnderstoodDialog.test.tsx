@@ -19,7 +19,7 @@ import { readableRule } from '../readableRule'
 test('"Cómo lo calculé" abre un pop-up con la regla legible, también en Safari', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockSaveNote.mockResolvedValue({
-    noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 98, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
+    status: 'REGISTRADA' as const, noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 98, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
     items: [{
       originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
@@ -71,7 +71,7 @@ test('el popup empieza cerrado y conserva la corrección al cerrarlo y volver a 
 test('las preguntas quedan en Hoy y los alimentos sin grupo se muestran en el popup', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{
-    mealId: 1, noteId: 1, noteVersion: 1, noteText: 'leche, manzana, algo raro',
+    mealId: 1, status: 'PREGUNTAR' as const, noteId: 1, noteVersion: 1, noteText: 'leche, manzana, algo raro',
     items: [...removableItems, { ...removableItems[1], id: 103, food: 'algo raro', origin: ItemOrigin.UNKNOWN }],
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'PREGUNTAR' }],
   }] })
