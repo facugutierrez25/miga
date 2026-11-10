@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/authTypes'
 import { useWeek } from '../hooks/useWeek'
 import { logHabit, type HabitDto } from '../api/week'
+import Miga from './Miga'
 import './TodayHabits.css'
 
 function fullDate(date: string) { return new Date(date + 'T12:00:00').toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }
@@ -32,6 +33,49 @@ function habitDone(habit: HabitDto, value: number): boolean {
 }
 
 
+export function HabitCrumbs({ habit, value = 0, disabled = false, date, onChange }: {
+  habit: HabitDto; value?: number; disabled?: boolean; date?: string; onChange?: (value: number) => void
+}) {
+  const yesNo = habit.habitType === 'SI_NO'
+  const slots = yesNo ? 1 : habit.dailyGoal != null && habit.step > 0 ? Math.round(habit.dailyGoal / habit.step) : 0
+  const filled = yesNo ? Number(value > 0) : Math.round(value / habit.step)
+  const done = habitDone(habit, value)
+  const progress = habitProgress(habit, value)
+  const unit = habit.unit ? ` ${habit.unit}` : ''
+  const suffix = date ? `, ${fullDate(date)}` : ''
+  const unavailable = disabled || !onChange
+  const update = (next: number) => onChange?.(round(next))
+  return <div role="group" aria-label={`${habit.name}: ${progress}${suffix}, ${done ? 'completado' : 'pendiente'}`}
+    className={`hoy-habito${done ? ' hoy-habito--ok' : ''}`}>
+    <span className="hoy-habito__name">{habit.name}</span>
+    <span className="hoy-habito__val">{yesNo ? value > 0 ? 'Hecho' : '' : progress}</span>
+    <span className="hoy-habito__migas">
+      {slots > 0 && slots <= 6 ? <>
+        {Array.from({ length: slots }, (_, index) => {
+          const step = yesNo ? 1 : habit.step
+          const next = round((filled === index + 1 ? index : index + 1) * step)
+          return <button type="button" key={index} disabled={unavailable} aria-pressed={index < filled}
+            aria-label={`${habit.name}: ${yesNo ? next ? 'Hecho' : 'Sin hacer' : `${fmtN(next)}${unit}`}${suffix}`}
+            onClick={() => update(next)}><Miga aspect={index < filled ? 'full' : 'empty'} /></button>
+        })}
+        {!yesNo && <button type="button" disabled={unavailable}
+          aria-label={`Sumar ${fmtN(habit.step)}${unit} a ${habit.name}${suffix}`}
+          onClick={() => update(Math.max(value, habit.dailyGoal!) + habit.step)}>
+          <span className={`hoy-habito__extra${filled > slots ? ' hoy-habito__extra--on' : ''}`}>+{filled > slots ? filled - slots : ''}</span>
+        </button>}
+      </> : <>
+        <button type="button" className="hoy-habito__paso" disabled={unavailable || value <= 0}
+          aria-label={`Restar ${fmtN(habit.step)}${unit} de ${habit.name}${suffix}`}
+          onClick={() => update(Math.max(0, value - habit.step))}>−</button>
+        <button type="button" className="hoy-habito__paso" disabled={unavailable}
+          aria-label={`Sumar ${fmtN(habit.step)}${unit} a ${habit.name}${suffix}`}
+          onClick={() => update(value + habit.step)}>+</button>
+      </>}
+    </span>
+  </div>
+}
+
+
 export default function TodayHabits({ date, revision }: { date: string; revision?: unknown }) {
   const { token, email } = useAuth()
   const { data: week, setData, status, retry } = useWeek(token, email, date)
@@ -43,7 +87,7 @@ export default function TodayHabits({ date, revision }: { date: string; revision
     }
   }, [revision, retry])
   const day = week?.days.find(d => d.date === date)
-  const habits = week?.habits.filter(h => !day?.habitIds || day.habitIds.includes(h.id)) ?? []
+  const habits = week?.habits.filter(h => !h.countsFlexibleMeals && (!day?.habitIds || day.habitIds.includes(h.id))) ?? []
   function onLogUpdated(log: Awaited<ReturnType<typeof logHabit>>) {
     setData(prev => prev && ({ ...prev, days: prev.days.map(d => d.date !== date ? d : ({ ...d, habitLogs: [...d.habitLogs.filter(l => l.habitId !== log.habitId), log] })) }))
   }
@@ -79,57 +123,10 @@ export default function TodayHabits({ date, revision }: { date: string; revision
         <div className="hoy-habitos">
 
           <ul className="hoy-habitos__lista">
-            {habits.map(h => {
-              const log = logMap.get(h.id)
-              const value = log?.value ?? 0
-              const done = habitDone(h, value)
-              const progress = habitProgress(h, value)
-              const unit = h.unit ? ` ${h.unit}` : ''
-              // Contadores y cantidades se corrigen con − y +; los flexibles son de solo lectura.
-              const isCounter = h.habitType !== 'SI_NO' && !h.countsFlexibleMeals
-              const check = done && (
-                <svg viewBox="0 0 14 14"><path d="M3.5 7.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              )
-              return (
-                <li key={h.id}>
-                  {isCounter ? (
-                    <div role="group" aria-label={`${h.name}: ${progress}, ${fullDate(date)}, ${done ? 'completado' : 'pendiente'}`} className={`hoy-habito${done ? ' hoy-habito--ok' : ''}`}>
-                      <span className="hoy-habito__check" aria-hidden="true">{check}</span>
-                      <span className="hoy-habito__name">{h.name}</span>
-                      <span className="hoy-habito__val">{progress}</span>
-                      <span className="hoy-habito__ajuste">
-                        <button type="button" className="hoy-habito__paso"
-                          disabled={value <= 0 || savingHabit !== null}
-                          aria-label={`Restar ${fmtN(h.step)}${unit} de ${h.name}, ${fullDate(date)}`}
-                          onClick={() => void setHabit(h, Math.max(0, value - h.step))}>
-                          −
-                        </button>
-                        <button type="button" className="hoy-habito__paso"
-                          disabled={savingHabit !== null}
-                          aria-label={`Sumar ${fmtN(h.step)}${unit} a ${h.name}, ${fullDate(date)}`}
-                          onClick={() => void setHabit(h, value + h.step)}>
-                          +
-                        </button>
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      disabled={h.countsFlexibleMeals || savingHabit !== null}
-                      className={`hoy-habito${done ? ' hoy-habito--ok' : ''}`}
-                      onClick={() => void setHabit(h, done ? 0 : 1)}
-                      aria-label={hasGoal(h) ? `${h.name}: ${progress}, ${fullDate(date)}, ${done ? 'completado' : 'pendiente'}` : `${h.name}: ${done ? 'completado' : 'pendiente'}, ${progress}, ${fullDate(date)}`}
-                      aria-pressed={done}
-                    >
-                      <span className="hoy-habito__check" aria-hidden="true">{check}</span>
-                      <span className="hoy-habito__name">{h.name}</span>
-                      {h.countsFlexibleMeals && (
-                        <span className="hoy-habito__val">{progress}</span>
-                      )}
-                    </button>
-                  )}
-                </li>
-              )
-            })}
+            {habits.map(h => <li key={h.id}>
+              <HabitCrumbs habit={h} value={logMap.get(h.id)?.value ?? 0} date={date}
+                disabled={savingHabit !== null} onChange={value => void setHabit(h, value)} />
+            </li>)}
           </ul>
         </div>
       )}
