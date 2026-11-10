@@ -272,8 +272,11 @@ export const MealNoteSection = memo(function MealNoteSection({
   return (
     <div className="nota-body">
       {(!hasNote || editing) && <p className="toca" aria-label="Te toca">
-        {meal.portions.some(p => p.portions > 0) ? <>Te toca: {meal.portions.filter(p => p.portions > 0).map(p =>
-          <span key={p.foodGroupId} style={{ color: groupsMap[p.foodGroupId]?.token }}>{fmt(p.portions)} {groupsMap[p.foodGroupId]?.name}</span>)}</>
+        {meal.portions.some(p => p.portions > 0) ? meal.portions.filter(p => p.portions > 0).map(p =>
+          <span key={p.foodGroupId}>
+            <i className="nota-item__dot" style={{ background: groupsMap[p.foodGroupId]?.token }} aria-hidden="true" />
+            {fmt(p.portions)} {groupsMap[p.foodGroupId]?.name}
+          </span>)
           : 'Para lo que comas fuera de las comidas de tu plan.'}
       </p>}
       {hasNote && !editing ? <>

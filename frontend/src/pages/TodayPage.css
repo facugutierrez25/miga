@@ -772,8 +772,9 @@
 .comida__cab { display: flex; align-items: center; gap: 8px; }
 .comida__cab h2 { font-family: var(--font-display); font-weight: 700; }
 .comida__cab .chip { margin-left: auto; }
-.toca { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.toca { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; color: var(--ink); }
 .toca span { display: inline-flex; align-items: center; gap: 6px; }
+.toca .nota-item__dot { width: 10px; height: 10px; }
 
 .hoy-page { width: 100%; max-width: 480px; margin-inline: auto; }
 .hoy-page .hoy-body { width: 100%; max-width: 480px; }
