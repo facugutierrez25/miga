@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import BottomSheet from '../../components/BottomSheet'
 import type { PlanFoodGroupDto } from '../../api/plans'
 import { MAX_CARD_PORTIONS } from '../../components/crumbSlots'
@@ -12,7 +12,8 @@ export interface MealDraft {
   weekdays?: number[] | null
   portions: Record<number, number>
 }
-export default function MealSheet({ meal, groups, isNew, busy, error, conflict, onReload, onClose, onSave, onDelete, onDirtyChange }: {
+export default function MealSheet({ meal, groups, isNew, busy, error, conflict, onReload, onClose, onSave, onDelete, onDirtyChange, children }: {
+  children?: ReactNode
   meal: MealDraft; groups: PlanFoodGroupDto[]; isNew: boolean; busy: boolean
   error: string | null; conflict: boolean; onReload: () => void; onClose: () => void
   onSave: (meal: MealDraft) => void; onDelete: () => void; onDirtyChange: (dirty: boolean) => void
@@ -29,6 +30,7 @@ export default function MealSheet({ meal, groups, isNew, busy, error, conflict, 
   }
   return <BottomSheet title={isNew ? 'Agregar comida' : 'Editar comida'} onClose={close}>
     <div className="meal-sheet">
+      {children}
       {guard.notice(onClose)}
       <fieldset disabled={busy} className="meal-sheet__fields">
         <label>Nombre de la comida<input placeholder="Nombre de la comida" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>

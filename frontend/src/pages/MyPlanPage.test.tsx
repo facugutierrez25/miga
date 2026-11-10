@@ -1,8 +1,8 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import TodayPage from './TodayPage'
 import WeekPage from './WeekPage'
 import { getWeek } from '../api/week'
-import { MemoryRouter, Routes, Route, Link } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, Link, createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { vi, beforeEach, afterEach, test, expect } from 'vitest'
 import MyPlanPage from './MyPlanPage'
 import * as plansApi from '../api/plans'
@@ -212,4 +212,61 @@ test('en onboarding guarda cada comida y espera el botón final para ir a Hoy', 
   expect(screen.queryByRole('heading', { name: 'Hoy' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Listo, ir a Hoy' }))
   expect(await screen.findByRole('heading', { name: 'Hoy' })).toBeInTheDocument()
+  expect(mockSaveMyPlan).toHaveBeenLastCalledWith('tok', expect.objectContaining({ clientVersion: 5 }))
+})
+
+test('el botón final guarda las comidas pendientes y permanece si falla', async () => {
+  mockGetMyPlan.mockRejectedValue(new Error('sin-plan'))
+  let finishSave!: (plan: typeof planWithGroups) => void
+  mockSaveMyPlan.mockRejectedValueOnce(new Error('sin conexión')).mockImplementationOnce(() =>
+    new Promise(resolve => { finishSave = resolve }))
+  const router = createMemoryRouter([
+    { path: '/mi-plan', element: <MyPlanPage /> },
+    { path: '/hoy', element: <h1>Hoy</h1> },
+  ], { initialEntries: [{ pathname: '/mi-plan', state: { meals: [
+    { name: 'Desayuno', suggestedTime: '08:00' },
+    { name: 'Cena', suggestedTime: '20:00' },
+  ] } }] })
+  render(<RouterProvider router={router} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Listo, ir a Hoy' }))
+  expect(await screen.findByText('No se pudo guardar el plan. Intentá de nuevo.')).toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/mi-plan')
+  fireEvent.click(screen.getByRole('button', { name: 'Listo, ir a Hoy' }))
+  expect(mockSaveMyPlan).toHaveBeenLastCalledWith('tok', {
+    clientVersion: undefined,
+    meals: ['Desayuno', 'Cena'].map((name, index) => ({
+      name, suggestedTime: index ? '20:00:00' : '08:00:00', displayOrder: index + 1,
+      weekdays: undefined,
+      portions: defaultGroups.map(group => ({ foodGroupAbbr: group.abbreviation, portions: 0 })),
+    })),
+  })
+  expect(router.state.location.pathname).toBe('/mi-plan')
+  await act(async () => finishSave(planWithGroups))
+  expect(await screen.findByRole('heading', { name: 'Hoy' })).toBeInTheDocument()
+  expect(screen.queryByRole('alert', { name: 'Cambios sin guardar' })).not.toBeInTheDocument()
+})
+
+test('al volver con cambios la confirmación está dentro de la hoja y permite continuar o descartar', async () => {
+  mockGetMyPlan.mockResolvedValue(planWithGroups)
+  const router = createMemoryRouter([
+    { path: '/anterior', element: <h1>Anterior</h1> },
+    { path: '/mi-plan', element: <MyPlanPage /> },
+  ], { initialEntries: ['/anterior', '/mi-plan'] })
+  render(<RouterProvider router={router} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar Desayuno' }))
+  fireEvent.change(screen.getByLabelText('Nombre de la comida'), { target: { value: 'Desayuno nuevo' } })
+  await act(async () => { await router.navigate(-1) })
+  const dialog = screen.getByRole('dialog', { name: 'Editar comida' })
+  const notice = within(dialog).getByRole('alert', { name: 'Cambios sin guardar' })
+  const discard = within(notice).getByRole('button', { name: 'Descartar cambios' })
+  discard.focus()
+  expect(discard).toHaveFocus()
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+  expect(dialog).toContainElement(document.activeElement as HTMLElement)
+  fireEvent.click(within(notice).getByRole('button', { name: 'Seguir editando' }))
+  expect(router.state.location.pathname).toBe('/mi-plan')
+  expect(screen.getByLabelText('Nombre de la comida')).toHaveValue('Desayuno nuevo')
+  await act(async () => { await router.navigate(-1) })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Descartar cambios' }))
+  expect(await screen.findByRole('heading', { name: 'Anterior' })).toBeInTheDocument()
 })

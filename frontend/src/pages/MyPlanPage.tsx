@@ -212,6 +212,10 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
   const [planDetail, setPlanDetail] = useState<PlanSummaryDto | null>(null)
   const [planVersion, setPlanVersion] = useState<number | undefined>(initialPlan?.version)
   const [confirmed, setConfirmed] = useState(false)
+  const [goToToday, setGoToToday] = useState(false)
+  useEffect(() => {
+    if (goToToday && !confirming) navigate('/hoy', { replace: true })
+  }, [goToToday, confirming, navigate])
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState(false)
   const [sheetIndex, setSheetIndex] = useState<number | null>(null)
@@ -274,7 +278,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
     await confirmPlan(next)
   }
 
-  async function confirmPlan(nextMeals: LocalMeal[]) {
+  async function confirmPlan(nextMeals: LocalMeal[], goToToday = false) {
     if (!token) return
     setConfirming(true)
     setError(null)
@@ -289,6 +293,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       setSheetIndex(null)
       setSheetDirty(false)
       setConfirmed(true)
+      setGoToToday(goToToday)
       returnToSummary()
     } catch (err) {
       if (err instanceof PlanConflictError) {
@@ -338,7 +343,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
       </header>
 
       <div className="mi-plan-body" aria-busy={confirming || rulesBusy}>
-        {dataRouter && <NavigationGuard dirty={hasChanges || rulesDirty || sheetDirty} busy={confirming || rulesBusy} />}
+        {dataRouter && sheetIndex === null && <NavigationGuard dirty={hasChanges || rulesDirty || sheetDirty} busy={confirming || rulesBusy} />}
         {tab === 'resumen' && !loading && !loadError && <>
           <p>{savedPlan?.createdAt ? `Actualizado el ${formatDate(savedPlan.createdAt)}` : savedPlan ? 'Fecha de carga no disponible' : 'Todavía no tenés un plan'}. Tocá una comida para cambiarla.</p>
 
@@ -389,7 +394,7 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
             })}
             <button className="btn-agregar" onClick={addMeal}>Agregar comida</button>
             </div>
-            {fromWizard && <button className="btn-confirmar" onClick={() => navigate('/hoy', { replace: true })}>Listo, ir a Hoy</button>}
+            {fromWizard && <button className="btn-confirmar" onClick={() => confirmPlan(meals, true)}>Listo, ir a Hoy</button>}
 
             {tab === 'resumen' && <>
             <h2>Tu día completo{hasWeekdayRestrictions ? ` · hoy, ${today.toLocaleDateString('es-UY', { weekday: 'long' })}` : ''}</h2>
@@ -453,7 +458,9 @@ function PlanEditor({ initialPlan, loading, loadError, retry, tab, setTab }: {
         error={error} conflict={conflict} onReload={reloadPlan} onDirtyChange={setSheetDirty}
         onClose={() => { setSheetIndex(null); setSheetDirty(false); setError(null); setConflict(false) }}
         onSave={saveSheet} onDelete={() => saveSheet(null)}
-      />}
+      >
+        {dataRouter && <NavigationGuard dirty={hasChanges || rulesDirty || sheetDirty} busy={confirming || rulesBusy} />}
+      </MealSheet>}
     </div>
   )
 }
