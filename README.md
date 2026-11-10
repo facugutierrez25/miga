@@ -8,6 +8,15 @@ Funciona aunque tu nutricionista no use la app. Las herramientas para nutricioni
 
 Sitio: [miga.uy](https://miga.uy)
 
+## Pantallas
+
+- **Hoy:** tira del día con banda y punto «Sigue», panel con «Te toca», registro y diferencias en palabras. Una hoja «Así lo entendí» para revisar y corregir; hábitos con migas y «+».
+- **Semana:** tarjeta de sellos o planilla con comidas y hábitos, resumen de comidas como el plan y metas semanales. El detalle abre la fecha en Hoy.
+- **Mi plan:** portada con migas, edición por comida en una hoja y configuración de hábitos, alimentos y grupos.
+- **Perfil:** datos personales, tema y acceso a exportar.
+
+La [guía de estilo](docs/diseno/guia-de-estilo.md) detalla las reglas D1–D14 del rediseño v3.
+
 ## Stack
 
 | Capa | Tecnología |
