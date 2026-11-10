@@ -73,7 +73,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
 
   function saveSplit(saveAsRule: boolean) {
     submit({
-      quantity: qty === '' ? item.quantity : Number(qty),
+      quantity: item.quantity,
       grupos: splitRows.map(r => ({ foodGroupId: Number(r.foodGroupId), porciones: Number(r.portions) })),
       saveAsRule,
     })
@@ -152,7 +152,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
             add: '+ Agregar grupo', placeholder: 'Elegí un grupo',
           }} />
           <div className="nota-reparto__acciones">
-            <button type="button" className="nota-reparto__principal" disabled={saving || !validSplit || (qty !== '' && !(Number(qty) > 0))}
+            <button type="button" className="nota-reparto__principal" disabled={saving || !validSplit}
               onClick={() => saveSplit(saveAsRule)}>
               Guardar
             </button>

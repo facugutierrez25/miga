@@ -98,7 +98,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   }))
 })
 
-test('el reparto no permite guardar una cantidad cero o negativa y se habilita al corregirla', async () => {
+test.each(['3', '0', '-1', ''])('el reparto conserva la cantidad original aunque se edite a «%s»', async quantity => {
   setupRemoval([removableItems[0]])
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
   const mockPatchItem = vi.mocked(recordsApi.patchItem)
@@ -106,24 +106,14 @@ test('el reparto no permite guardar una cantidad cero o negativa y se habilita a
   renderToday()
   await openDetails()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: quantity } })
   fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
   fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
-  const quantity = screen.getByRole('spinbutton', { name: 'Cantidad de leche' })
   const save = screen.getByRole('button', { name: 'Guardar' })
-  expect(save).toBeEnabled()
-  for (const value of ['0', '-1']) {
-    fireEvent.change(quantity, { target: { value } })
-    expect(save).toBeDisabled()
-    fireEvent.click(save)
-    expect(mockPatchItem).not.toHaveBeenCalled()
-  }
-  fireEvent.change(quantity, { target: { value: '' } })
-  expect(save).toBeEnabled()
-  fireEvent.change(quantity, { target: { value: '3' } })
   expect(save).toBeEnabled()
   fireEvent.click(save)
   await waitFor(() => expect(mockPatchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 101, {
-    quantity: 3,
+    quantity: 1,
     grupos: [{ foodGroupId: 1, porciones: 1 }, { foodGroupId: 3, porciones: 1 }],
     saveAsRule: false,
   }))
