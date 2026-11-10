@@ -1,0 +1,8 @@
+.meal-crumb { display: block; width: 26px; height: 26px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--miga-empty); flex: none; }
+.meal-crumb--full { background: var(--ink); border-color: var(--ink); }
+.meal-crumb--half { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); border-color: var(--ink); }
+.meal-crumb--noted { background: var(--miga-empty); }
+.meal-crumb--flexible { background: var(--accent); border-color: var(--accent); }
+.meal-crumb--future { border-style: dashed; }
+.meal-crumb--dash { width: 10px; height: 2px; border: none; border-radius: 2px; background: var(--surface-3); }
+.meal-crumb--plus { display: grid; place-items: center; border-style: dashed; color: var(--muted); font-style: normal; font-size: 13px; font-weight: 700; line-height: 1; }
