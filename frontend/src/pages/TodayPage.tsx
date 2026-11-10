@@ -61,7 +61,7 @@ function TodayContent() {
     if (submittedText !== undefined) {
       const key = `${interp.date}-${mealId}`
       const current = drafts.get(key)
-      drafts.set(key, current && current.text !== submittedText
+      drafts.set(key, current && current.text.trim() !== submittedText.trim()
         ? { ...current, baseVersion: interp.version, dirty: true }
         : { text: interp.text, baseVersion: interp.version, dirty: false, conflict: false })
     }
@@ -88,7 +88,7 @@ function TodayContent() {
     // El panel puede haberse desmontado mientras se borraba la nota.
     const key = `${date}-${mealId}`
     const current = drafts.get(key)
-    drafts.set(key, current && current.text !== submittedText
+    drafts.set(key, current && current.text.trim() !== submittedText.trim()
       ? { ...current, baseVersion: version, dirty: true }
       : { text: '', baseVersion: version, dirty: false, conflict: false })
     setDayRecord(prev => {
