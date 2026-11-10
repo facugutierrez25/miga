@@ -6,7 +6,7 @@
 
 .semana-header {
   padding: var(--s3) var(--s4) 0;
-  max-width: 640px;
+  max-width: 480px;
   margin: 0 auto;
 }
 
@@ -64,7 +64,7 @@
 
 /* Descarga: un solo botón que abre CSV o Excel */
 .semana-body {
-  max-width: 640px;
+  max-width: 480px;
   margin: 0 auto;
   padding: var(--s3) var(--s4) var(--s6);
   display: flex;
@@ -681,7 +681,7 @@
 @media (min-width: 640px) {
   .semana-header,
   .semana-body {
-    max-width: 720px;
+    max-width: 480px;
   }
 
   /* En escritorio el logo ya está en la barra lateral */
@@ -701,3 +701,32 @@
 
 
 .semana-comida__estado--flexible { color: var(--on-accent-soft); background: var(--accent-soft); border-radius: var(--radius-sm); padding: var(--s1); }
+
+.semana-tarjeta__celda {
+  width: 100%;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.semana-dia__habitos { border-top: 1px solid var(--line); padding-top: var(--s3); }
+.semana-dia__habitos h3 { font-size: var(--fs-sm); }
+.semana-dia__habitos .hoy-habito { padding: var(--s2) 0; min-height: 0; }
+.semana-dia__habitos .hoy-habito__migas { display: none; }
+.semana-dia__abrir {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--s2);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.semana-habito__flexibles { display: flex; flex-wrap: wrap; gap: 4px; }
+.semana-habito__flexibles .meal-crumb { width: 12px; height: 12px; }
+.semana-habito__val { text-align: right; }
