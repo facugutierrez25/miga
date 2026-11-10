@@ -36,18 +36,20 @@ test.each([false, true])('corrige por medias porciones para esta comida; usar si
   fireEvent.click(within(dialog).getByRole('button', { name: 'Más porciones de leche' }))
   if (remember) fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Usar siempre' }))
   fireEvent.click(within(dialog).getByRole('button', { name: 'Listo' }))
-  await waitFor(() => expect(recordsApi.patchItem).toHaveBeenCalledWith('tok', expect.any(String), 101, { portions: 1.5, saveAsRule: remember }))
+  await waitFor(() => expect(recordsApi.patchItem).toHaveBeenCalledWith('tok', expect.any(String), 101, { quantity: 2, unit: 'u', portions: 1.5, saveAsRule: remember }))
 })
 
-test('la corrección de cantidad conserva el cálculo de porciones de la API', async () => {
+test.each(['Listo', 'Guardar cantidad'])('guarda cantidad y porciones juntas con Usar siempre desde %s', async action => {
   setupRemoval([removableItems[0]])
   vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'EN_PLAN', replacedItemIds: [101], items: [] })
   renderToday()
   await openDetails()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cantidad' }))
-  await waitFor(() => expect(recordsApi.patchItem).toHaveBeenCalledWith('tok', expect.any(String), 101, { quantity: 3, unit: 'u', saveAsRule: false }))
+  fireEvent.click(screen.getByRole('button', { name: 'Más porciones de leche' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(recordsApi.patchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 101, { quantity: 3, unit: 'u', portions: 1.5, saveAsRule: true }))
 })
 
 test.each(['Sí', 'No'])('responder %s quita la pregunta y actualiza el estado del panel', async answer => {

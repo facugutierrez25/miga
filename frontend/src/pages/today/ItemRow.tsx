@@ -65,9 +65,14 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
     setSplitting(true)
   }
 
+  function saveCorrection() {
+    submit({ quantity: qty === '' ? item.quantity : Number(qty), unit: item.unit,
+      ...(item.foodGroupId !== null ? { portions } : {}), saveAsRule })
+  }
+
   function saveSplit(saveAsRule: boolean) {
     submit({
-      quantity: item.quantity,
+      quantity: qty === '' ? item.quantity : Number(qty),
       grupos: splitRows.map(r => ({ foodGroupId: Number(r.foodGroupId), porciones: Number(r.portions) })),
       saveAsRule,
     })
@@ -98,7 +103,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
             <span className="nota-item__unit">{displayUnit(item.unit, Number(qty))}</span>
             <button type="button" className="nota-item__save" aria-label="Guardar cantidad"
               disabled={saving || !(Number(qty) > 0)}
-              onClick={() => submit({ quantity: Number(qty), unit: item.unit, saveAsRule })}>✓</button>
+              onClick={saveCorrection}>✓</button>
             <button type="button" className="nota-item__cancel" aria-label="Cancelar"
               onClick={() => { setEditing(false); setSplitting(false); setQty(String(item.quantity ?? '')) }}>✕</button>
           </>
@@ -128,7 +133,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
           <button type="button" aria-label={`Menos porciones de ${item.food}`} disabled={saving || portions <= 0.5} onClick={() => setPortions(value => value - 0.5)}>−</button>
           <output aria-label={`Porciones de ${item.food}`}>{fmt(portions)}</output>
           <button type="button" aria-label={`Más porciones de ${item.food}`} disabled={saving} onClick={() => setPortions(value => value + 0.5)}>+</button>
-          <button type="button" disabled={saving} onClick={() => submit({ portions, saveAsRule })}>Listo</button>
+          <button type="button" disabled={saving || (qty !== '' && !(Number(qty) > 0))} onClick={saveCorrection}>Listo</button>
         </div>
       )}
       {editing && <label className="resolve-remember"><input type="checkbox" checked={saveAsRule} disabled={saving} onChange={event => setSaveAsRule(event.target.checked)} />Usar siempre</label>}

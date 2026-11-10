@@ -20,7 +20,13 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void, activ
 
     function onKeyDown(e: KeyboardEvent) {
       if (!dialog) return
-      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')
+      const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].filter(dialog => {
+        for (let element: HTMLElement | null = dialog; element; element = element.parentElement) {
+          const style = getComputedStyle(element)
+          if (element.hidden || element.inert || style.display === 'none' || style.visibility === 'hidden') return false
+        }
+        return true
+      })
       if (dialogs.length > 0 && dialogs[dialogs.length - 1] !== dialog) return
       if (e.key === 'Escape') {
         e.preventDefault()

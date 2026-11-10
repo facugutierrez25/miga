@@ -11,9 +11,42 @@ import {
 } from './test-utils'
 import { ItemOrigin } from '../../api/records'
 import { readFileSync } from 'node:fs'
-import { screen, fireEvent, within } from '@testing-library/react'
-import { test, expect } from 'vitest'
+import { render, screen, fireEvent, within } from '@testing-library/react'
+import { test, expect, vi } from 'vitest'
 import { readableRule } from '../readableRule'
+import { useRef, useState } from 'react'
+import { MemoryRouter } from 'react-router-dom'
+import { UnderstoodSheet } from './UnderstoodSheet'
+
+test('una hoja posterior cerrada no bloquea Tab ni Escape de la primera comida', () => {
+  function Meals() {
+    const [firstOpen, setFirstOpen] = useState(false)
+    const [secondOpen, setSecondOpen] = useState(true)
+    const firstHeading = useRef<HTMLHeadingElement>(null)
+    const secondHeading = useRef<HTMLHeadingElement>(null)
+    const props = { items: removableItems, token: 'tok', date: '2025-01-01', groups: {}, selected: null, onSelect: vi.fn(), onPatched: vi.fn() }
+    return <>
+      <button onClick={event => { event.currentTarget.focus(); setFirstOpen(true) }}>Abrir Desayuno</button>
+      <UnderstoodSheet {...props} mealId={1} headingRef={firstHeading} open={firstOpen} onClose={() => setFirstOpen(false)}>Nota del desayuno</UnderstoodSheet>
+      <UnderstoodSheet {...props} mealId={2} headingRef={secondHeading} open={secondOpen} onClose={() => setSecondOpen(false)}>Nota del almuerzo</UnderstoodSheet>
+    </>
+  }
+  render(<MemoryRouter><Meals /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir Desayuno' }))
+  expect(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).toHaveLength(2)
+  const dialog = screen.getByRole('dialog', { name: 'Así lo entendí' })
+  expect(dialog).toHaveTextContent('Nota del desayuno')
+  const close = within(dialog).getByRole('button', { name: 'Cerrar' })
+  expect(close).toHaveFocus()
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+  expect(within(dialog).getByRole('link')).toHaveFocus()
+  fireEvent.keyDown(document, { key: 'Tab' })
+  expect(close).toHaveFocus()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Abrir Desayuno' })).toHaveFocus()
+})
 test('la regla se muestra con números y acentos legibles', () => {
   expect(readableRule('90.000 g de pollo = 1 porcion')).toBe('90 g de pollo = 1 porción')
   expect(readableRule('arroz = 0.500 porcion (supuesto)')).toBe('arroz = 0,5 porción (supuesto)')
