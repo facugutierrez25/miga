@@ -121,9 +121,13 @@ function TodayContent() {
   const hasDraft = [...drafts.entries()].some(([key, draft]) => key.startsWith(`${date}-`) && draft.dirty)
   const selectedId = selection?.date === date ? selection.id : meals[initialIndex]?.id
   const currentMeal = meals.find(meal => meal.id === selectedId)
-  if (!loading && meals.length && (selection?.date !== date || !currentMeal || (selection.nextId !== nextId && !hasDraft
-    && !dayRecord?.meals.some(meal => meal.mealId === selection.nextId && meal.status !== 'SIN_ANOTAR')))) {
+  if (!loading && meals.length && (selection?.date !== date || !currentMeal)) {
     setSelection({ date, id: meals[initialIndex]?.id, nextId })
+  } else if (!loading && meals.length && selection?.nextId !== nextId) {
+    const keepSavedPanel = dayRecord?.meals.some(meal => meal.mealId === selection?.nextId && meal.status !== 'SIN_ANOTAR')
+    if (keepSavedPanel || !hasDraft) {
+      setSelection({ date, id: keepSavedPanel ? selectedId : meals[initialIndex]?.id, nextId })
+    }
   }
   const { total, done, byGroup } = calculateDaySummary(dayRecord, meals, groupsMap)
 

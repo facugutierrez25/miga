@@ -92,6 +92,26 @@ test('fecha pasada desde URL, título largo y navegación', async () => {
   expect((await screen.findAllByRole('heading', { name: /sábado, 7 de noviembre/ }))[0]).toBeInTheDocument()
 })
 
+test('guardar mantiene el panel abierto y el reloj luego sigue la nueva comida pendiente', async () => {
+  mockSaveNote.mockResolvedValue({ status: 'REGISTRADA', noteId: 1, version: 1, text: 'leche', date: '2026-11-09', mealId: 1, items: [], entries: [], comparison: [] })
+  setup('/hoy', '08:00')
+  const breakfast = await screen.findByRole('button', { name: 'Desayuno, 08:00: sin anotar' })
+  expect(breakfast).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'leche' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(await screen.findByRole('button', { name: 'Editar' })).toBeVisible()
+  expect(screen.getByText('leche')).toBeVisible()
+  expect(breakfast).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Almuerzo, 13:00: sin anotar' })).toHaveAttribute('data-sigue')
+
+  vi.setSystemTime(new Date('2026-11-09T16:00:00'))
+  fireEvent.focus(window)
+  const snack = screen.getByRole('button', { name: 'Merienda, 17:00: sin anotar' })
+  expect(snack).toHaveAttribute('data-sigue')
+  expect(snack).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('heading', { name: 'Merienda', level: 2 })).toBeVisible()
+})
+
 test('el reloj no cambia el panel mientras existe un borrador sin guardar', async () => {
   setup('/hoy', '09:00')
   const breakfast = await screen.findByRole('button', { name: 'Desayuno, 08:00: sin anotar' })
