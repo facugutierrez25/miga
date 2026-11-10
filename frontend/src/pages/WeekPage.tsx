@@ -1,7 +1,9 @@
+import Miga from '../components/Miga'
+import BottomSheet from '../components/BottomSheet'
+import Segmented from '../components/Segmented'
 import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
-import { mealStatus } from '../lib/mealStatus'
+import { mealStatus, mealAspect } from '../lib/mealStatus'
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
 import { useTitle } from '../hooks/useTitle'
@@ -9,7 +11,6 @@ import { exportWeek, type HabitDto, type WeekDayDto, type WeekSummaryDto } from 
 import './WeekPage.css'
 import { useWeek } from '../hooks/useWeek'
 import { useNow } from '../hooks/useNow'
-import { useDialogFocus } from './useDialogFocus'
 
 function fullDate(iso: string): string {
   return new Date(iso + 'T12:00:00').toLocaleDateString('es-UY', {
@@ -115,10 +116,9 @@ function hasFlexibleHabit(week: WeekSummaryDto, day: WeekDayDto): boolean {
 interface DayDetailProps {
   day: WeekDayDto
   todayISO: string
-  flexibleEnabled: boolean
 }
 
-function DayDetail({ day, todayISO, flexibleEnabled }: DayDetailProps) {
+function DayDetail({ day, todayISO }: DayDetailProps) {
   const d = new Date(day.date + 'T12:00:00')
   const isToday = day.date === todayISO
   const recorded = Number(day.totalRecorded)
@@ -140,7 +140,7 @@ function DayDetail({ day, todayISO, flexibleEnabled }: DayDetailProps) {
       {meals.length > 0 && (
         <ul className="semana-comidas">
           {meals.map(meal => {
-            const status = flexibleEnabled && (meal.flexibleCount ?? 0) > 0 ? { label: 'Flexible', crumb: 'flexible' } : mealStatus(meal)
+            const status = mealStatus(meal)
             return (
               <li key={meal.mealId} className="semana-comida">
                 <span className="semana-comida__nombre">{meal.name}</span>
@@ -207,20 +207,20 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
               <span className="semana-tarjeta__comida">{name}</span>
               {week.days.map(day => {
                 const meal = (day.meals ?? []).find(m => m.name === name)
-                const className = !meal ? 'no-aplica' : day.date > todayISO ? 'futuro' : hasFlexibleHabit(week, day) && (meal.flexibleCount ?? 0) > 0 ? 'flexible' : mealStatus(meal).crumb
-                return <span key={day.date} className="semana-tarjeta__celda"><i className={`semana-miga semana-miga--${className}`} /></span>
+                const aspect = meal ? mealAspect(meal.status, { planned: meal.planned, future: day.date > todayISO, week: true }) : 'dash'
+                return <span key={day.date} className="semana-tarjeta__celda"><Miga aspect={aspect} className={`semana-miga semana-miga--${aspect === 'dash' ? 'no-aplica' : aspect === 'future' ? 'futuro' : aspect}`} /></span>
               })}
             </div>
           ))}
         </div>
       </section>
       <ul className="semana-leyenda" aria-hidden="true">
-        <li><i className="semana-miga semana-miga--full" />Como el plan</li>
-        <li><i className="semana-miga semana-miga--half" />Faltó o sobró algo</li>
-        {week.days.some(day => hasFlexibleHabit(week, day)) && <li><i className="semana-miga semana-miga--flexible" />Flexible</li>}
-        <li><i className="semana-miga semana-miga--empty" />Sin anotar</li>
-        <li><i className="semana-miga semana-miga--futuro" />Todavía no</li>
-        {hasNonApplicableMeals && <li><i className="semana-miga semana-miga--no-aplica" />No toca ese día</li>}
+        <li><Miga aspect="full" className="semana-miga semana-miga--full" />Como el plan</li>
+        <li><Miga aspect="half" className="semana-miga semana-miga--half" />Faltó o sobró algo</li>
+        {week.days.some(day => hasFlexibleHabit(week, day) || day.meals?.some(meal => meal.status === 'FLEXIBLE')) && <li><Miga aspect="flexible" className="semana-miga semana-miga--flexible" />Flexible</li>}
+        <li><Miga aspect="empty" className="semana-miga semana-miga--empty" />Sin anotar</li>
+        <li><Miga aspect="future" className="semana-miga semana-miga--futuro" />Todavía no</li>
+        {hasNonApplicableMeals && <li><Miga aspect="dash" className="semana-miga semana-miga--no-aplica" />No toca ese día</li>}
       </ul>
     </>
   )
@@ -230,15 +230,7 @@ function WeekCard({ week, todayISO, selected, onSelect }: {
 function ExportDialog({ range, onExcel, onPdf, onClose }: {
   range: string; onExcel: () => void; onPdf: () => void; onClose: () => void
 }) {
-  const ref = useDialogFocus<HTMLDivElement>(onClose)
-  return createPortal(
-    <div className="semana-overlay" onClick={onClose}>
-      <div className="semana-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby="exportar-titulo"
-        onClick={event => event.stopPropagation()}>
-        <div className="semana-dialog__header">
-          <h2 id="exportar-titulo">Exportar para tu nutri</h2>
-          <button type="button" className="semana-dialog__cerrar" onClick={onClose} aria-label="Cerrar">✕</button>
-        </div>
+  return <BottomSheet title="Exportar para tu nutri" onClose={onClose}>
         <p className="semana-dialog__texto">
           La semana del {range}, con lo que escribiste en cada comida, cómo quedó y tus hábitos.
           Se descarga en tu celular y lo mandás vos: Miga no lo comparte con nadie.
@@ -246,10 +238,7 @@ function ExportDialog({ range, onExcel, onPdf, onClose }: {
         <button type="button" className="semana-dialog__principal" onClick={onExcel}>Descargar planilla de Excel</button>
         <button type="button" className="semana-dialog__secundario" onClick={onPdf}>Descargar PDF</button>
         <p className="semana-dialog__nota">PDF abre la impresión del navegador: elegí «Descargar PDF».</p>
-      </div>
-    </div>,
-    document.body,
-  )
+  </BottomSheet>
 }
 
 export default function WeekPage() {
@@ -347,11 +336,8 @@ export default function WeekPage() {
                 <span>comidas como el plan esta semana</span>
               </p>
             )}
-            <div className="semana-seg" role="group" aria-label="Vista de la semana">
-              <span className="semana-seg__pastilla" aria-hidden="true" style={{ transform: view === 'day' ? 'translateX(0)' : 'translateX(100%)' }} />
-              <button type="button" aria-pressed={view === 'day'} onClick={() => setView('day')}>Tarjeta</button>
-              <button type="button" aria-pressed={view === 'sheet'} onClick={() => setView('sheet')}>Planilla</button>
-            </div>
+            <Segmented label="Vista de la semana" value={view} onChange={setView}
+              options={[{ value: 'day', label: 'Tarjeta' }, { value: 'sheet', label: 'Planilla' }]} />
             {view === 'day' ? (
               <>
                 <WeekCard
@@ -364,7 +350,6 @@ export default function WeekPage() {
                   <DayDetail
                     key={selectedDay.date}
                     day={selectedDay}
-                    flexibleEnabled={hasFlexibleHabit(week, selectedDay)}
                     todayISO={today}
                   />
                 )}

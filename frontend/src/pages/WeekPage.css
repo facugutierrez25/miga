@@ -284,40 +284,8 @@
   min-height: 24px;
 }
 
-.semana-miga {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1.5px solid var(--miga-empty);
-  box-sizing: border-box;
-}
-
-.semana-miga--full {
-  background: var(--ink);
-  border-color: var(--ink);
-}
-
-.semana-miga--half {
-  background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
-  border-color: var(--ink);
-}
-
-.semana-miga--noted {
-  background: var(--miga-empty);
-}
-
-.semana-miga--futuro {
-  border-style: dashed;
-}
-
-.semana-miga--no-aplica {
-  width: 10px;
-  height: 2px;
-  border: none;
-  border-radius: 2px;
-  background: var(--line);
-}
+.semana-miga { width: 22px; height: 22px; }
+.semana-miga.meal-crumb--dash { width: 10px; height: 2px; background: var(--line); }
 
 .semana-leyenda {
   list-style: none;
@@ -731,5 +699,5 @@
   }
 }
 
-.semana-miga--flexible { background: var(--accent); border-color: var(--ink); }
+
 .semana-comida__estado--flexible { color: var(--on-accent-soft); background: var(--accent-soft); border-radius: var(--radius-sm); padding: var(--s1); }
