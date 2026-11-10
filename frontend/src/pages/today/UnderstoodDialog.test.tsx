@@ -87,22 +87,16 @@ test('las preguntas quedan en Hoy y los alimentos sin grupo se muestran en el po
   expect(screen.getByRole('button', { name: 'Corregir leche' })).toBeVisible()
 })
 
-test('el menú se abre, se cierra con Escape y devuelve el foco al botón', async () => {
+test('editar ofrece borrar y la confirmación se puede cancelar', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetDayRecord.mockResolvedValue(dayWithNote)
   renderToday()
-  const trigger = await screen.findByRole('button', { name: 'Más opciones de Desayuno' })
-  expect(trigger).toHaveTextContent('⋯')
-  expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
-  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+  const trigger = screen.getByRole('button', { name: 'Borrar lo anotado' })
   fireEvent.click(trigger)
-  const action = screen.getByRole('menuitem', { name: 'Borrar lo anotado' })
-  expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  expect(action).toHaveFocus()
-  fireEvent.keyDown(action, { key: 'Escape' })
-  expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  expect(trigger).toHaveAttribute('aria-expanded', 'false')
-  expect(trigger).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Borrar' })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.getByRole('button', { name: 'Borrar lo anotado' })).toHaveFocus()
 })
 
 test('el detalle se envuelve sin recortes y conserva acciones de 44 px', () => {

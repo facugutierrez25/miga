@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.mocked(AuthContext.useAuth).mockReturnValue({
     token: 'tok',
     email: 'facu@miga.uy',
-    firstName: null,
+    firstName: 'Facundo',
     login: vi.fn(),
     setFirstName: vi.fn(),
     sessionExpired: false, restoring: false,
@@ -72,7 +72,7 @@ test('cerrar sesión llama a logout', () => {
 test('contraseña incorrecta muestra el error y mantiene la sesión', async () => {
   vi.mocked(deleteMe).mockRejectedValueOnce(new Error('Contraseña incorrecta. No se eliminó tu cuenta.'))
   renderProfile()
-  fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta…' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta' }))
   fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'incorrecta' } })
   fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta definitivamente' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Contraseña incorrecta')
@@ -94,7 +94,7 @@ test('elimina la cuenta, cierra sesión y vuelve al inicio con mensaje', async (
       <Route path="/" element={<LandingPage />} />
     </Routes>
   </MemoryRouter>)
-  fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta…' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta' }))
   fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'correcta' } })
   fireEvent.click(screen.getByRole('button', { name: 'Eliminar mi cuenta definitivamente' }))
   await waitFor(() => expect(deleteMe).toHaveBeenCalledWith('tok', 'correcta'))
@@ -104,7 +104,7 @@ test('elimina la cuenta, cierra sesión y vuelve al inicio con mensaje', async (
 
 test('la eliminación está plegada y después de cerrar sesión', () => {
   renderProfile()
-  const toggle = screen.getByRole('button', { name: 'Eliminar mi cuenta…' })
+  const toggle = screen.getByRole('button', { name: 'Eliminar mi cuenta' })
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
   expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cerrar sesión' }).compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -114,4 +114,47 @@ test('la eliminación está plegada y después de cerrar sesión', () => {
   fireEvent.click(toggle)
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
   expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument()
+})
+
+
+test('la primera tarjeta muestra nombre y email', () => {
+  const { container } = renderProfile()
+  const card = container.querySelector('.perfil-card')!
+  expect(card).toHaveTextContent('Facundo')
+  expect(card).toHaveTextContent('facu@miga.uy')
+})
+
+test('los accesos abren Semana con exportación y la página de privacidad', () => {
+  render(<MemoryRouter initialEntries={['/perfil']}><Routes>
+    <Route path="/perfil" element={<ProfilePage />} />
+    <Route path="/semana" element={<p>Semana con exportación</p>} />
+    <Route path="/privacidad" element={<p>Página de privacidad</p>} />
+  </Routes></MemoryRouter>)
+  expect(screen.getByRole('link', { name: /Exportar para tu nutri/ })).toHaveAttribute('href', '/semana?exportar=1')
+  fireEvent.click(screen.getByRole('link', { name: 'Privacidad' }))
+  expect(screen.getByText('Página de privacidad')).toBeInTheDocument()
+})
+
+test('el tema segmentado persiste y se recupera al volver a Perfil', () => {
+  const view = renderProfile()
+  expect(screen.getAllByRole('radio')).toHaveLength(3)
+  fireEvent.click(screen.getByRole('radio', { name: 'Oscuro' }))
+  expect(localStorage.getItem('theme')).toBe('dark')
+  view.unmount()
+  renderProfile()
+  expect(screen.getByRole('radio', { name: 'Oscuro' })).toBeChecked()
+  fireEvent.click(screen.getByRole('radio', { name: 'Claro' }))
+  expect(localStorage.getItem('theme')).toBe('light')
+  fireEvent.click(screen.getByRole('radio', { name: 'Automático' }))
+  expect(localStorage.getItem('theme')).toBeNull()
+})
+
+
+test('el acceso a exportar navega a Semana', () => {
+  render(<MemoryRouter initialEntries={['/perfil']}><Routes>
+    <Route path="/perfil" element={<ProfilePage />} />
+    <Route path="/semana" element={<p>Semana</p>} />
+  </Routes></MemoryRouter>)
+  fireEvent.click(screen.getByRole('link', { name: /Exportar para tu nutri/ }))
+  expect(screen.getByText('Semana')).toBeInTheDocument()
 })

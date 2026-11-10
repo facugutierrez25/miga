@@ -7,7 +7,6 @@ import {
   barGroups,
   barRule,
   barEntry,
-  openNote,
   removableItems,
   setupRemoval,
   openDetails,
@@ -23,7 +22,7 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
     entries: [barEntry(11, 1), barEntry(12, 2), barEntry(13, 3)],
   })
   renderToday()
-  await openNote()
+  await screen.findByRole('heading', { name: 'Desayuno', level: 2 })
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: '1 barrita' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -50,7 +49,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   })
   mockPatchItem.mockResolvedValue({ status: 'REGISTRADA' as const, replacedItemIds: [21], items: [] })
   renderToday()
-  await openNote()
+  await screen.findByRole('heading', { name: 'Desayuno', level: 2 })
 
   await openDetails()
   expect(screen.getByText(/cantidad estimada/)).toBeInTheDocument()
@@ -78,7 +77,7 @@ test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
     }],
   })
   renderToday()
-  await openNote()
+  await screen.findByRole('heading', { name: 'Desayuno', level: 2 })
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: 'mate' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -102,7 +101,7 @@ test('no duplica las menciones que ya generaron ítems', async () => {
     entries: [barEntry(11, 1), barEntry(12, 2), barEntry(13, 3)],
   })
   renderToday()
-  await openNote()
+  await screen.findByRole('heading', { name: 'Desayuno', level: 2 })
   fireEvent.change(screen.getByRole('textbox', { name: '¿Qué comiste?' }), { target: { value: '1 barrita' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -125,7 +124,7 @@ test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', as
     }],
   })
   renderToday()
-  await openNote()
+  await screen.findByRole('heading', { name: 'Desayuno', level: 2 })
 
   if (screen.getByRole('button', { name: /^Así lo entendí/ }).getAttribute('aria-expanded') === 'false') await openDetails()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))

@@ -20,9 +20,10 @@ test('conserva el borrador ante conflicto, recarga la versión y usa la nueva al
   const meal = { mealId: 1, status: 'REGISTRADA' as const, noteId: 5, noteVersion: 2, noteText: 'leche', items: [], comparison: [] }
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [meal] })
   renderToday()
+  await openNote()
   await waitFor(() => expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche'))
   const textarea = screen.getByRole('textbox', { name: '¿Qué comiste?' })
-  fireEvent.change(textarea, { target: { value: 'mi borrador' } })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'mi borrador' } })
   const message = 'Esta nota cambió en otro dispositivo. Recargá para ver la versión actual.'
   mockSaveNote.mockRejectedValueOnce(new recordsApi.NoteConflictError(message))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
@@ -37,8 +38,9 @@ test('conserva el borrador ante conflicto, recarga la versión y usa la nueva al
     mealId: 1, items: [], entries: [], comparison: [] })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
   await waitFor(() => expect(mockSaveNote).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'mi borrador', 3))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled())
-  fireEvent.change(textarea, { target: { value: 'segunda edición' } })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'segunda edición' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
   await waitFor(() => expect(mockSaveNote).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'segunda edición', 4))
 })
@@ -90,7 +92,7 @@ test('recargar desde el conflicto adopta la versión actual aunque no haya cambi
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
   await waitFor(() => expect(mockSaveNote).toHaveBeenLastCalledWith('tok', expect.any(String), 1, 'leche y pan', 3))
-  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche y pan')
+  expect(await screen.findByText('leche y pan', { selector: '.comida__texto' })).toBeInTheDocument()
 })
 
 test('si recargar falla, la versión base no cambia', async () => {
@@ -160,8 +162,8 @@ test('si la nota cambió en otro dispositivo, no la borra y ofrece recargar', as
   mockGetDayRecord.mockResolvedValue(dayWithNote)
   mockDeleteNote.mockRejectedValue(new recordsApi.NoteConflictError('Esta nota cambió en otro dispositivo. Recargá para ver la versión actual.'))
   renderToday()
-  fireEvent.click(await screen.findByRole('button', { name: 'Más opciones de Desayuno' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Borrar lo anotado' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Borrar lo anotado' }))
   fireEvent.click(screen.getByRole('button', { name: 'Borrar' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Esta nota cambió en otro dispositivo')
   expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()

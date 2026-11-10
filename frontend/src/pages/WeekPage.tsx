@@ -245,7 +245,7 @@ export default function WeekPage() {
   useTitle('Semana | Miga')
   const { token, email } = useAuth()
   const [view, setView] = useState<'day' | 'sheet'>('day')
-  const [exportOpen, setExportOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(() => new URLSearchParams(window.location.search).get('exportar') === '1')
   const [exportError, setExportError] = useState('')
   const [refDate, setRefDate] = useState(() => mondayOf(toISO(new Date())))
   const { data: week, status, retry } = useWeek(token, email, refDate)
