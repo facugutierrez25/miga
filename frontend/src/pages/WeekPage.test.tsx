@@ -249,3 +249,21 @@ test('Semana muestra guion para Extra sin anotar y la etiqueta MIXED de la API',
   expect(container.querySelector('.semana-tarjeta__celda .meal-crumb--dash')).toBeInTheDocument()
   expect(screen.getByText('Faltó y de más')).toBeInTheDocument()
 })
+
+
+test.each(['1', '0'])('el parámetro exportar=%s controla la apertura inicial de la hoja', value => {
+  window.history.replaceState({}, '', `/semana?exportar=${value}`)
+  try {
+    render(<WeekPage />)
+    const dialog = screen.queryByRole('dialog', { name: 'Exportar para tu nutri' })
+    if (value === '1') {
+      expect(dialog).toBeInTheDocument()
+      fireEvent.keyDown(dialog!, { key: 'Escape' })
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    } else {
+      expect(dialog).not.toBeInTheDocument()
+    }
+  } finally {
+    window.history.replaceState({}, '', '/')
+  }
+})
