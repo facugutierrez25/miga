@@ -1,7 +1,7 @@
 import './TodayPage.css'
 import { DayStrip } from './today/DayStrip'
 import { MealPanel } from './today/MealPanel'
-import { type DraftStore } from './today/MealNoteSection'
+import { type Draft, type DraftStore } from './today/MealNoteSection'
 import {
   buildGroupsMap,
   toISO,
@@ -56,7 +56,9 @@ function TodayContent() {
     setDate(addDays(date, delta))
   }
 
-  const handleNoteSaved = useCallback((interp: NoteInterpretationDto, mealId: number) => {
+  const handleNoteSaved = useCallback((interp: NoteInterpretationDto, mealId: number, draft?: Draft) => {
+    // El panel puede haberse desmontado mientras se guardaba la nota.
+    if (draft) drafts.set(`${interp.date}-${mealId}`, draft)
     setDayRecord(prev => {
       if (!prev) return prev
       const updatedMeal: MealDayDto = {
@@ -74,7 +76,7 @@ function TodayContent() {
         : [...prev.meals, updatedMeal]
       return { ...prev, meals, summary: adjustSummary(prev.summary, previous?.items ?? [], interp.entries, groupsMap) }
     })
-  }, [setDayRecord, groupsMap])
+  }, [setDayRecord, groupsMap, drafts])
 
   const handleNoteDeleted = useCallback((mealId: number, version: number | null) => {
     setDayRecord(prev => {

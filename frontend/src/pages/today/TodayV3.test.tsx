@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { mockGetMyPlan, mockGetDayRecord, mockGetSuggestions, mockSaveNote, mockDeleteNote, proteinGroups, emptyDay, dayWithNote } from './test-utils'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { expect, test, vi, afterEach } from 'vitest'
 import TodayPage from '../TodayPage'
@@ -9,6 +9,28 @@ const meals = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Extra'].map((name, i
   id: index + 1, name, displayOrder: index, suggestedTime: ['08:00', '13:00', '17:00', '23:00', undefined][index],
   portions: index === 4 ? [] : [{ foodGroupId: 1, portions: 1 }],
 }))
+
+test('reconcilia el borrador si el guardado termina con otra comida abierta', async () => {
+  const saved = { status: 'REGISTRADA' as const, noteId: 1, version: 4, text: 'leche', date: '2026-11-09', mealId: 4, items: [], entries: [], comparison: [] }
+  let resolveSave!: (value: typeof saved) => void
+  mockSaveNote.mockReturnValueOnce(new Promise(resolve => { resolveSave = resolve }))
+  setup()
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'leche' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(mockSaveNote).toHaveBeenLastCalledWith('tok', saved.date, 4, 'leche', null)
+  fireEvent.click(screen.getByRole('button', { name: 'Desayuno, 08:00: sin anotar' }))
+  await act(async () => { resolveSave(saved) })
+  fireEvent.click(screen.getByRole('button', { name: /^Cena, 23:00:/ }))
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.getByText('leche')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  expect(screen.getByRole('textbox')).toHaveValue('leche')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'leche y pan' } })
+  mockSaveNote.mockResolvedValueOnce({ ...saved, version: 5, text: 'leche y pan' })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  expect(mockSaveNote).toHaveBeenLastCalledWith('tok', saved.date, 4, 'leche y pan', 4)
+  await screen.findByRole('button', { name: 'Editar' })
+})
 function setup(path = '/hoy', time = '19:04') {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(`2026-11-09T${time}:00`))

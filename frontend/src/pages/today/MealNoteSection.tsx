@@ -37,7 +37,7 @@ export interface MealNoteSectionProps {
   date: string
   token: string
   groupsMap: Record<number, GroupInfo>
-  onNoteSaved: (interp: NoteInterpretationDto, mealId: number) => void
+  onNoteSaved: (interp: NoteInterpretationDto, mealId: number, draft?: Draft) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onNoteDeleted: (mealId: number, version: number | null) => void
   onReload: () => Promise<DayRecordDto>
@@ -202,7 +202,12 @@ export const MealNoteSection = memo(function MealNoteSection({
       baseVersion.current = interp.version
       setConflict(false)
       if (!dirty.current) setEditing(false)
-      onNoteSaved(interp, meal.id)
+      onNoteSaved(interp, meal.id, {
+        text: dirty.current ? drafts.get(draftKey)?.text ?? value : interp.text,
+        baseVersion: interp.version,
+        dirty: dirty.current,
+        conflict: false,
+      })
       const status = mealStatus({
         status: interp.status, noteText: interp.text, comparison: interp.comparison,
       })
