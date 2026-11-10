@@ -757,5 +757,5 @@
 .dif .nota-item__dot { width: 10px; height: 10px; }
 .fila-links { display: flex; gap: 20px; flex-wrap: wrap; }
 .fila-links .nota-link { min-height: 40px; }
-.toast { position: fixed; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 100; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 14px; font-size: 14px; box-shadow: var(--shadow-float); }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 110; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 14px; font-size: 14px; box-shadow: var(--shadow-float); }
 .nota-mini { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 600; }

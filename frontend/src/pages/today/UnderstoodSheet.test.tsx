@@ -146,3 +146,20 @@ test('el popup cierra al tocar el fondo pero no al tocar su contenido', async ()
   expect(dialog).not.toBeVisible()
 })
 
+test('la confirmación de eliminación queda por encima del sheet abierto', () => {
+  const style = document.createElement('style')
+  style.textContent = readFileSync('src/pages/TodayPage.css', 'utf8') + readFileSync('src/components/BottomSheet.css', 'utf8')
+  const toast = document.createElement('div')
+  toast.className = 'toast'
+  const overlay = document.createElement('div')
+  overlay.className = 'bottom-sheet-overlay'
+  document.head.append(style)
+  document.body.append(toast, overlay)
+  try {
+    expect(Number(getComputedStyle(toast).zIndex)).toBeGreaterThan(Number(getComputedStyle(overlay).zIndex))
+  } finally {
+    style.remove()
+    toast.remove()
+    overlay.remove()
+  }
+})

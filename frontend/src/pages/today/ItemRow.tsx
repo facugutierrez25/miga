@@ -109,7 +109,11 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
         </span>
       )}
         {!editing && <>
-            {editable && (
+            {item.foodGroupId === null && item.origin !== ItemOrigin.UNKNOWN && removable ? (
+              <button type="button" className="nota-item__edit" disabled={busy} onClick={onRemove} aria-label={`Quitar ${item.food}`}>
+                Quitar
+              </button>
+            ) : editable && (
               <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => { setPortions(item.portions ?? 1); setPortionsTouched(false); setSaveAsRule(false); setSplitting(false); setEditing(true) }} aria-label={`Corregir ${item.food}`}>
                 Corregir
               </button>

@@ -31,3 +31,19 @@ test('un compuesto tiene un único botón de quitar en la cabecera', async () =>
   expect(screen.getAllByRole('menuitem', { name: 'Quitar' })).toHaveLength(1)
 })
 
+test('una mención sin grupo se puede quitar desde el detalle', async () => {
+  const manzana = { ...removableItems[1], origin: recordsApi.ItemOrigin.MENTION, foodGroupId: null, portions: null }
+  const meal = setupRemoval([removableItems[0], manzana])
+  vi.mocked(recordsApi.removeItem).mockResolvedValue({ ...meal, noteVersion: 8, noteText: 'leche', items: [removableItems[0]] })
+  renderToday()
+  await openDetails()
+  expect(screen.queryByRole('button', { name: 'Corregir manzana' })).not.toBeInTheDocument()
+  const remove = screen.getByRole('button', { name: 'Quitar manzana' })
+  expect(remove).toHaveClass('nota-item__edit')
+  expect(remove).toHaveTextContent('Quitar')
+  fireEvent.click(remove)
+  await waitFor(() => expect(recordsApi.removeItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 102, 7))
+  expect(await screen.findByText('Quitaste manzana.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Quitar manzana' })).not.toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: 'Así lo entendí' })).toBeVisible()
+})
