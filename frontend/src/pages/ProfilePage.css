@@ -105,6 +105,13 @@
 }
 
 .perfil-delete-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   min-height: 40px;

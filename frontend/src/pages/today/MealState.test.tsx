@@ -5,7 +5,6 @@ import {
   emptyDay,
   renderToday,
   twoMealPlan,
-  openDetails,
 } from './test-utils'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { test, expect } from 'vitest'
@@ -27,8 +26,12 @@ test.each([
 
   expect(row).not.toHaveTextContent(/9876|9999/)
   fireEvent.click(row)
-  await openDetails()
-  expect(await screen.findByText(new RegExp(`Entendí:.*${expected}`))).toBeVisible()
+  const differences = screen.getByRole('region', { name: 'Desayuno' }).querySelectorAll('.dif li')
+  expect(differences).toHaveLength(names.length + 1)
+  names.forEach((name, index) => {
+    expect(differences[index]).toHaveTextContent(`Faltó ${String(amounts[index]).replace('.', ',')} ${amounts[index] === 1 ? 'porción' : 'porciones'} de ${name || 'un grupo del plan'}`)
+    expect(differences[index].querySelector('.nota-item__dot')).toHaveAttribute('aria-hidden', 'true')
+  })
 })
 
 test.each(['EN_PLAN', 'CASI', 'DE_MAS', 'PREGUNTAR', 'FLEXIBLE', 'REGISTRADA'] as const)('el panel lee el estado %s de la API sin ficha', async status => {

@@ -158,3 +158,9 @@ test('el acceso a exportar navega a Semana', () => {
   fireEvent.click(screen.getByRole('link', { name: /Exportar para tu nutri/ }))
   expect(screen.getByText('Semana')).toBeInTheDocument()
 })
+
+test.each(['Claro', 'Oscuro'])('el acceso para eliminar la cuenta usa la clase de enlace en tema %s', theme => {
+  renderProfile()
+  fireEvent.click(screen.getByRole('radio', { name: theme }))
+  expect(screen.getByRole('button', { name: 'Eliminar mi cuenta' })).toHaveClass('perfil-delete-link')
+})

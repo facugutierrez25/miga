@@ -36,6 +36,7 @@ export interface MealNoteSectionProps {
   date: string
   token: string
   groupsMap: Record<number, GroupInfo>
+  onToast?: (message: string | null) => void
   onNoteSaved: (interp: NoteInterpretationDto, mealId: number, submittedText?: string) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onNoteDeleted: (mealId: number, version: number | null, submittedText: string) => void
@@ -45,7 +46,7 @@ export interface MealNoteSectionProps {
 
 export const MealNoteSection = memo(function MealNoteSection({
   meal, drafts, mealDay, date, token, groupsMap,
-  onNoteSaved, onItemPatched, onNoteDeleted, onAnswerSaved, onReload,
+  onNoteSaved, onItemPatched, onNoteDeleted, onAnswerSaved, onReload, onToast,
 }: MealNoteSectionProps) {
   const [detailOpen, setDetailOpen] = useState(false)
   const [resolveTarget, setResolveTarget] = useState<EntryItemDto | null>(null)
@@ -67,7 +68,7 @@ export const MealNoteSection = memo(function MealNoteSection({
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const showToast = (message: string | null) => onToast?.(message)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [confirming, setConfirming] = useState(false)
@@ -85,11 +86,11 @@ export const MealNoteSection = memo(function MealNoteSection({
   const answerPending = useRef(false)
   const [answerSaving, setAnswerSaving] = useState(false)
   const questions = comparison.filter(s => s.status === 'PREGUNTAR' && !answeredGroups.includes(s.foodGroupId))
-  const understoodFoods = [...new Set(items.filter(item => item.origin !== ItemOrigin.UNKNOWN).map(item => item.food))]
-  const understoodSummary = understoodFoods.slice(0, 3).join(', ')
-    + (understoodFoods.length > 3 ? ' y otros alimentos' : '')
-  const unknownCount = items.filter(item => item.origin === ItemOrigin.UNKNOWN).length
-  const estimatedCount = items.filter(item => item.uncertain).length
+  const differences = comparison.filter(group =>
+    (['CASI', 'SIN_ANOTAR'].includes(group.status) && group.expected > group.recorded)
+    || (group.status === 'DE_MAS' && group.recorded > group.expected))
+    .sort((a, b) => Number(a.status === 'DE_MAS') - Number(b.status === 'DE_MAS'))
+
 
   useLayoutEffect(() => {
     if (!dirty.current) {
@@ -122,7 +123,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     setEditing(true)
     dirty.current = true
     draftRevision.current += 1
-    setSavedMessage(null)
+    showToast(null)
     setText(update)
   }
 
@@ -142,7 +143,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     saveInFlight.current = true
     setSaving(true)
     setError(null)
-    setSavedMessage(null)
+    showToast(null)
     try {
       const updated = await removeItem(token, date, item.id, baseVersion.current)
       baseVersion.current = updated.noteVersion
@@ -152,7 +153,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       if (updated.items.length === 0) setDetailOpen(false)
       onNoteSaved({ status: updated.status, noteId: updated.noteId!, version: updated.noteVersion!, text: updated.noteText ?? '',
         date, mealId: updated.mealId, items: [], entries: updated.items, comparison: updated.comparison }, updated.mealId)
-      setSavedMessage(`Quitaste ${item.food}.`)
+      showToast(`Quitaste ${item.food}.`)
     } catch (err) {
       setConflict(err instanceof NoteConflictError)
       setError(err instanceof NoteConflictError ? err.message : 'No se pudo quitar. Intentá de nuevo.')
@@ -167,7 +168,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     saveInFlight.current = true
     setSaving(true)
     setError(null)
-    setSavedMessage(null)
+    showToast(null)
     const submittedRevision = draftRevision.current
     const submittedText = text
     try {
@@ -181,7 +182,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       }
       setConflict(false)
       setConfirming(false)
-      setSavedMessage(`Borraste lo anotado en ${meal.name}.`)
+      showToast(`Borraste lo anotado en ${meal.name}.`)
       pendingFocus.current = 'textarea'
       onNoteDeleted(meal.id, version, submittedText)
     } catch (err) {
@@ -201,7 +202,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     const submittedRevision = draftRevision.current
     setText(value)
     setSaving(true)
-    setSavedMessage(null)
+    showToast(null)
     setError(null)
     try {
       const interp = await saveNote(token, date, meal.id, value.trim(), baseVersion.current)
@@ -213,7 +214,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       const status = mealStatus({
         status: interp.status, noteText: interp.text, comparison: interp.comparison,
       })
-      setSavedMessage(`Guardado. ${status.text}.`)
+      showToast(`Guardado. ${status.text}.`)
     } catch (err) {
       setConflict(err instanceof NoteConflictError)
       setError(err instanceof NoteConflictError ? err.message : 'No se pudo guardar. Intentá de nuevo.')
@@ -243,7 +244,6 @@ export const MealNoteSection = memo(function MealNoteSection({
     await onAnswerSaved(meal.id).catch(() => {})
   }
   const feedback = (<>
-      <p className="nota-guardado" role="status">{savedMessage}</p>
       {error && <p id={`nota-error-${meal.id}`} className="nota-error" role="alert">{error}</p>}
       {conflict && (
         <button type="button" className="nota-btn-recargar" disabled={saving}
@@ -272,13 +272,26 @@ export const MealNoteSection = memo(function MealNoteSection({
   return (
     <div className="nota-body">
       {(!hasNote || editing) && <p className="toca" aria-label="Te toca">
-        {meal.portions.some(p => p.portions > 0) ? <>Te toca: {meal.portions.filter(p => p.portions > 0).map(p =>
-          <span key={p.foodGroupId} style={{ color: groupsMap[p.foodGroupId]?.token }}>{fmt(p.portions)} {groupsMap[p.foodGroupId]?.name}</span>)}</>
+        {meal.portions.some(p => p.portions > 0) ? meal.portions.filter(p => p.portions > 0).map(p =>
+          <span key={p.foodGroupId}>
+            <i className="nota-item__dot" style={{ background: groupsMap[p.foodGroupId]?.token }} aria-hidden="true" />
+            {fmt(p.portions)} {groupsMap[p.foodGroupId]?.name}
+          </span>)
           : 'Para lo que comas fuera de las comidas de tu plan.'}
       </p>}
       {hasNote && !editing ? <>
         <p className="comida__texto">{mealDay?.noteText}</p>
-        <button type="button" className="nota-btn-cancelar" onClick={() => { setEditing(true); pendingFocus.current = 'textarea' }}>Editar</button>
+        {mealDay?.status !== 'FLEXIBLE' && differences.length > 0 && <ul className="dif">
+          {differences.map(group => {
+            const extra = group.status === 'DE_MAS'
+            const amount = extra ? group.recorded - group.expected : group.expected - group.recorded
+            return <li key={group.foodGroupId}>
+              <i className="nota-item__dot" style={{ background: groupsMap[group.foodGroupId]?.token ?? 'var(--muted)' }} aria-hidden="true" />
+              {extra ? 'De más: ' : 'Faltó '}{fmt(amount)} {amount === 1 ? 'porción' : 'porciones'} de {group.name.trim() || groupsMap[group.foodGroupId]?.name || 'un grupo del plan'}
+            </li>
+          })}
+        </ul>}
+        {mealDay?.status === 'FLEXIBLE' && <p className="muted sm">Cuenta como comida flexible: no se compara con el plan.</p>}
       </> : <NoteEditor onCancelEdit={() => {
         dirty.current = false
         setText(mealDay?.noteText ?? '')
@@ -297,25 +310,27 @@ export const MealNoteSection = memo(function MealNoteSection({
 
       {!detailOpen && feedback}
 
+      <MealQuestions questions={questions} answerSaving={answerSaving} handleAnswer={handleAnswer} />
       {items.filter(item => item.origin === ItemOrigin.UNKNOWN).map(item => <div className="pregunta" key={item.id}>
         <span>No reconocí <strong>«{item.originalText || item.food}»</strong></span>
-        <button type="button" className="nota-link" onClick={() => { setResolveTarget(item); setDetailOpen(true) }}>Decime qué es</button>
+        <button type="button" className="nota-mini" onClick={() => { setResolveTarget(item); setDetailOpen(true) }}>Decime qué es</button>
       </div>)}
-      <MealQuestions questions={questions} answerSaving={answerSaving} handleAnswer={handleAnswer} />
-
       {(hasNote || items.length > 0) && (
         <>
-          <button type="button" className="nota-revisar" aria-haspopup="dialog"
+          <div className="fila-links">
+          {hasNote && !editing && <button type="button" className="nota-link" onClick={() => { setEditing(true); pendingFocus.current = 'textarea' }}>Editar</button>}
+          <button type="button" className="nota-link" aria-haspopup="dialog"
             aria-expanded={detailOpen} aria-controls={`entendido-dialog-${meal.id}`}
             onClick={event => { event.currentTarget.focus(); setResolveTarget(null); setDetailOpen(true) }}>
-            Así lo entendí{unknownCount > 0 && ` · ${unknownCount} sin reconocer`}{estimatedCount > 0 && ` · ${estimatedCount} estimados`}
+            Así lo entendí
           </button>
+          </div>
           <UnderstoodSheet open={detailOpen} onClose={() => { setDetailOpen(false); setResolveTarget(null) }}
             selected={resolveTarget} onSelect={setResolveTarget} headingRef={understoodRef} mealId={meal.id} items={items} token={token} date={date} groups={groupsMap}
             onPatched={result => onItemPatched(meal.id!, result)}>
-            <UnderstoodItems meal={meal} mealDay={mealDay} items={items} date={date} token={token}
+            <UnderstoodItems meal={meal} items={items} date={date} token={token}
               groupsMap={groupsMap} detailOpen={detailOpen} feedback={feedback}
-              expandedMentions={expandedMentions} setExpandedMentions={setExpandedMentions} understoodSummary={understoodSummary}
+              expandedMentions={expandedMentions} setExpandedMentions={setExpandedMentions}
               saving={saving} conflict={conflict} handleRemove={handleRemove} onItemPatched={onItemPatched} />
           </UnderstoodSheet>
         </>

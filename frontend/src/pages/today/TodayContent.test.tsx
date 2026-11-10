@@ -148,6 +148,36 @@ test('respeta el margen del plan: dentro del margen la comida es como el plan', 
   expect(await screen.findByRole('button', { name: /Desayuno: como el plan/ })).toBeInTheDocument()
 })
 
+test('muestra una miga de color por grupo con porciones y texto sin color de grupo', async () => {
+  mockGetMyPlan.mockResolvedValue({
+    foodGroups: [
+      { id: 1, name: 'Grupo propio', abbreviation: 'CUS', displayOrder: 1, color: '#368C91' },
+      { id: 2, name: 'Otro grupo', abbreviation: 'OTR', displayOrder: 2, color: '#A8822E' },
+      { id: 3, name: 'Sin porciones', abbreviation: 'SIN', displayOrder: 3, color: null },
+    ],
+    meals: [{ ...planWithMeal.meals[0], portions: [
+      { foodGroupId: 1, portions: 2 },
+      { foodGroupId: 2, portions: 1.5 },
+      { foodGroupId: 3, portions: 0 },
+    ] }],
+  })
+  renderToday()
+  const line = await screen.findByLabelText('Te toca')
+  expect(line).not.toHaveTextContent('Te toca:')
+  expect(line).not.toHaveTextContent('Sin porciones')
+  const groups = line.querySelectorAll('span')
+  expect(groups).toHaveLength(2)
+  expect(line.querySelectorAll('.nota-item__dot')).toHaveLength(2)
+  groups.forEach((group, index) => {
+    expect(group.style.color).toBe('')
+    const dot = group.querySelector('.nota-item__dot')
+    expect(dot).toHaveAttribute('aria-hidden', 'true')
+    expect(dot).toHaveAttribute('style', `background: var(--g-${index === 0 ? 'turq' : 'cer'});`)
+  })
+  expect(groups[0]).toHaveTextContent('2 Grupo propio')
+  expect(groups[1]).toHaveTextContent(/1[,.]5 Otro grupo/)
+})
+
 test('usa el color del grupo propio en sus migas', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: [
     { id: 1, name: 'Grupo propio', abbreviation: 'CUS', displayOrder: 1, color: '#368C91' },

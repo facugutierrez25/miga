@@ -13,39 +13,69 @@ import {
 } from './test-utils'
 import * as recordsApi from '../../api/records'
 import { ItemOrigin } from '../../api/records'
-import { screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { vi, test, expect } from 'vitest'
+import { ItemRow } from './ItemRow'
 
-test.each(['Listo', 'Guardar cantidad'])('envía solo las porciones editadas al guardar desde %s', async action => {
+test.each(['NO_CUENTA', 'LIBRE'])('Quitar en Corregir llama a onRemove para un item %s sin grupo', rule => {
+  const onRemove = vi.fn()
+  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}` }
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={vi.fn()} onRemove={onRemove} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  const remove = screen.getByRole('button', { name: 'Quitar' })
+  expect(remove.parentElement).toBe(screen.getByRole('button', { name: 'Repartir en varios grupos' }).parentElement)
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeVisible()
+  fireEvent.click(remove)
+  expect(onRemove).toHaveBeenCalledTimes(1)
+})
+
+test.each(['NO_CUENTA', 'LIBRE', 'FLEXIBLE'] as const)('un item %s sin grupo permite corregir, repartir y cerrar', async rule => {
+  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}`, ruleType: rule }
+  setupRemoval([item])
+  vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [item.id], items: [item] })
+  renderToday()
+  await openDetails()
+
+  expect(screen.queryByRole('button', { name: 'Quitar leche' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeEnabled()
+  expect(screen.queryByRole('button', { name: 'Menos porciones de leche' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
+  expect(screen.getByRole('group', { name: 'Repartir leche en grupos' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
+  expect(await screen.findByRole('button', { name: 'Corregir leche' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Listo' })).not.toBeInTheDocument()
+  expect(recordsApi.patchItem).not.toHaveBeenCalled()
+  expect(recordsApi.removeItem).not.toHaveBeenCalled()
+})
+
+test.each([
+  { touched: false, saveAsRule: false },
+  { touched: true, saveAsRule: false },
+  { touched: false, saveAsRule: true },
+  { touched: true, saveAsRule: true },
+])('Listo con grupo: %j', async ({ touched, saveAsRule }) => {
   setupRemoval([removableItems[0]])
   const mockPatchItem = vi.mocked(recordsApi.patchItem)
   mockPatchItem.mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [101], items: [removableItems[0]] })
   renderToday()
   await openDetails()
-
-  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
-  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
-  fireEvent.click(screen.getByRole('button', { name: action }))
-  await waitFor(() => expect(mockPatchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 101, {
-    quantity: 3, unit: 'u', saveAsRule: false,
-  }))
-  expect(mockPatchItem.mock.calls[0][3]).not.toHaveProperty('portions')
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Corregir leche' }))
-  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '4' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Más porciones de leche' }))
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
-  fireEvent.click(screen.getByRole('button', { name: action }))
-  await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
-    quantity: 4, unit: 'u', portions: 1.5, saveAsRule: true,
-  }))
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Corregir leche' }))
-  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '5' } })
-  fireEvent.click(screen.getByRole('button', { name: action }))
-  await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
-    quantity: 5, unit: 'u', saveAsRule: false,
-  }))
+  for (const edit of [{ touched, saveAsRule }, { touched: false, saveAsRule: false }]) {
+    const previousCalls = mockPatchItem.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+    if (edit.touched) fireEvent.click(screen.getByRole('button', { name: 'M\u00e1s porciones de leche' }))
+    if (edit.saveAsRule) fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
+    await screen.findByRole('button', { name: 'Corregir leche' })
+    expect(mockPatchItem).toHaveBeenCalledTimes(previousCalls + (edit.touched || edit.saveAsRule ? 1 : 0))
+    if (edit.touched || edit.saveAsRule) {
+      expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
+        ...(edit.touched ? { portions: 1.5 } : {}), saveAsRule: edit.saveAsRule,
+      })
+    }
+  }
 })
 
 test('muestra un compuesto en una fila con su regla bajo el título Así lo entendí', async () => {
@@ -98,7 +128,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
   }))
 })
 
-test.each(['3', '0', '-1', ''])('el reparto conserva la cantidad original aunque se edite a «%s»', async quantity => {
+test('el reparto conserva la cantidad original', async () => {
   setupRemoval([removableItems[0]])
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
   const mockPatchItem = vi.mocked(recordsApi.patchItem)
@@ -106,7 +136,6 @@ test.each(['3', '0', '-1', ''])('el reparto conserva la cantidad original aunque
   renderToday()
   await openDetails()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
-  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: quantity } })
   fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
   fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '3' } })
   const save = screen.getByRole('button', { name: 'Guardar' })
@@ -162,7 +191,7 @@ test('no duplica las menciones que ya generaron ítems', async () => {
   expect(screen.getAllByText(barRule).filter(node => !node.closest('[hidden]'))).toHaveLength(1)
 })
 
-test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', async () => {
+test('Listo devuelve el foco a Corregir', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetDayRecord.mockResolvedValue({
     date: '2025-01-01', summary: [],
@@ -172,13 +201,14 @@ test('corregir mueve el foco a la cantidad y cancelar lo devuelve al botón', as
         origin: ItemOrigin.RULE, uncertain: false, appliedRule: null, occurrenceId: 'occ-31' }],
     }],
   })
+  vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [], items: [] })
   renderToday()
   await screen.findByRole('heading', { name: 'Desayuno', level: 2 })
 
   if (screen.getByRole('button', { name: /^Así lo entendí/ }).getAttribute('aria-expanded') === 'false') await openDetails()
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
-  expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveFocus()
-  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.getByRole('button', { name: 'Menos porciones de leche' })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Corregir leche' })).toHaveFocus())
 })
@@ -210,3 +240,35 @@ test('un ítem de un grupo sin nombre nunca muestra el identificador', async () 
   expect(document.body).not.toHaveTextContent('987654')
 })
 
+
+test('corregir muestra los editores secundarios solo al abrir sus enlaces', async () => {
+  setupRemoval([removableItems[0]])
+  renderToday()
+  await openDetails()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeVisible()
+  expect(screen.getByRole('checkbox', { name: 'Usar siempre' })).toBeVisible()
+  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: /Repartir leche/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Cambiar la cantidad' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Guardar cantidad' })).not.toBeInTheDocument()
+  const split = screen.getByRole('button', { name: 'Repartir en varios grupos', expanded: false })
+  fireEvent.click(split)
+  expect(screen.getByRole('group', { name: /Repartir leche/ })).toBeVisible()
+  fireEvent.click(split)
+  expect(screen.queryByRole('group', { name: /Repartir leche/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+})
+
+
+test('ANSWER conserva el mínimo de media porción', async () => {
+  setupRemoval([{ ...removableItems[0], origin: ItemOrigin.ANSWER }])
+  renderToday()
+  await openDetails()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  const minus = screen.getByRole('button', { name: 'Menos porciones de leche' })
+  fireEvent.click(minus)
+  expect(screen.getByLabelText('Porciones de leche')).toHaveTextContent('0,5')
+  expect(minus).toBeDisabled()
+  expect(recordsApi.removeItem).not.toHaveBeenCalled()
+})

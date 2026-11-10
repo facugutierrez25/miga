@@ -56,7 +56,7 @@ test('la regla se muestra con números y acentos legibles', () => {
 test('el popup empieza cerrado y conserva la corrección al cerrarlo y volver a abrirlo', async () => {
   setupRemoval([{ ...removableItems[0], uncertain: true }])
   renderToday()
-  const toggle = await screen.findByRole('button', { name: 'Así lo entendí · 1 estimados' })
+  const toggle = await screen.findByRole('button', { name: 'Así lo entendí' })
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
   expect(screen.queryByRole('button', { name: 'Corregir leche' })).not.toBeInTheDocument()
   fireEvent.click(toggle)
@@ -64,11 +64,15 @@ test('el popup empieza cerrado y conserva la corrección al cerrarlo y volver a 
   const correct = screen.getByRole('button', { name: 'Corregir leche' })
   expect(correct).toHaveTextContent('Corregir')
   fireEvent.click(correct)
-  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeVisible()
+  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Cambiar la cantidad' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Repartir en varios grupos' })).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(screen.getByRole('button', { name: 'Más porciones de leche' }))
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
   expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   fireEvent.click(toggle)
-  expect(screen.getByRole('spinbutton', { name: 'Cantidad de leche' })).toHaveValue(3)
+  expect(screen.getByLabelText('Porciones de leche')).toHaveTextContent('1,5')
 })
 
 test('las preguntas quedan en Hoy y los alimentos sin grupo se muestran en el popup', async () => {
@@ -80,7 +84,7 @@ test('las preguntas quedan en Hoy y los alimentos sin grupo se muestran en el po
   }] })
   renderToday()
   expect(await screen.findByRole('button', { name: /^Así lo entendí/ })).toHaveAttribute('aria-expanded', 'false')
-  expect(screen.getByText(/¿Consumiste/)).toBeVisible()
+  expect(screen.getByText(/¿Comiste/)).toBeVisible()
   expect(screen.getByRole('button', { name: 'Sí' })).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Más opciones de manzana' })).not.toBeInTheDocument()
   expect(screen.getAllByText('«algo raro»')[0]).toBeVisible()
@@ -107,7 +111,7 @@ test('el detalle se envuelve sin recortes y conserva acciones de 44 px', () => {
   expect(css).not.toContain('text-overflow: ellipsis')
   expect(css).not.toContain('-webkit-line-clamp')
   expect(css).toContain('overflow-wrap: anywhere')
-  expect(css).toMatch(/\.nota-item__edit,[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
+  expect(css).toMatch(/\.nota-item__edit \{[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
   expect(css).toMatch(/\.nota-menu__trigger, \.nota-revisar[\s\S]*min-width: 44px;[\s\S]*min-height: 44px/)
 })
 
@@ -142,3 +146,20 @@ test('el popup cierra al tocar el fondo pero no al tocar su contenido', async ()
   expect(dialog).not.toBeVisible()
 })
 
+test('la confirmación de eliminación queda por encima del sheet abierto', () => {
+  const style = document.createElement('style')
+  style.textContent = readFileSync('src/pages/TodayPage.css', 'utf8') + readFileSync('src/components/BottomSheet.css', 'utf8')
+  const toast = document.createElement('div')
+  toast.className = 'toast'
+  const overlay = document.createElement('div')
+  overlay.className = 'bottom-sheet-overlay'
+  document.head.append(style)
+  document.body.append(toast, overlay)
+  try {
+    expect(Number(getComputedStyle(toast).zIndex)).toBeGreaterThan(Number(getComputedStyle(overlay).zIndex))
+  } finally {
+    style.remove()
+    toast.remove()
+    overlay.remove()
+  }
+})

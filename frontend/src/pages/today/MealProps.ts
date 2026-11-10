@@ -15,6 +15,7 @@ export interface MealProps {
   date: string
   token: string
   groupsMap: Record<number, GroupInfo>
+  onToast?: (message: string | null) => void
   onNoteSaved: (interp: NoteInterpretationDto, mealId: number) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
   onNoteDeleted: (mealId: number, version: number | null, submittedText: string) => void
