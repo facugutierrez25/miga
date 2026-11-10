@@ -126,6 +126,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       {editing && <div className="nota-item__secondary">
         {(portions !== 0 || splitting) && <label className="resolve-remember"><input type="checkbox" checked={saveAsRule} disabled={saving} onChange={event => setSaveAsRule(event.target.checked)} />Usar siempre</label>}
         <button type="button" aria-expanded={splitting} disabled={saving} onClick={() => splitting ? setSplitting(false) : openSplit()}>Repartir en varios grupos</button>
+        {item.foodGroupId === null && removable && <button type="button" className="link" disabled={busy} onClick={onRemove}>Quitar</button>}
       </div>}
       {splitting && (
         <fieldset className="nota-reparto">

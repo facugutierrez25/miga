@@ -13,8 +13,22 @@ import {
 } from './test-utils'
 import * as recordsApi from '../../api/records'
 import { ItemOrigin } from '../../api/records'
-import { screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { vi, test, expect } from 'vitest'
+import { ItemRow } from './ItemRow'
+
+test.each(['NO_CUENTA', 'LIBRE'])('Quitar en Corregir llama a onRemove para un item %s sin grupo', rule => {
+  const onRemove = vi.fn()
+  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}` }
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={vi.fn()} onRemove={onRemove} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  const remove = screen.getByRole('button', { name: 'Quitar' })
+  expect(remove.parentElement).toBe(screen.getByRole('button', { name: 'Repartir en varios grupos' }).parentElement)
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeVisible()
+  fireEvent.click(remove)
+  expect(onRemove).toHaveBeenCalledTimes(1)
+})
 
 test.each(['NO_CUENTA', 'LIBRE'])('un item %s sin grupo permite corregir, repartir y cerrar', async rule => {
   const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}` }
