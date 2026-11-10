@@ -139,6 +139,7 @@ Solo se mueve lo que cambió por algo que hiciste. Anotar nunca espera a una ani
 
 | Pantalla | Puntos clave |
 | --- | --- |
+| **Landing** | Inicio con demo de tres comidas, tres pasos, tarjeta semanal y exportación para la nutri, hábitos interactivos, límites, origen y cierre. Usa las piezas de la app, con claro y oscuro; [prototipo v3.1](landing-v3.1.html). |
 | **Hoy** | Saludo con punto amarillo, tira del día con banda y punto «Sigue», resumen por grupo desplegable y panel de la comida elegida. «Te toca» antes de anotar; texto y diferencias en palabras después. Una hoja «Así lo entendí». Hábitos con migas y «+». |
 | **Semana** | Exportar, resumen «N de M comidas como el plan», selector Tarjeta / Planilla, sellos de comidas y hábitos con franja del día elegido. El detalle abre esa fecha en Hoy. Metas semanales con hábitos automáticos. |
 | **Exportar** | Excel y PDF por impresión del navegador; la persona descarga y comparte el archivo. |

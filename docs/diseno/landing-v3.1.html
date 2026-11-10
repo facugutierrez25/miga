@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Miga · landing v3.1 (prototipo)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: la landing cuenta la app con sus propias piezas. Arriba se prueba una comida; después, tres pasos, la tarjeta de la semana a lo ancho, y una banda en tinta con lo que Miga no hace. */
+:root {
+  --bg: #F2F1EA; --surface: #FBFAF5; --surface-2: #E8E6DA; --surface-3: #DEDBCB;
+  --ink: #040200; --muted: #3F5E3A; --line: #E2E0D3; --control: #6B8066; --brand: #2F6336;
+  --accent: #F6C344; --on-accent: #3A2A00; --accent-soft: #FBEBB8; --on-accent-soft: #5C4300;
+  --ok: #2F6B45; --warn: #A9431B; --warn-soft: #F8E6DB; --miga-empty: #6B8066;
+  --g-prot: #C8553D; --g-cer: #9A7420; --g-gras: #6F63B8; --g-verd: #2E8B6E;
+  --band: #040200; --band-ink: #F2F1EA; --band-muted: #BDB9A6; --band-line: #2C2A22;
+  --shadow-card: 0 1px 2px rgba(40, 38, 20, 0.06), 0 6px 18px -6px rgba(40, 38, 20, 0.12);
+  --shadow-float: 0 1px 2px rgba(40, 38, 20, 0.08), 0 18px 40px -12px rgba(40, 38, 20, 0.28);
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Onest', system-ui, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121212; --surface: #1C1C1C; --surface-2: #262626; --surface-3: #303030;
+    --ink: #F3EFE6; --muted: #ADA89D; --line: #2C2C2C; --control: #8A867C; --brand: #F3EFE6;
+    --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
+    --ok: #7CC79A; --warn: #F4A57E; --warn-soft: #38271F; --miga-empty: #8A867C;
+    --g-prot: #E6707B; --g-cer: #E3B04F; --g-gras: #9C91E0; --g-verd: #7CC277;
+    --band: #1C1C1C; --band-ink: #F3EFE6; --band-muted: #ADA89D; --band-line: #303030;
+    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121212; --surface: #1C1C1C; --surface-2: #262626; --surface-3: #303030;
+  --ink: #F3EFE6; --muted: #ADA89D; --line: #2C2C2C; --control: #8A867C; --brand: #F3EFE6;
+  --accent-soft: #3A3218; --on-accent-soft: #F6D27A;
+  --ok: #7CC79A; --warn: #F4A57E; --warn-soft: #38271F; --miga-empty: #8A867C;
+  --g-prot: #E6707B; --g-cer: #E3B04F; --g-gras: #9C91E0; --g-verd: #7CC277;
+  --band: #1C1C1C; --band-ink: #F3EFE6; --band-muted: #ADA89D; --band-line: #303030;
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.5; }
+a { color: inherit; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:active:not(:disabled) { transform: scale(0.97); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+ul, ol { list-style: none; }
+.in { max-width: 1080px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+h1, h2 { font-family: var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+h1 { font-size: clamp(38px, 6vw, 68px); line-height: 1.02; font-weight: 800; }
+h1 b, .punto { color: var(--accent); }
+h2 { font-size: clamp(28px, 3.6vw, 42px); line-height: 1.08; font-weight: 700; }
+h3 { font-size: 19px; line-height: 1.25; font-weight: 600; }
+p { text-wrap: pretty; }
+.lead { font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); max-width: 34em; }
+.muted { color: var(--muted); }
+.sm { font-size: 14px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.brand { color: var(--brand); font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.02em; position: relative; text-decoration: none; }
+.brand i { position: absolute; left: 1.02em; top: 0.2em; width: 0.2em; height: 0.2em; border-radius: 50%; background: var(--accent); }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 24px; border-radius: 12px; font-weight: 600; font-size: 16px; text-decoration: none; }
+.btn--pri { background: var(--ink); color: var(--bg); }
+.btn--sm { height: 40px; padding: 0 16px; font-size: 14px; }
+.nav { display: flex; align-items: center; justify-content: space-between; padding-block: 20px; }
+.nav div { display: flex; align-items: center; gap: 20px; }
+.nav a.txt { font-size: 14px; font-weight: 600; text-decoration: none; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 400px); gap: 56px; align-items: center; padding-block: 40px 88px; }
+.hero__t { display: flex; flex-direction: column; gap: 24px; align-items: flex-start; }
+.hero__cta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+@media (max-width: 860px) { .hero { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-block: 16px 64px; } }
+
+/* Piezas de la app */
+.card { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-card); }
+.miga { display: block; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--miga-empty); flex: none; transition: background 250ms var(--ease), border-color 250ms var(--ease); }
+.miga--full { background: var(--ink); border-color: var(--ink); }
+.miga--half { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); border-color: var(--ink); }
+.miga--flex { background: var(--accent); border-color: var(--accent); }
+.miga--mas { display: grid; place-items: center; border-style: dashed; color: var(--muted); font-style: normal; font-size: 13px; font-weight: 700; line-height: 1; }
+.miga--mas-on { background: var(--ink); border: 1.5px solid var(--ink); color: var(--bg); font-size: 11px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
+.chip { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.chip--sigue { background: var(--accent); color: var(--on-accent); }
+.chip--warn { background: var(--warn-soft); color: var(--warn); }
+.chip--ok { color: var(--ok); box-shadow: inset 0 0 0 1px currentColor; }
+.chip--flex { background: var(--accent-soft); color: var(--on-accent-soft); }
+
+.demo { display: flex; flex-direction: column; gap: 12px; background: var(--bg); border: 1px solid var(--surface-3); border-radius: 32px; padding: 20px 16px 18px; box-shadow: var(--shadow-float); font-size: 16px; }
+.demo__cab { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px; }
+.demo__cab strong { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; }
+.tira { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); position: relative; padding: 8px; }
+.tira__banda { position: absolute; top: 8px; bottom: 8px; left: 8px; width: calc((100% - 16px) / 4); transform: translateX(100%); border-radius: 12px; background: var(--surface-2); }
+.tira__dia { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0 8px; font-size: 12px; }
+.tira__dia b { font-weight: 600; }
+.tira__dia span { color: var(--muted); }
+.panel { padding: 16px; display: flex; flex-direction: column; gap: 12px; border-radius: 20px; }
+.panel__cab { display: flex; align-items: center; gap: 8px; }
+.panel__cab h3 { font-family: var(--font-display); font-weight: 700; }
+.panel__cab .chip { margin-left: auto; }
+.toca { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.toca span { display: inline-flex; align-items: center; gap: 6px; }
+.opciones { display: flex; flex-direction: column; gap: 6px; }
+.opciones p { font-size: 14px; font-weight: 600; }
+.opciones button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 14px; text-align: left; }
+.opciones button::before { content: "+"; font-weight: 700; color: var(--muted); }
+.opciones button:hover { background: var(--surface-3); }
+.dif { font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.dif li { display: flex; align-items: center; gap: 8px; }
+.entendi { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+.link { font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; min-height: 40px; display: inline-flex; align-items: center; align-self: flex-start; }
+.aparece { animation: aparece 350ms var(--ease); }
+@keyframes aparece { from { opacity: 0; transform: translateY(6px); } }
+.demo__pie { font-size: 13px; color: var(--muted); text-align: center; }
+
+/* Secciones */
+section { padding-block: 72px; }
+.cab { display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
+.pasos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; counter-reset: paso; }
+.paso { display: flex; flex-direction: column; gap: 14px; }
+.paso__v { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-card); padding: 18px; min-height: 188px; display: flex; flex-direction: column; justify-content: center; gap: 12px; font-size: 14px; }
+.paso h3::before { counter-increment: paso; content: counter(paso) ". "; color: var(--muted); }
+.paso p { color: var(--muted); font-size: 16px; }
+.papel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 1.6; color: var(--muted); border-left: 2px solid var(--surface-3); padding-left: 12px; }
+.flecha { color: var(--muted); font-size: 13px; }
+.campo { border: 1px solid var(--control); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
+.campo i { display: inline-block; width: 1.5px; height: 1.1em; background: var(--ink); vertical-align: text-bottom; margin-left: 1px; animation: cursor 1.1s steps(1) infinite; }
+@keyframes cursor { 50% { opacity: 0; } }
+.estados { display: flex; flex-direction: column; gap: 10px; }
+.estados li { display: flex; align-items: center; gap: 12px; }
+.estados .miga { width: 22px; height: 22px; }
+@media (max-width: 860px) { .pasos { grid-template-columns: minmax(0, 1fr); gap: 36px; } .paso__v { min-height: 0; } }
+
+.semana { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); gap: 56px; align-items: center; }
+.semana__t { display: flex; flex-direction: column; gap: 18px; }
+.resumen { display: flex; align-items: baseline; gap: 10px; }
+.resumen strong { font-family: var(--font-display); font-size: 44px; line-height: 1; white-space: nowrap; }
+.resumen small { font-size: 22px; color: var(--muted); }
+.sellos { padding: 12px 10px 14px; }
+.sellos__grid { display: grid; grid-template-columns: 92px repeat(7, minmax(0, 1fr)); align-items: center; row-gap: 2px; }
+.sellos__d { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 8px; font-size: 12px; color: var(--muted); }
+.sellos__d b { font-size: 15px; color: var(--ink); }
+.sellos__n { font-size: 12px; font-weight: 600; padding-left: 8px; }
+.sellos__c { display: grid; place-items: center; height: 34px; }
+.sellos__c .miga { width: 22px; height: 22px; }
+.sellos__sep { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 6px 8px; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin-top: 12px; padding: 0 4px; }
+.leyenda li { display: flex; align-items: center; gap: 6px; }
+.leyenda .miga { width: 12px; height: 12px; }
+.nutri { border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-direction: column; gap: 6px; }
+.nutri p { color: var(--muted); font-size: 16px; }
+@media (max-width: 860px) { .semana { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+
+.habitos { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 56px; align-items: center; }
+.habitos__t { display: flex; flex-direction: column; gap: 14px; }
+.lista > li { display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 16px; min-height: 58px; font-size: 15px; }
+.lista > li + li { border-top: 1px solid var(--line); }
+.hab__nom { font-weight: 600; }
+.hab__val { color: var(--muted); font-size: 14px; }
+.hab--ok .hab__val { color: var(--ok); }
+.hab__migas { margin-left: auto; display: flex; }
+.hab__migas button { width: 38px; height: 44px; display: grid; place-items: center; border-radius: 10px; }
+.hab__migas .miga { width: 24px; height: 24px; }
+@media (max-width: 860px) { .habitos { grid-template-columns: minmax(0, 1fr); gap: 28px; } .habitos__t { order: -1; } }
+
+.no { background: var(--band); color: var(--band-ink); }
+.no h2 { max-width: 14em; }
+.no ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 56px; margin-top: 40px; }
+.no li { padding: 22px 0; border-top: 1px solid var(--band-line); display: flex; flex-direction: column; gap: 6px; }
+.no li strong { font-size: 19px; font-weight: 600; }
+.no li span { color: var(--band-muted); font-size: 16px; }
+@media (max-width: 860px) { .no ul { grid-template-columns: minmax(0, 1fr); } }
+
+.origen { max-width: 680px; }
+.origen blockquote { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 2.6vw, 30px); line-height: 1.25; letter-spacing: -0.01em; text-wrap: pretty; }
+.origen figcaption { margin-top: 18px; color: var(--muted); font-size: 16px; }
+.cierre { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; padding-block: 24px 96px; }
+footer { border-top: 1px solid var(--line); }
+footer .in { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 24px; font-size: 14px; color: var(--muted); }
+footer .brand { font-size: 20px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="in nav">
+  <a class="brand" href="https://miga.uy" aria-label="miga">mıga<i></i></a>
+  <div><a class="txt" href="https://miga.uy/login">Iniciar sesión</a><a class="btn btn--pri btn--sm" href="https://miga.uy/register">Crear cuenta</a></div>
+</header>
+
+<main>
+  <div class="in hero">
+    <div class="hero__t">
+      <h1>Anotá lo que comiste. Miga te dice cómo vas con tu plan<b>.</b></h1>
+      <p class="lead">Cargás una vez el plan que te dio tu nutricionista. Después escribís «milanesa con ensalada», como se lo contarías a alguien, y ves qué faltó o qué sobró.</p>
+      <div class="hero__cta"><a class="btn btn--pri" href="https://miga.uy/register">Crear cuenta</a></div>
+    </div>
+
+    <div class="demo" aria-label="Probá cómo se anota una comida">
+      <div class="demo__cab"><strong>Hoy</strong><span class="muted sm">Probalo: ¿qué almorzaste?</span></div>
+      <div class="card tira" aria-hidden="true">
+        <span class="tira__banda"></span>
+        <div class="tira__dia"><i class="miga miga--full"></i><b>Desayuno</b><span class="num">09:00</span></div>
+        <div class="tira__dia"><i class="miga" id="miga-alm"></i><b>Almuerzo</b><span class="num">13:00</span></div>
+        <div class="tira__dia"><i class="miga"></i><b>Merienda</b><span class="num">17:00</span></div>
+        <div class="tira__dia"><i class="miga"></i><b>Cena</b><span class="num">21:00</span></div>
+      </div>
+      <div class="card panel" id="panel" aria-live="polite"></div>
+      <p class="demo__pie">Así se ve Miga por dentro. Los ejemplos son de muestra.</p>
+    </div>
+  </div>
+
+  <section class="in" aria-labelledby="t-pasos">
+    <div class="cab"><h2 id="t-pasos">Tres cosas, y la primera se hace una sola vez.</h2></div>
+    <ol class="pasos">
+      <li class="paso">
+        <div class="paso__v">
+          <p class="papel">Almuerzo<br>1 proteína · 1 cereal<br>1 grasa · 2 verduras</p>
+          <span class="flecha">pasa a ser</span>
+          <p class="toca"><span><i class="dot" style="color:var(--g-prot)"></i>1 Proteínas</span><span><i class="dot" style="color:var(--g-cer)"></i>1 Cereales</span><span><i class="dot" style="color:var(--g-gras)"></i>1 Grasas</span><span><i class="dot" style="color:var(--g-verd)"></i>2 Verduras</span></p>
+        </div>
+        <h3>Pasás tu plan del papel</h3>
+        <p>Las comidas y las porciones de cada grupo, tal como te las dieron. Una guía te lleva paso a paso, y tu nutricionista no tiene que usar ninguna app.</p>
+      </li>
+      <li class="paso">
+        <div class="paso__v">
+          <div class="campo">tarta de zapallitos y ensalada<i></i></div>
+          <span class="muted sm">o lo dictás, o tocás lo de siempre</span>
+        </div>
+        <h3>Anotás como hablás</h3>
+        <p>Sin buscar alimentos en una lista ni pesar nada. Lo que comés seguido queda a un toque.</p>
+      </li>
+      <li class="paso">
+        <div class="paso__v">
+          <ul class="estados">
+            <li><i class="miga miga--full"></i>Como el plan</li>
+            <li><i class="miga miga--half"></i>Faltó 1 porción de Verduras</li>
+            <li><i class="miga miga--flex"></i>Comida flexible</li>
+          </ul>
+        </div>
+        <h3>Ves cómo vas</h3>
+        <p>Cada comida es una miga: llena si salió como el plan, a medias si faltó o sobró algo. Y siempre te dice qué.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="in semana" aria-labelledby="t-semana">
+    <div class="semana__t">
+      <h2 id="t-semana">Tu semana entra en una tarjeta.</h2>
+      <p class="lead">Una fila por comida y una columna por día. De un vistazo ves qué días salieron como el plan y en qué comida se te complica.</p>
+      <div class="nutri">
+        <h3>Y el día de la consulta, se la llevás a tu nutri.</h3>
+        <p>Descargás la semana en Excel o PDF, con lo que escribiste en cada comida. La mandás vos: Miga no la comparte con nadie.</p>
+      </div>
+    </div>
+    <div>
+      <p class="resumen" style="margin-bottom:14px"><strong class="num">19<small> de 28</small></strong><span class="muted sm">comidas como el plan esta semana</span></p>
+      <div class="card sellos" role="img" aria-label="Tarjeta de la semana: una miga por comida y por día. 19 de 28 comidas salieron como el plan."><div class="sellos__grid" id="sellos"></div></div>
+      <ul class="leyenda" aria-hidden="true"><li><i class="miga miga--full"></i>Como el plan</li><li><i class="miga miga--half"></i>Faltó o sobró algo</li><li><i class="miga miga--flex"></i>Flexible</li><li><i class="miga"></i>Sin anotar</li></ul>
+    </div>
+  </section>
+
+  <section class="in habitos" aria-labelledby="t-hab">
+    <ul class="card lista" id="habitos"></ul>
+    <div class="habitos__t">
+      <h2 id="t-hab">Tus hábitos también se anotan.</h2>
+      <p class="lead">Cargás los que te marcó tu nutricionista, cada uno con su meta, y los anotás con un toque. Estos dos son de ejemplo: tocá las migas.</p>
+    </div>
+  </section>
+
+  <section class="no" aria-labelledby="t-no">
+    <div class="in">
+      <h2 id="t-no">Lo que Miga no hace<span class="punto">.</span></h2>
+      <ul>
+        <li><strong>No arma dietas ni cambia tu plan.</strong><span>Eso lo decide tu nutricionista. Miga solo te ayuda a cumplir lo que ya te indicó.</span></li>
+        <li><strong>No cuenta calorías.</strong><span>Trabaja con porciones e intercambios, como los planes de acá.</span></li>
+        <li><strong>No te reta.</strong><span>Te muestra el dato, «Faltó 1 porción de verduras», y cómo lo entendió.</span></li>
+        <li><strong>No hace nada con tus datos.</strong><span>Guardamos lo mínimo, según la Ley 18.331, y podés borrar tu cuenta cuando quieras.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="in" aria-labelledby="t-origen">
+    <figure class="origen">
+      <h2 id="t-origen" class="sm muted" style="font-family:var(--font-body);letter-spacing:0;font-weight:600;font-size:14px;margin-bottom:14px">Por qué existe</h2>
+      <blockquote>Mi nutricionista me pedía anotar cada comida en una planilla. Anotar era fácil. Saber cómo venía con el plan, no. Miga es esa planilla, un paso más allá.</blockquote>
+      <figcaption>Facu, que hace Miga en Uruguay.</figcaption>
+    </figure>
+  </section>
+
+  <div class="in cierre">
+    <h2>Empezá con el plan que ya tenés<span class="punto">.</span></h2>
+    <p class="lead">Lo cargás hoy y mañana ya anotás el desayuno.</p>
+    <a class="btn btn--pri" href="https://miga.uy/register">Crear cuenta</a>
+  </div>
+</main>
+
+<footer><div class="in"><a class="brand" href="https://miga.uy" aria-label="miga">mıga<i></i></a><span><a href="https://miga.uy/privacidad">Privacidad y términos</a> · Hecho en Uruguay.</span></div></footer>
+
+<script>
+const G = { P: ['Proteínas', '--g-prot'], C: ['Cereales', '--g-cer'], G: ['Grasas', '--g-gras'], V: ['Verduras', '--g-verd'] };
+const OPCIONES = [
+  { texto: 'Milanesa con ensalada', miga: 'half', chip: ['warn', 'Faltó algo'], dif: [['G', 'Faltó 1 porción de Grasas']], entendi: 'Milanesa: 1 Proteínas y 1 Cereales. Ensalada: 2 Verduras.' },
+  { texto: 'Pollo con arroz, ensalada y aceite de oliva', miga: 'full', chip: ['ok', 'Como el plan'], dif: [], entendi: 'Pollo: 1 Proteínas. Arroz: 1 Cereales. Ensalada: 2 Verduras. Aceite: 1 Grasas.' },
+  { texto: 'Pizza con amigos', miga: 'flex', chip: ['flex', 'Flexible'], dif: [], entendi: 'Pizza cuenta como comida flexible: se anota y no se compara con el plan.' },
+];
+const panel = document.getElementById('panel'), migaAlm = document.getElementById('miga-alm');
+function demo(i) {
+  const o = OPCIONES[i];
+  migaAlm.className = 'miga' + (o ? ' miga--' + o.miga : '');
+  const cab = chip => `<div class="panel__cab"><h3>Almuerzo</h3><span class="muted sm num">13:00</span>${chip}</div>`;
+  if (!o) {
+    panel.innerHTML = cab('<span class="chip chip--sigue">Sigue</span>') +
+      `<p class="toca" aria-label="Te toca">${['P', 'C', 'G'].map(g => `<span><i class="dot" style="color:var(${G[g][1]})"></i>1 ${G[g][0]}</span>`).join('')}<span><i class="dot" style="color:var(${G.V[1]})"></i>2 ${G.V[0]}</span></p>
+      <div class="opciones"><p>¿Qué comiste?</p>${OPCIONES.map((x, k) => `<button type="button" data-i="${k}">${x.texto}</button>`).join('')}</div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="aparece" style="display:flex;flex-direction:column;gap:12px">${cab(`<span class="chip chip--${o.chip[0]}">${o.chip[1]}</span>`)}
+    <p>${o.texto}</p>
+    ${o.dif.length ? `<ul class="dif">${o.dif.map(([g, t]) => `<li><i class="dot" style="color:var(${G[g][1]})"></i>${t}</li>`).join('')}</ul>` : ''}
+    <p class="entendi">Así lo entendí: ${o.entendi}</p>
+    <button type="button" class="link" data-i="-1">Probar con otra comida</button></div>`;
+}
+panel.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) demo(Number(b.dataset.i)); });
+demo(-1);
+
+const FILAS = [['Desayuno', 'ffhffff'], ['Almuerzo', 'fhfffhx'], ['Merienda', 'ffefhff'], ['Cena', 'hfffxfe'], null, ['Agua', 'fhffhfh']];
+const CLASE = { f: 'miga--full', h: 'miga--half', x: 'miga--flex', e: '' };
+document.getElementById('sellos').innerHTML = '<span></span>' + [...'LMMJVSD'].map((l, i) => `<span class="sellos__d">${l}<b class="num">${i + 2}</b></span>`).join('') + '<span class="sellos__sep"></span>' +
+  FILAS.map(f => f ? `<span class="sellos__n">${f[0]}</span>` + [...f[1]].map(c => `<span class="sellos__c"><i class="miga ${CLASE[c]}"></i></span>`).join('') : '<span class="sellos__sep"></span>').join('');
+
+const HAB = [{ id: 'agua', name: 'Agua', unit: 'Lt', goal: 2, step: 0.5, value: 1 }, { id: 'entr', name: 'Entrenamiento', goal: 1, step: 1, value: 0, yesNo: true }];
+const num = n => String(n).replace('.', ',');
+function habitos() {
+  document.getElementById('habitos').innerHTML = HAB.map(h => {
+    const slots = Math.round(h.goal / h.step), filled = Math.round(h.value / h.step);
+    const val = h.yesNo ? (h.value ? 'Hecho' : '') : `${num(h.value)} de ${num(h.goal)} ${h.unit}`;
+    return `<li class="${h.value >= h.goal ? 'hab--ok' : ''}"><span class="hab__nom">${h.name}</span><span class="hab__val num">${val}</span><span class="hab__migas">${
+      Array.from({ length: slots }, (_, i) => `<button type="button" data-h="${h.id}" data-i="${i}" aria-pressed="${i < filled}" aria-label="${h.name}: ${h.yesNo ? 'hecho' : num((i + 1) * h.step) + ' ' + h.unit}"><i class="miga ${i < filled ? 'miga--full' : ''}"></i></button>`).join('')}${
+      h.yesNo ? '' : `<button type="button" data-h="${h.id}" data-mas aria-label="Sumar ${num(h.step)} ${h.unit}"><i class="miga miga--mas${filled > slots ? ' miga--mas-on' : ''}">+${filled > slots ? filled - slots : ''}</i></button>`}</span></li>`;
+  }).join('');
+}
+document.getElementById('habitos').addEventListener('click', e => {
+  const b = e.target.closest('button[data-h]'); if (!b) return;
+  const h = HAB.find(x => x.id === b.dataset.h), n = Number(b.dataset.i) + 1;
+  if ('mas' in b.dataset) h.value = Math.max(h.value, h.goal) + h.step;
+  else h.value = Math.round(h.value / h.step) === n ? (n - 1) * h.step : n * h.step;
+  habitos();
+});
+habitos();
+</script>
+
+</body>
+</html>
