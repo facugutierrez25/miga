@@ -35,6 +35,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
   const [splitting, setSplitting] = useState(false)
   const [qty, setQty] = useState(String(item.quantity ?? ''))
   const [portions, setPortions] = useState(item.portions ?? 1)
+  const [portionsTouched, setPortionsTouched] = useState(false)
   const [saveAsRule, setSaveAsRule] = useState(false)
   const [splitRows, setSplitRows] = useState<{ foodGroupId: string; portions: string }[]>([])
   const [saving, setSaving] = useState(false)
@@ -67,7 +68,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
 
   function saveCorrection() {
     submit({ quantity: qty === '' ? item.quantity : Number(qty), unit: item.unit,
-      ...(item.foodGroupId !== null ? { portions } : {}), saveAsRule })
+      ...(portionsTouched && item.foodGroupId !== null ? { portions } : {}), saveAsRule })
   }
 
   function saveSplit(saveAsRule: boolean) {
@@ -117,7 +118,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
               <span className="nota-item__porciones">{fmt(item.portions)} {item.portions === 1 ? 'porción' : 'porciones'}{label && ` de ${label}`}</span>
             )}
             {editable && (
-              <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => { setPortions(item.portions ?? 1); setSaveAsRule(false); setEditing(true) }} aria-label={`Corregir ${item.food}`}>
+              <button type="button" className="nota-item__edit" ref={editButtonRef} onClick={() => { setPortions(item.portions ?? 1); setPortionsTouched(false); setSaveAsRule(false); setEditing(true) }} aria-label={`Corregir ${item.food}`}>
                 Corregir
               </button>
             )}
@@ -130,9 +131,9 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       {item.uncertain && <p className="nota-item__regla">cantidad estimada</p>}
       {editing && !splitting && item.foodGroupId !== null && (
         <div className="understood-correction">
-          <button type="button" aria-label={`Menos porciones de ${item.food}`} disabled={saving || portions <= 0.5} onClick={() => setPortions(value => value - 0.5)}>−</button>
+          <button type="button" aria-label={`Menos porciones de ${item.food}`} disabled={saving || portions <= 0.5} onClick={() => { setPortions(value => value - 0.5); setPortionsTouched(true) }}>−</button>
           <output aria-label={`Porciones de ${item.food}`}>{fmt(portions)}</output>
-          <button type="button" aria-label={`Más porciones de ${item.food}`} disabled={saving} onClick={() => setPortions(value => value + 0.5)}>+</button>
+          <button type="button" aria-label={`Más porciones de ${item.food}`} disabled={saving} onClick={() => { setPortions(value => value + 0.5); setPortionsTouched(true) }}>+</button>
           <button type="button" disabled={saving || (qty !== '' && !(Number(qty) > 0))} onClick={saveCorrection}>Listo</button>
         </div>
       )}

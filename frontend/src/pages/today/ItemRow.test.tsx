@@ -15,6 +15,39 @@ import * as recordsApi from '../../api/records'
 import { ItemOrigin } from '../../api/records'
 import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { vi, test, expect } from 'vitest'
+
+test.each(['Listo', 'Guardar cantidad'])('envía solo las porciones editadas al guardar desde %s', async action => {
+  setupRemoval([removableItems[0]])
+  const mockPatchItem = vi.mocked(recordsApi.patchItem)
+  mockPatchItem.mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [101], items: [removableItems[0]] })
+  renderToday()
+  await openDetails()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(mockPatchItem).toHaveBeenCalledExactlyOnceWith('tok', expect.any(String), 101, {
+    quantity: 3, unit: 'u', saveAsRule: false,
+  }))
+  expect(mockPatchItem.mock.calls[0][3]).not.toHaveProperty('portions')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Más porciones de leche' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
+    quantity: 4, unit: 'u', portions: 1.5, saveAsRule: true,
+  }))
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Corregir leche' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Cantidad de leche' }), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: action }))
+  await waitFor(() => expect(mockPatchItem).toHaveBeenLastCalledWith('tok', expect.any(String), 101, {
+    quantity: 5, unit: 'u', saveAsRule: false,
+  }))
+})
+
 test('muestra un compuesto en una fila con su regla bajo el título Así lo entendí', async () => {
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
   mockSaveNote.mockResolvedValue({
