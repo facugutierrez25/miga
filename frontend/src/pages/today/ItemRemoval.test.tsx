@@ -12,7 +12,7 @@ test('quitar usa la versión, actualiza texto y lista, anuncia y enfoca el títu
   await waitFor(() => expect(recordsApi.removeItem).toHaveBeenCalledWith('tok', expect.any(String), 102, 7))
   expect(await screen.findByText('Quitaste manzana.')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Quitar manzana' })).not.toBeInTheDocument()
-  expect(screen.getByRole('textbox', { name: '¿Qué comiste?' })).toHaveValue('leche')
+  expect(screen.getByText('leche', { selector: '.comida__texto' })).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Así lo entendí' })).toHaveFocus()
 })
 

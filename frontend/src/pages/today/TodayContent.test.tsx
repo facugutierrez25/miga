@@ -14,7 +14,7 @@ import {
   openDetails,
 } from './test-utils'
 import { ItemOrigin } from '../../api/records'
-import { act, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { test, expect } from 'vitest'
 test('muestra cargando mientras carga el plan', () => {
   mockGetMyPlan.mockReturnValue(new Promise(() => {}))
@@ -29,25 +29,14 @@ test('muestra link a mi plan cuando no hay plan cargado', async () => {
   expect(screen.getByRole('link', { name: 'Cargar mi plan' })).toHaveAttribute('href', '/onboarding')
 })
 
-test('muestra primero la comida de ahora y el resto en el orden del plan', async () => {
-  mockGetMyPlan.mockResolvedValue({
-    foodGroups: [
-      { id: 1, name: 'Proteínas', abbreviation: 'PRO', displayOrder: 1, color: null },
-      { id: 2, name: 'Cereales',  abbreviation: 'CER', displayOrder: 2, color: null },
-    ],
-    meals: [
-      { id: 3, name: 'Cena', displayOrder: 3, portions: [{ foodGroupId: 1, portions: 1 }] },
-      { id: 2, name: 'Almuerzo', displayOrder: 2, portions: [{ foodGroupId: 1, portions: 2 }] },
-      { id: 1, name: 'Desayuno', displayOrder: 1, portions: [{ foodGroupId: 2, portions: 1 }] },
-    ],
-  })
+test('muestra la tira en el orden del plan y abre la primera sin horarios', async () => {
+  mockGetMyPlan.mockResolvedValue({ foodGroups: proteinGroups, meals: [3, 1, 2].map(id => ({
+    id, name: ['Desayuno', 'Almuerzo', 'Cena'][id - 1], displayOrder: id, portions: [],
+  })) })
   renderToday()
-  // Sin horarios, la comida de ahora es la última del plan; el resto sigue el orden del plan.
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Cena', level: 2 })).toBeInTheDocument())
-  const previous = screen.getByRole('region', { name: 'Antes' })
-  const names = Array.from(previous.querySelectorAll('.hoy-fila__nombre')).map(n => n.textContent)
-  expect(names).toEqual(['Desayuno', 'Almuerzo'])
-  expect(screen.queryByRole('region', { name: 'Después' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Desayuno', level: 2 })).toBeInTheDocument()
+  const strip = screen.getByRole('group', { name: /Comidas del d.a/ })
+  expect(within(strip).getAllByRole('button').map(button => button.textContent?.replace('+', ''))).toEqual(['Desayuno', 'Almuerzo', 'Cena'])
 })
 
 test('muestra la hora sugerida cuando está presente', async () => {
@@ -56,7 +45,7 @@ test('muestra la hora sugerida cuando está presente', async () => {
     meals: [{ id: 1, name: 'Desayuno', suggestedTime: '08:00:00', displayOrder: 1, portions: [{ foodGroupId: 4, portions: 1 }] }],
   })
   renderToday()
-  await waitFor(() => expect(screen.getByText('08:00')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getAllByText('08:00')[0]).toBeInTheDocument())
 })
 
 test('muestra solo los grupos con porciones mayores a cero', async () => {
@@ -74,7 +63,7 @@ test('muestra solo los grupos con porciones mayores a cero', async () => {
     }],
   })
   renderToday()
-  await waitFor(() => expect(screen.getAllByText('Proteínas').length).toBeGreaterThan(0))
+  await waitFor(() => expect(screen.getByLabelText('Te toca')).toHaveTextContent('Proteínas'))
   expect(screen.queryByText('Cereales')).not.toBeInTheDocument()
 })
 
@@ -88,13 +77,14 @@ test('muestra el resumen de porciones cuando hay un plan', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   renderToday()
   await waitFor(() => expect(screen.getByText('0 de 2 porciones')).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /Tu d.a por grupo/ }))
   expect(screen.getAllByRole('img', { name: 'Proteínas: 0 de 2 porciones' }).length).toBeGreaterThan(0)
 })
 
-test('el día sin anotar explica las migas', async () => {
+test('el resumen del día abre cerrado', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   renderToday()
-  await waitFor(() => expect(screen.getByText(/Cada porción de tu plan es una miga/)).toBeInTheDocument())
+  expect(await screen.findByRole('button', { name: /Tu d.a por grupo/ })).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('muestra error si getDayRegistro falla', async () => {
@@ -142,12 +132,11 @@ test('las otras comidas muestran su estado en texto y se abren para anotar', asy
     }],
   })
   renderToday()
-  const renderRow = await screen.findByRole('button', { name: /Desayuno/, expanded: false })
-  expect(renderRow).toHaveTextContent('De más')
-  expect(renderRow).toHaveAccessibleName('Desayuno: De más: 1 porción de Proteínas')
-  fireEvent.click(renderRow)
-  expect(renderRow).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getAllByRole('textbox', { name: '¿Qué comiste?' }).some(t => (t as HTMLTextAreaElement).value === 'dos huevos')).toBe(true)
+  const row = await screen.findByRole('button', { name: /Desayuno: de m.s/ })
+  fireEvent.click(row)
+  expect(row).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByText('dos huevos')).toBeVisible()
+  expect(screen.getAllByText(/De m.s: 1 porci.n de Prote.nas/)[0]).toBeVisible()
 })
 
 test('respeta el margen del plan: dentro del margen la comida es como el plan', async () => {
@@ -160,7 +149,7 @@ test('respeta el margen del plan: dentro del margen la comida es como el plan', 
     }],
   })
   renderToday()
-  expect(await screen.findByRole('button', { name: /Desayuno/, expanded: false })).toHaveTextContent('Como el plan')
+  expect(await screen.findByRole('button', { name: /Desayuno: como el plan/ })).toBeInTheDocument()
 })
 
 test('usa el color del grupo propio en sus migas', async () => {
@@ -168,7 +157,8 @@ test('usa el color del grupo propio en sus migas', async () => {
     { id: 1, name: 'Grupo propio', abbreviation: 'CUS', displayOrder: 1, color: '#368C91' },
   ] })
   const { container } = renderToday()
-  await screen.findAllByText('Grupo propio')
+  await screen.findByLabelText('Te toca')
+  fireEvent.click(screen.getByRole('button', { name: /Tu d.a por grupo/ }))
   await waitFor(() => expect(container.querySelector('path[stroke="var(--g-turq)"]')).toBeInTheDocument())
   expect(container.querySelector('path[stroke="var(--g-prot)"]')).not.toBeInTheDocument()
 })
@@ -201,7 +191,7 @@ test('past dates load their plan and show its meal note', async () => {
   await screen.findByRole('heading', { name: 'Desayuno' })
   fireEvent.click(screen.getAllByRole('button', { name: /a anterior$/ })[0])
   fireEvent.click(await screen.findByRole('button', { name: /Desayuno/ }))
-  expect(await screen.findByDisplayValue('Historical note')).toBeInTheDocument()
+  expect(await screen.findByText('Historical note')).toBeInTheDocument()
   expect(mockGetMyPlan.mock.calls.some(([, , date]) => date !== today)).toBe(true)
 })
 
@@ -230,19 +220,16 @@ test('meal renders stay isolated while typing and toggling the daily summary', a
     ...planWithMeal.meals[0], id: index + 1, name, suggestedTime: undefined, displayOrder: index,
   })) })
   renderToday()
-  await screen.findByRole('heading', { name: 'Snack', level: 2 })
+  await screen.findByRole('heading', { name: 'Breakfast', level: 2 })
   fireEvent.click(screen.getByRole('button', { name: /Breakfast/ }))
   fireEvent.click(screen.getByRole('button', { name: /Lunch/ }))
-  await waitFor(() => expect(mockGetSuggestions).toHaveBeenCalledTimes(3))
-  await act(async () => {})
+  await waitFor(() => expect(mockGetSuggestions).toHaveBeenCalledTimes(2))
   mealRenders.clear()
-  const editor = screen.getAllByRole('textbox', { name: /comiste/ })[1]
+  const editor = screen.getByRole('textbox', { name: /comiste/ })
   for (const value of ['a', 'ab', 'abc']) fireEvent.change(editor, { target: { value } })
-  expect(Object.fromEntries(mealRenders)).toEqual({ 'MealNoteSection-1': 3 })
+  expect(Object.fromEntries(mealRenders)).toEqual({ 'MealNoteSection-2': 3 })
   mealRenders.clear()
-  const summary = screen.getByText(/Tu d.a por grupo/).closest('details')!
-  summary.open = false
-  fireEvent(summary, new Event('toggle'))
+  fireEvent.click(screen.getByRole('button', { name: /Tu d.a por grupo/ }))
   expect(Object.fromEntries(mealRenders)).toEqual({})
 })
 

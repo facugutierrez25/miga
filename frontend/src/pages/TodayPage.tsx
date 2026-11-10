@@ -1,6 +1,6 @@
 import './TodayPage.css'
-import { MealRow } from './today/MealRow'
-import { CurrentMeal } from './today/CurrentMeal'
+import { DayStrip } from './today/DayStrip'
+import { MealPanel } from './today/MealPanel'
 import { type DraftStore } from './today/MealNoteSection'
 import {
   buildGroupsMap,
@@ -11,16 +11,16 @@ import {
   greeting,
   formatName,
   findCurrentMealIndex,
-  fmt,
+  findInitialMealIndex,
+  resolveDate,
   calculateDaySummary,
   adjustSummary,
 } from './today/helpers'
 import Skeleton, { LoadingSkeleton } from '../components/Skeleton'
 import { useMemo, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/authTypes'
 import Brand from '../components/Brand'
-import Crumbs from '../components/Crumbs'
 import { useTitle } from '../hooks/useTitle'
 import { useNow } from '../hooks/useNow'
 import { type MealDayDto, type NoteInterpretationDto, type PatchItemResultDto } from '../api/records'
@@ -38,28 +38,33 @@ function TodayContent() {
   const now = useNow()
   const TODAY = toISO(now)
   const { token, email, firstName } = useAuth()
-  const [date, setDate] = useState(TODAY)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const date = resolveDate(searchParams.get('fecha'), TODAY)
+  function setDate(value: string) {
+    setSearchParams(value === TODAY ? {} : { fecha: value })
+  }
   const planLoad = usePlan(token, email, date)
   const plan = planLoad.data
   const withoutPlan = planLoad.status === 'empty' && !plan
   const { data: dayRecord, setData: setDayRecord, status: dayStatus, retry: retryDay, reload: reloadDay } = useDayRecord(token, email, date)
   const loading = planLoad.status === 'loading' || (!!plan && dayStatus === 'loading' && !dayRecord)
   const dayError = dayStatus === 'error'
-  const [dayOpen, setDayOpen] = useState<boolean | null>(null)
   const [drafts] = useState<DraftStore>(() => new Map())
   const groupsMap = useMemo(() => plan ? buildGroupsMap(plan.foodGroups ?? []) : {}, [plan])
 
-  const [previousToday, setPreviousToday] = useState(TODAY)
-  if (previousToday !== TODAY) {
-    setPreviousToday(TODAY)
-    if (date === previousToday) setDate(TODAY)
-  }
-
   function changeDay(delta: number) {
-    setDate(f => addDays(f, delta))
+    setDate(addDays(date, delta))
   }
 
-  const handleNoteSaved = useCallback((interp: NoteInterpretationDto, mealId: number) => {
+  const handleNoteSaved = useCallback((interp: NoteInterpretationDto, mealId: number, submittedText?: string) => {
+    // El panel puede haberse desmontado mientras se guardaba la nota.
+    if (submittedText !== undefined) {
+      const key = `${interp.date}-${mealId}`
+      const current = drafts.get(key)
+      drafts.set(key, current && current.text.trim() !== submittedText.trim()
+        ? { ...current, baseVersion: interp.version, dirty: true }
+        : { text: interp.text, baseVersion: interp.version, dirty: false, conflict: false })
+    }
     setDayRecord(prev => {
       if (!prev) return prev
       const updatedMeal: MealDayDto = {
@@ -77,9 +82,15 @@ function TodayContent() {
         : [...prev.meals, updatedMeal]
       return { ...prev, meals, summary: adjustSummary(prev.summary, previous?.items ?? [], interp.entries, groupsMap) }
     })
-  }, [setDayRecord, groupsMap])
+  }, [setDayRecord, groupsMap, drafts])
 
-  const handleNoteDeleted = useCallback((mealId: number, version: number | null) => {
+  const handleNoteDeleted = useCallback((mealId: number, version: number | null, submittedText: string) => {
+    // El panel puede haberse desmontado mientras se borraba la nota.
+    const key = `${date}-${mealId}`
+    const current = drafts.get(key)
+    drafts.set(key, current && current.text.trim() !== submittedText.trim()
+      ? { ...current, baseVersion: version, dirty: true }
+      : { text: '', baseVersion: version, dirty: false, conflict: false })
     setDayRecord(prev => {
       if (!prev) return prev
       const previous = prev.meals.find(m => m.mealId === mealId)
@@ -89,7 +100,7 @@ function TodayContent() {
         summary: adjustSummary(prev.summary, previous?.items ?? [], [], groupsMap),
       }
     })
-  }, [setDayRecord, groupsMap])
+  }, [setDayRecord, groupsMap, drafts, date])
 
   const handleItemPatched = useCallback((mealId: number, result: PatchItemResultDto) => {
     setDayRecord(prev => {
@@ -117,22 +128,22 @@ function TodayContent() {
   const isToday = date === TODAY
   const name = firstName ?? formatName(email ?? undefined)
   const meals = plan?.meals.slice().sort((a, b) => a.displayOrder - b.displayOrder) ?? []
-  const calculatedCurrentMeal = isToday && plan ? meals[findCurrentMealIndex(meals, now)]?.id ?? null : null
-  const [fixedCurrentMeal, setFixedCurrentMeal] = useState<{ date: string; id: number | null }>({ date, id: calculatedCurrentMeal })
-  const currentMealId = fixedCurrentMeal.date === date ? fixedCurrentMeal.id : calculatedCurrentMeal
-  // Al cambiar de día se actualiza siempre; dentro del día, la comida de ahora solo cambia
-  // si no hay un borrador sin guardar, para no mover el editor mientras se escribe.
-  if (fixedCurrentMeal.date !== date || (fixedCurrentMeal.id !== calculatedCurrentMeal && (fixedCurrentMeal.id === null
-    || ![...drafts.entries()].some(([key, d]) => key.startsWith(`${date}-`) && d.dirty)))) {
-    setFixedCurrentMeal({ date, id: calculatedCurrentMeal })
+  const nextIndex = isToday ? findCurrentMealIndex(meals, now, dayRecord?.meals) : -1
+  const initialIndex = nextIndex >= 0 ? nextIndex : findInitialMealIndex(meals, dayRecord?.meals)
+  const [selection, setSelection] = useState<{ date: string; id: number | undefined; nextId: number | undefined } | null>(null)
+  const nextId = meals[nextIndex]?.id
+  const hasDraft = [...drafts.entries()].some(([key, draft]) => key.startsWith(`${date}-`) && draft.dirty)
+  const selectedId = selection?.date === date ? selection.id : meals[initialIndex]?.id
+  const currentMeal = meals.find(meal => meal.id === selectedId)
+  if (!loading && meals.length && (selection?.date !== date || !currentMeal)) {
+    setSelection({ date, id: meals[initialIndex]?.id, nextId })
+  } else if (!loading && meals.length && selection?.nextId !== nextId) {
+    const keepSavedPanel = dayRecord?.meals.some(meal => meal.mealId === selection?.nextId && meal.status !== 'SIN_ANOTAR')
+    if (keepSavedPanel || !hasDraft) {
+      setSelection({ date, id: keepSavedPanel ? selectedId : meals[initialIndex]?.id, nextId })
+    }
   }
-  const currentMealIndex = currentMealId === null ? -1 : meals.findIndex(m => m.id === currentMealId)
   const { total, done, byGroup } = calculateDaySummary(dayRecord, meals, groupsMap)
-  const withoutNotes = !dayRecord?.meals.some(m => m.noteText)
-  const currentMeal = currentMealIndex >= 0 ? meals[currentMealIndex] : null
-  // Con la comida de ahora en el medio, lo anterior queda en "Antes" y lo que falta en "Después".
-  const earlierMeals = currentMealIndex >= 0 ? meals.slice(0, currentMealIndex) : []
-  const laterMeals = currentMealIndex >= 0 ? meals.slice(currentMealIndex + 1) : meals
 
   const title = isToday ? (
     <>{name ? `${greeting(now)}, ${name}` : greeting(now)}<span className="punto-miga">.</span></>
@@ -229,58 +240,15 @@ function TodayContent() {
               </p>
             )}
 
+            <DayStrip key={`strip-${date}`} meals={meals} records={dayRecord?.meals ?? []} selectedId={selectedId}
+              nextId={nextId} total={total} done={done} rows={byGroup}
+              onSelect={id => setSelection({ date, id, nextId })} />
             {currentMeal && (
-              <CurrentMeal
-                key={`${date}-${currentMeal.id}`}
-                meal={currentMeal}
+              <MealPanel key={`${date}-${currentMeal.id}`} meal={currentMeal}
                 mealDay={dayRecord?.meals.find(m => m.mealId === currentMeal.id)}
-                {...mealProps}
-              />
+                next={currentMeal.id === nextId} {...mealProps} />
             )}
-
             <TodayHabits key={date} date={date} revision={dayRecord} />
-
-            {total > 0 && (
-              <details
-                className="hoy-dia"
-                open={dayOpen ?? (withoutNotes || !currentMeal)}
-                onToggle={e => setDayOpen(e.currentTarget.open)}
-              >
-                <summary className="hoy-dia__summary">
-                  <span className="hoy-dia__titulo">Tu día por grupo</span>
-                  <span className="hoy-dia__total">{fmt(done)} de {fmt(total)} porciones</span>
-                  <svg className="hoy-dia__chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </summary>
-                {withoutNotes && isToday && (
-                  <p className="hoy-dia__explicacion">
-                    Todavía no anotaste nada hoy. Cada porción de tu plan es una miga: se rellena
-                    cuando la comés, y la media miga es media porción.
-                  </p>
-                )}
-                <Crumbs rows={byGroup} />
-              </details>
-            )}
-
-            {[
-              { key: 'despues', title: currentMeal ? 'Después' : 'Comidas', list: laterMeals },
-              { key: 'antes', title: 'Antes', list: earlierMeals },
-            ].filter(section => section.list.length > 0).map(section => (
-              <section key={section.key} className="hoy-resto" aria-labelledby={`hoy-${section.key}-titulo`}>
-                <h2 id={`hoy-${section.key}-titulo`} className="hoy-resto__titulo">{section.title}</h2>
-                <ul className="hoy-filas">
-                  {section.list.map(meal => (
-                    <MealRow
-                      key={`${date}-${meal.id ?? meal.name}`}
-                      meal={meal}
-                      mealDay={dayRecord?.meals.find(m => m.mealId === meal.id)}
-                      {...mealProps}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
           </>
         )}
       </div>

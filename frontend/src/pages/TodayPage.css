@@ -1090,3 +1090,23 @@
   color: var(--ink);
 }
 .resolve-food button:disabled, .resolve-notice button:disabled { opacity: .6; cursor: default; }
+
+.comida { padding: 16px; display: flex; flex-direction: column; gap: 12px; border-radius: 20px; }
+.comida__cab { display: flex; align-items: center; gap: 8px; }
+.comida__cab h2 { font-family: var(--font-display); font-weight: 700; }
+.comida__cab .chip { margin-left: auto; }
+.toca { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.toca span { display: inline-flex; align-items: center; gap: 6px; }
+
+.hoy-page { width: 100%; max-width: 480px; margin-inline: auto; }
+.hoy-page .hoy-body { width: 100%; max-width: 480px; }
+.tira, .comida { background: var(--surface); box-shadow: var(--shadow-card); border: 1px solid var(--line); border-radius: 20px; }
+.comida__cab h2 { margin: 0; font-size: var(--fs-h3); }
+.comida__hora { color: var(--muted); font-size: var(--fs-sm); }
+.comida__cab .status-chip, .comida__sigue { margin-left: auto; }
+.comida__sigue { background: var(--accent); color: var(--on-accent); border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; }
+.comida__texto { white-space: pre-wrap; overflow-wrap: anywhere; }
+.comida__diferencias { font-size: var(--fs-sm); }
+.comida .nota-body { padding: 0; border: 0; }
+.comida .nota-acciones { flex-wrap: wrap; }
+@media (min-width: 1024px) { .hoy-page .hoy-body { max-width: 480px; margin-inline: auto; } }

@@ -16,11 +16,11 @@ import {
 import { NoteEditor } from './NoteEditor'
 import { UnderstoodItems } from './UnderstoodItems'
 import { UnderstoodDialog } from './UnderstoodDialog'
-import { type GroupInfo } from './helpers'
+import { fmt, type GroupInfo } from './helpers'
 import { mealStatus } from '../../lib/mealStatus'
 import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react'
 import { type MealDto } from '../../api/plans'
-// El borrador vive fuera del editor para conservarse al cerrar una fila o cambiar la comida de ahora.
+// El borrador vive fuera del editor para conservarse al cambiar de comida.
 export interface Draft {
   text: string
   baseVersion: number | null
@@ -37,9 +37,9 @@ export interface MealNoteSectionProps {
   date: string
   token: string
   groupsMap: Record<number, GroupInfo>
-  onNoteSaved: (interp: NoteInterpretationDto, mealId: number) => void
+  onNoteSaved: (interp: NoteInterpretationDto, mealId: number, submittedText?: string) => void
   onItemPatched: (mealId: number, result: PatchItemResultDto) => void
-  onNoteDeleted: (mealId: number, version: number | null) => void
+  onNoteDeleted: (mealId: number, version: number | null, submittedText: string) => void
   onReload: () => Promise<DayRecordDto>
   onAnswerSaved: (mealId: number) => Promise<void>
 }
@@ -55,6 +55,7 @@ export const MealNoteSection = memo(function MealNoteSection({
   const [saved] = useState(() => drafts.get(draftKey))
   const [text, setText] = useState(saved?.dirty ? saved.text : mealDay?.noteText ?? '')
   const dirty = useRef(saved?.dirty ?? false)
+  const [editing, setEditing] = useState(saved?.dirty ?? false)
   const draftRevision = useRef(0)
   // Versión de la nota sobre la que se empezó el borrador: una recarga automática
   // no la cambia, así guardar un borrador viejo sigue dando conflicto.
@@ -91,12 +92,19 @@ export const MealNoteSection = memo(function MealNoteSection({
   const unknownCount = items.filter(item => item.origin === ItemOrigin.UNKNOWN).length
   const estimatedCount = items.filter(item => item.uncertain).length
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!dirty.current) {
       setText(mealDay?.noteText ?? '')
       baseVersion.current = mealDay?.noteVersion ?? null
+    } else if (drafts.get(draftKey)?.baseVersion === mealDay?.noteVersion) {
+      // Adoptar la reconciliación antes de persistir las refs de este editor.
+      const shared = drafts.get(draftKey)!
+      baseVersion.current = shared.baseVersion
+      dirty.current = shared.dirty
+      setText(shared.text)
+      setEditing(shared.dirty)
     }
-  }, [mealDay?.noteText, mealDay?.noteVersion])
+  }, [mealDay?.noteText, mealDay?.noteVersion, drafts, draftKey])
 
   useEffect(() => {
     if (!meal.id) return
@@ -112,6 +120,7 @@ export const MealNoteSection = memo(function MealNoteSection({
   // Cada edición del borrador (teclado o dictado) sube la revisión: si cambia mientras se
   // guarda, el borrador sigue marcado como modificado y la respuesta no lo reemplaza.
   function editDraft(update: (current: string) => string) {
+    setEditing(true)
     dirty.current = true
     draftRevision.current += 1
     setSavedMessage(null)
@@ -161,6 +170,7 @@ export const MealNoteSection = memo(function MealNoteSection({
     setError(null)
     setSavedMessage(null)
     const submittedRevision = draftRevision.current
+    const submittedText = text
     try {
       const version = await deleteNote(token, date, meal.id, baseVersion.current)
       baseVersion.current = version
@@ -174,7 +184,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       setConfirming(false)
       setSavedMessage(`Borraste lo anotado en ${meal.name}.`)
       pendingFocus.current = 'textarea'
-      onNoteDeleted(meal.id, version)
+      onNoteDeleted(meal.id, version, submittedText)
     } catch (err) {
       setConfirming(false)
       setConflict(err instanceof NoteConflictError)
@@ -199,7 +209,8 @@ export const MealNoteSection = memo(function MealNoteSection({
       dirty.current = draftRevision.current !== submittedRevision
       baseVersion.current = interp.version
       setConflict(false)
-      onNoteSaved(interp, meal.id)
+      if (!dirty.current) setEditing(false)
+      onNoteSaved(interp, meal.id, value.trim())
       const status = mealStatus({
         status: interp.status, noteText: interp.text, comparison: interp.comparison,
       })
@@ -261,13 +272,29 @@ export const MealNoteSection = memo(function MealNoteSection({
 
   return (
     <div className="nota-body">
-      <NoteEditor meal={meal} textareaId={textareaId} textareaRef={textareaRef} text={text}
+      {(!hasNote || editing) && <p className="toca" aria-label="Te toca">
+        {meal.portions.some(p => p.portions > 0) ? <>Te toca: {meal.portions.filter(p => p.portions > 0).map(p =>
+          <span key={p.foodGroupId} style={{ color: groupsMap[p.foodGroupId]?.token }}>{fmt(p.portions)} {groupsMap[p.foodGroupId]?.name}</span>)}</>
+          : 'Para lo que comas fuera de las comidas de tu plan.'}
+      </p>}
+      {hasNote && !editing ? <>
+        <p className="comida__texto">{mealDay?.noteText}</p>
+        <button type="button" className="nota-btn-cancelar" onClick={() => { setEditing(true); pendingFocus.current = 'textarea' }}>Editar</button>
+      </> : <NoteEditor onCancelEdit={() => {
+        dirty.current = false
+        setText(mealDay?.noteText ?? '')
+        baseVersion.current = mealDay?.noteVersion ?? null
+        setConflict(false)
+        setError(null)
+        setConfirming(false)
+        setEditing(false)
+      }} meal={meal} textareaId={textareaId} textareaRef={textareaRef} text={text}
         editDraft={editDraft} error={error} loadingSuggestions={loadingSuggestions} suggestions={suggestions}
         hasNote={hasNote} saving={saving} conflict={conflict} handleSave={handleSave}
         deleteRef={deleteRef} confirming={confirming}
         onConfirmDelete={() => { setConfirming(true); pendingFocus.current = 'confirmar' }}
         onCancelDelete={() => { setConfirming(false); pendingFocus.current = 'borrar' }}
-        confirmRef={confirmRef} handleDelete={handleDelete} />
+        confirmRef={confirmRef} handleDelete={handleDelete} />}
 
       {!detailOpen && feedback}
 
