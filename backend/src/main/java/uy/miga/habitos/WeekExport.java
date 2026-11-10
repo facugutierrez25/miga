@@ -207,12 +207,12 @@ final class WeekExport {
         writeXlsx(Data.of(week), out);
     }
 
-    // Paleta clara de la app: papel salvia, tinta, oliva y acento amarillo.
+    // Paleta clara de la app: papel salvia, tinta, verde bosque y acento amarillo.
     private static final String PAPER = "F2F1EA";
     private static final String SURFACE = "FBFAF5";
     private static final String INK = "040200";
-    private static final String MUTED = "5E5A2E";
-    private static final String BRAND = "7C773F";
+    private static final String MUTED = "3F5E3A";
+    private static final String BRAND = "2F6336";
     private static final String ACCENT = "F6C344";
     private static final String LINE = "E2E0D3";
     private static final String SITE = "https://miga.uy";

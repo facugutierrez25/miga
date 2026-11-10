@@ -139,7 +139,7 @@ class WeekExportTest {
         assertThat(xml.get("xl/drawings/miga1.xml")).contains("Logo oficial de Miga", "rIdLogo");
         assertThat(xml.get("xl/drawings/miga2.xml")).contains("Logo oficial de Miga", "rIdLogo");
         assertThat(xml.get("xl/drawings/_rels/miga1.xml.rels")).contains("../media/miga-wordmark.png");
-        assertThat(xml.get("xl/styles.xml")).contains("F2F1EA", "7C773F", "F6C344", "wrapText=\"true\"");
+        assertThat(xml.get("xl/styles.xml")).contains("F2F1EA", "2F6336", "F6C344", "wrapText=\"true\"");
         for (int sheet = 1; sheet <= 2; sheet++) {
             assertThat(xml.get("xl/worksheets/sheet" + sheet + ".xml"))
                 .contains("orientation=\"landscape\"", "fitToWidth=\"1\"", "state=\"frozen\"", "<hyperlink ", "<drawing r:id=\"rIdMigaLogo\"");
