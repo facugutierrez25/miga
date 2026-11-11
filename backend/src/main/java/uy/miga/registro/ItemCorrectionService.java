@@ -106,6 +106,9 @@ class ItemCorrectionService {
         validateCorrectionGroups(planId, req);
 
         var occurrence = req.flexible() != null ? entryFacade.occurrence(entryId) : List.<FoodEntryFacade.EntryData>of();
+        if (occurrence.stream().anyMatch(e -> "PREGUNTAR".equals(e.ruleType()) && "CATALOGO".equals(e.ruleSource()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Respondé primero si cuenta como comida flexible.");
+        }
         if (req.flexible() != null && occurrence.stream().anyMatch(e -> e.foodGroupId() != null)) {
             if (req.quantity() != null || req.unit() != null || req.foodGroupId() != null
                     || req.portions() != null || req.groups() != null) {

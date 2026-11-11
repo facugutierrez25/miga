@@ -143,7 +143,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       {editing && <div className="nota-item__secondary">
         {(portions !== 0 || splitting) && <label className="resolve-remember"><input type="checkbox" checked={saveAsRule} disabled={saving} onChange={event => setSaveAsRule(event.target.checked)} />Usar siempre</label>}
         <button type="button" aria-expanded={splitting} disabled={saving} onClick={() => countsFlexible && item.foodGroupId !== null ? submit({ flexible: false, saveAsRule }) : splitting ? setSplitting(false) : openSplit()}>{countsFlexible ? 'No es flexible' : 'Repartir en varios grupos'}</button>
-        {recognized && !countsFlexible && <button type="button" disabled={busy} onClick={() => submit({ flexible: true, saveAsRule })}>Contar como comida flexible</button>}
+        {recognized && !countsFlexible && item.ruleType !== 'PREGUNTAR' && <button type="button" disabled={busy} onClick={() => submit({ flexible: true, saveAsRule })}>Contar como comida flexible</button>}
         {item.foodGroupId === null && removable && <button type="button" className="link" disabled={busy} onClick={onRemove}>Quitar</button>}
       </div>}
       {splitting && (

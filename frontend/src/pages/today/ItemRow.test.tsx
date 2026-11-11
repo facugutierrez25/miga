@@ -336,6 +336,13 @@ test('Usar siempre y Listo guarda como regla un ítem que ya es flexible', async
   expect(screen.getByRole('button', { name: 'Corregir leche' })).toBeVisible()
 })
 
+test('un alimento con la pregunta de flexible pendiente no ofrece contarlo como flexible', () => {
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'PREGUNTAR' as const, ruleSource: 'CATALOGO' as const }
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{ 1: { name: 'Grupo', token: 'red' } }} onPatched={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.queryByRole('button', { name: 'Contar como comida flexible' })).not.toBeInTheDocument()
+})
+
 test.each([1, 0.5, 1.5])('No es flexible permite volver a un solo grupo con %s porciones', async portions => {
   const item = { ...removableItems[0], origin: ItemOrigin.MENTION, countsFlexible: true, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
   const onPatched = vi.fn()
