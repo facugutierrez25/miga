@@ -17,7 +17,7 @@ import { vi, test, expect } from 'vitest'
 import { searchCatalog } from '../../api/planRules'
 import * as recordsApi from '../../api/records'
 test('cuenta y separa los alimentos sin reconocer del resumen', async () => {
-  setupRemoval([unknownFood, { ...removableItems[0], uncertain: true }])
+  setupRemoval([unknownFood, { ...removableItems[0], countsFlexible: false, uncertain: true }])
   renderToday()
   expect(await screen.findByRole('button', { name: 'Así lo entendí' })).toBeInTheDocument()
   await openDetails()

@@ -11,6 +11,7 @@ import uy.miga.plans.PlanService;
 import uy.miga.reglas.FoodRuleService;
 import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.RuleInput;
+import uy.miga.reglas.RuleText;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
@@ -23,6 +24,8 @@ import uy.miga.plans.PlanVersionConflictException;
 
 @Service
 class ItemCorrectionService {
+    private final InterpreterService interpreter;
+    private final RegistrationRuleInputMapper ruleInputMapper;
     private final MealNoteRepository noteRepository;
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
@@ -32,7 +35,10 @@ class ItemCorrectionService {
     private final DayReadService dayReadService;
 
     ItemCorrectionService(MealNoteRepository noteRepository, FoodEntryFacade entryFacade, PlanService planService,
-            FoodRuleService ruleService, UserService userService, DailyLogSupport support, DayReadService dayReadService) {
+            FoodRuleService ruleService, UserService userService, DailyLogSupport support, DayReadService dayReadService,
+            InterpreterService interpreter, RegistrationRuleInputMapper ruleInputMapper) {
+        this.interpreter = interpreter;
+        this.ruleInputMapper = ruleInputMapper;
         this.noteRepository = noteRepository;
         this.entryFacade = entryFacade;
         this.planService = planService;
@@ -72,7 +78,8 @@ class ItemCorrectionService {
         Long currentPlanId = support.lockCurrentPlanIfPresent(userId);
         FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
         if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        if (Set.of(EntryOrigin.MENTION, EntryOrigin.UNKNOWN).contains(entry.origin() == null ? "" : entry.origin())) {
+        if (EntryOrigin.UNKNOWN.equals(entry.origin()) || (EntryOrigin.MENTION.equals(entry.origin())
+                && !Set.of("LIBRE", "NO_CUENTA", "FLEXIBLE").contains(entry.ruleType() == null ? "" : entry.ruleType()))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta mención no admite correcciones.");
         }
         if (req.groups() != null && (req.foodGroupId() != null || req.portions() != null)) {
@@ -80,6 +87,20 @@ class ItemCorrectionService {
                 "Indicá un grupo o varios grupos, no ambos.");
         }
 
+        if (req.makesFlexible() && (req.groups() != null || req.foodGroupId() != null || req.portions() != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Una comida flexible no lleva grupos ni porciones.");
+        }
+        if ("FLEXIBLE".equals(entry.ruleType()) && !req.makesFlexible()
+                && req.groups() == null) {
+            if (req.foodGroupId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un grupo para dejar de contarla como flexible.");
+            }
+            if (req.portions() == null || req.portions().signum() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indicá porciones mayores a cero para volver a un grupo.");
+            }
+        }
         Long planId = support.entryPlanId(userId, entry);
         if (!planService.getMealIds(planId).contains(entry.mealId())) {
             throw new PlanVersionConflictException();
@@ -89,6 +110,52 @@ class ItemCorrectionService {
         }
         validateCorrectionGroups(planId, req);
 
+        var occurrence = req.flexible() != null ? entryFacade.occurrence(entryId) : List.<FoodEntryFacade.EntryData>of();
+        if (occurrence.stream().anyMatch(e -> "PREGUNTAR".equals(e.ruleType()) && "CATALOGO".equals(e.ruleSource()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Respondé primero si cuenta como comida flexible.");
+        }
+        if (req.flexible() != null && occurrence.stream().anyMatch(e -> e.foodGroupId() != null)) {
+            if (req.quantity() != null || req.unit() != null || req.foodGroupId() != null
+                    || req.portions() != null || req.groups() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Marcá o quitá la comida flexible sin cambiar la cantidad ni los grupos.");
+            }
+            var ids = occurrence.stream().map(FoodEntryFacade.EntryData::id).toList();
+            entryFacade.setCountsFlexible(ids, req.makesFlexible());
+            if (req.savesRule()) {
+                var selected = interpreter.findRule(InterpreterService.normalize(entry.food()),
+                    ruleService.findApplicable(planId, userId));
+                if (selected == null) {
+                    var groups = new LinkedHashMap<Long, BigDecimal>();
+                    occurrence.stream().filter(e -> e.foodGroupId() != null && e.portions() != null)
+                        .forEach(e -> groups.merge(e.foodGroupId(), e.portions(), BigDecimal::add));
+                    saveOccurrenceRule(userId, planId, entry, entryQuantity(entry), groups, req.makesFlexible());
+                } else if ("USUARIO".equals(selected.scope())) {
+                    var own = ruleService.getUserRules(userId, planId).stream()
+                        .filter(rule -> rule.uid().equals(selected.uid())).findFirst().orElseThrow();
+                    ruleService.updateUserRule(userId, planId, own.uid(), new RuleInput(own.food(), own.synonyms(),
+                        own.type(), own.foodGroupId(), own.amountPerPortion(), own.unit(), own.defaultPortions(),
+                        own.components(), own.overridesRuleUid(), req.makesFlexible()));
+                } else {
+                    var input = ruleInputMapper.resolveRuleInput(entry, selected, selected.type(), Map.of(), planId, planId);
+                    if (input == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Los grupos no pertenecen a tu plan.");
+                    ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(),
+                        selected.type(), input.foodGroupId(), input.amountPerPortion(), input.unit(),
+                        input.defaultPortions(), input.components(), selected.uid(), req.makesFlexible()));
+                }
+                planService.bumpVersion(planId);
+            }
+            return new PatchItemResultDto(ids, ids.stream()
+                .map(id -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId))).toList(),
+                dayReadService.getMealLog(userEmail, date, entry.mealId(), planId).status());
+        }
+        List<Long> replacedIds = List.of(entryId);
+        if (req.makesFlexible()) {
+            replacedIds = entryFacade.makeFlexible(entryId);
+        } else if ("FLEXIBLE".equals(entry.ruleType())) {
+            replacedIds = entryFacade.collapseOccurrence(entryId);
+        }
         List<Long> resultIds = applyCorrection(userId, planId, entryId, entry, req);
 
         if (req.savesRule()) {
@@ -97,7 +164,7 @@ class ItemCorrectionService {
         List<DayLogDto.EntryItemDto> items = resultIds.stream()
             .map(id -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId)))
             .toList();
-        return new PatchItemResultDto(List.of(entryId), items, dayReadService.getMealLog(userEmail, date, entry.mealId(), planId).status());
+        return new PatchItemResultDto(replacedIds, items, dayReadService.getMealLog(userEmail, date, entry.mealId(), planId).status());
     }
 
     // Al cambiar solo la cantidad, las porciones se ajustan en la misma proporción.
@@ -159,20 +226,20 @@ class ItemCorrectionService {
 
     private List<Long> applyCorrection(Long userId, Long planId, Long entryId, FoodEntryFacade.EntryData entry,
             PatchItemRequest req) {
-        BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity());
+        BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity() != null ? entry.quantity() : 1);
         List<Long> resultIds;
-        if (req.groups() != null) {
+        if (req.makesFlexible()) {
+            resultIds = List.of(entryId);
+            if (req.savesRule()) {
+                ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "FLEXIBLE",
+                    null, null, null, null, List.of(), null));
+            }
+        } else if (req.groups() != null) {
             Map<Long, BigDecimal> portionsByGroup = new LinkedHashMap<>();
             req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
-            resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
+            resultIds = entryFacade.splitEntry(entryId, portionsByGroup, quantity.doubleValue());
             if (req.savesRule()) {
-                List<RuleComponent> components = req.groups().stream()
-                    .map(g -> new RuleComponent(g.foodGroupId(), null,
-                        g.portions().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
-                    .toList();
-                // Los componentes quedan por unidad de lo anotado: "200 g" guarda lo de 1 g.
-                ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
-                    null, entry.unit() != null ? BigDecimal.ONE : null, entry.unit(), BigDecimal.ONE, components, null));
+                saveOccurrenceRule(userId, planId, entry, quantity, portionsByGroup, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType()));
             }
         } else {
             BigDecimal portions = req.portions() != null ? req.portions() : scaledPortions(entry, quantity);
@@ -184,14 +251,43 @@ class ItemCorrectionService {
             resultIds = List.of(entryId);
             if (req.savesRule()) {
                 Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
+                String unit = req.unit() != null ? req.unit() : entry.unit();
+                if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) {
+                    unit = null;
+                }
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
-                    groupId, quantity.divide(portions, 3, RoundingMode.HALF_UP),
-                    req.unit() != null ? req.unit() : entry.unit(),
-                    BigDecimal.ONE, List.of(), null));
+                    groupId, unit != null ? quantity.divide(portions, 3, RoundingMode.HALF_UP) : null,
+                    unit, unit != null ? BigDecimal.ONE
+                        : portions.divide(InterpreterService.parsedFoodCount(entry.originalText()), 3, RoundingMode.HALF_UP),
+                    List.of(), null, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType())));
             }
         }
 
         return resultIds;
+    }
+
+    private static BigDecimal entryQuantity(FoodEntryFacade.EntryData entry) {
+        return BigDecimal.valueOf(entry.quantity() != null ? entry.quantity() : 1);
+    }
+
+    private void saveOccurrenceRule(Long userId, Long planId, FoodEntryFacade.EntryData entry, BigDecimal correctedQuantity,
+            Map<Long, BigDecimal> groups, boolean flexible) {
+        String unit = entry.unit();
+        if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) unit = null;
+        BigDecimal quantity = unit != null ? correctedQuantity : InterpreterService.parsedFoodCount(entry.originalText());
+        if (groups.isEmpty() || groups.values().stream().anyMatch(p -> p.signum() <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para guardar como regla, indicá porciones mayores a cero");
+        }
+        var first = groups.entrySet().iterator().next();
+        boolean compound = groups.size() > 1;
+        // Con medida, el compuesto guarda la cantidad anotada y las porciones enteras para no perder precisión.
+        BigDecimal componentDivisor = unit != null ? BigDecimal.ONE : quantity;
+        var components = compound ? groups.entrySet().stream().map(g -> new RuleComponent(g.getKey(), null,
+            g.getValue().divide(componentDivisor, 3, RoundingMode.HALF_UP).doubleValue())).toList() : List.<RuleComponent>of();
+        ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), compound ? "COMPUESTO" : "NORMAL",
+            compound ? null : first.getKey(), unit == null ? null : compound ? quantity : quantity.divide(first.getValue(), 3, RoundingMode.HALF_UP),
+            unit, compound || unit != null ? BigDecimal.ONE : first.getValue().divide(quantity, 3, RoundingMode.HALF_UP),
+            components, null, flexible));
     }
 
     private void validateCorrectionGroups(Long planId, PatchItemRequest req) {

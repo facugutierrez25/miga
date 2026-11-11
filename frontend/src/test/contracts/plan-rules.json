@@ -28,7 +28,8 @@
       "porciones" : 1.5
     } ],
     "overridesRuleUid" : "00000000-0000-0000-0000-000000000001",
-    "textoRegla" : "Sintético"
+    "textoRegla" : "Sintético",
+    "countsFlexible" : false
   } ],
   "habitos" : [ {
     "uid" : "00000000-0000-0000-0000-000000000001",

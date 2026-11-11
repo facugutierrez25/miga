@@ -51,6 +51,7 @@ export const ItemOrigin = {
 export type ItemOrigin = typeof ItemOrigin[keyof typeof ItemOrigin]
 
 export interface EntryItemDto {
+  countsFlexible: boolean
   id: number
   food: string
   quantity: number | null
@@ -97,6 +98,7 @@ export interface GroupPortion {
 }
 
 export interface PatchItemRequest {
+  flexible?: boolean
   quantity?: number | null
   unit?: string | null
   foodGroupId?: number | null
@@ -186,6 +188,12 @@ export async function saveAnswer(
   req: AnswerRequest,
 ): Promise<void> {
   return apiRequest(`/api/v1/registro/${date}/comidas/${mealId}/respuestas`, { errorMessage: 'Error al guardar la respuesta.', token, method: 'POST', body: req })
+}
+
+export function answerFlexible(token: string, date: string, itemId: number, flexible: boolean): Promise<PatchItemResultDto> {
+  return apiRequest(`/api/v1/registro/${date}/items/${itemId}/flexible`, {
+    token, method: 'POST', body: { flexible }, errorMessage: 'No se pudo guardar la respuesta.',
+  })
 }
 
 export async function getSuggestions(

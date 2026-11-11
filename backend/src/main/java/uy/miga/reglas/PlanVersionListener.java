@@ -27,6 +27,7 @@ class PlanVersionListener {
             copy.setFood(source.getFood());
             copy.setSynonyms(source.getSynonyms() == null ? null : List.copyOf(source.getSynonyms()));
             copy.setType(source.getType());
+            copy.setCountsFlexible(source.isCountsFlexible());
             copy.setStandardGroupKey(source.getStandardGroupKey());
             copy.setFoodGroupId(remap(source.getFoodGroupId(), event.groupIdMap()));
             copy.setComponents(source.getComponents() == null ? null : source.getComponents().stream()

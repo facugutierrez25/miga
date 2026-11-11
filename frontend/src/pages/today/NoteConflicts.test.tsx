@@ -148,8 +148,8 @@ test('al recargar muestra menciones persistidas sin corrección ni porciones', a
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{ mealId: 1, status: 'REGISTRADA' as const, noteId: 5, noteVersion: 2,
     noteText: 'mate, algo raro', comparison: [], items: [
-      { id: 51, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'libre' },
-      { id: 52, food: 'algo raro', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.UNKNOWN, uncertain: false },
+      { id: 51, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, countsFlexible: false, uncertain: false, appliedRule: 'libre' },
+      { id: 52, food: 'algo raro', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.UNKNOWN, countsFlexible: false, uncertain: false },
     ] }] })
   renderToday()
   await openNote()

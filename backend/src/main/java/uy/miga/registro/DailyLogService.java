@@ -74,6 +74,10 @@ public class DailyLogService {
         return itemResolutionService.resolveItem(email, date, id, req);
     }
 
+    PatchItemResultDto answerFlexible(String email, LocalDate date, Long id, boolean flexible) {
+        return itemResolutionService.answerFlexible(email, date, id, flexible);
+    }
+
     PatchItemResultDto undoResolve(String email, LocalDate date, UndoResolveRequest req) {
         return itemResolutionService.undoResolve(email, date, req);
     }

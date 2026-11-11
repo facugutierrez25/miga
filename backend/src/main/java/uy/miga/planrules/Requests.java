@@ -56,7 +56,17 @@ final class Requests {
                 @JsonProperty("unidad") @Size(max = 20) String unit,
                 @JsonProperty("porcionPorDefecto") @Positive BigDecimal defaultPortions,
                 @JsonProperty("componentes") List<@NotNull @Valid Component> components,
-                UUID overridesRuleUid) {}
+                UUID overridesRuleUid, Boolean countsFlexible) {
+        Rule {
+            countsFlexible = Boolean.TRUE.equals(countsFlexible);
+        }
+
+        Rule(Long planVersion, String food, List<String> synonyms, String type, UUID groupUid,
+                BigDecimal amountPerPortion, String unit, BigDecimal defaultPortions,
+                List<Component> components, UUID overridesRuleUid) {
+            this(planVersion, food, synonyms, type, groupUid, amountPerPortion, unit, defaultPortions, components, overridesRuleUid, false);
+        }
+    }
 
     record Habit(@NotNull @PositiveOrZero Long planVersion,
                  @NotBlank @Size(max = 100) String name,

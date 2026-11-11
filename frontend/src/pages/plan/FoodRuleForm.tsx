@@ -48,6 +48,7 @@ export default function FoodRuleForm({
           alimento: '',
           sinonimos: [],
           tipo: 'NORMAL',
+          countsFlexible: false,
           groupUid: '',
           cantidadPorPorcion: null,
           unidad: null,
@@ -94,6 +95,7 @@ export default function FoodRuleForm({
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean),
+      countsFlexible: hasQuantityUnit ? !!input.countsFlexible : input.tipo === 'FLEXIBLE',
       groupUid: input.tipo === 'NORMAL' ? input.groupUid : null,
       cantidadPorPorcion: hasQuantityUnit ? input.cantidadPorPorcion : null,
       unidad: hasQuantityUnit ? input.unidad : null,
@@ -174,6 +176,11 @@ export default function FoodRuleForm({
 
         </>
       )}
+
+      {hasQuantityUnit && <label>
+        <input type="checkbox" checked={!!input.countsFlexible} onChange={e => setInput({ ...input, countsFlexible: e.target.checked })} />
+        También cuenta como comida flexible
+      </label>}
 
       {hasQuantityUnit && (
         <>

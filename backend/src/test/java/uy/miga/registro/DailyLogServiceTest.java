@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
@@ -41,6 +42,32 @@ class DailyLogServiceTest {
         when(plans.getPlanIdForDate(1L, today)).thenReturn(20L);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void togglesGroupedOccurrenceAndRemembersEquivalentCompound(boolean flexible) {
+        var occurrence = java.util.UUID.randomUUID();
+        var first = new FoodEntryFacade.EntryData(3L, 10L, "sandwich", 1.0, "u", 7L, false, null,
+            "USUARIO", false, BigDecimal.ONE, today, "sandwich", null, occurrence, "COMPUESTO", "USUARIO", false, null, !flexible);
+        var second = new FoodEntryFacade.EntryData(4L, 10L, "sandwich", 1.0, "u", 8L, false, null,
+            "USUARIO", false, BigDecimal.valueOf(2), today, "sandwich", null, occurrence, "COMPUESTO", "USUARIO", false, null, !flexible);
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(first);
+        when(entries.findEntryByIdAndUserId(4L, 1L)).thenReturn(second);
+        when(entries.occurrence(3L)).thenReturn(List.of(first, second));
+        when(plans.getMealIds(20L)).thenReturn(List.of(10L));
+        var result = service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, true, flexible));
+        assertThat(result.replacedItemIds()).containsExactly(3L, 4L);
+        assertThat(result.items()).hasSize(2);
+        verify(entries).setCountsFlexible(List.of(3L, 4L), flexible);
+        verify(entries, never()).makeFlexible(any());
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+        assertThat(input.getValue().type()).isEqualTo("COMPUESTO");
+        assertThat(input.getValue().countsFlexible()).isEqualTo(flexible);
+        assertThat(input.getValue().components()).hasSize(2);
+    }
+
     @Test
     void dayAndWeekUseFlexibleStatusWithoutAnyHabitConfiguration() {
         var entry = new FoodEntryFacade.EntryData(1L, 10L, "pizza", 1.0, "u", null, false, null,
@@ -53,11 +80,30 @@ class DailyLogServiceTest {
         assertThat(dayMeal.status()).isEqualTo("FLEXIBLE");
         assertThat(weekMeal.status()).isEqualTo(dayMeal.status());
         assertThat(weekMeal.planned()).isFalse();
-        assertThat(weekMeal.flexibleCount()).isZero();
+        assertThat(weekMeal.flexibleCount()).isEqualTo(1);
     }
 
     @Test
-    void legacyFlexibleNotesUseTheSameFallbackForDayAndWeek() {
+    void weekCountsDistinctFlexibleOccurrencesAndLegacyRowsSeparately() {
+        var occurrence = java.util.UUID.randomUUID();
+        var otherOccurrence = java.util.UUID.randomUUID();
+        var occurrences = java.util.Arrays.asList(occurrence, occurrence, otherOccurrence, null, null);
+        var items = new java.util.ArrayList<FoodEntryFacade.EntryData>();
+        for (int index = 0; index < occurrences.size(); index++) {
+            items.add(new FoodEntryFacade.EntryData((long) index + 1, 10L, "pizza", 1.0, "u", null,
+                false, null, "USUARIO", false, null, today, "pizza", null, occurrences.get(index),
+                index < 2 ? "COMPUESTO" : "FLEXIBLE", "USUARIO", false, null, true));
+        }
+        when(entries.findByUserIdAndDate(1L, today)).thenReturn(items);
+        var plan = plans.getReadData(20L);
+        when(plans.getPlansForRange(1L, today, today)).thenReturn(java.util.Map.of(today, plan));
+
+        assertThat(service.getWeekMeals("user", today).getFirst().flexibleCount()).isEqualTo(4);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void legacyFlexibleNotesUseTheSameFallbackForDayAndWeek(boolean grouped) {
         var interpreter = mock(InterpreterService.class);
         var log = DailyLogTestServices.create(notes, interpreter, mock(ComparisonService.class), entries,
             plans, rules, users, java.time.Clock.systemUTC());
@@ -69,9 +115,12 @@ class DailyLogServiceTest {
         note.setText("pizza");
         when(notes.findByUserIdAndDate(1L, today)).thenReturn(List.of(note));
         when(notes.findByUserIdAndDateBetween(1L, today, today)).thenReturn(List.of(note));
+        when(rules.findApplicable(20L, 1L)).thenReturn(List.of(new uy.miga.reglas.FoodRuleDto(
+            5L, "PLAN", 20L, null, "pizza", List.of(), "NORMAL", null, 7L, null,
+            null, null, BigDecimal.ONE, null, null, false, grouped)));
         when(interpreter.interpret(eq("pizza"), anyList())).thenReturn(List.of(new InterpretedItem(
             "pizza", "pizza", BigDecimal.ONE, "u", null, null, BigDecimal.ZERO, "Flexible", false,
-            5L, null, "FLEXIBLE")));
+            5L, null, grouped ? "NORMAL" : "FLEXIBLE")));
         var plan = plans.getReadData(20L);
         when(plans.getPlansForRange(1L, today, today)).thenReturn(java.util.Map.of(today, plan));
         assertThat(log.getDayLog("user", today).meals().getFirst().status()).isEqualTo("FLEXIBLE");
@@ -163,6 +212,21 @@ class DailyLogServiceTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"MENTION", "UNKNOWN"})
+    void patchRejectsMentionsWithoutRuleTypeBeforeWriting(String origin) {
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 10L, "alimento", 1.0, "u", null, false, null, origin, false,
+            null, today, "alimento", null, null, null, null, false, null));
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, false, true)))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatusCode().value()).isEqualTo(400));
+        verify(entries, never()).makeFlexible(any());
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        verifyNoInteractions(rules);
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void respuestaAlwaysLocksAndRejectsStaleMeal(boolean consumed) {
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
@@ -238,6 +302,98 @@ class DailyLogServiceTest {
         when(plans.getReadData(20L)).thenReturn(new uy.miga.plans.PlanReadData(20L, today, null,
             "PORCIONES", BigDecimal.ZERO, List.of(), List.of(
                 new uy.miga.plans.PlanReadData.MealData(11L, "Almuerzo", List.of()))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void flexibleCorrectionUsesPublicRuleApiOnlyWhenRemembered(boolean remember) {
+        entryWithPortions(null);
+        when(entries.makeFlexible(3L)).thenReturn(List.of(3L, 4L, 5L));
+        var result = service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, remember, true));
+        assertThat(result.replacedItemIds()).containsExactly(3L, 4L, 5L);
+        verify(entries).makeFlexible(3L);
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        if (remember) {
+            ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
+            verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+            assertThat(input.getValue().type()).isEqualTo("FLEXIBLE");
+            assertThat(input.getValue().foodGroupId()).isNull();
+            assertThat(input.getValue().components()).isEmpty();
+            verify(plans).bumpVersion(20L);
+        } else {
+            verifyNoInteractions(rules);
+            verify(plans, never()).bumpVersion(any());
+        }
+    }
+
+    @Test
+    void returningFromFlexibleReplacesEverySiblingId() {
+        entryWithPortions(null);
+        when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
+            7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", 2.0, "u", null, false, null, "USUARIO", false,
+            null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+        when(entries.collapseOccurrence(3L)).thenReturn(List.of(3L, 4L, 5L));
+
+        var result = service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, 7L, BigDecimal.ONE, null, false));
+
+        assertThat(result.replacedItemIds()).containsExactly(3L, 4L, 5L);
+        var order = inOrder(entries);
+        order.verify(entries).collapseOccurrence(3L);
+        order.verify(entries).correctEntry(3L, 2.0, null, 7L, BigDecimal.ONE);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void returningFromFlexibleRequiresExplicitPositivePortions(boolean zero) {
+        entryWithPortions(null);
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", 1.0, null, null, false, null, "USUARIO", false,
+            null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, 7L, zero ? BigDecimal.ZERO : null, null, false)))
+            .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                assertThat(exception.getStatusCode().value()).isEqualTo(400);
+                assertThat(exception.getReason()).isEqualTo("Indicá porciones mayores a cero para volver a un grupo.");
+            });
+        verify(entries, never()).collapseOccurrence(any());
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"1,NULL,3", "2,NULL,1.5", "1,porción,3", "2,porciones,1.5", "7,porciones,0.429"}, nullValues = "NULL")
+    void correctionWithoutRealMeasureSavesDefaultPortionsPerParsedQuantity(int quantity, String unit, BigDecimal expectedDefault) {
+        entryWithPortions(null);
+        when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
+            7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", 12.0, unit, null, false, null, "USUARIO", false,
+            null, today, quantity == 1 ? "yogur" : quantity + " yogur", "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+        when(entries.collapseOccurrence(3L)).thenReturn(List.of(3L));
+
+        service.patchItem("user", today, 3L, new PatchItemRequest(null, null, 7L, new BigDecimal("3"), null, true));
+
+        var input = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+        assertThat(input.getValue().type()).isEqualTo("NORMAL");
+        assertThat(input.getValue().foodGroupId()).isEqualTo(7L);
+        assertThat(input.getValue().amountPerPortion()).isNull();
+        assertThat(input.getValue().unit()).isNull();
+        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo(expectedDefault);
+    }
+
+    @Test
+    void flexibleCorrectionRejectsSimultaneousGroupBeforeWriting() {
+        entryWithPortions(BigDecimal.ONE);
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, 7L, BigDecimal.ONE, null, true, true)))
+            .isInstanceOf(ResponseStatusException.class);
+        verify(entries, never()).makeFlexible(any());
+        verifyNoInteractions(rules);
     }
 
     @Test

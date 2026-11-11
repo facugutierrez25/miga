@@ -125,7 +125,7 @@ test('al guardar dice qué faltó y suma lo anotado al día', async () => {
   mockSaveNote.mockResolvedValue({
     status: 'CASI' as const, noteId: 1, version: 0, text: 'un huevo', date: '2025-01-01', mealId: 1, items: [],
     entries: [{ id: 7, food: 'huevo', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE,
-      uncertain: false, originalText: 'un huevo', appliedRule: null, occurrenceId: null }],
+      countsFlexible: false, uncertain: false, originalText: 'un huevo', appliedRule: null, occurrenceId: null }],
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 1, status: 'CASI' }],
   })
   renderToday()
@@ -160,9 +160,9 @@ test('al guardar suma al día también los grupos que esa comida no tenía previ
     status: 'EN_PLAN' as const, noteId: 1, version: 0, text: 'pollo y una manzana', date: '2025-01-01', mealId: 2, items: [],
     entries: [
       { id: 8, food: 'pollo', quantity: 1, unit: 'u', foodGroupId: 1, portions: 2, origin: ItemOrigin.RULE,
-        uncertain: false, originalText: 'pollo', appliedRule: null, occurrenceId: null },
+        countsFlexible: false, uncertain: false, originalText: 'pollo', appliedRule: null, occurrenceId: null },
       { id: 9, food: 'manzana', quantity: 1, unit: 'u', foodGroupId: 2, portions: 1, origin: ItemOrigin.RULE,
-        uncertain: false, originalText: 'manzana', appliedRule: null, occurrenceId: null },
+        countsFlexible: false, uncertain: false, originalText: 'manzana', appliedRule: null, occurrenceId: null },
     ],
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN' }],
   })

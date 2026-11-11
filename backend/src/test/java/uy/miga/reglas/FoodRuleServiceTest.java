@@ -10,7 +10,8 @@ import static org.mockito.Mockito.*;
 
 class FoodRuleServiceTest {
     final FoodRuleRepository repository = mock(FoodRuleRepository.class);
-    final FoodRuleService service = new FoodRuleService(repository);
+    final org.springframework.context.ApplicationEventPublisher events = mock(org.springframework.context.ApplicationEventPublisher.class);
+    final FoodRuleService service = new FoodRuleService(repository, events);
     FoodRule rule(String scope, String name) {
         FoodRule r = new FoodRule(); r.setScope(scope); r.setFood(name); r.setType("NORMAL"); r.setDefaultPortions(BigDecimal.ONE); return r;
     }
@@ -60,6 +61,7 @@ class FoodRuleServiceTest {
         when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("arbol", List.of(), "NORMAL",
             7L, BigDecimal.valueOf(2), "u", BigDecimal.ONE, List.of(), null));
+        verify(events).publishEvent(new UserRuleReused(2L, uid));
         assertThat(result.uid()).isEqualTo(uid);
         assertThat(result.overridesRuleUid()).isEqualTo(override);
         assertThat(result.amountPerPortion()).isEqualByComparingTo("2");
@@ -71,6 +73,7 @@ class FoodRuleServiceTest {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("Nuevo", null, "LIBRE",
             null, null, null, null, List.of(), null));
+        verifyNoInteractions(events);
         assertThat(result.food()).isEqualTo("Nuevo");
         assertThat(result.synonyms()).isEmpty();
         FoodRule persisted = rule("PLAN", "Sin alias");
@@ -109,6 +112,8 @@ class FoodRuleServiceTest {
                 exception -> assertThat(exception.getStatusCode().value()).isEqualTo(409));
         assertThat(second.getFood()).isEqualTo("Otro");
         assertThat(service.updateUserRule(2L, 1L, first.getUid(), input).food()).isEqualTo("ARBOL");
+        verify(events).publishEvent(new UserRuleReused(2L, first.getUid()));
+        verify(events, never()).publishEvent(new UserRuleReused(2L, second.getUid()));
     }
 
 
@@ -207,6 +212,49 @@ class FoodRuleServiceTest {
                 .isInstanceOf(InvalidRuleException.class).hasMessageContaining("cantidad positiva y unidad juntas");
         }
         verify(repository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void explicitCreationRejectsDuplicatesAndImplicitUpsertPreservesUid(boolean legacy) {
+        List<FoodRule> stored = new ArrayList<>();
+        when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenAnswer(invocation -> stored);
+        when(repository.save(any())).thenAnswer(invocation -> {
+            FoodRule saved = invocation.getArgument(0);
+            stored.add(saved);
+            return saved;
+        });
+        FoodRuleDto first;
+        Runnable duplicate;
+        if (legacy) {
+            first = service.createUserRule(2L, 1L, 3L, "Árbol", List.of(), BigDecimal.ONE, "u", null);
+            duplicate = () -> service.createUserRule(2L, 1L, 7L, " ARBOL ", List.of(), BigDecimal.TEN, "g", null);
+        } else {
+            first = service.createUserRule(2L, 1L, new RuleInput("Árbol", List.of(), "NORMAL", 3L,
+                BigDecimal.ONE, "u", null, List.of(), null));
+            duplicate = () -> service.createUserRule(2L, 1L, new RuleInput(" ARBOL ", List.of(), "NORMAL", 7L,
+                BigDecimal.TEN, "g", null, List.of(), null));
+        }
+        assertThatThrownBy(duplicate::run)
+            .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, exception -> {
+                assertThat(exception.getStatusCode().value()).isEqualTo(409);
+                assertThat(exception.getReason())
+                    .isEqualTo("Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
+            });
+        assertThat(stored).hasSize(1);
+        assertThat(stored.getFirst().getUid()).isEqualTo(first.uid());
+        assertThat(stored.getFirst().getFood()).isEqualTo("Árbol");
+        assertThat(stored.getFirst().getFoodGroupId()).isEqualTo(3L);
+        assertThat(stored.getFirst().getAmountPerPortion()).isEqualByComparingTo(BigDecimal.ONE);
+
+        FoodRuleDto second = service.upsertUserRule(2L, 1L, new RuleInput(" ARBOL ", List.of(), "NORMAL", 7L,
+            BigDecimal.TEN, "g", null, List.of(), null));
+        assertThat(stored).hasSize(1);
+        assertThat(second.uid()).isEqualTo(first.uid());
+        assertThat(second.foodGroupId()).isEqualTo(7L);
+        assertThat(second.amountPerPortion()).isEqualByComparingTo(BigDecimal.TEN);
+        verify(repository, times(3)).lockUserRules(2L, 1L);
+        verify(repository, times(1)).save(any());
     }
 
 }

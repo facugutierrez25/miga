@@ -5,6 +5,7 @@ interface Props {
   rows: GroupPortionRow[]
   onChange: (rows: GroupPortionRow[]) => void
   variant: 'split' | 'resolve'
+  portionButtons?: boolean
   labels: {
     group: (index: number) => string
     portions: (index: number) => string
@@ -15,7 +16,7 @@ interface Props {
   }
 }
 
-export function GroupPortionsEditor({ groups, rows, onChange, variant, labels }: Props) {
+export function GroupPortionsEditor({ groups, rows, onChange, variant, portionButtons = false, labels }: Props) {
   const resolving = variant === 'resolve'
   function update(index: number, patch: Partial<GroupPortionRow>) {
     onChange(rows.map((row, i) => i === index ? { ...row, ...patch } : row))
@@ -30,11 +31,16 @@ export function GroupPortionsEditor({ groups, rows, onChange, variant, labels }:
             disabled={resolving ? rows.some((value, i) => i !== index && value.foodGroupId === id) : undefined}>{group.name}</option>)}
         </select>
       </label>
+      {portionButtons && <button type="button" className="paso" aria-label={`Menos ${labels.portions(index).toLowerCase()}`}
+        disabled={Number(row.portions) <= 0.5}
+        onClick={() => update(index, { portions: String(Math.max(0.5, Number(row.portions) - 0.5)) })}>−</button>}
       <label>
         {resolving ? labels.portions(index) : <span className="sr-only">{labels.portions(index)}</span>}
         <input type="number" step="0.5" min="0.5" value={row.portions}
           onChange={event => update(index, { portions: event.target.value })} />
       </label>
+      {portionButtons && <button type="button" className="paso" aria-label={`Más ${labels.portions(index).toLowerCase()}`}
+        onClick={() => update(index, { portions: String(Number(row.portions) + 0.5) })}>+</button>}
       {rows.length > (resolving ? 1 : 2) && <button type="button" aria-label={labels.removeGroup(index)}
         onClick={() => onChange(rows.filter((_, i) => i !== index))}>{labels.remove}</button>}
     </div>)}

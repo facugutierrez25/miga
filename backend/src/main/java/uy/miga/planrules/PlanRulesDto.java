@@ -11,7 +11,7 @@ record PlanRulesDto(Long planId, Long planVersion, @JsonProperty("modoRegistro")
     record ComponentDto(UUID groupUid, @JsonProperty("porciones") double portions) {}
     record RuleDto(UUID uid, @JsonProperty("alcance") String scope, @JsonProperty("alimento") String food, @JsonProperty("sinonimos") List<String> synonyms, @JsonProperty("tipo") String type, UUID groupUid,
         @JsonProperty("cantidadPorPorcion") BigDecimal amountPerPortion, @JsonProperty("unidad") String unit, @JsonProperty("porcionPorDefecto") BigDecimal defaultPortions, @JsonProperty("componentes") List<ComponentDto> components,
-        UUID overridesRuleUid, @JsonProperty("textoRegla") String ruleText) {}
+        UUID overridesRuleUid, @JsonProperty("textoRegla") String ruleText, boolean countsFlexible) {}
     record CatalogDto(UUID uid, @JsonProperty("alcance") String scope, @JsonProperty("alimento") String food, @JsonProperty("sinonimos") List<String> synonyms, @JsonProperty("tipo") String type,
         UUID groupUid, @JsonProperty("textoRegla") String ruleText, @JsonProperty("ajustadoPorUid") UUID adjustedByUid) {}
 }
