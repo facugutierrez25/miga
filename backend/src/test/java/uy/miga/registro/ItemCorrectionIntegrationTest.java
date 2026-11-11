@@ -473,6 +473,38 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         }
     }
 
+    @Test
+    void measurelessNormalFoodKeepsItsParsedCountWhenCorrectedThroughFlexible() throws Exception {
+        createUniqueUserPlan();
+        JsonNode rules = planRules();
+        JsonNode group = rules.path("grupos").get(0);
+        long groupId = group.path("id").asLong();
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "pizza", "tipo", "NORMAL",
+                "groupUid", group.path("uid").asText(), "porcionPorDefecto", 2))))
+            .andExpect(status().isCreated());
+        String date = LocalDate.now().toString();
+        JsonNode original = putNote(date, "pizza").path("entries").get(0);
+        assertThat(original.path("quantity").decimalValue()).isEqualByComparingTo("2");
+        assertThat(original.path("portions").decimalValue()).isEqualByComparingTo("2");
+        assertThat(original.path("unit").asText()).isEqualTo("porciones");
+        long id = original.path("id").asLong();
+        patchItem(date, id, "{\"flexible\":true}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"));
+        patchItem(date, id, "{\"foodGroupId\":" + groupId + ",\"portions\":3,\"saveAsRule\":true}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"))
+            .andExpect(jsonPath("$.items[0].portions").value(3));
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "pizza").path("entries").get(0);
+        assertThat(next.path("foodGroupId").asLong()).isEqualTo(groupId);
+        assertThat(next.path("ruleSource").asText()).isEqualTo("USUARIO");
+        assertThat(next.path("portions").decimalValue()).isEqualByComparingTo("3");
+    }
+
     @ParameterizedTest
     @CsvSource({"pizza,2,2", "2 pizza,3,1.5"})
     void recognizedFlexibleWithoutMeasureRemembersPortionsPerParsedQuantity(
