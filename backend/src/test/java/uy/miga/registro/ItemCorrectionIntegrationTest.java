@@ -451,6 +451,11 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             assertThat(weekDay.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
         });
         long proteinId = groupId("Proteínas");
+        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + "}")
+            .andExpect(status().isBadRequest());
+        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + ",\"portions\":0}")
+            .andExpect(status().isBadRequest());
+        assertThat(getDay(date).path("meals").get(0).path("status").asText()).isEqualTo("FLEXIBLE");
         patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + ",\"portions\":2}")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.replacedItemIds[0]").value(selectedId))
@@ -464,6 +469,28 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             assertThat(group.path("totalRecorded").asDouble())
                 .isEqualTo(group.path("foodGroupId").asLong() == proteinId ? 2 : 0);
         }
+    }
+
+    @Test
+    void unitlessFlexibleEntryCanReturnToAGroupAndSaveAMeasurelessRule() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode unknown = putNote(date, "zqxsinunidad").path("entries").get(0);
+        assertThat(unknown.path("unit").isNull()).isTrue();
+        JsonNode flexible = resolve(date, unknown.path("id").asLong(), "{\"kind\":\"FLEXIBLE\",\"remember\":false}")
+            .path("items").get(0);
+        assertThat(flexible.path("unit").isNull()).isTrue();
+        long groupId = groupId("Proteínas");
+        patchItem(date, flexible.path("id").asLong(),
+            "{\"foodGroupId\":" + groupId + ",\"portions\":2,\"saveAsRule\":true}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"))
+            .andExpect(jsonPath("$.items[0].portions").value(2));
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "zqxsinunidad").path("entries").get(0);
+        assertThat(next.path("ruleType").asText()).isEqualTo("NORMAL");
+        assertThat(next.path("ruleSource").asText()).isEqualTo("USUARIO");
+        assertThat(next.path("foodGroupId").asLong()).isEqualTo(groupId);
+        assertThat(next.path("portions").decimalValue()).isEqualByComparingTo("2");
     }
 
     @Test

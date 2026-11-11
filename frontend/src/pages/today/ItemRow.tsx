@@ -146,7 +146,8 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       {splitting && (
         <fieldset className="nota-reparto">
           <legend>Repartir {item.food} en grupos</legend>
-          <GroupPortionsEditor groups={groupsMap} rows={splitRows} onChange={setSplitRows} variant="split" labels={{
+          <GroupPortionsEditor groups={groupsMap} rows={splitRows} onChange={setSplitRows} variant="split"
+            portionButtons={flexible && splitRows.length === 1} labels={{
             group: index => `Grupo ${index + 1}`, portions: index => `Porciones del grupo ${index + 1}`,
             remove: '✕', removeGroup: index => `Quitar grupo ${index + 1}`,
             add: '+ Agregar grupo', placeholder: 'Elegí un grupo',
