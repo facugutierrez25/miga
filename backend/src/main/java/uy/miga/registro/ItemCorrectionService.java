@@ -258,10 +258,12 @@ class ItemCorrectionService {
         }
         var first = groups.entrySet().iterator().next();
         boolean compound = groups.size() > 1;
+        // Con medida, el compuesto guarda la cantidad anotada y las porciones enteras para no perder precisión.
+        BigDecimal componentDivisor = unit != null ? BigDecimal.ONE : quantity;
         var components = compound ? groups.entrySet().stream().map(g -> new RuleComponent(g.getKey(), null,
-            g.getValue().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue())).toList() : List.<RuleComponent>of();
+            g.getValue().divide(componentDivisor, 3, RoundingMode.HALF_UP).doubleValue())).toList() : List.<RuleComponent>of();
         ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), compound ? "COMPUESTO" : "NORMAL",
-            compound ? null : first.getKey(), unit == null ? null : compound ? BigDecimal.ONE : quantity.divide(first.getValue(), 3, RoundingMode.HALF_UP),
+            compound ? null : first.getKey(), unit == null ? null : compound ? quantity : quantity.divide(first.getValue(), 3, RoundingMode.HALF_UP),
             unit, compound || unit != null ? BigDecimal.ONE : first.getValue().divide(quantity, 3, RoundingMode.HALF_UP),
             components, null, flexible));
     }
