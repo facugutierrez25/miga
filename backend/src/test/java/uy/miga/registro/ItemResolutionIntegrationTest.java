@@ -143,9 +143,24 @@ class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
             {"kind":"GROUPS","groups":[{"foodGroupId":%d,"portions":2}],"remember":true}
             """.formatted(group));
         assertThat(result.path("undo").path("ruleUid").isNull()).isTrue();
-        assertThat(planRules()).isEqualTo(before);
+        JsonNode updated = planRules();
+        assertThat(updated.path("alimentos")).hasSize(1);
+        assertThat(updated.path("alimentos").get(0).path("uid"))
+            .isEqualTo(before.path("alimentos").get(0).path("uid"));
+        assertThat(updated.path("alimentos").get(0).path("tipo").asText()).isEqualTo("NORMAL");
+        assertThat(updated.path("planVersion").asLong()).isGreaterThan(before.path("planVersion").asLong());
+        JsonNode restored = undo(date, result.path("undo"));
+        assertThat(planRules()).isEqualTo(updated);
+        result = resolve(date, restored.path("items").get(0).path("id").asLong(),
+            "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        assertThat(result.path("undo").path("ruleUid").isNull()).isTrue();
+        JsonNode repeated = planRules();
+        assertThat(repeated.path("alimentos")).hasSize(1);
+        assertThat(repeated.path("alimentos").get(0).path("uid"))
+            .isEqualTo(before.path("alimentos").get(0).path("uid"));
+        assertThat(repeated.path("alimentos").get(0).path("tipo").asText()).isEqualTo("FLEXIBLE");
         undo(date, result.path("undo"));
-        assertThat(planRules()).isEqualTo(before);
+        assertThat(planRules()).isEqualTo(repeated);
     }
 
     @Test
