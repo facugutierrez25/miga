@@ -51,6 +51,8 @@ interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
                            @Param("date") LocalDate date,
                            @Param("mealId") Long mealId);
 
+    List<FoodEntry> findByUserIdAndResolvedRuleUid(Long userId, java.util.UUID resolvedRuleUid);
+
     List<FoodEntry> findByFoodGroupId(Long foodGroupId);
 
     List<FoodEntry> findByMealNoteIdOrderByIdAsc(Long mealNoteId);

@@ -528,13 +528,16 @@ class PlanRulesIntegrationTest {
     @Test
     void nullSynonymsAndNormalizedDuplicateFoodContract() throws Exception {
         long planId = state.path("planId").asLong();
-        jdbc.update("insert into food_rules(plan_id,user_id,alcance,alimento,sinonimos,tipo) select id,user_id,'USUARIO','Árbol',NULL,'LIBRE' from plans where id=?", planId);
+        state = request(post(BASE + "alimentos"), body(Map.of("alimento", "Árbol", "tipo", "LIBRE")), 201);
+        jdbc.update("update food_rules set sinonimos = NULL where plan_id = ? and alcance = 'USUARIO'", planId);
         state = request(get(BASE + "reglas"), null, 200);
         assertThat(state.path("alimentos").get(0).path("sinonimos").isArray()).isTrue();
         assertThat(state.path("alimentos").get(0).path("sinonimos").size()).isZero();
-        JsonNode error = request(post(BASE + "alimentos"), body(Map.of("alimento", "  ARBOL  ", "tipo", "LIBRE")), 409);
+        JsonNode before = state.deepCopy();
+        JsonNode error = request(post(BASE + "alimentos"), body(Map.of("alimento", "  ARBOL  ", "tipo", "FLEXIBLE")), 409);
         assertThat(error.path("code").asText()).isEqualTo("DUPLICATE");
         assertThat(error.path("error").asText()).isEqualTo("Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
+        assertThat(request(get(BASE + "reglas"), null, 200)).isEqualTo(before);
         UUID uid = UUID.randomUUID();
         jdbc.update("insert into food_rules(uid,alcance,alimento,sinonimos,tipo) values (?,'GLOBAL','Catalogo nulo',NULL,'LIBRE')", uid);
         JsonNode catalog = request(get(BASE + "catalogo").param("q", "Catalogo nulo"), null, 200);
