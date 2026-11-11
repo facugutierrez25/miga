@@ -2,6 +2,8 @@ package uy.miga.intake;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -139,17 +141,58 @@ public class FoodEntryFacade {
         });
     }
 
+    @Transactional
+    public List<Long> makeFlexible(Long id) {
+        FoodEntry entry = repository.findById(id).orElseThrow();
+        List<Long> replacedIds = collapseOccurrence(entry);
+        entry.setFoodGroupId(null);
+        entry.setPortions(null);
+        entry.setRuleType("FLEXIBLE");
+        entry.setRuleSource(EntryOrigin.USER);
+        entry.setOrigin(EntryOrigin.USER);
+        entry.setAppliedRule(entry.getFood() + ": cuenta como comida flexible");
+        entry.setEstimated(false);
+        return replacedIds;
+    }
+
+    @Transactional
+    public List<Long> collapseOccurrence(Long id) {
+        return collapseOccurrence(repository.findById(id).orElseThrow());
+    }
+
+    private List<Long> collapseOccurrence(FoodEntry entry) {
+        rejectAmbiguousLegacyOccurrence(entry);
+        if (entry.getOccurrenceId() == null) return List.of(entry.getId());
+        var siblings = repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
+            entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId());
+        List<Long> replacedIds = siblings.stream().map(FoodEntry::getId).toList();
+        repository.deleteAll(siblings.stream().filter(sibling -> !sibling.getId().equals(entry.getId())).toList());
+        return replacedIds;
+    }
+
+    private void rejectAmbiguousLegacyOccurrence(FoodEntry entry) {
+        if (entry.getOccurrenceId() == null && entry.getMealNoteId() != null
+                && repository.existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
+                    entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getMealNoteId(),
+                    entry.getFood(), entry.getOriginalText(), entry.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Este alimento se anotó en una versión anterior; editá la nota para corregirlo");
+        }
+    }
+
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {
         FoodEntry source = repository.findById(id).orElseThrow();
+        rejectAmbiguousLegacyOccurrence(source);
+        UUID occurrenceId = source.getOccurrenceId() != null ? source.getOccurrenceId() : UUID.randomUUID();
         List<Long> ids = new ArrayList<>();
         portionsByGroup.forEach((groupId, portions) -> {
             FoodEntry entry = new FoodEntry(source.getUserId(), source.getUserEmail(), source.getMealId(),
                 source.getDate(), source.getFood(), source.getQuantity(), source.getUnit(), groupId);
             entry.setMealNoteId(source.getMealNoteId());
             entry.setOriginalText(source.getOriginalText());
-            entry.setOccurrenceId(source.getOccurrenceId());
+            entry.setOccurrenceId(occurrenceId);
             entry.setConsumed(source.isConsumed());
             entry.setOrigin(EntryOrigin.USER);
             entry.setRuleType("COMPUESTO");

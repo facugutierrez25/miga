@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -17,6 +19,7 @@ import org.springframework.web.context.WebApplicationContext;
 import uy.miga.users.EmailOutboxWorker;
 import uy.miga.users.MockEmailService;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -28,6 +31,7 @@ class IntakeIntegrationTest {
     @Autowired private FilterChainProxy springSecurityFilterChain;
     @Autowired private MockEmailService mockEmailService;
     @Autowired private EmailOutboxWorker outboxWorker;
+    @Autowired private FoodEntryRepository repository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private MockMvc mockMvc;
@@ -88,6 +92,94 @@ class IntakeIntegrationTest {
             if ("CER".equals(abbr)) cerGroupId = g.get("id").asLong();
             if ("FRU".equals(abbr)) fruGroupId = g.get("id").asLong();
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FLEXIBLE", "GROUP", "SPLIT"})
+    void legacyCompoundWithoutOccurrenceRejectsCorrectionsWithoutChangingCounts(String correctionKind) throws Exception {
+        boolean alreadyFlexible = "GROUP".equals(correctionKind);
+        String date = java.time.LocalDate.now().toString();
+        JsonNode note = objectMapper.readTree(mockMvc.perform(put("/api/v1/registro/" + date + "/comidas/" + mealId + "/nota")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"zqxlegacy\"}")).andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString());
+        long noteId = note.path("noteId").asLong();
+        var initial = repository.findByMealNoteIdOrderByIdAsc(noteId);
+        FoodEntry source = initial.getFirst();
+        repository.deleteAll(initial);
+        var siblings = new java.util.ArrayList<FoodEntry>();
+        for (long groupId : java.util.List.of(proGroupId, cerGroupId, fruGroupId)) {
+            var entry = new FoodEntry(source.getUserId(), source.getUserEmail(), mealId,
+                java.time.LocalDate.parse(date), "Sticks de pollo", 1.0, "u", groupId);
+            entry.setMealNoteId(noteId);
+            entry.setOriginalText("Sticks de pollo");
+            entry.setRuleType("COMPUESTO");
+            entry.setRuleSource("USUARIO");
+            entry.setOrigin(EntryOrigin.USER);
+            entry.setPortions(java.math.BigDecimal.ONE);
+            siblings.add(entry);
+        }
+        FoodEntry selected = siblings.getFirst();
+        if (alreadyFlexible) {
+            selected.setRuleType("FLEXIBLE");
+            selected.setFoodGroupId(null);
+            selected.setPortions(null);
+        }
+        repository.saveAllAndFlush(siblings);
+        long expectedFlexibleCount = alreadyFlexible ? 1 : 0;
+        assertWeekFlexibleCount(date, expectedFlexibleCount);
+        JsonNode totalsBefore = objectMapper.readTree(mockMvc.perform(get("/api/v1/registro/" + date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("summary");
+        String correction = switch (correctionKind) {
+            case "GROUP" -> "{\"foodGroupId\":" + proGroupId + ",\"portions\":2}";
+            case "SPLIT" -> objectMapper.writeValueAsString(java.util.Map.of("grupos", java.util.List.of(
+                java.util.Map.of("foodGroupId", proGroupId, "porciones", 2),
+                java.util.Map.of("foodGroupId", cerGroupId, "porciones", 2))));
+            default -> "{\"flexible\":true}";
+        };
+
+        mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + selected.getId())
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content(correction))
+            .andExpect(status().isConflict())
+            .andExpect(result -> assertThat(result.getResolvedException())
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, exception ->
+                    assertThat(exception.getReason()).isEqualTo(
+                        "Este alimento se anotó en una versión anterior; editá la nota para corregirlo")));
+
+        var reloaded = repository.findByMealNoteIdOrderByIdAsc(noteId);
+        assertThat(reloaded).hasSize(3);
+        for (int index = 0; index < siblings.size(); index++) {
+            FoodEntry expected = siblings.get(index);
+            FoodEntry actual = reloaded.get(index);
+            assertThat(actual.getId()).isEqualTo(expected.getId());
+            assertThat(actual.getFoodGroupId()).isEqualTo(expected.getFoodGroupId());
+            assertThat(actual.getRuleType()).isEqualTo(expected.getRuleType());
+            assertThat(actual.getOccurrenceId()).isNull();
+            if (expected.getPortions() == null) assertThat(actual.getPortions()).isNull();
+            else assertThat(actual.getPortions()).isEqualByComparingTo(expected.getPortions());
+        }
+        JsonNode totalsAfter = objectMapper.readTree(mockMvc.perform(get("/api/v1/registro/" + date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("summary");
+        assertThat(totalsAfter).hasSize(totalsBefore.size());
+        for (int index = 0; index < totalsBefore.size(); index++) {
+            assertThat(totalsAfter.get(index).path("foodGroupId").asLong())
+                .isEqualTo(totalsBefore.get(index).path("foodGroupId").asLong());
+            assertThat(totalsAfter.get(index).path("totalRecorded").decimalValue())
+                .isEqualByComparingTo(totalsBefore.get(index).path("totalRecorded").decimalValue());
+        }
+        assertWeekFlexibleCount(date, expectedFlexibleCount);
+    }
+
+    private void assertWeekFlexibleCount(String date, long expected) throws Exception {
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString());
+        assertThat(week.path("days")).anySatisfy(day -> {
+            assertThat(day.path("date").asText()).isEqualTo(date);
+            assertThat(day.path("meals").get(0).path("flexibleCount").asLong()).isEqualTo(expected);
+        });
     }
 
     @Test
