@@ -77,7 +77,7 @@ class ItemResolutionService {
     }
 
     @Transactional
-    PatchItemResultDto answerFlexible(String email, LocalDate date, Long id, boolean flexible) {
+    PatchItemResultDto answerFlexible(String email, LocalDate date, Long id, boolean answer) {
         Long userId = userService.findUserIdByEmail(email);
         support.lockCurrentPlanIfPresent(userId);
         var entry = entryFacade.findEntryByIdAndUserId(id, userId);
@@ -87,15 +87,20 @@ class ItemResolutionService {
         }
         Long planId = support.entryPlanId(userId, entry);
         var selected = interpreter.findRule(InterpreterService.normalize(entry.food()), ruleService.findApplicable(planId, userId));
-        if (selected == null || !"GLOBAL".equals(selected.scope()) || !selected.maybeFlexible()) {
+        if (selected == null || !("USUARIO".equals(selected.scope())
+                || ("GLOBAL".equals(selected.scope()) && selected.maybeFlexible()))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La clasificación del alimento cambió. Recargá el día.");
         }
+        // Si ya hay una regla propia (respuesta dada en otra nota), manda esa regla.
+        boolean flexible = "USUARIO".equals(selected.scope()) ? "FLEXIBLE".equals(selected.type()) : answer;
         String type = flexible ? "FLEXIBLE" : selected.type();
-        RuleInput input = resolveRuleInput(entry, flexible ? null : selected, type, Map.of(), planId, planId);
-        if (input == null) throw missingResolveGroup();
-        ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(), type,
-            input.foodGroupId(), input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components(), selected.uid()));
-        planService.bumpVersion(planId);
+        if (!"USUARIO".equals(selected.scope())) {
+            RuleInput input = resolveRuleInput(entry, flexible ? null : selected, type, Map.of(), planId, planId);
+            if (input == null) throw missingResolveGroup();
+            ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(), type,
+                input.foodGroupId(), input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components(), selected.uid()));
+            planService.bumpVersion(planId);
+        }
         var mentions = entryFacade.findByMealNoteId(entry.mealNoteId()).stream()
             .filter(e -> e.food().equals(entry.food()) && "PREGUNTAR".equals(e.ruleType()) && "CATALOGO".equals(e.ruleSource())).toList();
         var replaced = mentions.stream().map(FoodEntryFacade.EntryData::id).toList();

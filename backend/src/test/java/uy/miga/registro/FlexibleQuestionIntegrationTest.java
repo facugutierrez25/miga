@@ -12,6 +12,58 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class FlexibleQuestionIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
+    void yesResolvesBothPreexistingNotesAndCountsBothInWeek() throws Exception {
+        resolvePreexistingNotes(true);
+    }
+
+    @Test
+    void noResolvesBothPreexistingNotesAndKeepsCatalogPortions() throws Exception {
+        resolvePreexistingNotes(false);
+    }
+
+    private void resolvePreexistingNotes(boolean flexible) throws Exception {
+        LocalDate monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        String firstDate = monday.toString();
+        String secondDate = monday.plusDays(1).toString();
+        JsonNode first = putNote(firstDate, "60 g jamón").path("entries").get(0);
+        JsonNode second = putNote(secondDate, "120 g jamón").path("entries").get(0);
+        assertThat(first.path("ruleType").asText()).isEqualTo("PREGUNTAR");
+        assertThat(second.path("ruleType").asText()).isEqualTo("PREGUNTAR");
+
+        JsonNode firstResult = answer(firstDate, first.path("id").asLong(), flexible);
+        JsonNode savedRules = planRules();
+        JsonNode pending = getDay(secondDate).path("meals").get(0).path("items").get(0);
+        assertThat(pending.path("id")).isEqualTo(second.path("id"));
+        assertThat(pending.path("ruleType").asText()).isEqualTo("PREGUNTAR");
+        assertThat(pending.path("ruleSource").asText()).isEqualTo("CATALOGO");
+
+        JsonNode secondResult = answer(secondDate, second.path("id").asLong(), flexible);
+        assertThat(planRules()).isEqualTo(savedRules);
+        String expectedType = flexible ? "FLEXIBLE" : "NORMAL";
+        assertThat(firstResult.path("items").get(0).path("ruleType").asText()).isEqualTo(expectedType);
+        JsonNode resolved = secondResult.path("items").get(0);
+        assertThat(resolved.path("ruleType").asText()).isEqualTo(expectedType);
+        assertThat(resolved.path("ruleSource").asText()).isEqualTo("USUARIO");
+        if (!flexible) {
+            assertThat(resolved.path("foodGroupId")).isEqualTo(second.path("foodGroupId"));
+            assertThat(resolved.path("portions").asDouble()).isEqualTo(2);
+        }
+
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", firstDate)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString());
+        int flexibleCount = 0;
+        for (JsonNode day : week.path("days")) {
+            if (java.util.List.of(firstDate, secondDate).contains(day.path("date").asText())) {
+                int count = day.path("meals").get(0).path("flexibleCount").asInt();
+                assertThat(count).isEqualTo(flexible ? 1 : 0);
+                flexibleCount += count;
+            }
+        }
+        assertThat(flexibleCount).isEqualTo(flexible ? 2 : 0);
+    }
+
+    @Test
     void yesCreatesFlexibleRuleAndCountsInWeek() throws Exception {
         String date = LocalDate.now().toString();
         JsonNode note = putNote(date, "60 g jamón");
