@@ -97,6 +97,7 @@ export interface GroupPortion {
 }
 
 export interface PatchItemRequest {
+  flexible?: boolean
   quantity?: number | null
   unit?: string | null
   foodGroupId?: number | null

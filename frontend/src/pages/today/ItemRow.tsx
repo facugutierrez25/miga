@@ -38,7 +38,9 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const info = item.foodGroupId !== null ? groupsMap[item.foodGroupId] : null
-  const editable = item.id > 0 && !([ItemOrigin.MENTION, ItemOrigin.UNKNOWN] as readonly string[]).includes(item.origin ?? '')
+  const flexible = item.ruleType === 'FLEXIBLE'
+  const recognized = item.foodGroupId !== null || ['LIBRE', 'NO_CUENTA', 'FLEXIBLE'].includes(item.ruleType ?? '')
+  const editable = item.id > 0 && item.origin !== ItemOrigin.UNKNOWN && (item.origin !== ItemOrigin.MENTION || recognized)
 
   const removable = !!onRemove && item.id > 0 && item.origin !== ItemOrigin.ANSWER
   const minimumPortions = removable ? 0 : 0.5
@@ -62,7 +64,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
     const current = item.foodGroupId !== null ? String(item.foodGroupId) : ''
     setSplitRows([
       { foodGroupId: current, portions: String(item.portions ?? 1) },
-      { foodGroupId: '', portions: '1' },
+      ...(!flexible ? [{ foodGroupId: '', portions: '1' }] : []),
     ])
     setSplitting(true)
   }
@@ -72,7 +74,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       onRemove?.()
       return
     }
-    if (!portionsTouched && !saveAsRule) {
+    if (flexible || (!portionsTouched && !saveAsRule)) {
       setEditing(false)
       return
     }
@@ -80,6 +82,10 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
   }
 
   function saveSplit(saveAsRule: boolean) {
+    if (flexible && splitRows.length === 1) {
+      submit({ foodGroupId: Number(splitRows[0].foodGroupId), portions: Number(splitRows[0].portions), saveAsRule })
+      return
+    }
     submit({
       quantity: item.quantity,
       grupos: splitRows.map(r => ({ foodGroupId: Number(r.foodGroupId), porciones: Number(r.portions) })),
@@ -87,7 +93,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
     })
   }
 
-  const validSplit = validGroupPortions(splitRows)
+  const validSplit = validGroupPortions(splitRows, flexible ? groupsMap : undefined)
 
   const dot = info?.token ?? 'var(--muted)'
   const label = info?.name?.trim() || (item.foodGroupId !== null ? 'Grupo del plan' : item.appliedRule ? null : 'Sin grupo en tu plan')
@@ -129,7 +135,8 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       </div>
       {editing && <div className="nota-item__secondary">
         {(portions !== 0 || splitting) && <label className="resolve-remember"><input type="checkbox" checked={saveAsRule} disabled={saving} onChange={event => setSaveAsRule(event.target.checked)} />Usar siempre</label>}
-        <button type="button" aria-expanded={splitting} disabled={saving} onClick={() => splitting ? setSplitting(false) : openSplit()}>Repartir en varios grupos</button>
+        <button type="button" aria-expanded={splitting} disabled={saving} onClick={() => splitting ? setSplitting(false) : openSplit()}>{flexible ? 'No es flexible' : 'Repartir en varios grupos'}</button>
+        {recognized && !flexible && <button type="button" disabled={busy} onClick={() => submit({ flexible: true, saveAsRule })}>Contar como comida flexible</button>}
         {item.foodGroupId === null && removable && <button type="button" className="link" disabled={busy} onClick={onRemove}>Quitar</button>}
       </div>}
       {splitting && (

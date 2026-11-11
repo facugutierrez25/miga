@@ -41,7 +41,7 @@ test.each(['NO_CUENTA', 'LIBRE', 'FLEXIBLE'] as const)('un item %s sin grupo per
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   expect(screen.getByRole('button', { name: 'Listo' })).toBeEnabled()
   expect(screen.queryByRole('button', { name: 'Menos porciones de leche' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Repartir en varios grupos' }))
+  fireEvent.click(screen.getByRole('button', { name: rule === 'FLEXIBLE' ? 'No es flexible' : 'Repartir en varios grupos' }))
   expect(screen.getByRole('group', { name: 'Repartir leche en grupos' })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
   fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
@@ -271,4 +271,43 @@ test('ANSWER conserva el mínimo de media porción', async () => {
   expect(screen.getByLabelText('Porciones de leche')).toHaveTextContent('0,5')
   expect(minus).toBeDisabled()
   expect(recordsApi.removeItem).not.toHaveBeenCalled()
+})
+
+test.each([false, true])('cuenta un alimento reconocido como flexible, usar siempre %s', async remember => {
+  const item = removableItems[0]
+  const onPatched = vi.fn()
+  const result = { status: 'FLEXIBLE' as const, replacedItemIds: [item.id], items: [{ ...item, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }] }
+  vi.mocked(recordsApi.patchItem).mockResolvedValue(result)
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={onPatched} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  if (remember) fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+  const flexible = screen.getByRole('button', { name: 'Contar como comida flexible' })
+  expect(flexible.parentElement).toBe(screen.getByRole('button', { name: 'Repartir en varios grupos' }).parentElement)
+  fireEvent.click(flexible)
+  await waitFor(() => expect(onPatched).toHaveBeenCalledWith(result))
+  expect(recordsApi.patchItem).toHaveBeenLastCalledWith('tok', '2025-01-01', item.id, { flexible: true, saveAsRule: remember })
+})
+
+test('No es flexible permite volver a un solo grupo', async () => {
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
+  const onPatched = vi.fn()
+  vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [item.id], items: [] })
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{ 1: { name: 'Grupo', token: 'red' } }} onPatched={onPatched} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.queryByRole('button', { name: 'Contar como comida flexible' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'No es flexible' }))
+  expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  await waitFor(() => expect(onPatched).toHaveBeenCalled())
+  expect(recordsApi.patchItem).toHaveBeenLastCalledWith('tok', '2025-01-01', item.id, {
+    foodGroupId: 1, portions: 1, saveAsRule: false,
+  })
+})
+
+test.each(['LIBRE', 'NO_CUENTA'] as const)('una mención %s permite contar como flexible', ruleType => {
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType, foodGroupId: null, portions: null }
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.getByRole('button', { name: 'Contar como comida flexible' })).toBeEnabled()
 })
