@@ -308,6 +308,26 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void savingOnlyTheFlexibleMarkKeepsCompoundPortionsExact() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        long id = putNote(date, "200 g leche").path("entries").get(0).path("id").asLong();
+        patchItem(date, id, """
+            {"grupos": [{"foodGroupId": %d, "porciones": 0.5}, {"foodGroupId": %d, "porciones": 0.5}],
+             "saveAsRule": true}
+            """.formatted(groupId("Proteínas"), groupId("Grasas")))
+            .andExpect(status().isOk());
+        long splitId = getDay(date).path("meals").get(0).path("items").get(0).path("id").asLong();
+        patchItem(date, splitId, "{\"flexible\":true,\"saveAsRule\":true}").andExpect(status().isOk());
+        patchItem(date, splitId, "{\"flexible\":false,\"saveAsRule\":true}").andExpect(status().isOk());
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "200 g leche").path("entries");
+        assertThat(next.findValues("portions").stream().map(JsonNode::decimalValue).toList())
+            .allSatisfy(portions -> assertThat(portions).isEqualByComparingTo("0.5"));
+        assertThat(next).hasSize(2);
+    }
+
+    @Test
     void patchItem_rejectsWrongDateForeignGroupAndAmbiguousBody() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();
