@@ -69,10 +69,52 @@ class ItemResolutionService {
                 planService.bumpVersion(currentPlan);
             }
         }
-        List<Long> ids = replaceUnknown(id, userId, email, date, entry, occurrence, groups, type, explanation);
+        List<Long> ids = replaceEntry(id, userId, email, date, entry, occurrence, groups, type, explanation, false);
         entryFacade.markResolved(ids, ruleUid);
         var items = ids.stream().map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList();
         return new ResolveItemResultDto(List.of(id), items, new ResolveItemResultDto.Undo(occurrence, ruleUid),
+            dayReadService.getMealLog(email, date, entry.mealId(), planId).status());
+    }
+
+    @Transactional
+    PatchItemResultDto answerFlexible(String email, LocalDate date, Long id, boolean answer) {
+        Long userId = userService.findUserIdByEmail(email);
+        support.lockCurrentPlanIfPresent(userId);
+        var entry = entryFacade.findEntryByIdAndUserId(id, userId);
+        if (entry == null || !date.equals(entry.date())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!"PREGUNTAR".equals(entry.ruleType()) || !"CATALOGO".equals(entry.ruleSource())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta pregunta ya fue respondida.");
+        }
+        Long planId = support.entryPlanId(userId, entry);
+        var selected = interpreter.findRule(InterpreterService.normalize(entry.food()), ruleService.findApplicable(planId, userId));
+        if (selected == null || !("USUARIO".equals(selected.scope())
+                || ("GLOBAL".equals(selected.scope()) && selected.maybeFlexible()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La clasificación del alimento cambió. Recargá el día.");
+        }
+        // Si ya hay una regla propia (respuesta dada en otra nota), manda esa regla.
+        boolean flexible = "USUARIO".equals(selected.scope()) ? "FLEXIBLE".equals(selected.type()) : answer;
+        String type = flexible ? "FLEXIBLE" : selected.type();
+        if (!"USUARIO".equals(selected.scope())) {
+            RuleInput input = resolveRuleInput(entry, flexible ? null : selected, type, Map.of(), planId, planId);
+            if (input == null) throw missingResolveGroup();
+            ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(), type,
+                input.foodGroupId(), input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components(), selected.uid()));
+            planService.bumpVersion(planId);
+        }
+        var mentions = entryFacade.findByMealNoteId(entry.mealNoteId()).stream()
+            .filter(e -> e.food().equals(entry.food()) && "PREGUNTAR".equals(e.ruleType()) && "CATALOGO".equals(e.ruleSource())).toList();
+        var replaced = mentions.stream().map(FoodEntryFacade.EntryData::id).toList();
+        List<Long> ids = new ArrayList<>();
+        for (var mention : mentions) {
+            Map<Long, BigDecimal> groups = new LinkedHashMap<>();
+            if (!flexible) addSelectedGroups(selected, type, planId,
+                interpreter.computePortions(mention.originalText(), mention.quantity(), mention.unit(), selected), groups);
+            ids.addAll(replaceEntry(mention.id(), userId, email, date, mention, mention.occurrenceId(), groups,
+                type, flexible ? selected.food() + " = flexible (sin porción fija)" : mention.appliedRule(),
+                !flexible && Boolean.TRUE.equals(mention.uncertain())));
+        }
+        return new PatchItemResultDto(replaced, ids.stream()
+            .map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList(),
             dayReadService.getMealLog(email, date, entry.mealId(), planId).status());
     }
 
@@ -190,18 +232,18 @@ class ItemResolutionService {
     }
     private record Resolution(Map<Long, BigDecimal> groups, FoodRuleDto selected, String type, String explanation) {}
 
-    private List<Long> replaceUnknown(Long id, Long userId, String email, LocalDate date,
+    private List<Long> replaceEntry(Long id, Long userId, String email, LocalDate date,
             FoodEntryFacade.EntryData entry, UUID occurrence, Map<Long, BigDecimal> groups, String type,
-            String explanation) {
+            String explanation, boolean uncertain) {
         entryFacade.deleteEntries(List.of(id));
         List<Long> ids = new ArrayList<>();
         if (groups.isEmpty()) {
             ids.add(entryFacade.createMentionEntry(userId, email, entry.mealId(), date, entry.food(), entry.quantity(), entry.unit(),
-                entry.mealNoteId(), entry.originalText(), false, explanation, occurrence, true, type, EntryOrigin.USER));
+                entry.mealNoteId(), entry.originalText(), uncertain, explanation, occurrence, true, type, EntryOrigin.USER));
         } else {
             for (var group : groups.entrySet()) {
                 ids.add(entryFacade.createNoteEntry(userId, email, entry.mealId(), date, entry.food(), entry.quantity(),
-                    entry.unit(), group.getKey(), entry.mealNoteId(), entry.originalText(), false, group.getValue(),
+                    entry.unit(), group.getKey(), entry.mealNoteId(), entry.originalText(), uncertain, group.getValue(),
                     explanation, occurrence, type, EntryOrigin.USER));
             }
         }

@@ -35,6 +35,15 @@ class DailyLogController {
         this.service = service;
     }
 
+    @PostMapping("/{date}/items/{id}/flexible")
+    PatchItemResultDto answerFlexible(Authentication auth,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @PathVariable Long id, @RequestBody @Valid FlexibleAnswerRequest req) {
+        return service.answerFlexible(auth.getName(), date, id, req.flexible());
+    }
+
+    record FlexibleAnswerRequest(@jakarta.validation.constraints.NotNull Boolean flexible) {}
+
     // GET  /api/v1/registro/{date} — día completo con comidas, ítems y comparación
     @GetMapping("/{date}")
     DayLogDto getDayLog(Authentication auth,

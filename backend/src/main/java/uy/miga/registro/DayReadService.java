@@ -242,7 +242,8 @@ class DayReadService {
             note != null ? note.getVersion() : null,
             itemDtos,
             compDtos,
-            ComparisonService.mealStatus((note != null && !note.getText().isBlank()) || !itemDtos.isEmpty(),
+            itemDtos.stream().anyMatch(item -> "PREGUNTAR".equals(item.ruleType())
+                && "CATALOGO".equals(item.ruleSource())) ? "PREGUNTAR" : ComparisonService.mealStatus((note != null && !note.getText().isBlank()) || !itemDtos.isEmpty(),
                 itemDtos.stream().anyMatch(item -> "FLEXIBLE".equals(item.ruleType()))
                     || flexibleCount(itemDtos, note, plan.id(), rules) > 0, compDtos)
         );
