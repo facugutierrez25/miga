@@ -198,13 +198,18 @@ public class FoodEntryFacade {
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {
+        return splitEntry(id, portionsByGroup, null);
+    }
+
+    @Transactional
+    public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup, Double quantity) {
         FoodEntry source = repository.findById(id).orElseThrow();
         rejectAmbiguousLegacyOccurrence(source);
         UUID occurrenceId = source.getOccurrenceId() != null ? source.getOccurrenceId() : UUID.randomUUID();
         List<Long> ids = new ArrayList<>();
         portionsByGroup.forEach((groupId, portions) -> {
             FoodEntry entry = new FoodEntry(source.getUserId(), source.getUserEmail(), source.getMealId(),
-                source.getDate(), source.getFood(), source.getQuantity(), source.getUnit(), groupId);
+                source.getDate(), source.getFood(), quantity != null ? quantity : source.getQuantity(), source.getUnit(), groupId);
             entry.setMealNoteId(source.getMealNoteId());
             entry.setOriginalText(source.getOriginalText());
             entry.setOccurrenceId(occurrenceId);

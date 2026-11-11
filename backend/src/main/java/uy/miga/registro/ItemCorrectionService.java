@@ -215,7 +215,7 @@ class ItemCorrectionService {
         } else if (req.groups() != null) {
             Map<Long, BigDecimal> portionsByGroup = new LinkedHashMap<>();
             req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
-            resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
+            resultIds = entryFacade.splitEntry(entryId, portionsByGroup, quantity.doubleValue());
             if (req.savesRule()) {
                 saveOccurrenceRule(userId, planId, entry, quantity, portionsByGroup, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType()));
             }
