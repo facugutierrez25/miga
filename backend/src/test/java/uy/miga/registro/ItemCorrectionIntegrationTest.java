@@ -204,6 +204,7 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         JsonNode entry = putNote(date, "leche").path("entries").get(0);
         long id = entry.path("id").asLong();
         long revision = planRules().path("planVersion").asLong();
+        String ruleUid = null;
         for (int portions : java.util.List.of(2, 3)) {
             String body = compound
                 ? """
@@ -219,6 +220,9 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             assertThat(rules.path("planVersion").asLong()).isGreaterThan(revision);
             revision = rules.path("planVersion").asLong();
             assertThat(rules.path("alimentos").size()).isEqualTo(1);
+            String savedUid = rules.path("alimentos").get(0).path("uid").asText();
+            if (ruleUid != null) assertThat(savedUid).isEqualTo(ruleUid);
+            ruleUid = savedUid;
         }
         JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "1 leche u").path("entries");
         assertThat(next.size()).isEqualTo(compound ? 2 : 1);

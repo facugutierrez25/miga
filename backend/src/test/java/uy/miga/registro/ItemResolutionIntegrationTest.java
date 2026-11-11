@@ -132,6 +132,50 @@ class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void undoEarlierCreationPreservesLaterRememberedContent() throws Exception {
+        String dateA = LocalDate.now().minusDays(2).toString();
+        String dateB = LocalDate.now().minusDays(1).toString();
+        long a = putNote(dateA, "zqxreused").path("entries").get(0).path("id").asLong();
+        long b = putNote(dateB, "zqxreused").path("entries").get(0).path("id").asLong();
+        JsonNode first = resolve(dateA, a, "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        assertThat(first.path("undo").path("ruleUid").isNull()).isFalse();
+        JsonNode second = resolve(dateB, b, "{\"kind\":\"NOT_COUNTED\",\"remember\":true}");
+        assertThat(second.path("undo").path("ruleUid").isNull()).isTrue();
+        JsonNode saved = planRules();
+        assertThat(saved.path("alimentos")).hasSize(1);
+        assertThat(saved.path("alimentos").get(0).path("uid"))
+            .isEqualTo(first.path("undo").path("ruleUid"));
+        assertThat(saved.path("alimentos").get(0).path("tipo").asText()).isEqualTo("NO_CUENTA");
+        assertThat(jdbc.queryForObject("SELECT resolved_rule_uid FROM food_entries WHERE id = ?",
+            UUID.class, first.path("items").get(0).path("id").asLong())).isNull();
+        undo(dateA, first.path("undo"));
+        assertThat(planRules()).isEqualTo(saved);
+        undo(dateB, second.path("undo"));
+        assertThat(planRules()).isEqualTo(saved);
+    }
+
+    @Test
+    void undoHistoricalResolutionPreservesExplicitPlanRuleEdit() throws Exception {
+        String date = LocalDate.now().minusDays(1).toString();
+        long id = putNote(date, "zqxedited").path("entries").get(0).path("id").asLong();
+        JsonNode resolution = resolve(date, id, "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        String uid = resolution.path("undo").path("ruleUid").asText();
+        assertThat(resolution.path("undo").path("ruleUid").isNull()).isFalse();
+        long version = planRules().path("planVersion").asLong();
+        mockMvc.perform(put("/api/v1/my-plan/alimentos/" + uid)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"planVersion":%d,"alimento":"zqxedited","tipo":"NO_CUENTA"}
+                """.formatted(version)))
+            .andExpect(status().isOk());
+        JsonNode edited = planRules();
+        assertThat(edited.path("alimentos").get(0).path("tipo").asText()).isEqualTo("NO_CUENTA");
+        undo(date, resolution.path("undo"));
+        assertThat(planRules()).isEqualTo(edited);
+        assertThat(edited.path("alimentos").get(0).path("uid").asText()).isEqualTo(uid);
+    }
+
+    @Test
     void undoPreservesExistingNormalizedUserRule() throws Exception {
         // Una nota de ayer: crear alimentos reinterpreta solo las de hoy.
         String date = LocalDate.now().minusDays(1).toString();
@@ -143,9 +187,24 @@ class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
             {"kind":"GROUPS","groups":[{"foodGroupId":%d,"portions":2}],"remember":true}
             """.formatted(group));
         assertThat(result.path("undo").path("ruleUid").isNull()).isTrue();
-        assertThat(planRules()).isEqualTo(before);
+        JsonNode updated = planRules();
+        assertThat(updated.path("alimentos")).hasSize(1);
+        assertThat(updated.path("alimentos").get(0).path("uid"))
+            .isEqualTo(before.path("alimentos").get(0).path("uid"));
+        assertThat(updated.path("alimentos").get(0).path("tipo").asText()).isEqualTo("NORMAL");
+        assertThat(updated.path("planVersion").asLong()).isGreaterThan(before.path("planVersion").asLong());
+        JsonNode restored = undo(date, result.path("undo"));
+        assertThat(planRules()).isEqualTo(updated);
+        result = resolve(date, restored.path("items").get(0).path("id").asLong(),
+            "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        assertThat(result.path("undo").path("ruleUid").isNull()).isTrue();
+        JsonNode repeated = planRules();
+        assertThat(repeated.path("alimentos")).hasSize(1);
+        assertThat(repeated.path("alimentos").get(0).path("uid"))
+            .isEqualTo(before.path("alimentos").get(0).path("uid"));
+        assertThat(repeated.path("alimentos").get(0).path("tipo").asText()).isEqualTo("FLEXIBLE");
         undo(date, result.path("undo"));
-        assertThat(planRules()).isEqualTo(before);
+        assertThat(planRules()).isEqualTo(repeated);
     }
 
     @Test
