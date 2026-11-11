@@ -25,7 +25,7 @@ class PlanVersionListenerTest {
         FoodRule source = saved.getValue();
         when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(source));
         service.upsertUserRule(2L, 1L, new RuleInput(" ZANAHORIA ", List.of(), "NORMAL", 3L,
-            BigDecimal.TEN, "g", null, List.of(), null));
+            BigDecimal.TEN, "g", null, List.of(), null, true));
         FoodRule planRule = new FoodRule();
         planRule.setScope("PLAN");
         planRule.setPlanId(1L);
@@ -45,6 +45,7 @@ class PlanVersionListenerTest {
             .satisfies(rule -> {
                 assertThat(rule.getUid()).isEqualTo(first.uid());
                 assertThat(rule.getFoodGroupId()).isEqualTo(5L);
+                assertThat(rule.isCountsFlexible()).isTrue();
                 assertThat(rule.getAmountPerPortion()).isEqualByComparingTo(BigDecimal.TEN);
             });
         assertThat(copies.getFirst().getUid()).isEqualTo(planRule.getUid());

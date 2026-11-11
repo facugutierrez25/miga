@@ -435,16 +435,16 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         var replacedIds = new java.util.ArrayList<Long>();
         corrected.path("replacedItemIds").forEach(id -> replacedIds.add(id.asLong()));
         assertThat(replacedIds).containsExactlyElementsOf(originalIds);
-        assertThat(corrected.path("items")).hasSize(1);
-        assertThat(corrected.path("items").get(0).path("id").asLong()).isEqualTo(selectedId);
+        assertThat(corrected.path("items")).hasSize(3);
+        for (int i = 0; i < 3; i++) {
+            assertThat(corrected.path("items").get(i).path("foodGroupId")).isEqualTo(original.get(i).path("foodGroupId"));
+            assertThat(corrected.path("items").get(i).path("portions").decimalValue()).isEqualByComparingTo(original.get(i).path("portions").decimalValue());
+            assertThat(corrected.path("items").get(i).path("countsFlexible").asBoolean()).isTrue();
+        }
         JsonNode day = getDay(date);
         JsonNode meal = day.path("meals").get(0);
         assertThat(meal.path("items")).isEqualTo(corrected.path("items"));
         assertThat(meal.path("status").asText()).isEqualTo("FLEXIBLE");
-        assertThat(meal.path("comparison")).allSatisfy(group ->
-            assertThat(group.path("recorded").asDouble()).isZero());
-        assertThat(day.path("summary")).allSatisfy(group ->
-            assertThat(group.path("totalRecorded").asDouble()).isZero());
         JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString());
@@ -452,24 +452,14 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             assertThat(weekDay.path("date").asText()).isEqualTo(date);
             assertThat(weekDay.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
         });
-        long proteinId = groupId("Proteínas");
-        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + "}")
-            .andExpect(status().isBadRequest());
-        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + ",\"portions\":0}")
-            .andExpect(status().isBadRequest());
-        assertThat(getDay(date).path("meals").get(0).path("status").asText()).isEqualTo("FLEXIBLE");
-        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + ",\"portions\":2}")
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.replacedItemIds[0]").value(selectedId))
-            .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"));
-        day = getDay(date);
-        meal = day.path("meals").get(0);
-        assertThat(meal.path("items")).hasSize(1);
-        assertThat(meal.path("items").get(0).path("occurrenceId")).isEqualTo(original.get(0).path("occurrenceId"));
+        patchItem(date, selectedId, "{\"flexible\":false}")
+            .andExpect(status().isOk());
+        meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("items")).hasSize(3);
         assertThat(meal.path("status").asText()).isNotEqualTo("FLEXIBLE");
-        for (JsonNode group : day.path("summary")) {
-            assertThat(group.path("totalRecorded").asDouble())
-                .isEqualTo(group.path("foodGroupId").asLong() == proteinId ? 2 : 0);
+        for (int i = 0; i < 3; i++) {
+            assertThat(meal.path("items").get(i).path("portions").decimalValue()).isEqualByComparingTo(original.get(i).path("portions").decimalValue());
+            assertThat(meal.path("items").get(i).path("countsFlexible").asBoolean()).isFalse();
         }
     }
 
@@ -493,7 +483,7 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         long id = original.path("id").asLong();
         patchItem(date, id, "{\"flexible\":true}")
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"));
+            .andExpect(jsonPath("$.items[0].countsFlexible").value(true));
         patchItem(date, id, "{\"foodGroupId\":" + groupId + ",\"portions\":3,\"saveAsRule\":true}")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"))
@@ -525,7 +515,7 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         long id = original.path("id").asLong();
         patchItem(date, id, "{\"flexible\":true}")
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"));
+            .andExpect(jsonPath("$.items[0].countsFlexible").value(true));
         patchItem(date, id, objectMapper.writeValueAsString(java.util.Map.of(
             "saveAsRule", true, "grupos", java.util.List.of(
                 java.util.Map.of("foodGroupId", firstGroupId, "porciones", 3),
@@ -623,9 +613,9 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
                 """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("FLEXIBLE"))
-            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"))
-            .andExpect(jsonPath("$.items[0].foodGroupId").isEmpty())
-            .andExpect(jsonPath("$.items[0].portions").isEmpty());
+            .andExpect(jsonPath("$.items[0].countsFlexible").value(true))
+            .andExpect(jsonPath("$.items[0].foodGroupId").value(groupId))
+            .andExpect(jsonPath("$.items[0].portions").value(entry.path("portions").asDouble()));
         JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString());
@@ -640,9 +630,9 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             .andExpect(content().contentTypeCompatibleWith("text/csv"))
             .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertThat(exported).contains("Flexible");
-        assertThat(putNote(date, "leche").path("entries").get(0).path("ruleType").asText())
-            .isEqualTo("FLEXIBLE");
+        assertThat(putNote(date, "leche").path("entries").get(0).path("countsFlexible").asBoolean()).isTrue();
         id = getDay(date).path("meals").get(0).path("items").get(0).path("id").asLong();
+        patchItem(date, id, "{\"flexible\":false,\"saveAsRule\":true}").andExpect(status().isOk());
         mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + id)
             .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
             .content("{\"foodGroupId\":" + groupId + ",\"portions\":1,\"saveAsRule\":true}"))

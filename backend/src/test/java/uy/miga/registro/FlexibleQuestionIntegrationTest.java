@@ -39,16 +39,19 @@ class FlexibleQuestionIntegrationTest extends DailyLogIntegrationTestBase {
 
         JsonNode secondResult = answer(secondDate, second.path("id").asLong(), flexible);
         assertThat(planRules()).isEqualTo(savedRules);
-        String expectedType = flexible ? "FLEXIBLE" : "NORMAL";
+        String expectedType = "NORMAL";
         assertThat(firstResult.path("items").get(0).path("ruleType").asText()).isEqualTo(expectedType);
         JsonNode resolved = secondResult.path("items").get(0);
         assertThat(resolved.path("ruleType").asText()).isEqualTo(expectedType);
         assertThat(resolved.path("ruleSource").asText()).isEqualTo("USUARIO");
-        if (!flexible) {
+        {
+            assertThat(resolved.path("countsFlexible").asBoolean()).isEqualTo(flexible);
             assertThat(resolved.path("foodGroupId")).isEqualTo(second.path("foodGroupId"));
             assertThat(resolved.path("portions").asDouble()).isEqualTo(2);
         }
 
+        assertThat(firstResult.path("items").get(0).path("foodGroupId")).isEqualTo(first.path("foodGroupId"));
+        assertThat(firstResult.path("items").get(0).path("portions").asDouble()).isEqualTo(1);
         JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", firstDate)
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString());
@@ -70,8 +73,15 @@ class FlexibleQuestionIntegrationTest extends DailyLogIntegrationTestBase {
         assertThat(note.path("status").asText()).isEqualTo("PREGUNTAR");
         JsonNode result = answer(date, note.path("entries").get(0).path("id").asLong(), true);
         assertThat(result.path("status").asText()).isEqualTo("FLEXIBLE");
-        assertThat(result.path("items").get(0).path("ruleType").asText()).isEqualTo("FLEXIBLE");
-        assertThat(planRules().toString()).contains("jamon cocido", "FLEXIBLE");
+        assertThat(result.path("items").get(0).path("ruleType").asText()).isEqualTo("NORMAL");
+        assertThat(planRules().toString()).contains("jamon cocido", "countsFlexible");
+        JsonNode item = result.path("items").get(0);
+        assertThat(item.path("countsFlexible").asBoolean()).isTrue();
+        assertThat(item.path("portions").asDouble()).isEqualTo(1);
+        assertThat(getDay(date).path("summary")).anySatisfy(group -> {
+            assertThat(group.path("foodGroupId")).isEqualTo(item.path("foodGroupId"));
+            assertThat(group.path("totalRecorded").asDouble()).isEqualTo(1);
+        });
         assertThat(putNote(LocalDate.now().minusDays(1).toString(), "60 g jamón").path("status").asText())
             .isEqualTo("FLEXIBLE");
         JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)

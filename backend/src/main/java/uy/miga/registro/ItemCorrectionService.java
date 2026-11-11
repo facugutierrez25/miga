@@ -105,6 +105,21 @@ class ItemCorrectionService {
         }
         validateCorrectionGroups(planId, req);
 
+        var occurrence = req.flexible() != null ? entryFacade.occurrence(entryId) : List.<FoodEntryFacade.EntryData>of();
+        if (req.flexible() != null && occurrence.stream().anyMatch(e -> e.foodGroupId() != null)) {
+            var ids = occurrence.stream().map(FoodEntryFacade.EntryData::id).toList();
+            entryFacade.setCountsFlexible(ids, req.makesFlexible());
+            if (req.savesRule()) {
+                var groups = new LinkedHashMap<Long, BigDecimal>();
+                occurrence.stream().filter(e -> e.foodGroupId() != null && e.portions() != null)
+                    .forEach(e -> groups.merge(e.foodGroupId(), e.portions(), BigDecimal::add));
+                saveOccurrenceRule(userId, planId, entry, groups, req.makesFlexible());
+                planService.bumpVersion(planId);
+            }
+            return new PatchItemResultDto(ids, ids.stream()
+                .map(id -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId))).toList(),
+                dayReadService.getMealLog(userEmail, date, entry.mealId(), planId).status());
+        }
         List<Long> replacedIds = List.of(entryId);
         if (req.makesFlexible()) {
             replacedIds = entryFacade.makeFlexible(entryId);
@@ -194,18 +209,7 @@ class ItemCorrectionService {
             req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
             resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
             if (req.savesRule()) {
-                String unit = entry.unit();
-                if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) {
-                    unit = null;
-                }
-                BigDecimal componentQuantity = unit != null ? quantity : InterpreterService.parsedFoodCount(entry.originalText());
-                List<RuleComponent> components = req.groups().stream()
-                    .map(g -> new RuleComponent(g.foodGroupId(), null,
-                        g.portions().divide(componentQuantity, 3, RoundingMode.HALF_UP).doubleValue()))
-                    .toList();
-                // Los componentes quedan por unidad de lo anotado: "200 g" guarda lo de 1 g.
-                ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
-                    null, unit != null ? BigDecimal.ONE : null, unit, BigDecimal.ONE, components, null));
+                saveOccurrenceRule(userId, planId, entry, portionsByGroup, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType()));
             }
         } else {
             BigDecimal portions = req.portions() != null ? req.portions() : scaledPortions(entry, quantity);
@@ -225,11 +229,29 @@ class ItemCorrectionService {
                     groupId, unit != null ? quantity.divide(portions, 3, RoundingMode.HALF_UP) : null,
                     unit, unit != null ? BigDecimal.ONE
                         : portions.divide(InterpreterService.parsedFoodCount(entry.originalText()), 3, RoundingMode.HALF_UP),
-                    List.of(), null));
+                    List.of(), null, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType())));
             }
         }
 
         return resultIds;
+    }
+
+    private void saveOccurrenceRule(Long userId, Long planId, FoodEntryFacade.EntryData entry,
+            Map<Long, BigDecimal> groups, boolean flexible) {
+        String unit = entry.unit();
+        if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) unit = null;
+        BigDecimal quantity = unit != null ? BigDecimal.valueOf(entry.quantity()) : InterpreterService.parsedFoodCount(entry.originalText());
+        if (groups.isEmpty() || groups.values().stream().anyMatch(p -> p.signum() <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para guardar como regla, indicá porciones mayores a cero");
+        }
+        var first = groups.entrySet().iterator().next();
+        boolean compound = groups.size() > 1;
+        var components = compound ? groups.entrySet().stream().map(g -> new RuleComponent(g.getKey(), null,
+            g.getValue().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue())).toList() : List.<RuleComponent>of();
+        ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), compound ? "COMPUESTO" : "NORMAL",
+            compound ? null : first.getKey(), unit == null ? null : compound ? BigDecimal.ONE : quantity.divide(first.getValue(), 3, RoundingMode.HALF_UP),
+            unit, compound || unit != null ? BigDecimal.ONE : first.getValue().divide(quantity, 3, RoundingMode.HALF_UP),
+            components, null, flexible));
     }
 
     private void validateCorrectionGroups(Long planId, PatchItemRequest req) {

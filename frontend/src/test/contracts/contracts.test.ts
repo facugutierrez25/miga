@@ -29,6 +29,7 @@ describe('contratos del backend', () => {
               "foodGroupId": 1,
               "portions": 1.5,
               "origin": "Sintético",
+              "countsFlexible": false,
               "uncertain": true,
               "originalText": "Sintético",
               "appliedRule": "Sintético",
@@ -134,7 +135,8 @@ describe('contratos del backend', () => {
             }
           ],
           "overridesRuleUid": "00000000-0000-0000-0000-000000000001",
-          "textoRegla": "Sintético"
+          "textoRegla": "Sintético",
+          "countsFlexible": false
         }
       ],
       "habitos": [
