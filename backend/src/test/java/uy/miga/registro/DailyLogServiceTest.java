@@ -53,7 +53,7 @@ class DailyLogServiceTest {
         assertThat(dayMeal.status()).isEqualTo("FLEXIBLE");
         assertThat(weekMeal.status()).isEqualTo(dayMeal.status());
         assertThat(weekMeal.planned()).isFalse();
-        assertThat(weekMeal.flexibleCount()).isZero();
+        assertThat(weekMeal.flexibleCount()).isEqualTo(1);
     }
 
     @Test
@@ -163,6 +163,21 @@ class DailyLogServiceTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"MENTION", "UNKNOWN"})
+    void patchRejectsMentionsWithoutRuleTypeBeforeWriting(String origin) {
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 10L, "alimento", 1.0, "u", null, false, null, origin, false,
+            null, today, "alimento", null, null, null, null, false, null));
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, false, true)))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatusCode().value()).isEqualTo(400));
+        verify(entries, never()).makeFlexible(any());
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        verifyNoInteractions(rules);
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void respuestaAlwaysLocksAndRejectsStaleMeal(boolean consumed) {
         when(plans.mealBelongsToUser(10L, 1L)).thenReturn(true);
@@ -238,6 +253,37 @@ class DailyLogServiceTest {
         when(plans.getReadData(20L)).thenReturn(new uy.miga.plans.PlanReadData(20L, today, null,
             "PORCIONES", BigDecimal.ZERO, List.of(), List.of(
                 new uy.miga.plans.PlanReadData.MealData(11L, "Almuerzo", List.of()))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void flexibleCorrectionUsesPublicRuleApiOnlyWhenRemembered(boolean remember) {
+        entryWithPortions(null);
+        service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, remember, true));
+        verify(entries).makeFlexible(3L);
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        if (remember) {
+            ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
+            verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+            assertThat(input.getValue().type()).isEqualTo("FLEXIBLE");
+            assertThat(input.getValue().foodGroupId()).isNull();
+            assertThat(input.getValue().components()).isEmpty();
+            verify(plans).bumpVersion(20L);
+        } else {
+            verifyNoInteractions(rules);
+            verify(plans, never()).bumpVersion(any());
+        }
+    }
+
+    @Test
+    void flexibleCorrectionRejectsSimultaneousGroupBeforeWriting() {
+        entryWithPortions(BigDecimal.ONE);
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, 7L, BigDecimal.ONE, null, true, true)))
+            .isInstanceOf(ResponseStatusException.class);
+        verify(entries, never()).makeFlexible(any());
+        verifyNoInteractions(rules);
     }
 
     @Test

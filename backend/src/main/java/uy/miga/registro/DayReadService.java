@@ -201,11 +201,11 @@ class DayReadService {
 
     private long flexibleCount(List<DayLogDto.EntryItemDto> items, MealNote note, Long planId,
             Map<Long, List<FoodRuleDto>> rules) {
-        if (note == null || note.getText().isBlank()) return 0;
         var noteItems = items.stream().filter(item -> !EntryOrigin.RESPONSE.equals(item.origin())).toList();
         if (noteItems.stream().anyMatch(item -> item.ruleType() != null)) {
             return noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType())).count();
         }
+        if (note == null || note.getText().isBlank()) return 0;
         Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
         return interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
             id -> ruleService.findApplicable(id, note.getUserId()))).stream()

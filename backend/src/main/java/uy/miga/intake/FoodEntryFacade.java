@@ -127,6 +127,18 @@ public class FoodEntryFacade {
         });
     }
 
+    @Transactional
+    public void makeFlexible(Long id) {
+        FoodEntry entry = repository.findById(id).orElseThrow();
+        entry.setFoodGroupId(null);
+        entry.setPortions(null);
+        entry.setRuleType("FLEXIBLE");
+        entry.setRuleSource(EntryOrigin.USER);
+        entry.setOrigin(EntryOrigin.USER);
+        entry.setAppliedRule(entry.getFood() + ": cuenta como comida flexible");
+        entry.setEstimated(false);
+    }
+
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {

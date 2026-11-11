@@ -72,7 +72,8 @@ class ItemCorrectionService {
         Long currentPlanId = support.lockCurrentPlanIfPresent(userId);
         FoodEntryFacade.EntryData entry = entryFacade.findEntryByIdAndUserId(entryId, userId);
         if (entry == null || !entry.date().equals(date)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        if (Set.of(EntryOrigin.MENTION, EntryOrigin.UNKNOWN).contains(entry.origin() == null ? "" : entry.origin())) {
+        if (EntryOrigin.UNKNOWN.equals(entry.origin()) || (EntryOrigin.MENTION.equals(entry.origin())
+                && !Set.of("LIBRE", "NO_CUENTA", "FLEXIBLE").contains(entry.ruleType() == null ? "" : entry.ruleType()))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta mención no admite correcciones.");
         }
         if (req.groups() != null && (req.foodGroupId() != null || req.portions() != null)) {
@@ -80,6 +81,14 @@ class ItemCorrectionService {
                 "Indicá un grupo o varios grupos, no ambos.");
         }
 
+        if (req.makesFlexible() && (req.groups() != null || req.foodGroupId() != null || req.portions() != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Una comida flexible no lleva grupos ni porciones.");
+        }
+        if ("FLEXIBLE".equals(entry.ruleType()) && !req.makesFlexible()
+                && req.groups() == null && req.foodGroupId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un grupo para dejar de contarla como flexible.");
+        }
         Long planId = support.entryPlanId(userId, entry);
         if (!planService.getMealIds(planId).contains(entry.mealId())) {
             throw new PlanVersionConflictException();
@@ -159,9 +168,16 @@ class ItemCorrectionService {
 
     private List<Long> applyCorrection(Long userId, Long planId, Long entryId, FoodEntryFacade.EntryData entry,
             PatchItemRequest req) {
-        BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity());
+        BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity() != null ? entry.quantity() : 1);
         List<Long> resultIds;
-        if (req.groups() != null) {
+        if (req.makesFlexible()) {
+            entryFacade.makeFlexible(entryId);
+            resultIds = List.of(entryId);
+            if (req.savesRule()) {
+                ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "FLEXIBLE",
+                    null, null, null, null, List.of(), null));
+            }
+        } else if (req.groups() != null) {
             Map<Long, BigDecimal> portionsByGroup = new LinkedHashMap<>();
             req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
             resultIds = entryFacade.splitEntry(entryId, portionsByGroup);

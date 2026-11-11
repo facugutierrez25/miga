@@ -53,4 +53,20 @@ class FoodEntryFacadeTest {
         assertThat(entry.getEstimated()).isFalse();
         assertThat(entry.getOrigin()).isEqualTo("USUARIO");
     }
+    @Test
+    void flexibleCorrectionClearsGroupAndCanBeCorrectedBack() {
+        var entry = new FoodEntry(1L, "user", 2L, date, "leche", 1.0, "u", 3L);
+        entry.setPortions(BigDecimal.ONE);
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(entry));
+        facade.makeFlexible(1L);
+        assertThat(entry.getRuleType()).isEqualTo("FLEXIBLE");
+        assertThat(entry.getFoodGroupId()).isNull();
+        assertThat(entry.getPortions()).isNull();
+        assertThat(entry.getAppliedRule()).isEqualTo("leche: cuenta como comida flexible");
+        assertThat(entry.getRuleSource()).isEqualTo("USUARIO");
+        facade.correctEntry(1L, null, null, 3L, BigDecimal.ONE);
+        assertThat(entry.getRuleType()).isEqualTo("NORMAL");
+        assertThat(entry.getFoodGroupId()).isEqualTo(3L);
+        assertThat(entry.getPortions()).isEqualByComparingTo(BigDecimal.ONE);
+    }
 }

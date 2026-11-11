@@ -374,4 +374,47 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
                 """))
             .andExpect(status().isForbidden());
     }
+    @Test
+    void flexibleCorrectionCanBeSavedAndCorrectedBack() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode saved = putNote(date, "leche");
+        JsonNode entry = saved.path("entries").get(0);
+        long id = entry.path("id").asLong();
+        long groupId = entry.path("foodGroupId").asLong();
+        String url = "/api/v1/registro/" + date + "/items/" + id;
+        mockMvc.perform(patch(url).header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("""
+                {"flexible": true, "saveAsRule": true}
+                """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("FLEXIBLE"))
+            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"))
+            .andExpect(jsonPath("$.items[0].foodGroupId").isEmpty())
+            .andExpect(jsonPath("$.items[0].portions").isEmpty());
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString());
+        assertThat(week.path("days")).anySatisfy(day -> {
+            assertThat(day.path("date").asText()).isEqualTo(date);
+            assertThat(day.path("meals").get(0).path("status").asText()).isEqualTo("FLEXIBLE");
+            assertThat(day.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
+        });
+        String exported = mockMvc.perform(get("/api/v1/semana/export").param("date", date)
+            .param("format", "csv").param("incluir", "porciones")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith("text/csv"))
+            .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(exported).contains("Flexible");
+        assertThat(putNote(date, "leche").path("entries").get(0).path("ruleType").asText())
+            .isEqualTo("FLEXIBLE");
+        id = getDay(date).path("meals").get(0).path("items").get(0).path("id").asLong();
+        mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + id)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"foodGroupId\":" + groupId + ",\"portions\":1,\"saveAsRule\":true}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].foodGroupId").value(groupId))
+            .andExpect(jsonPath("$.items[0].portions").value(1));
+        assertThat(getDay(date).path("meals").get(0).path("status").asText()).isNotEqualTo("FLEXIBLE");
+    }
 }
