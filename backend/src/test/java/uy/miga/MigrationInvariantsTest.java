@@ -565,7 +565,7 @@ class MigrationInvariantsTest {
 
 
     @Test
-    void v40KeepsLowestIdRepointsReferencesAndPreservesPlanVersions() throws Exception {
+    void v40KeepsLowestIdRevokesUndoAndPreservesPlanVersions() throws Exception {
         buildFlyway("39").migrate();
         long user;
         long older;
@@ -587,8 +587,8 @@ class MigrationInvariantsTest {
                 c.createStatement().execute("""
                     INSERT INTO food_rules(uid, user_id, plan_id, alcance, alimento, tipo)
                     VALUES ('%1$s', %4$d, %5$d, 'USUARIO', 'Zanahoria', 'LIBRE'),
-                           ('%2$s', %4$d, %5$d, 'USUARIO', ' ZANAHORIA ', 'FLEXIBLE'),
-                           ('%3$s', %4$d, %5$d, 'USUARIO', 'zanahoria', 'NO_CUENTA');
+                           ('%2$s', %4$d, %5$d, 'USUARIO', 'Zanahoria', 'LIBRE'),
+                           ('%3$s', %4$d, %5$d, 'USUARIO', 'Zanahoria', 'LIBRE');
                     INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo, overrides_rule_uid)
                     VALUES (%4$d, %5$d, 'USUARIO', 'Referencia', 'LIBRE', '%2$s');
                     INSERT INTO food_rules(plan_id, alcance, alimento, tipo)
@@ -619,7 +619,7 @@ class MigrationInvariantsTest {
                 .isZero();
             assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE overrides_rule_uid = '" + kept + "'"))
                 .isEqualTo(2);
-            assertThat(queryLong(c, "SELECT count(*) FROM food_entries WHERE resolved_rule_uid = '" + kept + "'"))
+            assertThat(queryLong(c, "SELECT count(*) FROM food_entries WHERE resolved_rule_uid IS NULL"))
                 .isEqualTo(2);
             assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alcance = 'PLAN' AND alimento = 'Zanahoria'"))
                 .isEqualTo(4);
@@ -634,7 +634,7 @@ class MigrationInvariantsTest {
     }
 
     @Test
-    void v40ResolvesSharedUidsUsingTheReferencedPlanVersion() throws Exception {
+    void v40RevokesUndoForSharedDeletedUidsAcrossPlanVersions() throws Exception {
         buildFlyway("39").migrate();
         String firstUid = java.util.UUID.randomUUID().toString();
         String secondUid = java.util.UUID.randomUUID().toString();
@@ -652,7 +652,7 @@ class MigrationInvariantsTest {
                 c.createStatement().execute("""
                     INSERT INTO food_rules(uid, user_id, plan_id, alcance, alimento, tipo)
                     VALUES ('%1$s', %3$d, %4$d, 'USUARIO', 'Zanahoria', 'LIBRE'),
-                           ('%2$s', %3$d, %4$d, 'USUARIO', ' ZANAHORIA ', 'LIBRE');
+                           ('%2$s', %3$d, %4$d, 'USUARIO', 'Zanahoria', 'LIBRE');
                     INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo, overrides_rule_uid)
                     VALUES (%3$d, %4$d, 'USUARIO', 'Referencia', 'LIBRE', '%2$s');
                     INSERT INTO food_entries(user_id, user_email, meal_id, date, food, quantity, unit, resolved_rule_uid)
@@ -674,9 +674,37 @@ class MigrationInvariantsTest {
                     " AND overrides_rule_uid = '" + kept + "'"))
                     .isEqualTo(1);
                 assertThat(queryLong(c, "SELECT count(*) FROM food_entries e JOIN meals m ON m.id = e.meal_id WHERE m.plan_id = " +
-                    plan + " AND resolved_rule_uid = '" + kept + "'"))
+                    plan + " AND resolved_rule_uid IS NULL"))
                     .isEqualTo(2);
             }
+        }
+    }
+
+    @Test
+    void v40AbortsOnDivergentDuplicatesWithoutLosingData() throws Exception {
+        buildFlyway("39").migrate();
+        try (Connection c = connect()) {
+            long user = insertUser(c, "divergent-duplicates@test.com");
+            long plan = insertPlan(c, user);
+            c.createStatement().execute("""
+                INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo, unidad)
+                VALUES (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE', NULL),
+                       (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE', NULL),
+                       (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE', 'G'),
+                       (%1$d, %2$d, 'USUARIO', 'Arroz', 'LIBRE', NULL),
+                       (%1$d, %2$d, 'USUARIO', ' ARROZ ', 'LIBRE', NULL);
+                """.formatted(user, plan));
+        }
+
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V40 abortada: 2 grupos")
+            .hasStackTraceContaining("requieren reconciliación manual");
+
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alcance = 'USUARIO'"))
+                .isEqualTo(5);
+            assertThat(queryLong(c, "SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_food_rules_user_plan_food'"))
+                .isZero();
         }
     }
 
