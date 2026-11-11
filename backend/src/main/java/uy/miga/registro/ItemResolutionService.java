@@ -70,6 +70,7 @@ class ItemResolutionService {
             }
         }
         List<Long> ids = replaceEntry(id, userId, email, date, entry, occurrence, groups, type, explanation, false);
+        if (selected != null) entryFacade.setCountsFlexible(ids, selected.countsFlexible());
         entryFacade.markResolved(ids, ruleUid);
         var items = ids.stream().map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList();
         return new ResolveItemResultDto(List.of(id), items, new ResolveItemResultDto.Undo(occurrence, ruleUid),
@@ -92,26 +93,33 @@ class ItemResolutionService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La clasificación del alimento cambió. Recargá el día.");
         }
         // Si ya hay una regla propia (respuesta dada en otra nota), manda esa regla.
-        boolean flexible = "USUARIO".equals(selected.scope()) ? "FLEXIBLE".equals(selected.type()) : answer;
-        String type = flexible ? "FLEXIBLE" : selected.type();
+        boolean flexible = "USUARIO".equals(selected.scope()) ? ("FLEXIBLE".equals(selected.type()) || selected.countsFlexible()) : answer;
+        String type = selected.type();
         if (!"USUARIO".equals(selected.scope())) {
-            RuleInput input = resolveRuleInput(entry, flexible ? null : selected, type, Map.of(), planId, planId);
+            RuleInput input = resolveRuleInput(entry, selected, type, Map.of(), planId, planId);
             if (input == null) throw missingResolveGroup();
             ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(), type,
-                input.foodGroupId(), input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components(), selected.uid()));
+                input.foodGroupId(), input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components(), selected.uid(), flexible));
             planService.bumpVersion(planId);
         }
         var mentions = entryFacade.findByMealNoteId(entry.mealNoteId()).stream()
             .filter(e -> e.food().equals(entry.food()) && "PREGUNTAR".equals(e.ruleType()) && "CATALOGO".equals(e.ruleSource())).toList();
         var replaced = mentions.stream().map(FoodEntryFacade.EntryData::id).toList();
         List<Long> ids = new ArrayList<>();
-        for (var mention : mentions) {
+        Map<Object, List<FoodEntryFacade.EntryData>> occurrences = new LinkedHashMap<>();
+        mentions.forEach(e -> occurrences.computeIfAbsent(e.occurrenceId() != null ? e.occurrenceId() : e.id(),
+            key -> new ArrayList<>()).add(e));
+        for (var rows : occurrences.values()) {
+            var mention = rows.getFirst();
+            entryFacade.deleteEntries(rows.stream().skip(1).map(FoodEntryFacade.EntryData::id).toList());
             Map<Long, BigDecimal> groups = new LinkedHashMap<>();
-            if (!flexible) addSelectedGroups(selected, type, planId,
+            addSelectedGroups(selected, type, planId,
                 interpreter.computePortions(mention.originalText(), mention.quantity(), mention.unit(), selected), groups);
-            ids.addAll(replaceEntry(mention.id(), userId, email, date, mention, mention.occurrenceId(), groups,
-                type, flexible ? selected.food() + " = flexible (sin porción fija)" : mention.appliedRule(),
-                !flexible && Boolean.TRUE.equals(mention.uncertain())));
+            var created = replaceEntry(mention.id(), userId, email, date, mention, mention.occurrenceId(), groups,
+                type, mention.appliedRule(),
+                Boolean.TRUE.equals(mention.uncertain()));
+            entryFacade.setCountsFlexible(created, flexible);
+            ids.addAll(created);
         }
         return new PatchItemResultDto(replaced, ids.stream()
             .map(itemId -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(itemId, userId))).toList(),
@@ -165,7 +173,7 @@ class ItemResolutionService {
                 } else components.add(new RuleComponent(mapped, null, g.getValue().divide(quantity, 6, RoundingMode.HALF_UP).doubleValue()));
             }
         }
-        return new RuleInput(entry.food(), List.of(), type, groupId, amount, unit, defaultPortion, components, null);
+        return new RuleInput(entry.food(), List.of(), type, groupId, amount, unit, defaultPortion, components, null, selected != null && selected.countsFlexible());
     }
 
     @Transactional

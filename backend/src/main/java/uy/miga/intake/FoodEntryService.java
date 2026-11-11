@@ -121,6 +121,6 @@ class FoodEntryService {
 
     private FoodEntryDto toDto(FoodEntry e) {
         return new FoodEntryDto(e.getId(), e.getMealId(), e.getFood(), e.getQuantity(), e.getUnit(),
-            e.getFoodGroupId(), e.isConsumed(), e.getPortions());
+            e.getFoodGroupId(), e.isConsumed(), e.getPortions(), e.isCountsFlexible() || "FLEXIBLE".equals(e.getRuleType()));
     }
 }

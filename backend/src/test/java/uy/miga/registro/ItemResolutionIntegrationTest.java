@@ -26,6 +26,60 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
+    void compoundFlexibleKeepsGroupsThroughNoteAndPatch() throws Exception {
+        JsonNode rules = planRules();
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "zqxcompoundflex", "tipo", "COMPUESTO",
+                "countsFlexible", true, "componentes", java.util.List.of(
+                    java.util.Map.of("groupUid", rules.path("grupos").get(0).path("uid").asText(), "porciones", 1),
+                    java.util.Map.of("groupUid", rules.path("grupos").get(1).path("uid").asText(), "porciones", 2))))))
+            .andExpect(status().isCreated());
+        String date = LocalDate.now().toString();
+        JsonNode note = putNote(date, "zqxcompoundflex");
+        JsonNode entries = note.path("entries");
+        assertThat(entries).hasSize(2);
+        assertThat(note.path("status").asText()).isEqualTo("FLEXIBLE");
+        for (JsonNode entry : entries) {
+            assertThat(entry.path("countsFlexible").asBoolean()).isTrue();
+            assertThat(entry.path("foodGroupId").isNumber()).isTrue();
+            assertThat(entry.path("portions").asDouble()).isPositive();
+        }
+        for (boolean flexible : java.util.List.of(false, true)) {
+            JsonNode result = objectMapper.readTree(mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + entries.get(0).path("id").asLong())
+                .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"flexible\":" + flexible + ",\"saveAsRule\":true}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertThat(result.path("items")).hasSize(2);
+            for (int i = 0; i < 2; i++) {
+                assertThat(result.path("items").get(i).path("foodGroupId")).isEqualTo(entries.get(i).path("foodGroupId"));
+                assertThat(result.path("items").get(i).path("portions")).isEqualTo(entries.get(i).path("portions"));
+                assertThat(result.path("items").get(i).path("countsFlexible").asBoolean()).isEqualTo(flexible);
+            }
+            assertThat(planRules().path("alimentos")).anySatisfy(rule -> {
+                assertThat(rule.path("alimento").asText()).isEqualTo("zqxcompoundflex");
+                assertThat(rule.path("countsFlexible").asBoolean()).isEqualTo(flexible);
+            });
+        }
+        JsonNode day = getDay(date);
+        for (JsonNode entry : entries) {
+            assertThat(day.path("summary")).anySatisfy(group -> {
+                assertThat(group.path("foodGroupId")).isEqualTo(entry.path("foodGroupId"));
+                assertThat(group.path("totalRecorded").decimalValue()).isEqualByComparingTo(entry.path("portions").decimalValue());
+            });
+        }
+        assertThat(day.path("meals").get(0).path("comparison")).anySatisfy(group ->
+            assertThat(group.path("recorded").asDouble()).isPositive());
+        JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(week.path("days")).anySatisfy(d -> {
+            assertThat(d.path("date").asText()).isEqualTo(date);
+            assertThat(d.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
+        });
+    }
+
+    @Test
     void resolveGroupsRemembersInPlaceAndUndoRestoresUnknown() throws Exception {
         String date = LocalDate.now().toString();
         JsonNode rules = planRules();

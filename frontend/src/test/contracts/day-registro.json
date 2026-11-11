@@ -5,7 +5,6 @@
     "noteId" : 1,
     "noteText" : "Sintético",
     "noteVersion" : 1,
-    "status" : "EN_PLAN",
     "items" : [ {
       "id" : 1,
       "food" : "Sintético",
@@ -19,7 +18,8 @@
       "appliedRule" : "Sintético",
       "occurrenceId" : "00000000-0000-0000-0000-000000000001",
       "ruleType" : "NORMAL",
-      "ruleSource" : "PLAN"
+      "ruleSource" : "PLAN",
+      "countsFlexible" : false
     } ],
     "comparison" : [ {
       "foodGroupId" : 1,
@@ -27,7 +27,8 @@
       "expected" : 1.5,
       "recorded" : 1.5,
       "status" : "EN_PLAN"
-    } ]
+    } ],
+    "status" : "EN_PLAN"
   } ],
   "summary" : [ {
     "foodGroupId" : 1,

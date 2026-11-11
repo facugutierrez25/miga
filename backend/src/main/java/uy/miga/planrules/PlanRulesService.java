@@ -139,7 +139,7 @@ class PlanRulesService {
                 }
                 rules.createUserRule(owner, planId, new RuleInput(rule.food(), rule.synonyms(), rule.type(),
                     rule.foodGroupId(), rule.amountPerPortion(), rule.unit(), rule.defaultPortions(),
-                    rule.components(), uid));
+                    rule.components(), uid, rule.countsFlexible()));
             });
     }
 
@@ -225,7 +225,7 @@ class PlanRulesService {
             .toList();
         return new PlanRulesDto.RuleDto(rule.uid(), rule.scope(), rule.food(), rule.synonyms(), rule.type(),
             uids.get(rule.foodGroupId()), rule.amountPerPortion(), rule.unit(), rule.defaultPortions(),
-            components, rule.overridesRuleUid(), RuleText.describe(rule, names));
+            components, rule.overridesRuleUid(), RuleText.describe(rule, names), rule.countsFlexible());
     }
 
     private static PlanRulesDto.CatalogDto toCatalogDto(PlanRulesDto.RuleDto rule, Map<UUID, UUID> adjustments) {
@@ -243,7 +243,7 @@ class PlanRulesService {
             .toList();
         return new FoodRuleDto(rule.id(), rule.scope(), rule.planId(), rule.userId(), rule.food(),
             rule.synonyms(), rule.type(), rule.standardGroupKey(), group, components, rule.amountPerPortion(),
-            rule.unit(), rule.defaultPortions(), rule.uid(), rule.overridesRuleUid());
+            rule.unit(), rule.defaultPortions(), rule.uid(), rule.overridesRuleUid(), rule.maybeFlexible(), rule.countsFlexible());
     }
 
     private static Long groupIdByKey(List<PlanFoodGroupDto> groups, String key) {
@@ -261,7 +261,7 @@ class PlanRulesService {
             .map(component -> new RuleComponent(plans.findGroupIdByUid(planId, component.groupUid()), null, component.portions()))
             .toList();
         return new RuleInput(req.food(), req.synonyms(), req.type(), group, req.amountPerPortion(),
-            req.unit(), req.defaultPortions(), components, req.overridesRuleUid());
+            req.unit(), req.defaultPortions(), components, req.overridesRuleUid(), req.countsFlexible());
     }
 
     private void requireAllGroups(Long planId, List<UUID> requested) {
@@ -311,6 +311,7 @@ class PlanRulesService {
             .toList();
         return rule.food().equals(req.food().strip())
             && Objects.equals(rule.type(), req.type())
+            && rule.countsFlexible() == req.countsFlexible()
             && Objects.equals(orEmpty(rule.synonyms()), orEmpty(req.synonyms()))
             && Objects.equals(rule.groupUid(), req.groupUid())
             && Objects.equals(rule.unit(), req.unit())
