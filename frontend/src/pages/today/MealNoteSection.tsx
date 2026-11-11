@@ -81,6 +81,7 @@ export const MealNoteSection = memo(function MealNoteSection({
   const hasNote = !!mealDay?.noteText
   const items = mealDay?.items ?? []
   const comparison = mealDay?.comparison ?? []
+  const hasRecordedPortions = comparison.some(group => group.recorded > 0)
   // Las respuestas guardadas se ocultan hasta que llega la comparación nueva, aunque falle la recarga.
   const [answered, setAnswered] = useState<{ source: unknown; groupIds: number[] }>({ source: null, groupIds: [] })
   const answeredGroups = answered.source === mealDay?.comparison ? answered.groupIds : []
@@ -282,7 +283,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       </p>}
       {hasNote && !editing ? <>
         <p className="comida__texto">{mealDay?.noteText}</p>
-        {mealDay?.status !== 'FLEXIBLE' && differences.length > 0 && <ul className="dif">
+        {(mealDay?.status !== 'FLEXIBLE' || hasRecordedPortions) && differences.length > 0 && <ul className="dif">
           {differences.map(group => {
             const extra = group.status === 'DE_MAS'
             const amount = extra ? group.recorded - group.expected : group.expected - group.recorded
@@ -292,7 +293,7 @@ export const MealNoteSection = memo(function MealNoteSection({
             </li>
           })}
         </ul>}
-        {mealDay?.status === 'FLEXIBLE' && <p className="muted sm">Cuenta como comida flexible: no se compara con el plan.</p>}
+        {mealDay?.status === 'FLEXIBLE' && !hasRecordedPortions && <p className="muted sm">Cuenta como comida flexible: no se compara con el plan.</p>}
       </> : <NoteEditor onCancelEdit={() => {
         dirty.current = false
         setText(mealDay?.noteText ?? '')

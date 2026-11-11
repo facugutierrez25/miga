@@ -17,7 +17,7 @@ test('abre directamente cada alimento sin reconocer y permite dejarlo para la nu
 })
 
 test.each([false, true])('corrige por medias porciones para esta comida; usar siempre: %s', async remember => {
-  setupRemoval([{ ...removableItems[0], quantity: 2, uncertain: true, appliedRule: '2 u de leche = 1 porcion' }])
+  setupRemoval([{ ...removableItems[0], quantity: 2, countsFlexible: false, uncertain: true, appliedRule: '2 u de leche = 1 porcion' }])
   vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'EN_PLAN', replacedItemIds: [101], items: [] })
   renderToday()
   await openDetails()

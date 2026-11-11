@@ -591,3 +591,31 @@ test.each(['crear', 'editar', 'borrar'])('el error al %s un hábito aparece dent
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   if (action !== 'borrar') expect(vi.mocked(operation).mock.calls[1]).toContainEqual(expect.objectContaining({ name: 'Agua con limón' }))
 })
+
+
+test.each(['NORMAL', 'COMPUESTO'] as const)('guarda y edita la marca flexible para %s', async tipo => {
+  const onSave = vi.fn().mockResolvedValue(true)
+  const rule = { ...plan.alimentos[0], tipo, groupUid: groups[0].uid, countsFlexible: true,
+    componentes: tipo === 'COMPUESTO' ? [{ groupUid: groups[0].uid, porciones: 1 }, { groupUid: groups[1].uid, porciones: 2 }] : [] }
+  render(<FoodRuleForm groups={groups} rule={rule} onSave={onSave} onCancel={vi.fn()} />)
+  const checkbox = screen.getByRole('checkbox', { name: 'También cuenta como comida flexible' })
+  expect(checkbox).toBeChecked()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar alimento' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ tipo, countsFlexible: true })))
+  fireEvent.click(checkbox)
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar alimento' }))
+  await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ countsFlexible: false })))
+  fireEvent.click(screen.getByRole('radio', { name: 'Flexible' }))
+  expect(screen.queryByRole('checkbox', { name: 'También cuenta como comida flexible' })).not.toBeInTheDocument()
+})
+
+
+test('un alimento nuevo permite sumar su grupo y contar como flexible', async () => {
+  const onSave = vi.fn().mockResolvedValue(true)
+  render(<FoodRuleForm groups={groups} onSave={onSave} onCancel={vi.fn()} />)
+  fireEvent.change(screen.getByRole('textbox', { name: 'Alimento' }), { target: { value: 'Pizza' } })
+  fireEvent.change(screen.getByRole('combobox', { name: 'Grupo' }), { target: { value: groups[0].uid } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'También cuenta como comida flexible' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar alimento' }))
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ alimento: 'Pizza', tipo: 'NORMAL', groupUid: groups[0].uid, countsFlexible: true })))
+})
