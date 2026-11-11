@@ -21,8 +21,11 @@ public class FoodRuleService {
 
     private final FoodRuleRepository repository;
 
-    FoodRuleService(FoodRuleRepository repository) {
+    private final org.springframework.context.ApplicationEventPublisher events;
+
+    FoodRuleService(FoodRuleRepository repository, org.springframework.context.ApplicationEventPublisher events) {
         this.repository = repository;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -56,19 +59,8 @@ public class FoodRuleService {
                                      String food, List<String> synonyms,
                                      BigDecimal amountPerPortion, String unit,
                                      BigDecimal defaultPortions) {
-        validateNames(food, synonyms);
-        FoodRule rule = new FoodRule();
-        rule.setScope("USUARIO");
-        rule.setUserId(userId);
-        rule.setPlanId(planId);
-        rule.setFoodGroupId(foodGroupId);
-        rule.setFood(food.strip());
-        rule.setSynonyms(synonyms);
-        rule.setType("NORMAL");
-        rule.setAmountPerPortion(amountPerPortion);
-        rule.setUnit(unit);
-        rule.setDefaultPortions(defaultPortions != null ? defaultPortions : BigDecimal.ONE);
-        return toDto(repository.save(rule));
+        return createUserRule(userId, planId, new RuleInput(food, synonyms, "NORMAL", foodGroupId,
+            amountPerPortion, unit, defaultPortions, List.of(), null));
     }
 
     @Transactional
@@ -128,12 +120,14 @@ public class FoodRuleService {
 
     @Transactional
     public FoodRuleDto createUserRule(Long userId, Long planId, RuleInput in) {
+        repository.lockUserRules(userId, planId);
         checkDuplicateName(userId, planId, null, in.food());
         FoodRule rule = new FoodRule();
         rule.setUserId(userId);
         rule.setPlanId(planId);
         rule.setScope("USUARIO");
-        apply(rule, in); return toDto(repository.save(rule));
+        apply(rule, in);
+        return toDto(repository.save(rule));
     }
 
     @Transactional(readOnly = true)
@@ -144,11 +138,17 @@ public class FoodRuleService {
 
     @Transactional
     public FoodRuleDto upsertUserRule(Long userId, Long planId, RuleInput in) {
+        repository.lockUserRules(userId, planId);
         var existing = repository.findByUserIdAndPlanIdAndScope(userId, planId, "USUARIO").stream()
             .filter(r -> normalize(r.getFood()).equals(normalize(in.food())))
             .findFirst();
         if (existing.isEmpty()) {
-            return createUserRule(userId, planId, in);
+            FoodRule rule = new FoodRule();
+            rule.setUserId(userId);
+            rule.setPlanId(planId);
+            rule.setScope("USUARIO");
+            apply(rule, in);
+            return toDto(repository.save(rule));
         }
         FoodRule rule = existing.get();
         var aliases = new LinkedHashMap<String, String>();
@@ -159,7 +159,9 @@ public class FoodRuleService {
             in.synonyms().forEach(alias -> aliases.putIfAbsent(normalize(alias), alias));
         }
         apply(rule, new RuleInput(in.food(), List.copyOf(aliases.values()), in.type(), in.foodGroupId(),
-            in.amountPerPortion(), in.unit(), in.defaultPortions(), in.components(), rule.getOverridesRuleUid()));
+            in.amountPerPortion(), in.unit(), in.defaultPortions(), in.components(),
+            in.overridesRuleUid() != null ? in.overridesRuleUid() : rule.getOverridesRuleUid()));
+        events.publishEvent(new UserRuleReused(userId, rule.getUid()));
         return toDto(rule);
     }
 
@@ -168,6 +170,7 @@ public class FoodRuleService {
         FoodRule rule = userRule(userId, planId, uid);
         checkDuplicateName(userId, planId, uid, in.food());
         apply(rule, in);
+        events.publishEvent(new UserRuleReused(userId, rule.getUid()));
         return toDto(rule);
     }
 
@@ -181,10 +184,6 @@ public class FoodRuleService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Ya tenés un alimento con ese nombre. Editalo en lugar de crear otro.");
         }
-    }
-
-    private static void validateNames(String name, List<String> synonyms) {
-        validateNames(name, synonyms, null);
     }
 
     private static void validateNames(String name, List<String> synonyms, FoodRule existing) {

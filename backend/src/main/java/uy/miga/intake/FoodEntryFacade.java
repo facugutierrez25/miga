@@ -27,6 +27,18 @@ public class FoodEntryFacade {
         });
     }
 
+    @org.springframework.context.event.EventListener
+    @Transactional
+    public void onUserRuleReused(uy.miga.reglas.UserRuleReused event) {
+        revokeResolvedRule(event.userId(), event.ruleUid());
+    }
+
+    @Transactional
+    public void revokeResolvedRule(Long userId, UUID uid) {
+        repository.findByUserIdAndResolvedRuleUid(userId, uid)
+            .forEach(entry -> entry.setResolvedRuleUid(null));
+    }
+
     public FoodEntryFacade(FoodEntryRepository repository) {
         this.repository = repository;
     }

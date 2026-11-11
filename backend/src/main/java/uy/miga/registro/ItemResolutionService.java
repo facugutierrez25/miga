@@ -60,11 +60,12 @@ class ItemResolutionService {
         String type = resolution.type();
         String explanation = resolution.explanation();
         UUID ruleUid = null;
-        if (req.remembers() && currentPlan != null
-            && !ruleService.hasUserRuleNamed(userId, currentPlan, entry.food())) {
+        if (req.remembers() && currentPlan != null) {
             RuleInput input = resolveRuleInput(entry, selected, type, groups, planId, currentPlan);
             if (input != null) {
-                ruleUid = ruleService.createUserRule(userId, currentPlan, input).uid();
+                boolean existed = ruleService.hasUserRuleNamed(userId, currentPlan, entry.food());
+                UUID savedUid = ruleService.upsertUserRule(userId, currentPlan, input).uid();
+                if (!existed) ruleUid = savedUid;
                 planService.bumpVersion(currentPlan);
             }
         }
