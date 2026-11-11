@@ -30,12 +30,25 @@ interface FoodRuleRepository extends JpaRepository<FoodRule, Long> {
     List<FoodRule> findApplicable(@Param("planId") Long planId,
                                   @Param("userId") Long userId);
 
-    List<FoodRule> findByUserIdAndPlanIdAndScope(Long userId, Long planId, String scope);
+    @Query("""
+        SELECT r FROM FoodRule r
+        WHERE r.userId = :userId AND r.planId = :planId AND r.scope = :scope
+        ORDER BY r.id ASC
+        """)
+    List<FoodRule> findByUserIdAndPlanIdAndScope(@Param("userId") Long userId,
+                                               @Param("planId") Long planId,
+                                               @Param("scope") String scope);
 
     List<FoodRule> findByPlanIdAndScopeIn(Long planId, List<String> scopes);
 
     @Query("SELECT r FROM FoodRule r WHERE r.uid = :uid AND (r.scope = 'GLOBAL' OR (r.scope = 'PLAN' AND r.planId = :planId))")
     Optional<FoodRule> findForAdjust(@Param("uid") UUID uid, @Param("planId") Long planId);
+
+    @Query(value = """
+        SELECT count(*) FROM pg_advisory_xact_lock(
+            hashtextextended(CAST(:userId AS text) || ':' || CAST(:planId AS text), 0))
+        """, nativeQuery = true)
+    long lockUserRules(@Param("userId") Long userId, @Param("planId") Long planId);
 
     void deleteByIdAndUserId(Long id, Long userId);
 }

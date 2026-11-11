@@ -69,7 +69,7 @@ class InterpreterServiceTest {
         when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(
             new PlanFoodGroupDto(7L, "Cereales", "CER", 0, null, "CER", false, false, UUID.randomUUID())));
         when(entries.findEntryByIdAndUserId(anyLong(), eq(1L))).thenReturn(entry);
-        when(rules.createUserRule(eq(1L), eq(20L),
+        when(rules.upsertUserRule(eq(1L), eq(20L),
             any(RuleInput.class))).thenAnswer(invocation -> {
                 RuleInput input = invocation.getArgument(2);
                 return rule(1L, input.food(), input.synonyms(), input.type(), input.foodGroupId(), null,
@@ -80,7 +80,7 @@ class InterpreterServiceTest {
         service.resolveItem("user", date, 3L, new ResolveItemRequest(ResolveItemRequest.Kind.GROUPS, null,
             List.of(new ResolveItemRequest.GroupPortion(7L, new BigDecimal("2"))), true));
         var capture = ArgumentCaptor.forClass(RuleInput.class);
-        verify(rules).createUserRule(eq(1L), eq(20L), capture.capture());
+        verify(rules).upsertUserRule(eq(1L), eq(20L), capture.capture());
         var input = capture.getValue();
         assertThat(input.amountPerPortion()).isNull();
         assertThat(input.unit()).isNull();
