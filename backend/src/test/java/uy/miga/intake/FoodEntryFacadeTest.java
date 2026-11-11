@@ -18,6 +18,24 @@ class FoodEntryFacadeTest {
     private final LocalDate date = LocalDate.of(2026, 10, 30);
 
     @Test
+    void reusedRuleRevokesAllEarlierEntriesWithoutChangingResolution() {
+        var uid = java.util.UUID.randomUUID();
+        var first = new FoodEntry(1L, "user", 2L, date, "food", 1.0, "u", 3L);
+        var second = new FoodEntry(1L, "user", 2L, date.minusDays(1), "food", 1.0, "u", 3L);
+        for (var entry : java.util.List.of(first, second)) {
+            entry.setResolved(true);
+            entry.setResolvedRuleUid(uid);
+        }
+        when(repository.findByUserIdAndResolvedRuleUid(1L, uid)).thenReturn(java.util.List.of(first, second));
+        facade.onUserRuleReused(new uy.miga.reglas.UserRuleReused(1L, uid));
+        assertThat(first.getResolvedRuleUid()).isNull();
+        assertThat(second.getResolvedRuleUid()).isNull();
+        assertThat(first.isResolved()).isTrue();
+        assertThat(second.isResolved()).isTrue();
+        verify(repository).findByUserIdAndResolvedRuleUid(1L, uid);
+    }
+
+    @Test
     void repeatedResponseDoesNotCreateAnotherEntry() {
         when(repository.existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigin(
             1L, date, 2L, 3L, "RESPUESTA")).thenReturn(true);
