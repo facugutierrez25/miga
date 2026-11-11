@@ -263,7 +263,7 @@ class NoteService {
             }
             for (InterpretedItem item : expandCompound(List.of(mention), rules, planId)) {
                 if (!item.recognized() || item.foodGroupId() == null) continue;
-                entryFacade.createNoteEntry(
+                Long createdId = entryFacade.createNoteEntry(
                     userId, userEmail, mealId, date,
                     item.foodName(),
                     item.quantity().doubleValue(),
@@ -278,6 +278,8 @@ class NoteService {
                     ruleType,
                     ruleSource
                 );
+                entryFacade.setCountsFlexible(List.of(createdId), rules.stream().anyMatch(r ->
+                    Objects.equals(r.id(), mention.ruleId()) && r.countsFlexible()));
             }
         }
     }

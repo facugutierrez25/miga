@@ -33,6 +33,7 @@ export function FlexibleQuestions({ items, token, date, onSaved }: Props) {
   return <>
     {questions.map(item => <div key={item.id} className="nota-pregunta pregunta">
       <span className="nota-pregunta__texto">¿Tu plan cuenta «{item.food}» como comida flexible?</span>
+      <span className="muted sm">Si elegís Sí, suma sus grupos y también cuenta como flexible.</span>
       <div className="nota-pregunta__acciones">
         <button disabled={saving} className="nota-pregunta__si" onClick={() => handleAnswer(item, true)}>Sí</button>
         <button disabled={saving} className="nota-pregunta__no" onClick={() => handleAnswer(item, false)}>No</button>

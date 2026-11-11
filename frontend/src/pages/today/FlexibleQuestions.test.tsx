@@ -7,7 +7,7 @@ vi.mock('../../api/records', () => ({ answerFlexible: vi.fn() }))
 
 const item: EntryItemDto = {
   id: 7, food: 'jamón', quantity: 60, unit: 'g', foodGroupId: 1, portions: 1,
-  origin: 'REGLA', uncertain: false, ruleType: 'PREGUNTAR', ruleSource: 'CATALOGO',
+  origin: 'REGLA', countsFlexible: false, uncertain: false, ruleType: 'PREGUNTAR', ruleSource: 'CATALOGO',
 }
 
 test.each([true, false])('guarda la respuesta flexible y actualiza los ítems (%s)', async flexible => {
@@ -17,6 +17,7 @@ test.each([true, false])('guarda la respuesta flexible y actualiza los ítems (%
   const onSaved = vi.fn()
   const view = render(<FlexibleQuestions items={[item]} token="token" date="2026-11-11" onSaved={onSaved} />)
   expect(screen.getByText('¿Tu plan cuenta «jamón» como comida flexible?')).toBeInTheDocument()
+  expect(screen.getByText('Si elegís Sí, suma sus grupos y también cuenta como flexible.')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: flexible ? 'Sí' : 'No' }))
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(result))
   expect(answerFlexible).toHaveBeenLastCalledWith('token', '2026-11-11', 7, flexible)

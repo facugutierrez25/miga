@@ -103,7 +103,7 @@ export const barRule = '1 barrita = 1 Proteínas + 1 Cereales + 1 Grasas'
 export function barEntry(id: number, foodGroupId: number) {
   return {
     id, food: 'barrita', quantity: 1, unit: 'u', foodGroupId, portions: 1, origin: ItemOrigin.RULE,
-    uncertain: false, originalText: '1 barrita', appliedRule: barRule, occurrenceId: 'occ-1',
+    countsFlexible: false, uncertain: false, originalText: '1 barrita', appliedRule: barRule, occurrenceId: 'occ-1',
   }
 }
 
@@ -131,9 +131,9 @@ export const dayWithNote = {
     mealId: 1, status: 'EN_PLAN' as const, noteId: 5, noteVersion: 3, noteText: 'leche y pan',
     items: [
       { id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE,
-        uncertain: false, originalText: 'leche', appliedRule: null, occurrenceId: 'occ-a' },
+        countsFlexible: false, uncertain: false, originalText: 'leche', appliedRule: null, occurrenceId: 'occ-a' },
       { id: 22, food: 'pan', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE,
-        uncertain: false, originalText: 'pan', appliedRule: null, occurrenceId: 'occ-b' },
+        countsFlexible: false, uncertain: false, originalText: 'pan', appliedRule: null, occurrenceId: 'occ-b' },
     ],
     comparison: [{ foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: 2, status: 'EN_PLAN' }],
   }],
@@ -141,8 +141,8 @@ export const dayWithNote = {
 }
 
 export const removableItems = [
-  { id: 101, food: 'leche', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE, uncertain: false, occurrenceId: 'milk' },
-  { id: 102, food: 'manzana', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, occurrenceId: 'apple' },
+  { id: 101, food: 'leche', quantity: 1, unit: 'u', foodGroupId: 1, portions: 1, origin: ItemOrigin.RULE, countsFlexible: false, uncertain: false, occurrenceId: 'milk' },
+  { id: 102, food: 'manzana', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, countsFlexible: false, uncertain: false, occurrenceId: 'apple' },
 ]
 
 export function setupRemoval(items: recordsApi.EntryItemDto[] = removableItems) {
@@ -162,9 +162,9 @@ export async function openDetails() {
 
 
 
-export const unknownFood: recordsApi.EntryItemDto = { id: 501, food: 'milanesa rara', originalText: 'milanesa rara', quantity: null, unit: null, foodGroupId: null, portions: null, origin: ItemOrigin.UNKNOWN, uncertain: false }
+export const unknownFood: recordsApi.EntryItemDto = { id: 501, food: 'milanesa rara', originalText: 'milanesa rara', quantity: null, unit: null, foodGroupId: null, portions: null, origin: ItemOrigin.UNKNOWN, countsFlexible: false, uncertain: false }
 export async function openResolution() {
-  setupRemoval([unknownFood, { ...removableItems[0], uncertain: true }])
+  setupRemoval([unknownFood, { ...removableItems[0], countsFlexible: false, uncertain: true }])
   renderToday()
   await openDetails()
   fireEvent.click(screen.getByRole('button', { name: 'Decime qué es «milanesa rara»' }))

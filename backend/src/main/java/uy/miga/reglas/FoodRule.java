@@ -12,6 +12,12 @@ import java.util.UUID;
 @Table(name = "food_rules")
 class FoodRule {
 
+    @Column(name = "counts_flexible", nullable = false)
+    private boolean countsFlexible;
+
+    boolean isCountsFlexible() { return countsFlexible; }
+    void setCountsFlexible(boolean value) { countsFlexible = value; }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

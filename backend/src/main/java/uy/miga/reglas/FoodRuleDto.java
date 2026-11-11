@@ -22,8 +22,15 @@ public record FoodRuleDto(
     @JsonProperty("porcionPorDefecto") BigDecimal defaultPortions,
     UUID uid,
     UUID overridesRuleUid,
-    boolean maybeFlexible
+    boolean maybeFlexible,
+    boolean countsFlexible
 ) {
+    public FoodRuleDto(Long id, String scope, Long planId, Long userId, String food, List<String> synonyms,
+        String type, String standardGroupKey, Long foodGroupId, List<RuleComponent> components,
+        BigDecimal amountPerPortion, String unit, BigDecimal defaultPortions, UUID uid, UUID overridesRuleUid, boolean maybeFlexible) {
+        this(id, scope, planId, userId, food, synonyms, type, standardGroupKey, foodGroupId, components,
+            amountPerPortion, unit, defaultPortions, uid, overridesRuleUid, maybeFlexible, false);
+    }
     public FoodRuleDto(Long id, String scope, Long planId, Long userId, String food, List<String> synonyms,
         String type, String standardGroupKey, Long foodGroupId, List<RuleComponent> components,
         BigDecimal amountPerPortion, String unit, BigDecimal defaultPortions, UUID uid, UUID overridesRuleUid) {

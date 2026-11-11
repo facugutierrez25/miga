@@ -54,7 +54,7 @@ test('la regla se muestra con números y acentos legibles', () => {
 })
 
 test('el popup empieza cerrado y conserva la corrección al cerrarlo y volver a abrirlo', async () => {
-  setupRemoval([{ ...removableItems[0], uncertain: true }])
+  setupRemoval([{ ...removableItems[0], countsFlexible: false, uncertain: true }])
   renderToday()
   const toggle = await screen.findByRole('button', { name: 'Así lo entendí' })
   expect(toggle).toHaveAttribute('aria-expanded', 'false')

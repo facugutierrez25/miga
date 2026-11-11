@@ -1,3 +1,4 @@
+import '../../components/StatusChip.css'
 import { validGroupPortions } from '../../lib/groupPortions'
 import {
   ItemOrigin,
@@ -38,7 +39,8 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const info = item.foodGroupId !== null ? groupsMap[item.foodGroupId] : null
-  const flexible = item.ruleType === 'FLEXIBLE'
+  const countsFlexible = item.countsFlexible
+  const flexible = item.foodGroupId === null && countsFlexible
   const recognized = item.foodGroupId !== null || ['LIBRE', 'NO_CUENTA', 'FLEXIBLE'].includes(item.ruleType ?? '')
   const editable = item.id > 0 && item.origin !== ItemOrigin.UNKNOWN && (item.origin !== ItemOrigin.MENTION || recognized)
 
@@ -108,6 +110,7 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
         <span className="nota-item__dot" style={{ background: dot }} aria-hidden="true" />
         <div className="nota-item__contenido">
           <strong className="nota-item__food">{item.food}</strong>
+          {countsFlexible && item.foodGroupId !== null && <> <span className="status-chip status-chip--flexible">flexible</span></>}
           {item.uncertain && <> <span className="understood-tag tag">cantidad estimada</span></>}
           <p className="nota-item__regla">
             {item.portions !== null && <>{fmt(item.portions)} {item.portions === 1 ? 'porción' : 'porciones'}{label && ` de ${label}`} · </>}
@@ -139,8 +142,8 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       </div>
       {editing && <div className="nota-item__secondary">
         {(portions !== 0 || splitting) && <label className="resolve-remember"><input type="checkbox" checked={saveAsRule} disabled={saving} onChange={event => setSaveAsRule(event.target.checked)} />Usar siempre</label>}
-        <button type="button" aria-expanded={splitting} disabled={saving} onClick={() => splitting ? setSplitting(false) : openSplit()}>{flexible ? 'No es flexible' : 'Repartir en varios grupos'}</button>
-        {recognized && !flexible && <button type="button" disabled={busy} onClick={() => submit({ flexible: true, saveAsRule })}>Contar como comida flexible</button>}
+        <button type="button" aria-expanded={splitting} disabled={saving} onClick={() => countsFlexible && item.foodGroupId !== null ? submit({ flexible: false, saveAsRule }) : splitting ? setSplitting(false) : openSplit()}>{countsFlexible ? 'No es flexible' : 'Repartir en varios grupos'}</button>
+        {recognized && !countsFlexible && item.ruleType !== 'PREGUNTAR' && <button type="button" disabled={busy} onClick={() => submit({ flexible: true, saveAsRule })}>Contar como comida flexible</button>}
         {item.foodGroupId === null && removable && <button type="button" className="link" disabled={busy} onClick={onRemove}>Quitar</button>}
       </div>}
       {splitting && (

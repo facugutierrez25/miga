@@ -44,7 +44,7 @@ public class FoodRuleService {
             if (source.get().getSynonyms() != null) aliases.addAll(source.get().getSynonyms());
             return new FoodRuleDto(dto.id(), dto.scope(), dto.planId(), dto.userId(), dto.food(), List.copyOf(aliases),
                 dto.type(), dto.standardGroupKey(), dto.foodGroupId(), dto.components(), dto.amountPerPortion(),
-                dto.unit(), dto.defaultPortions(), dto.uid(), dto.overridesRuleUid());
+                dto.unit(), dto.defaultPortions(), dto.uid(), dto.overridesRuleUid(), dto.maybeFlexible(), dto.countsFlexible());
         }).toList();
     }
 
@@ -75,7 +75,7 @@ public class FoodRuleService {
         return new FoodRuleDto(r.getId(), r.getScope(), r.getPlanId(), r.getUserId(),
             r.getFood(), r.getSynonyms(), r.getType(), r.getStandardGroupKey(),
             r.getFoodGroupId(), r.getComponents(), r.getAmountPerPortion(),
-            r.getUnit(), r.getDefaultPortions(), r.getUid(), r.getOverridesRuleUid(), r.isMaybeFlexible());
+            r.getUnit(), r.getDefaultPortions(), r.getUid(), r.getOverridesRuleUid(), r.isMaybeFlexible(), r.isCountsFlexible());
     }
 
     @Transactional(readOnly = true)
@@ -160,7 +160,7 @@ public class FoodRuleService {
         }
         apply(rule, new RuleInput(in.food(), List.copyOf(aliases.values()), in.type(), in.foodGroupId(),
             in.amountPerPortion(), in.unit(), in.defaultPortions(), in.components(),
-            in.overridesRuleUid() != null ? in.overridesRuleUid() : rule.getOverridesRuleUid()));
+            in.overridesRuleUid() != null ? in.overridesRuleUid() : rule.getOverridesRuleUid(), in.countsFlexible()));
         events.publishEvent(new UserRuleReused(userId, rule.getUid()));
         return toDto(rule);
     }
@@ -225,6 +225,7 @@ public class FoodRuleService {
         rule.setFood(in.food().strip());
         rule.setSynonyms(in.synonyms() == null ? List.of() : in.synonyms());
         rule.setType(in.type());
+        rule.setCountsFlexible(!"FLEXIBLE".equals(in.type()) && in.countsFlexible());
         rule.setFoodGroupId(in.foodGroupId());
         rule.setAmountPerPortion(in.amountPerPortion());
         // Los compuestos guardados antes con unidad y sin cantidad conservan su comportamiento: la unidad suelta se descarta.

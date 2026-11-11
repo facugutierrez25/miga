@@ -771,6 +771,25 @@ class MigrationInvariantsTest {
         }
     }
 
+    @Test
+    void v42PreservesLegacyFlexibleData() throws Exception {
+        buildFlyway("41").migrate();
+        long user;
+        long meal;
+        try (Connection c = connect()) {
+            user = insertUser(c, "flexible-v42@test.com");
+            long plan = insertPlan(c, user);
+            meal = insertMeal(c, plan, "Cena");
+            c.createStatement().execute("INSERT INTO food_rules(alcance, plan_id, alimento, tipo) VALUES ('PLAN', " + plan + ", 'Legacy flexible', 'FLEXIBLE')");
+            c.createStatement().execute("INSERT INTO food_entries(user_id, user_email, meal_id, date, food, quantity, rule_type) VALUES (" + user + ", 'flexible-v42@test.com', " + meal + ", CURRENT_DATE, 'Legacy flexible', 1, 'FLEXIBLE')");
+        }
+        buildFlyway(null).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alimento = 'Legacy flexible' AND tipo = 'FLEXIBLE' AND food_group_id IS NULL AND counts_flexible = false")).isEqualTo(1);
+            assertThat(queryLong(c, "SELECT count(*) FROM food_entries WHERE meal_id = " + meal + " AND rule_type = 'FLEXIBLE' AND food_group_id IS NULL AND porciones IS NULL AND counts_flexible = false")).isEqualTo(1);
+        }
+    }
+
     private Flyway buildFlyway(String target) {
         return buildFlyway(target, false);
     }

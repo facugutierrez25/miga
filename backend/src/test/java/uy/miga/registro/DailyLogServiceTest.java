@@ -42,6 +42,32 @@ class DailyLogServiceTest {
         when(plans.getPlanIdForDate(1L, today)).thenReturn(20L);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void togglesGroupedOccurrenceAndRemembersEquivalentCompound(boolean flexible) {
+        var occurrence = java.util.UUID.randomUUID();
+        var first = new FoodEntryFacade.EntryData(3L, 10L, "sandwich", 1.0, "u", 7L, false, null,
+            "USUARIO", false, BigDecimal.ONE, today, "sandwich", null, occurrence, "COMPUESTO", "USUARIO", false, null, !flexible);
+        var second = new FoodEntryFacade.EntryData(4L, 10L, "sandwich", 1.0, "u", 8L, false, null,
+            "USUARIO", false, BigDecimal.valueOf(2), today, "sandwich", null, occurrence, "COMPUESTO", "USUARIO", false, null, !flexible);
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(first);
+        when(entries.findEntryByIdAndUserId(4L, 1L)).thenReturn(second);
+        when(entries.occurrence(3L)).thenReturn(List.of(first, second));
+        when(plans.getMealIds(20L)).thenReturn(List.of(10L));
+        var result = service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, null, null, null, true, flexible));
+        assertThat(result.replacedItemIds()).containsExactly(3L, 4L);
+        assertThat(result.items()).hasSize(2);
+        verify(entries).setCountsFlexible(List.of(3L, 4L), flexible);
+        verify(entries, never()).makeFlexible(any());
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+        ArgumentCaptor<RuleInput> input = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+        assertThat(input.getValue().type()).isEqualTo("COMPUESTO");
+        assertThat(input.getValue().countsFlexible()).isEqualTo(flexible);
+        assertThat(input.getValue().components()).hasSize(2);
+    }
+
     @Test
     void dayAndWeekUseFlexibleStatusWithoutAnyHabitConfiguration() {
         var entry = new FoodEntryFacade.EntryData(1L, 10L, "pizza", 1.0, "u", null, false, null,
@@ -66,7 +92,7 @@ class DailyLogServiceTest {
         for (int index = 0; index < occurrences.size(); index++) {
             items.add(new FoodEntryFacade.EntryData((long) index + 1, 10L, "pizza", 1.0, "u", null,
                 false, null, "USUARIO", false, null, today, "pizza", null, occurrences.get(index),
-                "FLEXIBLE", "USUARIO", false, null));
+                index < 2 ? "COMPUESTO" : "FLEXIBLE", "USUARIO", false, null, true));
         }
         when(entries.findByUserIdAndDate(1L, today)).thenReturn(items);
         var plan = plans.getReadData(20L);
@@ -75,8 +101,9 @@ class DailyLogServiceTest {
         assertThat(service.getWeekMeals("user", today).getFirst().flexibleCount()).isEqualTo(4);
     }
 
-    @Test
-    void legacyFlexibleNotesUseTheSameFallbackForDayAndWeek() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void legacyFlexibleNotesUseTheSameFallbackForDayAndWeek(boolean grouped) {
         var interpreter = mock(InterpreterService.class);
         var log = DailyLogTestServices.create(notes, interpreter, mock(ComparisonService.class), entries,
             plans, rules, users, java.time.Clock.systemUTC());
@@ -88,9 +115,12 @@ class DailyLogServiceTest {
         note.setText("pizza");
         when(notes.findByUserIdAndDate(1L, today)).thenReturn(List.of(note));
         when(notes.findByUserIdAndDateBetween(1L, today, today)).thenReturn(List.of(note));
+        when(rules.findApplicable(20L, 1L)).thenReturn(List.of(new uy.miga.reglas.FoodRuleDto(
+            5L, "PLAN", 20L, null, "pizza", List.of(), "NORMAL", null, 7L, null,
+            null, null, BigDecimal.ONE, null, null, false, grouped)));
         when(interpreter.interpret(eq("pizza"), anyList())).thenReturn(List.of(new InterpretedItem(
             "pizza", "pizza", BigDecimal.ONE, "u", null, null, BigDecimal.ZERO, "Flexible", false,
-            5L, null, "FLEXIBLE")));
+            5L, null, grouped ? "NORMAL" : "FLEXIBLE")));
         var plan = plans.getReadData(20L);
         when(plans.getPlansForRange(1L, today, today)).thenReturn(java.util.Map.of(today, plan));
         assertThat(log.getDayLog("user", today).meals().getFirst().status()).isEqualTo("FLEXIBLE");

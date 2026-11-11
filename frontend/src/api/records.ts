@@ -51,6 +51,7 @@ export const ItemOrigin = {
 export type ItemOrigin = typeof ItemOrigin[keyof typeof ItemOrigin]
 
 export interface EntryItemDto {
+  countsFlexible: boolean
   id: number
   food: string
   quantity: number | null
