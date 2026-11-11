@@ -218,7 +218,7 @@ class ItemCorrectionService {
                 }
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
                     groupId, unit != null ? quantity.divide(portions, 3, RoundingMode.HALF_UP) : null,
-                    unit, unit != null ? BigDecimal.ONE : portions,
+                    unit, unit != null ? BigDecimal.ONE : portions.divide(quantity, 3, RoundingMode.HALF_UP),
                     List.of(), null));
             }
         }

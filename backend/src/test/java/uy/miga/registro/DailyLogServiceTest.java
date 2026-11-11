@@ -335,8 +335,8 @@ class DailyLogServiceTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value = {"1,NULL", "2,NULL", "1,porción", "2,porciones"}, nullValues = "NULL")
-    void correctionWithoutRealMeasureSavesCorrectedDefaultPortions(int quantity, String unit) {
+    @CsvSource(value = {"1,NULL,3", "2,NULL,1.5", "1,porción,3", "2,porciones,1.5", "7,porciones,0.429"}, nullValues = "NULL")
+    void correctionWithoutRealMeasureSavesDefaultPortionsPerParsedQuantity(int quantity, String unit, BigDecimal expectedDefault) {
         entryWithPortions(null);
         when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
             7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
@@ -353,7 +353,7 @@ class DailyLogServiceTest {
         assertThat(input.getValue().foodGroupId()).isEqualTo(7L);
         assertThat(input.getValue().amountPerPortion()).isNull();
         assertThat(input.getValue().unit()).isNull();
-        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo("3");
+        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo(expectedDefault);
     }
 
     @Test
