@@ -536,6 +536,20 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @ParameterizedTest
+    @CsvSource({"true,{\"portions\":3}", "false,{\"portions\":3}", "false,{\"quantity\":2}"})
+    void flexibleMarkOnGroupedFoodRejectsOtherCorrectionFields(boolean flexible, String extra) throws Exception {
+        String date = LocalDate.now().toString();
+        JsonNode original = putNote(date, "leche").path("entries").get(0);
+        long id = original.path("id").asLong();
+        if (!flexible) patchItem(date, id, "{\"flexible\":true}").andExpect(status().isOk());
+        String body = extra.replace("}", ",\"flexible\":" + flexible + ",\"saveAsRule\":true}");
+        patchItem(date, id, body).andExpect(status().isBadRequest());
+        JsonNode item = getDay(date).path("meals").get(0).path("items").get(0);
+        assertThat(item.path("portions").decimalValue()).isEqualByComparingTo(original.path("portions").decimalValue());
+        assertThat(item.path("countsFlexible").asBoolean()).isEqualTo(!flexible);
+    }
+
+    @ParameterizedTest
     @CsvSource({"pizza,2,2", "2 pizza,3,1.5"})
     void recognizedFlexibleWithoutMeasureRemembersPortionsPerParsedQuantity(
             String text, java.math.BigDecimal correctedPortions, java.math.BigDecimal expectedDefault) throws Exception {
