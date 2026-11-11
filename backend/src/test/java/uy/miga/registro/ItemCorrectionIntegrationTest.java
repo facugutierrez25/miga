@@ -286,6 +286,23 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void compoundRuleUsesCorrectedQuantity() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode entry = putNote(date, "100 g leche").path("entries").get(0);
+        assertThat(entry.path("unit").asText()).isEqualTo("g");
+        patchItem(date, entry.path("id").asLong(), """
+            {"quantity": 200, "grupos": [{"foodGroupId": %d, "porciones": 2}, {"foodGroupId": %d, "porciones": 2}],
+             "saveAsRule": true}
+            """.formatted(groupId("Proteínas"), groupId("Grasas")))
+            .andExpect(status().isOk());
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "200 g leche").path("entries");
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
+            .containsExactlyInAnyOrder(2.0, 2.0);
+    }
+
+    @Test
     void patchItem_rejectsWrongDateForeignGroupAndAmbiguousBody() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();
