@@ -121,7 +121,7 @@ class ItemCorrectionService {
                 var groups = new LinkedHashMap<Long, BigDecimal>();
                 occurrence.stream().filter(e -> e.foodGroupId() != null && e.portions() != null)
                     .forEach(e -> groups.merge(e.foodGroupId(), e.portions(), BigDecimal::add));
-                saveOccurrenceRule(userId, planId, entry, groups, req.makesFlexible());
+                saveOccurrenceRule(userId, planId, entry, entryQuantity(entry), groups, req.makesFlexible());
                 planService.bumpVersion(planId);
             }
             return new PatchItemResultDto(ids, ids.stream()
@@ -217,7 +217,7 @@ class ItemCorrectionService {
             req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
             resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
             if (req.savesRule()) {
-                saveOccurrenceRule(userId, planId, entry, portionsByGroup, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType()));
+                saveOccurrenceRule(userId, planId, entry, quantity, portionsByGroup, entry.countsFlexible() && !"FLEXIBLE".equals(entry.ruleType()));
             }
         } else {
             BigDecimal portions = req.portions() != null ? req.portions() : scaledPortions(entry, quantity);
@@ -244,11 +244,15 @@ class ItemCorrectionService {
         return resultIds;
     }
 
-    private void saveOccurrenceRule(Long userId, Long planId, FoodEntryFacade.EntryData entry,
+    private static BigDecimal entryQuantity(FoodEntryFacade.EntryData entry) {
+        return BigDecimal.valueOf(entry.quantity() != null ? entry.quantity() : 1);
+    }
+
+    private void saveOccurrenceRule(Long userId, Long planId, FoodEntryFacade.EntryData entry, BigDecimal correctedQuantity,
             Map<Long, BigDecimal> groups, boolean flexible) {
         String unit = entry.unit();
         if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) unit = null;
-        BigDecimal quantity = unit != null ? BigDecimal.valueOf(entry.quantity()) : InterpreterService.parsedFoodCount(entry.originalText());
+        BigDecimal quantity = unit != null ? correctedQuantity : InterpreterService.parsedFoodCount(entry.originalText());
         if (groups.isEmpty() || groups.values().stream().anyMatch(p -> p.signum() <= 0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para guardar como regla, indicá porciones mayores a cero");
         }
