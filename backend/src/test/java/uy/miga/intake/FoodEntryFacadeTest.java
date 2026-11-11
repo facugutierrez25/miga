@@ -181,8 +181,9 @@ class FoodEntryFacadeTest {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void ambiguousLegacyOccurrenceRejectsCorrectionBeforeChangingAnything(boolean alreadyFlexible) {
+    @ValueSource(strings = {"FLEXIBLE", "GROUP", "SPLIT"})
+    void ambiguousLegacyOccurrenceRejectsCorrectionBeforeChangingAnything(String correctionKind) {
+        boolean alreadyFlexible = "GROUP".equals(correctionKind);
         var entry = new FoodEntry(1L, "user", 2L, date, "Sticks de pollo", 1.0, "u", 3L);
         org.springframework.test.util.ReflectionTestUtils.setField(entry, "id", 1L);
         entry.setMealNoteId(4L);
@@ -194,8 +195,11 @@ class FoodEntryFacadeTest {
             1L, date, 2L, 4L, "Sticks de pollo", "Sticks de pollo", 1L)).thenReturn(true);
 
         assertThatThrownBy(() -> {
-            if (alreadyFlexible) facade.collapseOccurrence(1L);
-            else facade.makeFlexible(1L);
+            switch (correctionKind) {
+                case "GROUP" -> facade.collapseOccurrence(1L);
+                case "SPLIT" -> facade.splitEntry(1L, java.util.Map.of(3L, BigDecimal.ONE, 5L, BigDecimal.ONE));
+                default -> facade.makeFlexible(1L);
+            }
         }).isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, exception -> {
             assertThat(exception.getStatusCode().value()).isEqualTo(409);
             assertThat(exception.getReason()).isEqualTo(
@@ -207,6 +211,7 @@ class FoodEntryFacadeTest {
         assertThat(entry.getRuleType()).isEqualTo(alreadyFlexible ? "FLEXIBLE" : "COMPUESTO");
         assertThat(entry.getOccurrenceId()).isNull();
         verify(repository, never()).deleteAll(any(Iterable.class));
+        verify(repository, never()).delete(any());
         verify(repository, never()).save(any());
     }
 }

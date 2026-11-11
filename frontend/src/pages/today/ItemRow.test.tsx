@@ -318,6 +318,29 @@ test.each([false, true])('cuenta un alimento reconocido como flexible, usar siem
   expect(recordsApi.patchItem).toHaveBeenLastCalledWith('tok', '2025-01-01', item.id, { flexible: true, saveAsRule: remember })
 })
 
+test('Usar siempre y Listo guarda como regla un ítem que ya es flexible', async () => {
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
+  const onPatched = vi.fn()
+  const result = { status: 'FLEXIBLE' as const, replacedItemIds: [item.id], items: [item] }
+  let completeSave!: (value: typeof result) => void
+  vi.mocked(recordsApi.patchItem).mockReturnValue(new Promise(resolve => { completeSave = resolve }))
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={onPatched} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Usar siempre' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
+
+  expect(recordsApi.patchItem).toHaveBeenCalledExactlyOnceWith('tok', '2025-01-01', item.id, {
+    flexible: true, saveAsRule: true,
+  })
+  expect(screen.getByRole('button', { name: 'Listo' })).toBeDisabled()
+  expect(onPatched).not.toHaveBeenCalled()
+  completeSave(result)
+  await waitFor(() => expect(onPatched).toHaveBeenCalledWith(result))
+  expect(screen.queryByRole('button', { name: 'Listo' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Corregir leche' })).toBeVisible()
+})
+
 test('No es flexible permite volver a un solo grupo', async () => {
   const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
   const onPatched = vi.fn()

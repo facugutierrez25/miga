@@ -74,6 +74,10 @@ export function ItemRow({ item, date, token, groupsMap, onPatched, onRemove, rem
       onRemove?.()
       return
     }
+    if (flexible && saveAsRule) {
+      submit({ flexible: true, saveAsRule: true })
+      return
+    }
     if (flexible || (!portionsTouched && !saveAsRule)) {
       setEditing(false)
       return

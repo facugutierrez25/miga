@@ -161,16 +161,8 @@ public class FoodEntryFacade {
     }
 
     private List<Long> collapseOccurrence(FoodEntry entry) {
-        if (entry.getOccurrenceId() == null) {
-            if (entry.getMealNoteId() != null
-                    && repository.existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
-                        entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getMealNoteId(),
-                        entry.getFood(), entry.getOriginalText(), entry.getId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Este alimento se anotó en una versión anterior; editá la nota para corregirlo");
-            }
-            return List.of(entry.getId());
-        }
+        rejectAmbiguousLegacyOccurrence(entry);
+        if (entry.getOccurrenceId() == null) return List.of(entry.getId());
         var siblings = repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
             entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId());
         List<Long> replacedIds = siblings.stream().map(FoodEntry::getId).toList();
@@ -178,10 +170,21 @@ public class FoodEntryFacade {
         return replacedIds;
     }
 
+    private void rejectAmbiguousLegacyOccurrence(FoodEntry entry) {
+        if (entry.getOccurrenceId() == null && entry.getMealNoteId() != null
+                && repository.existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
+                    entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getMealNoteId(),
+                    entry.getFood(), entry.getOriginalText(), entry.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Este alimento se anotó en una versión anterior; editá la nota para corregirlo");
+        }
+    }
+
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {
         FoodEntry source = repository.findById(id).orElseThrow();
+        rejectAmbiguousLegacyOccurrence(source);
         UUID occurrenceId = source.getOccurrenceId() != null ? source.getOccurrenceId() : UUID.randomUUID();
         List<Long> ids = new ArrayList<>();
         portionsByGroup.forEach((groupId, portions) -> {
