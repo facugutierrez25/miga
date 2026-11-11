@@ -1,4 +1,5 @@
 import { MealQuestions } from './MealQuestions'
+import { FlexibleQuestions } from './FlexibleQuestions'
 import {
   ItemOrigin,
   NoteConflictError,
@@ -311,6 +312,7 @@ export const MealNoteSection = memo(function MealNoteSection({
       {!detailOpen && feedback}
 
       <MealQuestions questions={questions} answerSaving={answerSaving} handleAnswer={handleAnswer} />
+      <FlexibleQuestions items={items} token={token} date={date} onSaved={result => onItemPatched(meal.id!, result)} />
       {items.filter(item => item.origin === ItemOrigin.UNKNOWN).map(item => <div className="pregunta" key={item.id}>
         <span>No reconocí <strong>«{item.originalText || item.food}»</strong></span>
         <button type="button" className="nota-mini" onClick={() => { setResolveTarget(item); setDetailOpen(true) }}>Decime qué es</button>

@@ -40,7 +40,7 @@ vi.mock('../../api/plans')
 vi.mock('../../api/records', async importOriginal => {
   const current = await importOriginal<typeof import('../../api/records')>()
   return { ...current, getDayRecord: vi.fn(), saveNote: vi.fn(), patchItem: vi.fn(),
-    saveAnswer: vi.fn(), getSuggestions: vi.fn(), deleteNote: vi.fn(), removeItem: vi.fn(), resolveItem: vi.fn(), undoResolveItem: vi.fn() }
+    saveAnswer: vi.fn(), answerFlexible: vi.fn(), getSuggestions: vi.fn(), deleteNote: vi.fn(), removeItem: vi.fn(), resolveItem: vi.fn(), undoResolveItem: vi.fn() }
 })
 vi.mock('../../auth/authTypes')
 
