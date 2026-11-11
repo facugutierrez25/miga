@@ -37,7 +37,8 @@ record DayLogDto(
         // NORMAL, COMPUESTO, LIBRE, FLEXIBLE, NO_CUENTA o PREGUNTAR
         String ruleType,
         // PLAN, CATALOGO o USUARIO
-        String ruleSource
+        String ruleSource,
+        boolean countsFlexible
     ) {}
 
     record DailySummaryDto(

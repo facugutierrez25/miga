@@ -142,6 +142,21 @@ public class FoodEntryFacade {
     }
 
     @Transactional
+    public void setCountsFlexible(List<Long> ids, boolean value) {
+        repository.findAllById(ids).forEach(e -> e.setCountsFlexible(value));
+    }
+
+    @Transactional(readOnly = true)
+    public List<EntryData> occurrence(Long id) {
+        FoodEntry entry = repository.findById(id).orElseThrow();
+        rejectAmbiguousLegacyOccurrence(entry);
+        return (entry.getOccurrenceId() == null ? List.of(entry) :
+            repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
+                entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId()))
+            .stream().map(this::toEntryData).toList();
+    }
+
+    @Transactional
     public List<Long> makeFlexible(Long id) {
         FoodEntry entry = repository.findById(id).orElseThrow();
         List<Long> replacedIds = collapseOccurrence(entry);
@@ -183,17 +198,23 @@ public class FoodEntryFacade {
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {
+        return splitEntry(id, portionsByGroup, null);
+    }
+
+    @Transactional
+    public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup, Double quantity) {
         FoodEntry source = repository.findById(id).orElseThrow();
         rejectAmbiguousLegacyOccurrence(source);
         UUID occurrenceId = source.getOccurrenceId() != null ? source.getOccurrenceId() : UUID.randomUUID();
         List<Long> ids = new ArrayList<>();
         portionsByGroup.forEach((groupId, portions) -> {
             FoodEntry entry = new FoodEntry(source.getUserId(), source.getUserEmail(), source.getMealId(),
-                source.getDate(), source.getFood(), source.getQuantity(), source.getUnit(), groupId);
+                source.getDate(), source.getFood(), quantity != null ? quantity : source.getQuantity(), source.getUnit(), groupId);
             entry.setMealNoteId(source.getMealNoteId());
             entry.setOriginalText(source.getOriginalText());
             entry.setOccurrenceId(occurrenceId);
             entry.setConsumed(source.isConsumed());
+            entry.setCountsFlexible(source.isCountsFlexible());
             entry.setOrigin(EntryOrigin.USER);
             entry.setRuleType("COMPUESTO");
             entry.setRuleSource(EntryOrigin.USER);
@@ -253,7 +274,7 @@ public class FoodEntryFacade {
             e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
             e.getOrigin(), e.getEstimated(), e.getPortions(),
             e.getDate(), e.getOriginalText(), e.getAppliedRule(), e.getOccurrenceId(),
-            e.getRuleType(), e.getRuleSource(), e.isResolved(), e.getResolvedRuleUid());
+            e.getRuleType(), e.getRuleSource(), e.isResolved(), e.getResolvedRuleUid(), e.isCountsFlexible() || "FLEXIBLE".equals(e.getRuleType()));
     }
 
     public record EntryData(
@@ -261,6 +282,15 @@ public class FoodEntryFacade {
         Long foodGroupId, boolean consumed, Long mealNoteId,
         String origin, Boolean uncertain, BigDecimal portions,
         LocalDate date, String originalText, String appliedRule, UUID occurrenceId,
-        String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid
-    ) {}
+        String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid, boolean countsFlexible
+    ) {
+        public EntryData(Long id, Long mealId, String food, Double quantity, String unit,
+                Long foodGroupId, boolean consumed, Long mealNoteId, String origin, Boolean uncertain,
+                BigDecimal portions, LocalDate date, String originalText, String appliedRule, UUID occurrenceId,
+                String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid) {
+            this(id, mealId, food, quantity, unit, foodGroupId, consumed, mealNoteId, origin, uncertain,
+                portions, date, originalText, appliedRule, occurrenceId, ruleType, ruleSource, resolved, resolvedRuleUid,
+                "FLEXIBLE".equals(ruleType));
+        }
+    }
 }

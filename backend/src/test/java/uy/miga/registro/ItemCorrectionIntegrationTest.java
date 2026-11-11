@@ -28,6 +28,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
+    void flexibleRuleChangesPreserveMeasuredConversionForEstimatedEntries() throws Exception {
+        createUniqueUserPlan();
+        JsonNode rules = planRules();
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "leche", "tipo", "NORMAL",
+                "groupUid", rules.path("grupos").get(0).path("uid").asText(),
+                "cantidadPorPorcion", 100, "unidad", "g", "porcionPorDefecto", 1))))
+            .andExpect(status().isCreated());
+        JsonNode savedUid = planRules().path("alimentos").get(0).path("uid");
+        String date = LocalDate.now().toString();
+        JsonNode original = putNote(date, "leche").path("entries").get(0);
+        assertThat(original.path("unit").asText()).isEqualTo(uy.miga.reglas.RuleText.portionUnit(java.math.BigDecimal.ONE));
+        assertThat(original.path("portions").decimalValue()).isEqualByComparingTo("1");
+        patchItem(date, original.path("id").asLong(), "{\"flexible\":true,\"saveAsRule\":true}")
+            .andExpect(status().isOk());
+        String nextDate = LocalDate.now().minusDays(1).toString();
+        JsonNode next = putNote(nextDate, "200 g leche").path("entries").get(0);
+        assertThat(next.path("portions").decimalValue()).isEqualByComparingTo("2");
+        assertThat(next.path("countsFlexible").asBoolean()).isTrue();
+        patchItem(nextDate, next.path("id").asLong(), "{\"flexible\":false,\"saveAsRule\":true}")
+            .andExpect(status().isOk());
+        JsonNode last = putNote(LocalDate.now().minusDays(2).toString(), "200 g leche").path("entries").get(0);
+        assertThat(last.path("portions").decimalValue()).isEqualByComparingTo("2");
+        assertThat(last.path("countsFlexible").asBoolean()).isFalse();
+        assertThat(planRules().path("alimentos").get(0).path("uid")).isEqualTo(savedUid);
+    }
+
+    @Test
     void responsesAreIdempotentAndCanBeRemoved() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();
@@ -286,6 +316,48 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void compoundRuleUsesCorrectedQuantity() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode entry = putNote(date, "100 g leche").path("entries").get(0);
+        assertThat(entry.path("unit").asText()).isEqualTo("g");
+        patchItem(date, entry.path("id").asLong(), """
+            {"quantity": 200, "grupos": [{"foodGroupId": %d, "porciones": 2}, {"foodGroupId": %d, "porciones": 2}],
+             "saveAsRule": true}
+            """.formatted(groupId("Proteínas"), groupId("Grasas")))
+            .andExpect(status().isOk());
+
+        JsonNode split = getDay(date).path("meals").get(0).path("items");
+        assertThat(split.findValues("quantity").stream().map(JsonNode::asDouble).toList()).containsOnly(200.0);
+        patchItem(date, split.get(0).path("id").asLong(), "{\"flexible\":true,\"saveAsRule\":true}")
+            .andExpect(status().isOk());
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "200 g leche").path("entries");
+        assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
+            .containsExactlyInAnyOrder(2.0, 2.0);
+    }
+
+    @Test
+    void savingOnlyTheFlexibleMarkKeepsCompoundPortionsExact() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        long id = putNote(date, "200 g leche").path("entries").get(0).path("id").asLong();
+        patchItem(date, id, """
+            {"grupos": [{"foodGroupId": %d, "porciones": 0.5}, {"foodGroupId": %d, "porciones": 0.5}],
+             "saveAsRule": true}
+            """.formatted(groupId("Proteínas"), groupId("Grasas")))
+            .andExpect(status().isOk());
+        long splitId = getDay(date).path("meals").get(0).path("items").get(0).path("id").asLong();
+        patchItem(date, splitId, "{\"flexible\":true,\"saveAsRule\":true}").andExpect(status().isOk());
+        patchItem(date, splitId, "{\"flexible\":false,\"saveAsRule\":true}").andExpect(status().isOk());
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "200 g leche").path("entries");
+        assertThat(next.findValues("portions").stream().map(JsonNode::decimalValue).toList())
+            .allSatisfy(portions -> assertThat(portions).isEqualByComparingTo("0.5"));
+        assertThat(next).hasSize(2);
+    }
+
+    @Test
     void patchItem_rejectsWrongDateForeignGroupAndAmbiguousBody() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();
@@ -435,16 +507,16 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         var replacedIds = new java.util.ArrayList<Long>();
         corrected.path("replacedItemIds").forEach(id -> replacedIds.add(id.asLong()));
         assertThat(replacedIds).containsExactlyElementsOf(originalIds);
-        assertThat(corrected.path("items")).hasSize(1);
-        assertThat(corrected.path("items").get(0).path("id").asLong()).isEqualTo(selectedId);
+        assertThat(corrected.path("items")).hasSize(3);
+        for (int i = 0; i < 3; i++) {
+            assertThat(corrected.path("items").get(i).path("foodGroupId")).isEqualTo(original.get(i).path("foodGroupId"));
+            assertThat(corrected.path("items").get(i).path("portions").decimalValue()).isEqualByComparingTo(original.get(i).path("portions").decimalValue());
+            assertThat(corrected.path("items").get(i).path("countsFlexible").asBoolean()).isTrue();
+        }
         JsonNode day = getDay(date);
         JsonNode meal = day.path("meals").get(0);
         assertThat(meal.path("items")).isEqualTo(corrected.path("items"));
         assertThat(meal.path("status").asText()).isEqualTo("FLEXIBLE");
-        assertThat(meal.path("comparison")).allSatisfy(group ->
-            assertThat(group.path("recorded").asDouble()).isZero());
-        assertThat(day.path("summary")).allSatisfy(group ->
-            assertThat(group.path("totalRecorded").asDouble()).isZero());
         JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString());
@@ -452,24 +524,14 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             assertThat(weekDay.path("date").asText()).isEqualTo(date);
             assertThat(weekDay.path("meals").get(0).path("flexibleCount").asInt()).isEqualTo(1);
         });
-        long proteinId = groupId("Proteínas");
-        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + "}")
-            .andExpect(status().isBadRequest());
-        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + ",\"portions\":0}")
-            .andExpect(status().isBadRequest());
-        assertThat(getDay(date).path("meals").get(0).path("status").asText()).isEqualTo("FLEXIBLE");
-        patchItem(date, selectedId, "{\"foodGroupId\":" + proteinId + ",\"portions\":2}")
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.replacedItemIds[0]").value(selectedId))
-            .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"));
-        day = getDay(date);
-        meal = day.path("meals").get(0);
-        assertThat(meal.path("items")).hasSize(1);
-        assertThat(meal.path("items").get(0).path("occurrenceId")).isEqualTo(original.get(0).path("occurrenceId"));
+        patchItem(date, selectedId, "{\"flexible\":false}")
+            .andExpect(status().isOk());
+        meal = getDay(date).path("meals").get(0);
+        assertThat(meal.path("items")).hasSize(3);
         assertThat(meal.path("status").asText()).isNotEqualTo("FLEXIBLE");
-        for (JsonNode group : day.path("summary")) {
-            assertThat(group.path("totalRecorded").asDouble())
-                .isEqualTo(group.path("foodGroupId").asLong() == proteinId ? 2 : 0);
+        for (int i = 0; i < 3; i++) {
+            assertThat(meal.path("items").get(i).path("portions").decimalValue()).isEqualByComparingTo(original.get(i).path("portions").decimalValue());
+            assertThat(meal.path("items").get(i).path("countsFlexible").asBoolean()).isFalse();
         }
     }
 
@@ -493,7 +555,7 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         long id = original.path("id").asLong();
         patchItem(date, id, "{\"flexible\":true}")
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"));
+            .andExpect(jsonPath("$.items[0].countsFlexible").value(true));
         patchItem(date, id, "{\"foodGroupId\":" + groupId + ",\"portions\":3,\"saveAsRule\":true}")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"))
@@ -525,7 +587,7 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         long id = original.path("id").asLong();
         patchItem(date, id, "{\"flexible\":true}")
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"));
+            .andExpect(jsonPath("$.items[0].countsFlexible").value(true));
         patchItem(date, id, objectMapper.writeValueAsString(java.util.Map.of(
             "saveAsRule", true, "grupos", java.util.List.of(
                 java.util.Map.of("foodGroupId", firstGroupId, "porciones", 3),
@@ -543,6 +605,20 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         }
         assertThat(portionsByGroup.get(firstGroupId)).isEqualByComparingTo("3");
         assertThat(portionsByGroup.get(secondGroupId)).isEqualByComparingTo("1");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,{\"portions\":3}", "false,{\"portions\":3}", "false,{\"quantity\":2}"})
+    void flexibleMarkOnGroupedFoodRejectsOtherCorrectionFields(boolean flexible, String extra) throws Exception {
+        String date = LocalDate.now().toString();
+        JsonNode original = putNote(date, "leche").path("entries").get(0);
+        long id = original.path("id").asLong();
+        if (!flexible) patchItem(date, id, "{\"flexible\":true}").andExpect(status().isOk());
+        String body = extra.replace("}", ",\"flexible\":" + flexible + ",\"saveAsRule\":true}");
+        patchItem(date, id, body).andExpect(status().isBadRequest());
+        JsonNode item = getDay(date).path("meals").get(0).path("items").get(0);
+        assertThat(item.path("portions").decimalValue()).isEqualByComparingTo(original.path("portions").decimalValue());
+        assertThat(item.path("countsFlexible").asBoolean()).isEqualTo(!flexible);
     }
 
     @ParameterizedTest
@@ -623,9 +699,9 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
                 """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("FLEXIBLE"))
-            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"))
-            .andExpect(jsonPath("$.items[0].foodGroupId").isEmpty())
-            .andExpect(jsonPath("$.items[0].portions").isEmpty());
+            .andExpect(jsonPath("$.items[0].countsFlexible").value(true))
+            .andExpect(jsonPath("$.items[0].foodGroupId").value(groupId))
+            .andExpect(jsonPath("$.items[0].portions").value(entry.path("portions").asDouble()));
         JsonNode week = objectMapper.readTree(mockMvc.perform(get("/api/v1/semana").param("date", date)
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString());
@@ -640,9 +716,9 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             .andExpect(content().contentTypeCompatibleWith("text/csv"))
             .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertThat(exported).contains("Flexible");
-        assertThat(putNote(date, "leche").path("entries").get(0).path("ruleType").asText())
-            .isEqualTo("FLEXIBLE");
+        assertThat(putNote(date, "leche").path("entries").get(0).path("countsFlexible").asBoolean()).isTrue();
         id = getDay(date).path("meals").get(0).path("items").get(0).path("id").asLong();
+        patchItem(date, id, "{\"flexible\":false,\"saveAsRule\":true}").andExpect(status().isOk());
         mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + id)
             .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
             .content("{\"foodGroupId\":" + groupId + ",\"portions\":1,\"saveAsRule\":true}"))

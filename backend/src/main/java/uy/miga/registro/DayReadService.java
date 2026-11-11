@@ -202,8 +202,8 @@ class DayReadService {
     private long flexibleCount(List<DayLogDto.EntryItemDto> items, MealNote note, Long planId,
             Map<Long, List<FoodRuleDto>> rules) {
         var noteItems = items.stream().filter(item -> !EntryOrigin.RESPONSE.equals(item.origin())).toList();
-        if (noteItems.stream().anyMatch(item -> item.ruleType() != null)) {
-            return noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType()))
+        if (noteItems.stream().anyMatch(item -> item.ruleType() != null || item.countsFlexible())) {
+            return noteItems.stream().filter(item -> item.countsFlexible())
                 .map(item -> item.occurrenceId() != null ? (Object) item.occurrenceId() : item.id())
                 .distinct().count();
         }
@@ -211,7 +211,8 @@ class DayReadService {
         Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
         return interpreter.interpret(note.getText(), rules.computeIfAbsent(notePlan,
             id -> ruleService.findApplicable(id, note.getUserId()))).stream()
-            .filter(item -> "FLEXIBLE".equals(item.type())).count();
+            .filter(item -> "FLEXIBLE".equals(item.type()) || rules.get(notePlan).stream()
+                .anyMatch(rule -> Objects.equals(rule.id(), item.ruleId()) && rule.countsFlexible())).count();
     }
 
     private DayLogDto.MealDayDto buildMeal(PlanReadData plan, Long mealId, MealNote note,
@@ -246,7 +247,7 @@ class DayReadService {
             compDtos,
             itemDtos.stream().anyMatch(item -> "PREGUNTAR".equals(item.ruleType())
                 && "CATALOGO".equals(item.ruleSource())) ? "PREGUNTAR" : ComparisonService.mealStatus((note != null && !note.getText().isBlank()) || !itemDtos.isEmpty(),
-                itemDtos.stream().anyMatch(item -> "FLEXIBLE".equals(item.ruleType()))
+                itemDtos.stream().anyMatch(item -> item.countsFlexible())
                     || flexibleCount(itemDtos, note, plan.id(), rules) > 0, compDtos)
         );
     }

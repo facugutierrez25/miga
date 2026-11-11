@@ -45,3 +45,26 @@ test.each(['EN_PLAN', 'CASI', 'DE_MAS', 'PREGUNTAR', 'FLEXIBLE', 'REGISTRADA'] a
   expect(meal.querySelector('.status-chip')).toBeInTheDocument()
   expect(meal.querySelector('.meal-card')).not.toBeInTheDocument()
 })
+
+
+test.each([false, true])('flexible muestra comparación solo con porciones registradas: %s', async recorded => {
+  mockGetMyPlan.mockResolvedValue(planWithMeal)
+  mockGetDayRecord.mockResolvedValue({ ...emptyDay, meals: [{
+    mealId: 1, status: 'FLEXIBLE', noteId: 1, noteVersion: 1, noteText: 'pizza', items: [],
+    comparison: [
+      { foodGroupId: 1, name: 'Proteínas', expected: 2, recorded: recorded ? 1 : 0, status: 'CASI' },
+      { foodGroupId: 2, name: 'Grasas', expected: 0, recorded: recorded ? 2 : 0, status: 'DE_MAS' },
+    ],
+  }] })
+  renderToday()
+  const meal = await screen.findByRole('region', { name: 'Desayuno' })
+  expect(within(meal).getByText('Flexible')).toBeVisible()
+  if (recorded) {
+    expect(within(meal).getByText('Faltó 1 porción de Proteínas')).toBeVisible()
+    expect(within(meal).getByText('De más: 2 porciones de Grasas')).toBeVisible()
+    expect(within(meal).queryByText(/no se compara/)).not.toBeInTheDocument()
+  } else {
+    expect(within(meal).getByText('Cuenta como comida flexible: no se compara con el plan.')).toBeVisible()
+    expect(meal.querySelector('.dif')).not.toBeInTheDocument()
+  }
+})

@@ -31,7 +31,7 @@ test.each(['NO_CUENTA', 'LIBRE'])('Quitar en Corregir llama a onRemove para un i
 })
 
 test.each(['NO_CUENTA', 'LIBRE', 'FLEXIBLE'] as const)('un item %s sin grupo permite corregir, repartir y cerrar', async rule => {
-  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}`, ruleType: rule }
+  const item = { ...removableItems[0], foodGroupId: null, portions: null, appliedRule: `leche = ${rule}`, ruleType: rule, countsFlexible: rule === 'FLEXIBLE' }
   setupRemoval([item])
   vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [item.id], items: [item] })
   renderToday()
@@ -97,7 +97,7 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
   expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
 })
 
-test('contar un compuesto como flexible quita todas sus filas y el encabezado', async () => {
+test('contar un compuesto como flexible conserva sus grupos', async () => {
   const compound = [barEntry(11, 1), barEntry(12, 2), barEntry(13, 3)]
   const otherOccurrence = { ...barEntry(14, 1), occurrenceId: 'occ-2' }
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
@@ -108,8 +108,7 @@ test('contar un compuesto como flexible quita todas sus filas y el encabezado', 
   }).mockImplementation(() => new Promise(() => {}))
   vi.mocked(recordsApi.patchItem).mockResolvedValue({
     status: 'FLEXIBLE', replacedItemIds: [11, 12, 13],
-    items: [{ ...compound[1], foodGroupId: null, portions: null, ruleType: 'FLEXIBLE',
-      origin: ItemOrigin.USER, appliedRule: 'barrita: cuenta como comida flexible' }],
+    items: compound.map(item => ({ ...item, countsFlexible: true })),
   })
   renderToday()
   await openDetails()
@@ -118,12 +117,8 @@ test('contar un compuesto como flexible quita todas sus filas y el encabezado', 
   fireEvent.click(within(groupRows).getAllByRole('button', { name: 'Corregir barrita' })[1])
   fireEvent.click(screen.getByRole('button', { name: 'Contar como comida flexible' }))
 
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Corregir grupos de barrita' })).not.toBeInTheDocument())
-  expect(screen.queryByRole('list', { name: 'Grupos de barrita' })).not.toBeInTheDocument()
-  const dialog = screen.getByRole('dialog', { name: 'Así lo entendí' })
-  expect(dialog.querySelectorAll('.nota-compuesto')).toHaveLength(0)
-  expect(dialog.querySelectorAll('.nota-item__food')).toHaveLength(2)
-  expect(within(dialog).getByText('barrita: cuenta como comida flexible')).toBeVisible()
+  await waitFor(() => expect(screen.getAllByText('flexible')).toHaveLength(3))
+  expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
   expect(recordsApi.patchItem).toHaveBeenCalledWith('tok', expect.any(String), 12, { flexible: true, saveAsRule: false })
 })
 
@@ -135,7 +130,7 @@ test('corregir permite repartir un ítem en varios grupos', async () => {
     meals: [{
       mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteVersion: 0, noteText: 'leche', comparison: [],
       items: [{ id: 21, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
-        origin: ItemOrigin.RULE, uncertain: true, appliedRule: '1 leche = 1 Proteínas', occurrenceId: 'occ-2' }],
+        origin: ItemOrigin.RULE, countsFlexible: false, uncertain: true, appliedRule: '1 leche = 1 Proteínas', occurrenceId: 'occ-2' }],
     }],
   })
   mockPatchItem.mockResolvedValue({ status: 'REGISTRADA' as const, replacedItemIds: [21], items: [] })
@@ -181,7 +176,7 @@ test('el reparto conserva la cantidad original', async () => {
 test('muestra los alimentos reconocidos sin grupo con su regla', async () => {
   mockGetMyPlan.mockResolvedValue(planWithMeal)
   mockSaveNote.mockResolvedValue({
-    status: 'REGISTRADA' as const, noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 99, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
+    status: 'REGISTRADA' as const, noteId: 1, version: 0, text: 'mate', date: '2025-01-01', mealId: 1, comparison: [], entries: [{ id: 99, food: 'mate', quantity: 1, unit: 'u', foodGroupId: null, portions: null, origin: ItemOrigin.MENTION, countsFlexible: false, uncertain: false, appliedRule: 'mate = libre (sin porcion asignada)', occurrenceId: 'mate-1' }],
     items: [{
       originalText: 'mate', foodName: 'mate', quantity: 1, unit: 'u', foodGroupId: null,
       standardGroupKey: null, portions: 0, appliedRule: 'mate = libre (sin porcion asignada)',
@@ -228,7 +223,7 @@ test('Listo devuelve el foco a Corregir', async () => {
     meals: [{
       mealId: 1, status: 'REGISTRADA' as const, noteId: 1, noteText: 'leche', noteVersion: 1, comparison: [],
       items: [{ id: 31, food: 'leche', quantity: 1, unit: 'taza', foodGroupId: 1, portions: 1,
-        origin: ItemOrigin.RULE, uncertain: false, appliedRule: null, occurrenceId: 'occ-31' }],
+        origin: ItemOrigin.RULE, countsFlexible: false, uncertain: false, appliedRule: null, occurrenceId: 'occ-31' }],
     }],
   })
   vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [], items: [] })
@@ -306,7 +301,7 @@ test('ANSWER conserva el mínimo de media porción', async () => {
 test.each([false, true])('cuenta un alimento reconocido como flexible, usar siempre %s', async remember => {
   const item = removableItems[0]
   const onPatched = vi.fn()
-  const result = { status: 'FLEXIBLE' as const, replacedItemIds: [item.id], items: [{ ...item, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }] }
+  const result = { status: 'FLEXIBLE' as const, replacedItemIds: [item.id], items: [{ ...item, countsFlexible: true, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }] }
   vi.mocked(recordsApi.patchItem).mockResolvedValue(result)
   render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={onPatched} />)
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
@@ -319,7 +314,7 @@ test.each([false, true])('cuenta un alimento reconocido como flexible, usar siem
 })
 
 test('Usar siempre y Listo guarda como regla un ítem que ya es flexible', async () => {
-  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, countsFlexible: true, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
   const onPatched = vi.fn()
   const result = { status: 'FLEXIBLE' as const, replacedItemIds: [item.id], items: [item] }
   let completeSave!: (value: typeof result) => void
@@ -341,8 +336,15 @@ test('Usar siempre y Listo guarda como regla un ítem que ya es flexible', async
   expect(screen.getByRole('button', { name: 'Corregir leche' })).toBeVisible()
 })
 
+test('un alimento con la pregunta de flexible pendiente no ofrece contarlo como flexible', () => {
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'PREGUNTAR' as const, ruleSource: 'CATALOGO' as const }
+  render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{ 1: { name: 'Grupo', token: 'red' } }} onPatched={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  expect(screen.queryByRole('button', { name: 'Contar como comida flexible' })).not.toBeInTheDocument()
+})
+
 test.each([1, 0.5, 1.5])('No es flexible permite volver a un solo grupo con %s porciones', async portions => {
-  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
+  const item = { ...removableItems[0], origin: ItemOrigin.MENTION, countsFlexible: true, ruleType: 'FLEXIBLE' as const, foodGroupId: null, portions: null }
   const onPatched = vi.fn()
   vi.mocked(recordsApi.patchItem).mockResolvedValue({ status: 'REGISTRADA', replacedItemIds: [item.id], items: [] })
   render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{ 1: { name: 'Grupo', token: 'red' } }} onPatched={onPatched} />)
@@ -366,4 +368,20 @@ test.each(['LIBRE', 'NO_CUENTA'] as const)('una mención %s permite contar como 
   render(<ItemRow item={item} date="2025-01-01" token="tok" groupsMap={{}} onPatched={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
   expect(screen.getByRole('button', { name: 'Contar como comida flexible' })).toBeEnabled()
+})
+
+
+test('un ítem con grupos flexible conserva las porciones y permite quitar solo la marca', async () => {
+  const item = { ...removableItems[0], countsFlexible: true }
+  const result = { status: 'REGISTRADA' as const, replacedItemIds: [item.id], items: [{ ...item, countsFlexible: false }] }
+  vi.mocked(recordsApi.patchItem).mockResolvedValue(result)
+  const onPatched = vi.fn()
+  render(<ItemRow item={item} token="tok" date="2025-01-01" groupsMap={{ 1: { name: 'Proteínas', token: 'var(--ink)' } }} onPatched={onPatched} />)
+  expect(screen.getByText(/1 porción de Proteínas/)).toBeVisible()
+  expect(screen.getByText('flexible')).toHaveClass('status-chip--flexible')
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir leche' }))
+  fireEvent.click(screen.getByRole('button', { name: 'No es flexible' }))
+  expect(screen.queryByRole('group')).not.toBeInTheDocument()
+  await waitFor(() => expect(onPatched).toHaveBeenCalledWith(result))
+  expect(recordsApi.patchItem).toHaveBeenCalledWith('tok', '2025-01-01', item.id, { flexible: false, saveAsRule: false })
 })

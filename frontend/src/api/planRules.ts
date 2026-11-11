@@ -7,6 +7,7 @@ export interface PlanGroup {
 export interface Component { groupUid: string; porciones: number }
 export type RuleType = 'NORMAL' | 'COMPUESTO' | 'LIBRE' | 'FLEXIBLE' | 'NO_CUENTA'
 export interface FoodInput {
+  countsFlexible?: boolean
   alimento: string; sinonimos: string[]; tipo: RuleType; groupUid: string | null
   cantidadPorPorcion: number | null; unidad: string | null; porcionPorDefecto: number | null
   componentes: Component[]; overridesRuleUid: string | null
