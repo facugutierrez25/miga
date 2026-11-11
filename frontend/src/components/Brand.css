@@ -1,0 +1,2 @@
+/* Conserva el tamaño explícito del logo frente a los estilos de cada pantalla. */
+.brand--default-size { font-size: 26px !important; }

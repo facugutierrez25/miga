@@ -11,6 +11,7 @@ test('la portada entrega contenido real sin navegador ni datos personales', () =
   expect(html).toContain('Tus hábitos también se anotan.')
   expect(html).toContain('href="/register"')
   expect(html).not.toContain('Hoy autenticado')
+  expect(html).not.toContain('style=')
 })
 test('el sitemap solo publica la portada y robots permite descubrirla', () => {
   const sitemap = readFileSync('public/sitemap.xml', 'utf8')
