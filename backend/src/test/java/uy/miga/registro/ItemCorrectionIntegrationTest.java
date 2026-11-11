@@ -28,6 +28,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     @Test
+    void flexibleRuleChangesPreserveMeasuredConversionForEstimatedEntries() throws Exception {
+        createUniqueUserPlan();
+        JsonNode rules = planRules();
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "leche", "tipo", "NORMAL",
+                "groupUid", rules.path("grupos").get(0).path("uid").asText(),
+                "cantidadPorPorcion", 100, "unidad", "g", "porcionPorDefecto", 1))))
+            .andExpect(status().isCreated());
+        JsonNode savedUid = planRules().path("alimentos").get(0).path("uid");
+        String date = LocalDate.now().toString();
+        JsonNode original = putNote(date, "leche").path("entries").get(0);
+        assertThat(original.path("unit").asText()).isEqualTo(uy.miga.reglas.RuleText.portionUnit(java.math.BigDecimal.ONE));
+        assertThat(original.path("portions").decimalValue()).isEqualByComparingTo("1");
+        patchItem(date, original.path("id").asLong(), "{\"flexible\":true,\"saveAsRule\":true}")
+            .andExpect(status().isOk());
+        String nextDate = LocalDate.now().minusDays(1).toString();
+        JsonNode next = putNote(nextDate, "200 g leche").path("entries").get(0);
+        assertThat(next.path("portions").decimalValue()).isEqualByComparingTo("2");
+        assertThat(next.path("countsFlexible").asBoolean()).isTrue();
+        patchItem(nextDate, next.path("id").asLong(), "{\"flexible\":false,\"saveAsRule\":true}")
+            .andExpect(status().isOk());
+        JsonNode last = putNote(LocalDate.now().minusDays(2).toString(), "200 g leche").path("entries").get(0);
+        assertThat(last.path("portions").decimalValue()).isEqualByComparingTo("2");
+        assertThat(last.path("countsFlexible").asBoolean()).isFalse();
+        assertThat(planRules().path("alimentos").get(0).path("uid")).isEqualTo(savedUid);
+    }
+
+    @Test
     void responsesAreIdempotentAndCanBeRemoved() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();

@@ -24,6 +24,8 @@ import uy.miga.plans.PlanVersionConflictException;
 
 @Service
 class ItemCorrectionService {
+    private final InterpreterService interpreter;
+    private final RegistrationRuleInputMapper ruleInputMapper;
     private final MealNoteRepository noteRepository;
     private final FoodEntryFacade entryFacade;
     private final PlanService planService;
@@ -33,7 +35,10 @@ class ItemCorrectionService {
     private final DayReadService dayReadService;
 
     ItemCorrectionService(MealNoteRepository noteRepository, FoodEntryFacade entryFacade, PlanService planService,
-            FoodRuleService ruleService, UserService userService, DailyLogSupport support, DayReadService dayReadService) {
+            FoodRuleService ruleService, UserService userService, DailyLogSupport support, DayReadService dayReadService,
+            InterpreterService interpreter, RegistrationRuleInputMapper ruleInputMapper) {
+        this.interpreter = interpreter;
+        this.ruleInputMapper = ruleInputMapper;
         this.noteRepository = noteRepository;
         this.entryFacade = entryFacade;
         this.planService = planService;
@@ -118,10 +123,27 @@ class ItemCorrectionService {
             var ids = occurrence.stream().map(FoodEntryFacade.EntryData::id).toList();
             entryFacade.setCountsFlexible(ids, req.makesFlexible());
             if (req.savesRule()) {
-                var groups = new LinkedHashMap<Long, BigDecimal>();
-                occurrence.stream().filter(e -> e.foodGroupId() != null && e.portions() != null)
-                    .forEach(e -> groups.merge(e.foodGroupId(), e.portions(), BigDecimal::add));
-                saveOccurrenceRule(userId, planId, entry, entryQuantity(entry), groups, req.makesFlexible());
+                var selected = interpreter.findRule(InterpreterService.normalize(entry.food()),
+                    ruleService.findApplicable(planId, userId));
+                if (selected == null) {
+                    var groups = new LinkedHashMap<Long, BigDecimal>();
+                    occurrence.stream().filter(e -> e.foodGroupId() != null && e.portions() != null)
+                        .forEach(e -> groups.merge(e.foodGroupId(), e.portions(), BigDecimal::add));
+                    saveOccurrenceRule(userId, planId, entry, entryQuantity(entry), groups, req.makesFlexible());
+                } else if ("USUARIO".equals(selected.scope())) {
+                    var own = ruleService.getUserRules(userId, planId).stream()
+                        .filter(rule -> rule.uid().equals(selected.uid())).findFirst().orElseThrow();
+                    ruleService.updateUserRule(userId, planId, own.uid(), new RuleInput(own.food(), own.synonyms(),
+                        own.type(), own.foodGroupId(), own.amountPerPortion(), own.unit(), own.defaultPortions(),
+                        own.components(), own.overridesRuleUid(), req.makesFlexible()));
+                } else {
+                    var input = ruleInputMapper.resolveRuleInput(entry, selected, selected.type(), Map.of(), planId, planId);
+                    if (input == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Los grupos no pertenecen a tu plan.");
+                    ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(),
+                        selected.type(), input.foodGroupId(), input.amountPerPortion(), input.unit(),
+                        input.defaultPortions(), input.components(), selected.uid(), req.makesFlexible()));
+                }
                 planService.bumpVersion(planId);
             }
             return new PatchItemResultDto(ids, ids.stream()
