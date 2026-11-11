@@ -194,13 +194,18 @@ class ItemCorrectionService {
             req.groups().forEach(g -> portionsByGroup.put(g.foodGroupId(), g.portions()));
             resultIds = entryFacade.splitEntry(entryId, portionsByGroup);
             if (req.savesRule()) {
+                String unit = entry.unit();
+                if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) {
+                    unit = null;
+                }
+                BigDecimal componentQuantity = unit != null ? quantity : InterpreterService.parsedFoodCount(entry.originalText());
                 List<RuleComponent> components = req.groups().stream()
                     .map(g -> new RuleComponent(g.foodGroupId(), null,
-                        g.portions().divide(quantity, 3, RoundingMode.HALF_UP).doubleValue()))
+                        g.portions().divide(componentQuantity, 3, RoundingMode.HALF_UP).doubleValue()))
                     .toList();
                 // Los componentes quedan por unidad de lo anotado: "200 g" guarda lo de 1 g.
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "COMPUESTO",
-                    null, entry.unit() != null ? BigDecimal.ONE : null, entry.unit(), BigDecimal.ONE, components, null));
+                    null, unit != null ? BigDecimal.ONE : null, unit, BigDecimal.ONE, components, null));
             }
         } else {
             BigDecimal portions = req.portions() != null ? req.portions() : scaledPortions(entry, quantity);

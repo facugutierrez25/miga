@@ -505,6 +505,46 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         assertThat(next.path("portions").decimalValue()).isEqualByComparingTo("3");
     }
 
+    @Test
+    void measurelessNormalFoodRemembersCompoundPortionsWhenCorrectedThroughFlexible() throws Exception {
+        createUniqueUserPlan();
+        JsonNode rules = planRules();
+        JsonNode firstGroup = rules.path("grupos").get(0);
+        long firstGroupId = firstGroup.path("id").asLong();
+        long secondGroupId = rules.path("grupos").get(1).path("id").asLong();
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "pizza", "tipo", "NORMAL",
+                "groupUid", firstGroup.path("uid").asText(), "porcionPorDefecto", 2))))
+            .andExpect(status().isCreated());
+        String date = LocalDate.now().toString();
+        JsonNode original = putNote(date, "pizza").path("entries").get(0);
+        assertThat(original.path("quantity").decimalValue()).isEqualByComparingTo("2");
+        assertThat(original.path("unit").asText()).isEqualTo("porciones");
+        long id = original.path("id").asLong();
+        patchItem(date, id, "{\"flexible\":true}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].ruleType").value("FLEXIBLE"));
+        patchItem(date, id, objectMapper.writeValueAsString(java.util.Map.of(
+            "saveAsRule", true, "grupos", java.util.List.of(
+                java.util.Map.of("foodGroupId", firstGroupId, "porciones", 3),
+                java.util.Map.of("foodGroupId", secondGroupId, "porciones", 1)))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(2));
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "pizza").path("entries");
+        assertThat(next.size()).isEqualTo(2);
+        java.util.Map<Long, java.math.BigDecimal> portionsByGroup = new java.util.HashMap<>();
+        for (JsonNode item : next) {
+            assertThat(item.path("ruleType").asText()).isEqualTo("COMPUESTO");
+            assertThat(item.path("ruleSource").asText()).isEqualTo("USUARIO");
+            portionsByGroup.put(item.path("foodGroupId").asLong(), item.path("portions").decimalValue());
+        }
+        assertThat(portionsByGroup.get(firstGroupId)).isEqualByComparingTo("3");
+        assertThat(portionsByGroup.get(secondGroupId)).isEqualByComparingTo("1");
+    }
+
     @ParameterizedTest
     @CsvSource({"pizza,2,2", "2 pizza,3,1.5"})
     void recognizedFlexibleWithoutMeasureRemembersPortionsPerParsedQuantity(
