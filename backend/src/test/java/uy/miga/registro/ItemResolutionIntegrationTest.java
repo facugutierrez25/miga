@@ -132,6 +132,29 @@ class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void undoEarlierCreationPreservesLaterRememberedContent() throws Exception {
+        String dateA = LocalDate.now().minusDays(2).toString();
+        String dateB = LocalDate.now().minusDays(1).toString();
+        long a = putNote(dateA, "zqxreused").path("entries").get(0).path("id").asLong();
+        long b = putNote(dateB, "zqxreused").path("entries").get(0).path("id").asLong();
+        JsonNode first = resolve(dateA, a, "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        assertThat(first.path("undo").path("ruleUid").isNull()).isFalse();
+        JsonNode second = resolve(dateB, b, "{\"kind\":\"NOT_COUNTED\",\"remember\":true}");
+        assertThat(second.path("undo").path("ruleUid").isNull()).isTrue();
+        JsonNode saved = planRules();
+        assertThat(saved.path("alimentos")).hasSize(1);
+        assertThat(saved.path("alimentos").get(0).path("uid"))
+            .isEqualTo(first.path("undo").path("ruleUid"));
+        assertThat(saved.path("alimentos").get(0).path("tipo").asText()).isEqualTo("NO_CUENTA");
+        assertThat(jdbc.queryForObject("SELECT resolved_rule_uid FROM food_entries WHERE id = ?",
+            UUID.class, first.path("items").get(0).path("id").asLong())).isNull();
+        undo(dateA, first.path("undo"));
+        assertThat(planRules()).isEqualTo(saved);
+        undo(dateB, second.path("undo"));
+        assertThat(planRules()).isEqualTo(saved);
+    }
+
+    @Test
     void undoPreservesExistingNormalizedUserRule() throws Exception {
         // Una nota de ayer: crear alimentos reinterpreta solo las de hoy.
         String date = LocalDate.now().minusDays(1).toString();

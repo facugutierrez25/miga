@@ -10,7 +10,8 @@ import static org.mockito.Mockito.*;
 
 class FoodRuleServiceTest {
     final FoodRuleRepository repository = mock(FoodRuleRepository.class);
-    final FoodRuleService service = new FoodRuleService(repository);
+    final org.springframework.context.ApplicationEventPublisher events = mock(org.springframework.context.ApplicationEventPublisher.class);
+    final FoodRuleService service = new FoodRuleService(repository, events);
     FoodRule rule(String scope, String name) {
         FoodRule r = new FoodRule(); r.setScope(scope); r.setFood(name); r.setType("NORMAL"); r.setDefaultPortions(BigDecimal.ONE); return r;
     }
@@ -60,6 +61,7 @@ class FoodRuleServiceTest {
         when(repository.findByUserIdAndPlanIdAndScope(2L, 1L, "USUARIO")).thenReturn(List.of(existing));
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("arbol", List.of(), "NORMAL",
             7L, BigDecimal.valueOf(2), "u", BigDecimal.ONE, List.of(), null));
+        verify(events).publishEvent(new UserRuleReused(2L, uid));
         assertThat(result.uid()).isEqualTo(uid);
         assertThat(result.overridesRuleUid()).isEqualTo(override);
         assertThat(result.amountPerPortion()).isEqualByComparingTo("2");
@@ -71,6 +73,7 @@ class FoodRuleServiceTest {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         FoodRuleDto result = service.upsertUserRule(2L, 1L, new RuleInput("Nuevo", null, "LIBRE",
             null, null, null, null, List.of(), null));
+        verifyNoInteractions(events);
         assertThat(result.food()).isEqualTo("Nuevo");
         assertThat(result.synonyms()).isEmpty();
         FoodRule persisted = rule("PLAN", "Sin alias");

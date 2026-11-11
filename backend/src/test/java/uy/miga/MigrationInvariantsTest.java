@@ -600,8 +600,9 @@ class MigrationInvariantsTest {
                 VALUES (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE');
                 INSERT INTO food_entries(user_id, user_email, meal_id, date, food, quantity, unit, resolved_rule_uid)
                 VALUES (%3$d, 'duplicates@test.com', %4$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%5$s'),
-                       (%3$d, 'duplicates@test.com', %4$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%6$s');
-                """.formatted(otherUser, otherPlan, user, meal, removed, third));
+                       (%3$d, 'duplicates@test.com', %4$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%6$s'),
+                       (%3$d, 'duplicates@test.com', %4$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%7$s');
+                """.formatted(otherUser, otherPlan, user, meal, removed, third, kept));
         }
 
         buildFlyway(null).migrate();
@@ -620,7 +621,7 @@ class MigrationInvariantsTest {
             assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE overrides_rule_uid = '" + kept + "'"))
                 .isEqualTo(2);
             assertThat(queryLong(c, "SELECT count(*) FROM food_entries WHERE resolved_rule_uid IS NULL"))
-                .isEqualTo(2);
+                .isEqualTo(3);
             assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alcance = 'PLAN' AND alimento = 'Zanahoria'"))
                 .isEqualTo(4);
             assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE user_id = " + otherUser + " AND alcance = 'USUARIO'"))

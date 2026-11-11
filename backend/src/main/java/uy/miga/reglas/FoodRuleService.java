@@ -21,8 +21,11 @@ public class FoodRuleService {
 
     private final FoodRuleRepository repository;
 
-    FoodRuleService(FoodRuleRepository repository) {
+    private final org.springframework.context.ApplicationEventPublisher events;
+
+    FoodRuleService(FoodRuleRepository repository, org.springframework.context.ApplicationEventPublisher events) {
         this.repository = repository;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -158,6 +161,7 @@ public class FoodRuleService {
         apply(rule, new RuleInput(in.food(), List.copyOf(aliases.values()), in.type(), in.foodGroupId(),
             in.amountPerPortion(), in.unit(), in.defaultPortions(), in.components(),
             in.overridesRuleUid() != null ? in.overridesRuleUid() : rule.getOverridesRuleUid()));
+        events.publishEvent(new UserRuleReused(userId, rule.getUid()));
         return toDto(rule);
     }
 

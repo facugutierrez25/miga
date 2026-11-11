@@ -17,7 +17,7 @@ class PlanVersionListenerTest {
     @Test
     void copiesUpsertedUserRuleAndPlanRulesKeepingVersionIdentities() {
         FoodRuleRepository repository = mock(FoodRuleRepository.class);
-        FoodRuleService service = new FoodRuleService(repository);
+        FoodRuleService service = new FoodRuleService(repository, mock(org.springframework.context.ApplicationEventPublisher.class));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         var first = service.createUserRule(2L, 1L, 3L, "Zanahoria", List.of(), BigDecimal.ONE, "u", null);
         ArgumentCaptor<FoodRule> saved = ArgumentCaptor.forClass(FoodRule.class);

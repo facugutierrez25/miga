@@ -25,13 +25,13 @@ FROM user_rule_replacements d
 WHERE r.overrides_rule_uid = d.uid
   AND r.plan_id IS NOT DISTINCT FROM d.plan_id;
 
--- Revocar la autoridad de undo de las resoluciones históricas del uid eliminado.
+-- Revocar undo del duplicado y de la regla conservada: representan varias creaciones.
 -- El uid puede corresponder a una versión posterior al plan de la comida.
 UPDATE food_entries e
 SET resolved_rule_uid = NULL
 WHERE EXISTS (
     SELECT 1 FROM user_rule_replacements d
-    WHERE d.uid = e.resolved_rule_uid AND d.user_id = e.user_id
+    WHERE e.resolved_rule_uid IN (d.uid, d.kept_uid) AND d.user_id = e.user_id
 );
 
 DELETE FROM food_rules r
