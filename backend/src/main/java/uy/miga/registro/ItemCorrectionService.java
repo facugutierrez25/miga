@@ -107,6 +107,11 @@ class ItemCorrectionService {
 
         var occurrence = req.flexible() != null ? entryFacade.occurrence(entryId) : List.<FoodEntryFacade.EntryData>of();
         if (req.flexible() != null && occurrence.stream().anyMatch(e -> e.foodGroupId() != null)) {
+            if (req.quantity() != null || req.unit() != null || req.foodGroupId() != null
+                    || req.portions() != null || req.groups() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Marcá o quitá la comida flexible sin cambiar la cantidad ni los grupos.");
+            }
             var ids = occurrence.stream().map(FoodEntryFacade.EntryData::id).toList();
             entryFacade.setCountsFlexible(ids, req.makesFlexible());
             if (req.savesRule()) {
