@@ -86,8 +86,14 @@ class ItemCorrectionService {
                 "Una comida flexible no lleva grupos ni porciones.");
         }
         if ("FLEXIBLE".equals(entry.ruleType()) && !req.makesFlexible()
-                && req.groups() == null && req.foodGroupId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un grupo para dejar de contarla como flexible.");
+                && req.groups() == null) {
+            if (req.foodGroupId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Elegí un grupo para dejar de contarla como flexible.");
+            }
+            if (req.portions() == null || req.portions().signum() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indicá porciones mayores a cero para volver a un grupo.");
+            }
         }
         Long planId = support.entryPlanId(userId, entry);
         if (!planService.getMealIds(planId).contains(entry.mealId())) {
@@ -205,10 +211,11 @@ class ItemCorrectionService {
             resultIds = List.of(entryId);
             if (req.savesRule()) {
                 Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
+                String unit = req.unit() != null ? req.unit() : entry.unit();
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
-                    groupId, quantity.divide(portions, 3, RoundingMode.HALF_UP),
-                    req.unit() != null ? req.unit() : entry.unit(),
-                    BigDecimal.ONE, List.of(), null));
+                    groupId, unit != null ? quantity.divide(portions, 3, RoundingMode.HALF_UP) : null,
+                    unit, unit != null ? BigDecimal.ONE : portions.divide(quantity, 3, RoundingMode.HALF_UP),
+                    List.of(), null));
             }
         }
 

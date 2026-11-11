@@ -315,6 +315,46 @@ class DailyLogServiceTest {
         order.verify(entries).correctEntry(3L, 2.0, null, 7L, BigDecimal.ONE);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void returningFromFlexibleRequiresExplicitPositivePortions(boolean zero) {
+        entryWithPortions(null);
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", 1.0, null, null, false, null, "USUARIO", false,
+            null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+
+        assertThatThrownBy(() -> service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, 7L, zero ? BigDecimal.ZERO : null, null, false)))
+            .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                assertThat(exception.getStatusCode().value()).isEqualTo(400);
+                assertThat(exception.getReason()).isEqualTo("Indicá porciones mayores a cero para volver a un grupo.");
+            });
+        verify(entries, never()).collapseOccurrence(any());
+        verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2})
+    void unitlessFlexibleCorrectionSavesDefaultPortionsPerUnit(int quantity) {
+        entryWithPortions(null);
+        when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
+            7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", (double) quantity, null, null, false, null, "USUARIO", false,
+            null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+        when(entries.collapseOccurrence(3L)).thenReturn(List.of(3L));
+
+        service.patchItem("user", today, 3L, new PatchItemRequest(null, null, 7L, new BigDecimal("3"), null, true));
+
+        var input = ArgumentCaptor.forClass(RuleInput.class);
+        verify(rules).upsertUserRule(eq(1L), eq(20L), input.capture());
+        assertThat(input.getValue().type()).isEqualTo("NORMAL");
+        assertThat(input.getValue().foodGroupId()).isEqualTo(7L);
+        assertThat(input.getValue().amountPerPortion()).isNull();
+        assertThat(input.getValue().unit()).isNull();
+        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo(quantity == 1 ? "3" : "1.5");
+    }
+
     @Test
     void flexibleCorrectionRejectsSimultaneousGroupBeforeWriting() {
         entryWithPortions(BigDecimal.ONE);
