@@ -6,6 +6,7 @@ import { useAuth } from './auth/authTypes'
 import AppLayout from './components/AppLayout'
 import LandingPage from './pages/LandingPage'
 import ScrollToTop from './components/ScrollToTop'
+import SearchMetadata from './components/SearchMetadata'
 
 const RELOAD_KEY = 'miga-chunk-reload'
 
@@ -46,7 +47,7 @@ function AuthLayout() {
 }
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route element={<Suspense fallback={<LoadingSkeleton label="Cargando…" />}><ScrollToTop /><Outlet /></Suspense>}>
+  <Route element={<Suspense fallback={<LoadingSkeleton label="Cargando…" />}><ScrollToTop /><SearchMetadata /><Outlet /></Suspense>}>
     <Route path="/" element={<LandingPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/login" element={<LoginPage />} />
