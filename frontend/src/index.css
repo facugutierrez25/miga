@@ -19,15 +19,15 @@
 /* Tokens de la guía de estilo (docs/diseno/guia-de-estilo.md) */
 :root {
   color-scheme: light;
-  /* Papel salvia, tinta negra; el oliva queda para el logo y el amarillo marca "ahora" */
+  /* Papel salvia, tinta negra; el verde bosque queda para el logo y el amarillo marca "ahora" */
   --bg: #F2F1EA; --surface: #FBFAF5; --surface-2: #E8E6DA; --surface-3: #DEDBCB;
-  --ink: #040200; --muted: #5E5A2E; --muted-2: #6B6850;
-  --text-secondary: #5E5A2E; --control-border: #857F62;
+  --ink: #040200; --muted: #3F5E3A; --muted-2: #4E6A4C;
+  --text-secondary: #3F5E3A; --control-border: #6B8066;
   --primary: #040200; --on-primary: #F2F1EA; --primary-soft: #E8E6DA; --primary-hover: #2A2820;
-  --brand: #7C773F;
+  --brand: #2F6336;
   --accent: #F6C344; --on-accent: #3A2A00; --accent-soft: #FBEBB8; --on-accent-soft: #5C4300;
-  --line: #E2E0D3; --line-soft: #ECEAE0; --border: #D9D6C8; --control: #857F62;
-  --ok: #2F6B45; --warn: #A9431B; --warn-soft: #F8E6DB; --miga-empty: #857F62;
+  --line: #E2E0D3; --line-soft: #ECEAE0; --border: #D9D6C8; --control: #6B8066;
+  --ok: #2F6B45; --warn: #A9431B; --warn-soft: #F8E6DB; --miga-empty: #6B8066;
   --g-prot: #C8553D; --g-cer: #9A7420; --g-frut: #B04A72;
   --g-lac: #3F7FB5; --g-gras: #6F63B8; --g-verd: #2E8B6E;
   --g-turq: #368C91; --g-tierra: #95715D; --g-indigo: #6675A0; --g-coral: #AD5860;
