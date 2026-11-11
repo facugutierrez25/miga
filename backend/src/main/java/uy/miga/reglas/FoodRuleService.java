@@ -170,6 +170,7 @@ public class FoodRuleService {
         FoodRule rule = userRule(userId, planId, uid);
         checkDuplicateName(userId, planId, uid, in.food());
         apply(rule, in);
+        events.publishEvent(new UserRuleReused(userId, rule.getUid()));
         return toDto(rule);
     }
 

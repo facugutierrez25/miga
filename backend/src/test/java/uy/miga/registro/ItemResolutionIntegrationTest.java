@@ -155,6 +155,27 @@ class ItemResolutionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void undoHistoricalResolutionPreservesExplicitPlanRuleEdit() throws Exception {
+        String date = LocalDate.now().minusDays(1).toString();
+        long id = putNote(date, "zqxedited").path("entries").get(0).path("id").asLong();
+        JsonNode resolution = resolve(date, id, "{\"kind\":\"FLEXIBLE\",\"remember\":true}");
+        String uid = resolution.path("undo").path("ruleUid").asText();
+        assertThat(resolution.path("undo").path("ruleUid").isNull()).isFalse();
+        long version = planRules().path("planVersion").asLong();
+        mockMvc.perform(put("/api/v1/my-plan/alimentos/" + uid)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"planVersion":%d,"alimento":"zqxedited","tipo":"NO_CUENTA"}
+                """.formatted(version)))
+            .andExpect(status().isOk());
+        JsonNode edited = planRules();
+        assertThat(edited.path("alimentos").get(0).path("tipo").asText()).isEqualTo("NO_CUENTA");
+        undo(date, resolution.path("undo"));
+        assertThat(planRules()).isEqualTo(edited);
+        assertThat(edited.path("alimentos").get(0).path("uid").asText()).isEqualTo(uid);
+    }
+
+    @Test
     void undoPreservesExistingNormalizedUserRule() throws Exception {
         // Una nota de ayer: crear alimentos reinterpreta solo las de hoy.
         String date = LocalDate.now().minusDays(1).toString();

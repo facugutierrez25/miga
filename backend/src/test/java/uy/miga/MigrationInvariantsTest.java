@@ -693,7 +693,7 @@ class MigrationInvariantsTest {
                        (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE', NULL),
                        (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE', 'G'),
                        (%1$d, %2$d, 'USUARIO', 'Arroz', 'LIBRE', NULL),
-                       (%1$d, %2$d, 'USUARIO', ' ARROZ ', 'LIBRE', NULL);
+                       (%1$d, %2$d, 'USUARIO', ' ARROZ ', 'NO_CUENTA', NULL);
                 """.formatted(user, plan));
         }
 
@@ -706,6 +706,68 @@ class MigrationInvariantsTest {
                 .isEqualTo(5);
             assertThat(queryLong(c, "SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_food_rules_user_plan_food'"))
                 .isZero();
+        }
+    }
+
+    @Test
+    void v40CanonicalNamesDeduplicateAccentsAndEnforceUniqueIndex() throws Exception {
+        buildFlyway("39").migrate();
+        long user;
+        long plan;
+        try (Connection c = connect()) {
+            user = insertUser(c, "accent-duplicates@test.com");
+            plan = insertPlan(c, user);
+            c.createStatement().execute("""
+                INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo)
+                VALUES (%1$d, %2$d, 'USUARIO', 'Árbol', 'LIBRE'),
+                       (%1$d, %2$d, 'USUARIO', 'arbol', 'LIBRE');
+                """.formatted(user, plan));
+        }
+        buildFlyway(null).migrate();
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alcance = 'USUARIO'"))
+                .isEqualTo(1);
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alimento = 'Árbol'"))
+                .isEqualTo(1);
+            // Compare the SQL function directly with Java's canonical form for Spanish
+            // and other Latin accents, including decomposed combining marks.
+            for (String name : java.util.List.of("ÁÉÍÓÚÜÑáéíóúüñ", "ÀÈÌÒÙàèìòùÂÊÎÔÛâêîôû", "  A\u0301rbol  ", "Çãõÿ")) {
+                String expected = java.text.Normalizer.normalize(name.strip(), java.text.Normalizer.Form.NFD)
+                    .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+                try (PreparedStatement ps = c.prepareStatement("SELECT canonical_user_rule_name(?)")) {
+                    ps.setString(1, name);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        rs.next();
+                        assertThat(rs.getString(1)).isEqualTo(expected);
+                    }
+                }
+            }
+            assertThatThrownBy(() -> c.createStatement().execute("""
+                INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo)
+                VALUES (%d, %d, 'USUARIO', ' ARBOL ', 'LIBRE')
+                """.formatted(user, plan)))
+                .isInstanceOfSatisfying(SQLException.class, e -> assertThat(e.getSQLState()).isEqualTo("23505"));
+        }
+    }
+
+    @Test
+    void v40CanonicalNamesAbortOnDivergentAccentedDuplicates() throws Exception {
+        buildFlyway("39").migrate();
+        try (Connection c = connect()) {
+            long user = insertUser(c, "accent-divergent@test.com");
+            long plan = insertPlan(c, user);
+            c.createStatement().execute("""
+                INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo)
+                VALUES (%1$d, %2$d, 'USUARIO', 'Árbol', 'LIBRE'),
+                       (%1$d, %2$d, 'USUARIO', 'arbol', 'NO_CUENTA');
+                """.formatted(user, plan));
+        }
+        assertThatThrownBy(() -> buildFlyway(null).migrate())
+            .hasStackTraceContaining("V40 abortada: 1 grupos")
+            .hasStackTraceContaining("requieren reconciliación manual");
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alcance = 'USUARIO'"))
+                .isEqualTo(2);
         }
     }
 

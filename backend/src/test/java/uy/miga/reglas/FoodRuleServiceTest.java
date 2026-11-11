@@ -112,6 +112,8 @@ class FoodRuleServiceTest {
                 exception -> assertThat(exception.getStatusCode().value()).isEqualTo(409));
         assertThat(second.getFood()).isEqualTo("Otro");
         assertThat(service.updateUserRule(2L, 1L, first.getUid(), input).food()).isEqualTo("ARBOL");
+        verify(events).publishEvent(new UserRuleReused(2L, first.getUid()));
+        verify(events, never()).publishEvent(new UserRuleReused(2L, second.getUid()));
     }
 
 
