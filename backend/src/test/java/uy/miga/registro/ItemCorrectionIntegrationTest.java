@@ -297,6 +297,11 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
             """.formatted(groupId("Proteínas"), groupId("Grasas")))
             .andExpect(status().isOk());
 
+        JsonNode split = getDay(date).path("meals").get(0).path("items");
+        assertThat(split.findValues("quantity").stream().map(JsonNode::asDouble).toList()).containsOnly(200.0);
+        patchItem(date, split.get(0).path("id").asLong(), "{\"flexible\":true,\"saveAsRule\":true}")
+            .andExpect(status().isOk());
+
         JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "200 g leche").path("entries");
         assertThat(next.findValues("portions").stream().map(JsonNode::asDouble).toList())
             .containsExactlyInAnyOrder(2.0, 2.0);
