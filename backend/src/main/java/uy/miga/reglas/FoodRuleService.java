@@ -83,7 +83,7 @@ public class FoodRuleService {
         return new FoodRuleDto(r.getId(), r.getScope(), r.getPlanId(), r.getUserId(),
             r.getFood(), r.getSynonyms(), r.getType(), r.getStandardGroupKey(),
             r.getFoodGroupId(), r.getComponents(), r.getAmountPerPortion(),
-            r.getUnit(), r.getDefaultPortions(), r.getUid(), r.getOverridesRuleUid());
+            r.getUnit(), r.getDefaultPortions(), r.getUid(), r.getOverridesRuleUid(), r.isMaybeFlexible());
     }
 
     @Transactional(readOnly = true)

@@ -60,6 +60,11 @@ class FoodRule {
     @Column(name = "porcion_por_defecto", nullable = false, precision = 8, scale = 3)
     private BigDecimal defaultPortions = BigDecimal.ONE;
 
+    @Column(name = "maybe_flexible", nullable = false)
+    private boolean maybeFlexible;
+
+    boolean isMaybeFlexible() { return maybeFlexible; }
+
     FoodRule() {}
 
     Long getId()                    { return id; }
