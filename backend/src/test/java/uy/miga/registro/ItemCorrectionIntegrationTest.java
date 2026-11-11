@@ -380,6 +380,42 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
         createCompound("Sticks de pollo", "Proteínas", "Grasas", "Cereales");
         String date = LocalDate.now().toString();
         JsonNode original = putNote(date, "Sticks de pollo").path("entries");
+        assertFlexibleRoundTrip(date, original);
+    }
+
+    @Test
+    void splitLegacyEntryGetsOneOccurrenceAndCanBecomeFlexibleAndReturnToGroups() throws Exception {
+        createUniqueUserPlan();
+        String date = LocalDate.now().toString();
+        JsonNode source = putNote(date, "leche").path("entries").get(0);
+        long sourceId = source.path("id").asLong();
+        jdbc.update("UPDATE food_entries SET occurrence_id = NULL WHERE id = ?", sourceId);
+        assertThat(getDay(date).path("meals").get(0).path("items").get(0).path("occurrenceId").isNull()).isTrue();
+        String groups = objectMapper.writeValueAsString(java.util.Map.of("grupos", java.util.List.of(
+            java.util.Map.of("foodGroupId", groupId("Proteínas"), "porciones", 1),
+            java.util.Map.of("foodGroupId", groupId("Grasas"), "porciones", 1),
+            java.util.Map.of("foodGroupId", groupId("Cereales"), "porciones", 1))));
+        JsonNode split = objectMapper.readTree(patchItem(date, sourceId, groups)
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode original = split.path("items");
+        assertThat(original).hasSize(3);
+        String occurrence = original.get(0).path("occurrenceId").asText();
+        assertThat(occurrence).isNotBlank().isNotEqualTo("null");
+        assertThat(original).allSatisfy(item -> assertThat(item.path("occurrenceId").asText()).isEqualTo(occurrence));
+        JsonNode reloaded = getDay(date).path("meals").get(0).path("items");
+        assertThat(reloaded).hasSize(original.size());
+        for (int index = 0; index < original.size(); index++) {
+            JsonNode expected = original.get(index);
+            JsonNode actual = reloaded.get(index);
+            assertThat(actual.path("id").asLong()).isEqualTo(expected.path("id").asLong());
+            assertThat(actual.path("foodGroupId").asLong()).isEqualTo(expected.path("foodGroupId").asLong());
+            assertThat(actual.path("portions").decimalValue()).isEqualByComparingTo(expected.path("portions").decimalValue());
+            assertThat(actual.path("occurrenceId").asText()).isEqualTo(expected.path("occurrenceId").asText());
+        }
+        assertFlexibleRoundTrip(date, original);
+    }
+
+    private void assertFlexibleRoundTrip(String date, JsonNode original) throws Exception {
         assertThat(original).hasSize(3);
         assertThat(original).allSatisfy(item -> {
             assertThat(item.path("ruleType").asText()).isEqualTo("COMPUESTO");

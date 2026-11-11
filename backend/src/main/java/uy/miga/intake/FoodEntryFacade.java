@@ -159,13 +159,14 @@ public class FoodEntryFacade {
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {
         FoodEntry source = repository.findById(id).orElseThrow();
+        UUID occurrenceId = source.getOccurrenceId() != null ? source.getOccurrenceId() : UUID.randomUUID();
         List<Long> ids = new ArrayList<>();
         portionsByGroup.forEach((groupId, portions) -> {
             FoodEntry entry = new FoodEntry(source.getUserId(), source.getUserEmail(), source.getMealId(),
                 source.getDate(), source.getFood(), source.getQuantity(), source.getUnit(), groupId);
             entry.setMealNoteId(source.getMealNoteId());
             entry.setOriginalText(source.getOriginalText());
-            entry.setOccurrenceId(source.getOccurrenceId());
+            entry.setOccurrenceId(occurrenceId);
             entry.setConsumed(source.isConsumed());
             entry.setOrigin(EntryOrigin.USER);
             entry.setRuleType("COMPUESTO");

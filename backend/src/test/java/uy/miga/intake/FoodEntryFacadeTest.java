@@ -1,6 +1,8 @@
 package uy.miga.intake;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
@@ -116,5 +118,46 @@ class FoodEntryFacadeTest {
         verify(repository).deleteAll(java.util.List.of(sibling));
         assertThat(selected.getRuleType()).isEqualTo("NORMAL");
         assertThat(selected.getFoodGroupId()).isEqualTo(4L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void splitComponentsShareAnOccurrenceAndCanBecomeFlexible(boolean hasOccurrence) {
+        var source = new FoodEntry(1L, "user", 2L, date, "Sticks de pollo", 1.0, "u", 3L);
+        org.springframework.test.util.ReflectionTestUtils.setField(source, "id", 1L);
+        var originalOccurrence = hasOccurrence ? java.util.UUID.randomUUID() : null;
+        source.setOccurrenceId(originalOccurrence);
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(source));
+        var nextId = new java.util.concurrent.atomic.AtomicLong(2);
+        when(repository.save(any())).thenAnswer(invocation -> {
+            FoodEntry entry = invocation.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(entry, "id", nextId.getAndIncrement());
+            return entry;
+        });
+        var groups = new java.util.LinkedHashMap<Long, BigDecimal>();
+        groups.put(3L, BigDecimal.ONE);
+        groups.put(4L, BigDecimal.ONE);
+        groups.put(5L, BigDecimal.ONE);
+
+        assertThat(facade.splitEntry(1L, groups)).containsExactly(2L, 3L, 4L);
+
+        var saved = ArgumentCaptor.forClass(FoodEntry.class);
+        verify(repository, times(3)).save(saved.capture());
+        var components = saved.getAllValues();
+        var occurrence = components.getFirst().getOccurrenceId();
+        assertThat(occurrence).isNotNull();
+        if (hasOccurrence) assertThat(occurrence).isEqualTo(originalOccurrence);
+        assertThat(components).allSatisfy(entry -> assertThat(entry.getOccurrenceId()).isEqualTo(occurrence));
+        verify(repository).delete(source);
+        var selected = components.get(1);
+        when(repository.findById(3L)).thenReturn(java.util.Optional.of(selected));
+        when(repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(1L, date, 2L, occurrence))
+            .thenReturn(components);
+
+        assertThat(facade.makeFlexible(3L)).containsExactly(2L, 3L, 4L);
+        verify(repository).deleteAll(java.util.List.of(components.get(0), components.get(2)));
+        assertThat(selected.getFoodGroupId()).isNull();
+        assertThat(selected.getPortions()).isNull();
+        assertThat(selected.getRuleType()).isEqualTo("FLEXIBLE");
     }
 }
