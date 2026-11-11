@@ -11,6 +11,7 @@ import uy.miga.plans.PlanService;
 import uy.miga.reglas.FoodRuleService;
 import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.RuleInput;
+import uy.miga.reglas.RuleText;
 import uy.miga.users.UserService;
 
 import java.math.BigDecimal;
@@ -212,9 +213,12 @@ class ItemCorrectionService {
             if (req.savesRule()) {
                 Long groupId = req.foodGroupId() != null ? req.foodGroupId() : entry.foodGroupId();
                 String unit = req.unit() != null ? req.unit() : entry.unit();
+                if (RuleText.portionUnit(BigDecimal.ONE).equals(unit) || RuleText.portionUnit(BigDecimal.ZERO).equals(unit)) {
+                    unit = null;
+                }
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "NORMAL",
                     groupId, unit != null ? quantity.divide(portions, 3, RoundingMode.HALF_UP) : null,
-                    unit, unit != null ? BigDecimal.ONE : portions.divide(quantity, 3, RoundingMode.HALF_UP),
+                    unit, unit != null ? BigDecimal.ONE : portions,
                     List.of(), null));
             }
         }

@@ -472,6 +472,41 @@ class ItemCorrectionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void recognizedFlexibleWithoutMeasureRemembersCorrectedPortionsOnAnotherDate() throws Exception {
+        createUniqueUserPlan();
+        JsonNode rules = planRules();
+        mockMvc.perform(post("/api/v1/my-plan/alimentos")
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                "planVersion", rules.path("planVersion").asLong(), "alimento", "zqxflexible",
+                "tipo", "FLEXIBLE"))))
+            .andExpect(status().isCreated());
+        String date = LocalDate.now().toString();
+        JsonNode flexible = putNote(date, "zqxflexible").path("entries").get(0);
+        assertThat(flexible.path("ruleType").asText()).isEqualTo("FLEXIBLE");
+        assertThat(flexible.path("unit").asText()).isEqualTo("porciones");
+        long groupId = groupId("Proteínas");
+
+        patchItem(date, flexible.path("id").asLong(),
+            "{\"foodGroupId\":" + groupId + ",\"portions\":2,\"saveAsRule\":true}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].ruleType").value("NORMAL"))
+            .andExpect(jsonPath("$.items[0].portions").value(2));
+
+        JsonNode next = putNote(LocalDate.now().minusDays(1).toString(), "zqxflexible").path("entries").get(0);
+        assertThat(next.path("ruleType").asText()).isEqualTo("NORMAL");
+        assertThat(next.path("ruleSource").asText()).isEqualTo("USUARIO");
+        assertThat(next.path("foodGroupId").asLong()).isEqualTo(groupId);
+        assertThat(next.path("portions").decimalValue()).isEqualByComparingTo("2");
+        var storedRule = jdbc.queryForMap(
+            "SELECT cantidad_por_porcion, unidad, porcion_por_defecto FROM food_rules WHERE plan_id = ? AND alimento = ? AND alcance = 'USUARIO'",
+            rules.path("planId").asLong(), "zqxflexible");
+        assertThat(storedRule.get("cantidad_por_porcion")).isNull();
+        assertThat(storedRule.get("unidad")).isNull();
+        assertThat((java.math.BigDecimal) storedRule.get("porcion_por_defecto")).isEqualByComparingTo("2");
+    }
+
+    @Test
     void unitlessFlexibleEntryCanReturnToAGroupAndSaveAMeasurelessRule() throws Exception {
         createUniqueUserPlan();
         String date = LocalDate.now().toString();

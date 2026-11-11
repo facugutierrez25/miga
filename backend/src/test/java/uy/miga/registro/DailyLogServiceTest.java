@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
 import uy.miga.intake.FoodEntryFacade;
@@ -334,13 +335,13 @@ class DailyLogServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {1, 2})
-    void unitlessFlexibleCorrectionSavesDefaultPortionsPerUnit(int quantity) {
+    @CsvSource(value = {"1,NULL", "2,NULL", "1,porción", "2,porciones"}, nullValues = "NULL")
+    void correctionWithoutRealMeasureSavesCorrectedDefaultPortions(int quantity, String unit) {
         entryWithPortions(null);
         when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
             7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
         when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
-            3L, 11L, "yogur", (double) quantity, null, null, false, null, "USUARIO", false,
+            3L, 11L, "yogur", (double) quantity, unit, null, false, null, "USUARIO", false,
             null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
         when(entries.collapseOccurrence(3L)).thenReturn(List.of(3L));
 
@@ -352,7 +353,7 @@ class DailyLogServiceTest {
         assertThat(input.getValue().foodGroupId()).isEqualTo(7L);
         assertThat(input.getValue().amountPerPortion()).isNull();
         assertThat(input.getValue().unit()).isNull();
-        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo(quantity == 1 ? "3" : "1.5");
+        assertThat(input.getValue().defaultPortions()).isEqualByComparingTo("3");
     }
 
     @Test
