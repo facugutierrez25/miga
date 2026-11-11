@@ -563,6 +563,123 @@ class MigrationInvariantsTest {
         }
     }
 
+
+    @Test
+    void v40KeepsLowestIdRepointsReferencesAndPreservesPlanVersions() throws Exception {
+        buildFlyway("39").migrate();
+        long user;
+        long older;
+        long newer;
+        long otherPlan;
+        long otherUser;
+        String kept = java.util.UUID.randomUUID().toString();
+        String removed = java.util.UUID.randomUUID().toString();
+        String third = java.util.UUID.randomUUID().toString();
+        try (Connection c = connect()) {
+            user = insertUser(c, "duplicates@test.com");
+            older = insertPlan(c, user);
+            c.createStatement().execute("UPDATE plans SET is_current = false, superseded_at = now() WHERE id = " + older);
+            newer = insertPlan(c, user);
+            otherUser = insertUser(c, "other-duplicates@test.com");
+            otherPlan = insertPlan(c, otherUser);
+            long meal = insertMeal(c, newer, "Desayuno");
+            for (long plan : new long[]{older, newer}) {
+                c.createStatement().execute("""
+                    INSERT INTO food_rules(uid, user_id, plan_id, alcance, alimento, tipo)
+                    VALUES ('%1$s', %4$d, %5$d, 'USUARIO', 'Zanahoria', 'LIBRE'),
+                           ('%2$s', %4$d, %5$d, 'USUARIO', ' ZANAHORIA ', 'FLEXIBLE'),
+                           ('%3$s', %4$d, %5$d, 'USUARIO', 'zanahoria', 'NO_CUENTA');
+                    INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo, overrides_rule_uid)
+                    VALUES (%4$d, %5$d, 'USUARIO', 'Referencia', 'LIBRE', '%2$s');
+                    INSERT INTO food_rules(plan_id, alcance, alimento, tipo)
+                    VALUES (%5$d, 'PLAN', 'Zanahoria', 'LIBRE'), (%5$d, 'PLAN', 'Zanahoria', 'LIBRE');
+                    """.formatted(kept, removed, third, user, plan));
+            }
+            c.createStatement().execute("""
+                INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo)
+                VALUES (%1$d, %2$d, 'USUARIO', 'Zanahoria', 'LIBRE');
+                INSERT INTO food_entries(user_id, user_email, meal_id, date, food, quantity, unit, resolved_rule_uid)
+                VALUES (%3$d, 'duplicates@test.com', %4$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%5$s'),
+                       (%3$d, 'duplicates@test.com', %4$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%6$s');
+                """.formatted(otherUser, otherPlan, user, meal, removed, third));
+        }
+
+        buildFlyway(null).migrate();
+
+        try (Connection c = connect()) {
+            assertThat(queryLong(c, """
+                SELECT count(*) FROM (
+                    SELECT user_id, plan_id, lower(btrim(alimento)) FROM food_rules WHERE alcance = 'USUARIO'
+                    GROUP BY user_id, plan_id, lower(btrim(alimento)) HAVING count(*) > 1
+                ) duplicates
+                """)).isZero();
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE uid = '" + kept + "' AND tipo = 'LIBRE'"))
+                .isEqualTo(2);
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE uid IN ('" + removed + "', '" + third + "')"))
+                .isZero();
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE overrides_rule_uid = '" + kept + "'"))
+                .isEqualTo(2);
+            assertThat(queryLong(c, "SELECT count(*) FROM food_entries WHERE resolved_rule_uid = '" + kept + "'"))
+                .isEqualTo(2);
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE alcance = 'PLAN' AND alimento = 'Zanahoria'"))
+                .isEqualTo(4);
+            assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE user_id = " + otherUser + " AND alcance = 'USUARIO'"))
+                .isEqualTo(1);
+            assertThatThrownBy(() -> c.createStatement().execute("""
+                INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo)
+                VALUES (%d, %d, 'USUARIO', ' ZANAHORIA ', 'LIBRE')
+                """.formatted(user, newer)))
+                .isInstanceOfSatisfying(SQLException.class, exception -> assertThat(exception.getSQLState()).isEqualTo("23505"));
+        }
+    }
+
+    @Test
+    void v40ResolvesSharedUidsUsingTheReferencedPlanVersion() throws Exception {
+        buildFlyway("39").migrate();
+        String firstUid = java.util.UUID.randomUUID().toString();
+        String secondUid = java.util.UUID.randomUUID().toString();
+        long older;
+        long newer;
+        try (Connection c = connect()) {
+            long user = insertUser(c, "versioned-duplicates@test.com");
+            older = insertPlan(c, user);
+            c.createStatement().execute("UPDATE plans SET is_current = false, superseded_at = now() WHERE id = " + older);
+            newer = insertPlan(c, user);
+            for (long plan : new long[]{older, newer}) {
+                long meal = insertMeal(c, plan, "Desayuno");
+                String kept = plan == older ? firstUid : secondUid;
+                String removed = plan == older ? secondUid : firstUid;
+                c.createStatement().execute("""
+                    INSERT INTO food_rules(uid, user_id, plan_id, alcance, alimento, tipo)
+                    VALUES ('%1$s', %3$d, %4$d, 'USUARIO', 'Zanahoria', 'LIBRE'),
+                           ('%2$s', %3$d, %4$d, 'USUARIO', ' ZANAHORIA ', 'LIBRE');
+                    INSERT INTO food_rules(user_id, plan_id, alcance, alimento, tipo, overrides_rule_uid)
+                    VALUES (%3$d, %4$d, 'USUARIO', 'Referencia', 'LIBRE', '%2$s');
+                    INSERT INTO food_entries(user_id, user_email, meal_id, date, food, quantity, unit, resolved_rule_uid)
+                    VALUES (%3$d, 'versioned-duplicates@test.com', %5$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%1$s'),
+                           (%3$d, 'versioned-duplicates@test.com', %5$d, CURRENT_DATE, 'Zanahoria', 1, 'u', '%2$s');
+                    """.formatted(kept, removed, user, plan, meal));
+            }
+        }
+
+        buildFlyway(null).migrate();
+
+        try (Connection c = connect()) {
+            for (long plan : new long[]{older, newer}) {
+                String kept = plan == older ? firstUid : secondUid;
+                assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE plan_id = " + plan +
+                    " AND uid = '" + kept + "' AND alimento = 'Zanahoria'"))
+                    .isEqualTo(1);
+                assertThat(queryLong(c, "SELECT count(*) FROM food_rules WHERE plan_id = " + plan +
+                    " AND overrides_rule_uid = '" + kept + "'"))
+                    .isEqualTo(1);
+                assertThat(queryLong(c, "SELECT count(*) FROM food_entries e JOIN meals m ON m.id = e.meal_id WHERE m.plan_id = " +
+                    plan + " AND resolved_rule_uid = '" + kept + "'"))
+                    .isEqualTo(2);
+            }
+        }
+    }
+
     private Flyway buildFlyway(String target) {
         return buildFlyway(target, false);
     }
