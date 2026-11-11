@@ -2,6 +2,8 @@ package uy.miga.intake;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -147,7 +149,16 @@ public class FoodEntryFacade {
     }
 
     private List<Long> collapseOccurrence(FoodEntry entry) {
-        if (entry.getOccurrenceId() == null) return List.of(entry.getId());
+        if (entry.getOccurrenceId() == null) {
+            if (entry.getMealNoteId() != null
+                    && repository.existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
+                        entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getMealNoteId(),
+                        entry.getFood(), entry.getOriginalText(), entry.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Este alimento se anotó en una versión anterior; editá la nota para corregirlo");
+            }
+            return List.of(entry.getId());
+        }
         var siblings = repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
             entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId());
         List<Long> replacedIds = siblings.stream().map(FoodEntry::getId).toList();

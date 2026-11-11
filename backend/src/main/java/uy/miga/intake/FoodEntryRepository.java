@@ -23,6 +23,9 @@ interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
     List<FoodEntry> findByUserIdAndDateOrderByIdAsc(Long userId, LocalDate date);
     Optional<FoodEntry> findByIdAndUserId(Long id, Long userId);
 
+    boolean existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
+        Long userId, LocalDate date, Long mealId, Long mealNoteId, String food, String originalText, Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<FoodEntry> findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
         Long userId, LocalDate date, Long mealId, UUID occurrenceId);

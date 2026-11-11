@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class FoodEntryFacadeTest {
@@ -159,5 +160,35 @@ class FoodEntryFacadeTest {
         assertThat(selected.getFoodGroupId()).isNull();
         assertThat(selected.getPortions()).isNull();
         assertThat(selected.getRuleType()).isEqualTo("FLEXIBLE");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void ambiguousLegacyOccurrenceRejectsCorrectionBeforeChangingAnything(boolean alreadyFlexible) {
+        var entry = new FoodEntry(1L, "user", 2L, date, "Sticks de pollo", 1.0, "u", 3L);
+        org.springframework.test.util.ReflectionTestUtils.setField(entry, "id", 1L);
+        entry.setMealNoteId(4L);
+        entry.setOriginalText("Sticks de pollo");
+        entry.setPortions(BigDecimal.ONE);
+        entry.setRuleType(alreadyFlexible ? "FLEXIBLE" : "COMPUESTO");
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(entry));
+        when(repository.existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
+            1L, date, 2L, 4L, "Sticks de pollo", "Sticks de pollo", 1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> {
+            if (alreadyFlexible) facade.collapseOccurrence(1L);
+            else facade.makeFlexible(1L);
+        }).isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, exception -> {
+            assertThat(exception.getStatusCode().value()).isEqualTo(409);
+            assertThat(exception.getReason()).isEqualTo(
+                "Este alimento se anotó en una versión anterior; editá la nota para corregirlo");
+        });
+
+        assertThat(entry.getFoodGroupId()).isEqualTo(3L);
+        assertThat(entry.getPortions()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(entry.getRuleType()).isEqualTo(alreadyFlexible ? "FLEXIBLE" : "COMPUESTO");
+        assertThat(entry.getOccurrenceId()).isNull();
+        verify(repository, never()).deleteAll(any(Iterable.class));
+        verify(repository, never()).save(any());
     }
 }
