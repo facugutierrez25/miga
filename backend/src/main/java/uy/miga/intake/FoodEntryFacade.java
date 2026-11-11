@@ -2,6 +2,8 @@ package uy.miga.intake;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,6 +27,18 @@ public class FoodEntryFacade {
             e.setResolvedRuleUid(ruleUid);
             if (EntryOrigin.RULE.equals(e.getOrigin())) e.setOrigin(EntryOrigin.USER);
         });
+    }
+
+    @org.springframework.context.event.EventListener
+    @Transactional
+    public void onUserRuleReused(uy.miga.reglas.UserRuleReused event) {
+        revokeResolvedRule(event.userId(), event.ruleUid());
+    }
+
+    @Transactional
+    public void revokeResolvedRule(Long userId, UUID uid) {
+        repository.findByUserIdAndResolvedRuleUid(userId, uid)
+            .forEach(entry -> entry.setResolvedRuleUid(null));
     }
 
     public FoodEntryFacade(FoodEntryRepository repository) {
@@ -127,18 +141,80 @@ public class FoodEntryFacade {
         });
     }
 
+    @Transactional
+    public void setCountsFlexible(List<Long> ids, boolean value) {
+        repository.findAllById(ids).forEach(e -> e.setCountsFlexible(value));
+    }
+
+    @Transactional(readOnly = true)
+    public List<EntryData> occurrence(Long id) {
+        FoodEntry entry = repository.findById(id).orElseThrow();
+        rejectAmbiguousLegacyOccurrence(entry);
+        return (entry.getOccurrenceId() == null ? List.of(entry) :
+            repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
+                entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId()))
+            .stream().map(this::toEntryData).toList();
+    }
+
+    @Transactional
+    public List<Long> makeFlexible(Long id) {
+        FoodEntry entry = repository.findById(id).orElseThrow();
+        List<Long> replacedIds = collapseOccurrence(entry);
+        entry.setFoodGroupId(null);
+        entry.setPortions(null);
+        entry.setRuleType("FLEXIBLE");
+        entry.setRuleSource(EntryOrigin.USER);
+        entry.setOrigin(EntryOrigin.USER);
+        entry.setAppliedRule(entry.getFood() + ": cuenta como comida flexible");
+        entry.setEstimated(false);
+        return replacedIds;
+    }
+
+    @Transactional
+    public List<Long> collapseOccurrence(Long id) {
+        return collapseOccurrence(repository.findById(id).orElseThrow());
+    }
+
+    private List<Long> collapseOccurrence(FoodEntry entry) {
+        rejectAmbiguousLegacyOccurrence(entry);
+        if (entry.getOccurrenceId() == null) return List.of(entry.getId());
+        var siblings = repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
+            entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId());
+        List<Long> replacedIds = siblings.stream().map(FoodEntry::getId).toList();
+        repository.deleteAll(siblings.stream().filter(sibling -> !sibling.getId().equals(entry.getId())).toList());
+        return replacedIds;
+    }
+
+    private void rejectAmbiguousLegacyOccurrence(FoodEntry entry) {
+        if (entry.getOccurrenceId() == null && entry.getMealNoteId() != null
+                && repository.existsByUserIdAndDateAndMealIdAndMealNoteIdAndFoodAndOriginalTextAndOccurrenceIdIsNullAndIdNot(
+                    entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getMealNoteId(),
+                    entry.getFood(), entry.getOriginalText(), entry.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Este alimento se anotó en una versión anterior; editá la nota para corregirlo");
+        }
+    }
+
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.
     @Transactional
     public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup) {
+        return splitEntry(id, portionsByGroup, null);
+    }
+
+    @Transactional
+    public List<Long> splitEntry(Long id, Map<Long, BigDecimal> portionsByGroup, Double quantity) {
         FoodEntry source = repository.findById(id).orElseThrow();
+        rejectAmbiguousLegacyOccurrence(source);
+        UUID occurrenceId = source.getOccurrenceId() != null ? source.getOccurrenceId() : UUID.randomUUID();
         List<Long> ids = new ArrayList<>();
         portionsByGroup.forEach((groupId, portions) -> {
             FoodEntry entry = new FoodEntry(source.getUserId(), source.getUserEmail(), source.getMealId(),
-                source.getDate(), source.getFood(), source.getQuantity(), source.getUnit(), groupId);
+                source.getDate(), source.getFood(), quantity != null ? quantity : source.getQuantity(), source.getUnit(), groupId);
             entry.setMealNoteId(source.getMealNoteId());
             entry.setOriginalText(source.getOriginalText());
-            entry.setOccurrenceId(source.getOccurrenceId());
+            entry.setOccurrenceId(occurrenceId);
             entry.setConsumed(source.isConsumed());
+            entry.setCountsFlexible(source.isCountsFlexible());
             entry.setOrigin(EntryOrigin.USER);
             entry.setRuleType("COMPUESTO");
             entry.setRuleSource(EntryOrigin.USER);
@@ -198,7 +274,7 @@ public class FoodEntryFacade {
             e.getFoodGroupId(), e.isConsumed(), e.getMealNoteId(),
             e.getOrigin(), e.getEstimated(), e.getPortions(),
             e.getDate(), e.getOriginalText(), e.getAppliedRule(), e.getOccurrenceId(),
-            e.getRuleType(), e.getRuleSource(), e.isResolved(), e.getResolvedRuleUid());
+            e.getRuleType(), e.getRuleSource(), e.isResolved(), e.getResolvedRuleUid(), e.isCountsFlexible() || "FLEXIBLE".equals(e.getRuleType()));
     }
 
     public record EntryData(
@@ -206,6 +282,15 @@ public class FoodEntryFacade {
         Long foodGroupId, boolean consumed, Long mealNoteId,
         String origin, Boolean uncertain, BigDecimal portions,
         LocalDate date, String originalText, String appliedRule, UUID occurrenceId,
-        String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid
-    ) {}
+        String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid, boolean countsFlexible
+    ) {
+        public EntryData(Long id, Long mealId, String food, Double quantity, String unit,
+                Long foodGroupId, boolean consumed, Long mealNoteId, String origin, Boolean uncertain,
+                BigDecimal portions, LocalDate date, String originalText, String appliedRule, UUID occurrenceId,
+                String ruleType, String ruleSource, boolean resolved, UUID resolvedRuleUid) {
+            this(id, mealId, food, quantity, unit, foodGroupId, consumed, mealNoteId, origin, uncertain,
+                portions, date, originalText, appliedRule, occurrenceId, ruleType, ruleSource, resolved, resolvedRuleUid,
+                "FLEXIBLE".equals(ruleType));
+        }
+    }
 }

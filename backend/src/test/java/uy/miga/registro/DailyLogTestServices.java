@@ -11,9 +11,10 @@ final class DailyLogTestServices {
             FoodRuleService rules, UserService users, java.time.Clock clock) {
         var support = new DailyLogSupport(notes, plans);
         var reads = new DayReadService(notes, interpreter, rules, comparison, entries, plans, users, support);
+        var ruleInputMapper = new RegistrationRuleInputMapper(plans, support);
         return new DailyLogService(
             new NoteService(notes, interpreter, comparison, entries, plans, rules, users, clock, support, reads),
-            reads, new ItemCorrectionService(notes, entries, plans, rules, users, support, reads),
-            new ItemResolutionService(interpreter, entries, plans, rules, users, support, reads));
+            reads, new ItemCorrectionService(notes, entries, plans, rules, users, support, reads, interpreter, ruleInputMapper),
+            new ItemResolutionService(interpreter, entries, plans, rules, users, support, reads, ruleInputMapper));
     }
 }

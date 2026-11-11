@@ -61,7 +61,7 @@ class ApiContractsTest {
         if (cls == Integer.class || cls == int.class) return 1;
         if (cls == Short.class || cls == short.class) return (short) 1;
         if (cls == Double.class || cls == double.class) return 1.5;
-        if (cls == Boolean.class || cls == boolean.class) return true;
+        if (cls == Boolean.class || cls == boolean.class) return !"countsFlexible".equals(name);
         var components = cls.getRecordComponents();
         assertThat(components).as("Tipo de contrato soportado: %s", cls).isNotNull();
         Class<?>[] types = new Class<?>[components.length];

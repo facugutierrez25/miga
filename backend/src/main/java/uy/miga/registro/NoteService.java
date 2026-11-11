@@ -251,6 +251,8 @@ class NoteService {
             UUID occurrenceId = UUID.randomUUID();
             String ruleText = describeRule(mention, rules, planId, groupNames);
             String ruleType = mention.recognized() ? mention.type() : null;
+            if (rules.stream().anyMatch(r -> Objects.equals(r.id(), mention.ruleId())
+                    && "GLOBAL".equals(r.scope()) && r.maybeFlexible())) ruleType = "PREGUNTAR";
             String ruleSource = ruleSource(mention, rules);
             if (!mention.recognized() || Set.of("LIBRE", "FLEXIBLE", "NO_CUENTA").contains(mention.type())) {
                 entryFacade.createMentionEntry(userId, userEmail, mealId, date, mention.foodName(),
@@ -261,7 +263,7 @@ class NoteService {
             }
             for (InterpretedItem item : expandCompound(List.of(mention), rules, planId)) {
                 if (!item.recognized() || item.foodGroupId() == null) continue;
-                entryFacade.createNoteEntry(
+                Long createdId = entryFacade.createNoteEntry(
                     userId, userEmail, mealId, date,
                     item.foodName(),
                     item.quantity().doubleValue(),
@@ -276,6 +278,8 @@ class NoteService {
                     ruleType,
                     ruleSource
                 );
+                entryFacade.setCountsFlexible(List.of(createdId), rules.stream().anyMatch(r ->
+                    Objects.equals(r.id(), mention.ruleId()) && r.countsFlexible()));
             }
         }
     }
