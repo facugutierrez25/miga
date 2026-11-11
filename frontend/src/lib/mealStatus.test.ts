@@ -55,3 +55,13 @@ test('el backend decide el estado aunque contradiga la comparación', () => {
   expect(mealStatus({ noteText: 'pan', status: 'FLEXIBLE', comparison: [missing, extra] }).label).toBe('Flexible')
   expect(mealStatus({ noteText: 'pan', status: 'EN_PLAN', comparison: [missing, extra] }).label).toBe('Como el plan')
 })
+
+
+test.each([0, 1])('flexible conserva su estado y describe grupos con porciones: %s', recorded => {
+  const result = mealStatus({ status: 'FLEXIBLE', noteText: 'pizza', comparison: [
+    { foodGroupId: 1, name: 'Proteínas', expected: 2, recorded, status: 'CASI' },
+  ] })
+  expect(result.label).toBe('Flexible')
+  expect(result.crumb).toBe('flexible')
+  expect(result.text).toBe(recorded ? 'Faltó 1 porción de Proteínas' : 'Flexible')
+})

@@ -42,7 +42,8 @@ export function mealStatus(mealDay: { noteText: string | null; comparison?: Grou
   if (!mealDay) return statusFromCode('SIN_ANOTAR')
   const status = statusFromCode(mealDay.status ?? 'SIN_ANOTAR')
   const comparison = mealDay.comparison
-  if (!comparison || !['CASI', 'DE_MAS', 'MIXED'].includes(mealDay.status ?? '')) return status
+  if (!comparison || (!['CASI', 'DE_MAS', 'MIXED'].includes(mealDay.status ?? '')
+    && !(mealDay.status === 'FLEXIBLE' && comparison.some(group => group.recorded > 0)))) return status
   const missing = comparison.filter(s => s.status === 'CASI' || s.status === 'SIN_ANOTAR')
   const extra = comparison.filter(s => s.status === 'DE_MAS')
   const parts = [

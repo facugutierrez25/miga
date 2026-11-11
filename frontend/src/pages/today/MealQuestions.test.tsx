@@ -5,7 +5,7 @@ import * as recordsApi from '../../api/records'
 
 test.each([true, false])('responde si el catálogo cuenta como flexible desde Hoy (%s)', async flexible => {
   const item: recordsApi.EntryItemDto = { id: 7, food: 'jamón', quantity: 60, unit: 'g',
-    foodGroupId: 1, portions: 1, origin: 'REGLA', uncertain: false, ruleType: 'PREGUNTAR', ruleSource: 'CATALOGO' }
+    foodGroupId: 1, portions: 1, origin: 'REGLA', countsFlexible: false, uncertain: false, ruleType: 'PREGUNTAR', ruleSource: 'CATALOGO' }
   const updated = { ...item, ruleType: flexible ? 'FLEXIBLE' as const : 'NORMAL' as const, ruleSource: 'USUARIO' as const }
   vi.mocked(recordsApi.answerFlexible).mockResolvedValue({ replacedItemIds: [7], items: [updated],
     status: flexible ? 'FLEXIBLE' : 'REGISTRADA' })
