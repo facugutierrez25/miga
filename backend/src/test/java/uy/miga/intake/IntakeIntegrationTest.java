@@ -95,8 +95,9 @@ class IntakeIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void legacyCompoundWithoutOccurrenceRejectsFlexibleCorrectionsWithoutChangingCounts(boolean alreadyFlexible) throws Exception {
+    @ValueSource(strings = {"FLEXIBLE", "GROUP", "SPLIT"})
+    void legacyCompoundWithoutOccurrenceRejectsCorrectionsWithoutChangingCounts(String correctionKind) throws Exception {
+        boolean alreadyFlexible = "GROUP".equals(correctionKind);
         String date = java.time.LocalDate.now().toString();
         JsonNode note = objectMapper.readTree(mockMvc.perform(put("/api/v1/registro/" + date + "/comidas/" + mealId + "/nota")
             .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
@@ -127,9 +128,16 @@ class IntakeIntegrationTest {
         repository.saveAllAndFlush(siblings);
         long expectedFlexibleCount = alreadyFlexible ? 1 : 0;
         assertWeekFlexibleCount(date, expectedFlexibleCount);
-        String correction = alreadyFlexible
-            ? "{\"foodGroupId\":" + proGroupId + ",\"portions\":2}"
-            : "{\"flexible\":true}";
+        JsonNode totalsBefore = objectMapper.readTree(mockMvc.perform(get("/api/v1/registro/" + date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("summary");
+        String correction = switch (correctionKind) {
+            case "GROUP" -> "{\"foodGroupId\":" + proGroupId + ",\"portions\":2}";
+            case "SPLIT" -> objectMapper.writeValueAsString(java.util.Map.of("grupos", java.util.List.of(
+                java.util.Map.of("foodGroupId", proGroupId, "porciones", 2),
+                java.util.Map.of("foodGroupId", cerGroupId, "porciones", 2))));
+            default -> "{\"flexible\":true}";
+        };
 
         mockMvc.perform(patch("/api/v1/registro/" + date + "/items/" + selected.getId())
             .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content(correction))
@@ -150,6 +158,16 @@ class IntakeIntegrationTest {
             assertThat(actual.getOccurrenceId()).isNull();
             if (expected.getPortions() == null) assertThat(actual.getPortions()).isNull();
             else assertThat(actual.getPortions()).isEqualByComparingTo(expected.getPortions());
+        }
+        JsonNode totalsAfter = objectMapper.readTree(mockMvc.perform(get("/api/v1/registro/" + date)
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("summary");
+        assertThat(totalsAfter).hasSize(totalsBefore.size());
+        for (int index = 0; index < totalsBefore.size(); index++) {
+            assertThat(totalsAfter.get(index).path("foodGroupId").asLong())
+                .isEqualTo(totalsBefore.get(index).path("foodGroupId").asLong());
+            assertThat(totalsAfter.get(index).path("totalRecorded").decimalValue())
+                .isEqualByComparingTo(totalsBefore.get(index).path("totalRecorded").decimalValue());
         }
         assertWeekFlexibleCount(date, expectedFlexibleCount);
     }
