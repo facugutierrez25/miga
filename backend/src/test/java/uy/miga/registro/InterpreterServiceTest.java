@@ -2,6 +2,8 @@ package uy.miga.registro;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import uy.miga.reglas.RuleComponent;
 import uy.miga.reglas.FoodRuleDto;
 import uy.miga.reglas.RuleInput;
@@ -25,6 +27,13 @@ import static org.mockito.ArgumentMatchers.*;
 class InterpreterServiceTest {
 
     private InterpreterService interpreter;
+
+    @ParameterizedTest
+    @CsvSource({"pizza,1", "2 pizza,2", "media pizza,0.5", "una pizza,1", "1.5 pizza,1.5", "200g pizza,200", "  DOS pizza,1"})
+    void parsedFoodCountUsesTheInterpretersQuantityParsing(String text, BigDecimal expected) {
+        assertThat(InterpreterService.parsedFoodCount(text)).isEqualByComparingTo(expected);
+        assertThat(interpreter.interpret(text, List.of()).getFirst().quantity()).isEqualByComparingTo(expected);
+    }
 
     @Test
     void unknownMentionPreservesWrittenMeasureForResolution() {

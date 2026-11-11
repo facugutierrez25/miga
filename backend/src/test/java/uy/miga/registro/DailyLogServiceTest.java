@@ -341,8 +341,8 @@ class DailyLogServiceTest {
         when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
             7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
         when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
-            3L, 11L, "yogur", (double) quantity, unit, null, false, null, "USUARIO", false,
-            null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+            3L, 11L, "yogur", 12.0, unit, null, false, null, "USUARIO", false,
+            null, today, quantity == 1 ? "yogur" : quantity + " yogur", "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
         when(entries.collapseOccurrence(3L)).thenReturn(List.of(3L));
 
         service.patchItem("user", today, 3L, new PatchItemRequest(null, null, 7L, new BigDecimal("3"), null, true));

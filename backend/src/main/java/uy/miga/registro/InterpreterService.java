@@ -101,7 +101,7 @@ class InterpreterService {
     }
 
     private InterpretedItem interpretSegment(String segment, List<FoodRuleDto> rules) {
-        double rawQty = 1.0;
+        double rawQty = parsedFoodCount(segment).doubleValue();
         String remaining = segment;
         String detectedUnit = null;
         boolean explicitQuantity = false;
@@ -109,12 +109,10 @@ class InterpreterService {
         Matcher m = QUANTITY_PREFIX.matcher(segment);
         if (m.find()) {
             explicitQuantity = true;
-            rawQty = parseQuantity(m.group(1));
             remaining = segment.substring(m.end()).strip();
         } else {
             Matcher m2 = QUANTITY_UNIT_NOSPACE.matcher(segment);
             if (m2.find()) {
-                rawQty = Double.parseDouble(m2.group(1).replace(",", "."));
                 String unitToken = m2.group(2).toLowerCase();
                 if (UNIT_CANONICAL.containsKey(unitToken)) {
                     explicitQuantity = true;
@@ -330,7 +328,16 @@ class InterpreterService {
             .replaceAll("\\s+", " ");
     }
 
-    private double parseQuantity(String s) {
+    static BigDecimal parsedFoodCount(String text) {
+        String normalized = normalize(text);
+        Matcher prefix = QUANTITY_PREFIX.matcher(normalized);
+        if (prefix.find()) return BigDecimal.valueOf(parseQuantity(prefix.group(1)));
+        Matcher withoutSpace = QUANTITY_UNIT_NOSPACE.matcher(normalized);
+        if (withoutSpace.find()) return BigDecimal.valueOf(parseQuantity(withoutSpace.group(1)));
+        return BigDecimal.ONE;
+    }
+
+    private static double parseQuantity(String s) {
         return switch (s.toLowerCase()) {
             case "medio", "media", "medios", "medias" -> 0.5;
             case "un", "una", "uno" -> 1.0;
