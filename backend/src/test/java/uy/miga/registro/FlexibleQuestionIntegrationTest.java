@@ -67,6 +67,15 @@ class FlexibleQuestionIntegrationTest extends DailyLogIntegrationTestBase {
     }
 
     @Test
+    void pendingQuestionCannotBeCorrectedAsFlexible() throws Exception {
+        String date = LocalDate.now().toString();
+        long id = putNote(date, "60 g jamón").path("entries").get(0).path("id").asLong();
+        patchItem(date, id, "{\"flexible\":true,\"saveAsRule\":true}").andExpect(status().isConflict());
+        assertThat(getDay(date).path("meals").get(0).path("status").asText()).isEqualTo("PREGUNTAR");
+        assertThat(answer(date, id, true).path("status").asText()).isEqualTo("FLEXIBLE");
+    }
+
+    @Test
     void yesCreatesFlexibleRuleAndCountsInWeek() throws Exception {
         String date = LocalDate.now().toString();
         JsonNode note = putNote(date, "60 g jamón");
