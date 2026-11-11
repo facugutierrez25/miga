@@ -93,7 +93,7 @@ class ItemResolutionService {
         String type = flexible ? "FLEXIBLE" : selected.type();
         RuleInput input = resolveRuleInput(entry, flexible ? null : selected, type, Map.of(), planId, planId);
         if (input == null) throw missingResolveGroup();
-        ruleService.createUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(), type,
+        ruleService.upsertUserRule(userId, planId, new RuleInput(selected.food(), selected.synonyms(), type,
             input.foodGroupId(), input.amountPerPortion(), input.unit(), input.defaultPortions(), input.components(), selected.uid()));
         planService.bumpVersion(planId);
         var mentions = entryFacade.findByMealNoteId(entry.mealNoteId()).stream()
