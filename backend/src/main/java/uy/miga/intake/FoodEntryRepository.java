@@ -3,11 +3,14 @@ package uy.miga.intake;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import jakarta.persistence.LockModeType;
 
 interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
     boolean existsByUserIdAndDateAndMealIdAndFoodGroupIdAndOrigin(
@@ -19,6 +22,10 @@ interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
     boolean existsByMealIdIn(List<Long> mealIds);
     List<FoodEntry> findByUserIdAndDateOrderByIdAsc(Long userId, LocalDate date);
     Optional<FoodEntry> findByIdAndUserId(Long id, Long userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<FoodEntry> findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
+        Long userId, LocalDate date, Long mealId, UUID occurrenceId);
 
     // Legacy queries kept for backward compatibility during transition
     List<FoodEntry> findByUserEmailAndDateOrderByIdAsc(String userEmail, LocalDate date);

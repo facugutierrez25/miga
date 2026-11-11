@@ -97,6 +97,36 @@ test('muestra un compuesto en una fila con su regla bajo el título Así lo ente
   expect(screen.getByRole('list', { name: 'Grupos de barrita' }).querySelectorAll('li')).toHaveLength(3)
 })
 
+test('contar un compuesto como flexible quita todas sus filas y el encabezado', async () => {
+  const compound = [barEntry(11, 1), barEntry(12, 2), barEntry(13, 3)]
+  const otherOccurrence = { ...barEntry(14, 1), occurrenceId: 'occ-2' }
+  mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })
+  mockGetDayRecord.mockResolvedValueOnce({
+    date: '2025-01-01', summary: [],
+    meals: [{ mealId: 1, status: 'REGISTRADA', noteId: 1, noteVersion: 0,
+      noteText: 'barrita, barrita', comparison: [], items: [...compound, otherOccurrence] }],
+  }).mockImplementation(() => new Promise(() => {}))
+  vi.mocked(recordsApi.patchItem).mockResolvedValue({
+    status: 'FLEXIBLE', replacedItemIds: [11, 12, 13],
+    items: [{ ...compound[1], foodGroupId: null, portions: null, ruleType: 'FLEXIBLE',
+      origin: ItemOrigin.USER, appliedRule: 'barrita: cuenta como comida flexible' }],
+  })
+  renderToday()
+  await openDetails()
+  fireEvent.click(screen.getByRole('button', { name: 'Corregir grupos de barrita' }))
+  const groupRows = screen.getByRole('list', { name: 'Grupos de barrita' })
+  fireEvent.click(within(groupRows).getAllByRole('button', { name: 'Corregir barrita' })[1])
+  fireEvent.click(screen.getByRole('button', { name: 'Contar como comida flexible' }))
+
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Corregir grupos de barrita' })).not.toBeInTheDocument())
+  expect(screen.queryByRole('list', { name: 'Grupos de barrita' })).not.toBeInTheDocument()
+  const dialog = screen.getByRole('dialog', { name: 'Así lo entendí' })
+  expect(dialog.querySelectorAll('.nota-compuesto')).toHaveLength(0)
+  expect(dialog.querySelectorAll('.nota-item__food')).toHaveLength(2)
+  expect(within(dialog).getByText('barrita: cuenta como comida flexible')).toBeVisible()
+  expect(recordsApi.patchItem).toHaveBeenCalledWith('tok', expect.any(String), 12, { flexible: true, saveAsRule: false })
+})
+
 test('corregir permite repartir un ítem en varios grupos', async () => {
   const mockPatchItem = vi.mocked(recordsApi.patchItem)
   mockGetMyPlan.mockResolvedValue({ ...planWithMeal, foodGroups: barGroups })

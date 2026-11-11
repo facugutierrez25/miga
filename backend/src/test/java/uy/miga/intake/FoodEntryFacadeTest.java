@@ -56,9 +56,11 @@ class FoodEntryFacadeTest {
     @Test
     void flexibleCorrectionClearsGroupAndCanBeCorrectedBack() {
         var entry = new FoodEntry(1L, "user", 2L, date, "leche", 1.0, "u", 3L);
+        org.springframework.test.util.ReflectionTestUtils.setField(entry, "id", 1L);
         entry.setPortions(BigDecimal.ONE);
         when(repository.findById(1L)).thenReturn(java.util.Optional.of(entry));
-        facade.makeFlexible(1L);
+        assertThat(facade.makeFlexible(1L)).containsExactly(1L);
+        verify(repository, never()).findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(any(), any(), any(), any());
         assertThat(entry.getRuleType()).isEqualTo("FLEXIBLE");
         assertThat(entry.getFoodGroupId()).isNull();
         assertThat(entry.getPortions()).isNull();
@@ -68,5 +70,51 @@ class FoodEntryFacadeTest {
         assertThat(entry.getRuleType()).isEqualTo("NORMAL");
         assertThat(entry.getFoodGroupId()).isEqualTo(3L);
         assertThat(entry.getPortions()).isEqualByComparingTo(BigDecimal.ONE);
+    }
+
+    @Test
+    void flexibleCorrectionCollapsesAllRowsOfTheScopedOccurrence() {
+        var occurrence = java.util.UUID.randomUUID();
+        var siblings = java.util.stream.LongStream.rangeClosed(1, 3).mapToObj(id -> {
+            var entry = new FoodEntry(1L, "user", 2L, date, "Sticks de pollo", 1.0, "u", id);
+            org.springframework.test.util.ReflectionTestUtils.setField(entry, "id", id);
+            entry.setOccurrenceId(occurrence);
+            entry.setPortions(BigDecimal.ONE);
+            return entry;
+        }).toList();
+        var selected = siblings.get(1);
+        when(repository.findById(2L)).thenReturn(java.util.Optional.of(selected));
+        when(repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(1L, date, 2L, occurrence))
+            .thenReturn(siblings);
+
+        assertThat(facade.makeFlexible(2L)).containsExactly(1L, 2L, 3L);
+
+        verify(repository).deleteAll(java.util.List.of(siblings.get(0), siblings.get(2)));
+        assertThat(selected.getRuleType()).isEqualTo("FLEXIBLE");
+        assertThat(selected.getFoodGroupId()).isNull();
+        assertThat(selected.getPortions()).isNull();
+        assertThat(selected.getOccurrenceId()).isEqualTo(occurrence);
+    }
+
+    @Test
+    void returningToGroupsCollapsesRemainingSiblingRows() {
+        var occurrence = java.util.UUID.randomUUID();
+        var selected = new FoodEntry(1L, "user", 2L, date, "Sticks de pollo", 1.0, "u", null);
+        org.springframework.test.util.ReflectionTestUtils.setField(selected, "id", 1L);
+        selected.setOccurrenceId(occurrence);
+        selected.setRuleType("FLEXIBLE");
+        var sibling = new FoodEntry(1L, "user", 2L, date, "Sticks de pollo", 1.0, "u", 3L);
+        org.springframework.test.util.ReflectionTestUtils.setField(sibling, "id", 2L);
+        sibling.setOccurrenceId(occurrence);
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(selected));
+        when(repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(1L, date, 2L, occurrence))
+            .thenReturn(java.util.List.of(selected, sibling));
+
+        assertThat(facade.collapseOccurrence(1L)).containsExactly(1L, 2L);
+        facade.correctEntry(1L, null, null, 4L, BigDecimal.ONE);
+
+        verify(repository).deleteAll(java.util.List.of(sibling));
+        assertThat(selected.getRuleType()).isEqualTo("NORMAL");
+        assertThat(selected.getFoodGroupId()).isEqualTo(4L);
     }
 }

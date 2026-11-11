@@ -57,6 +57,24 @@ class DailyLogServiceTest {
     }
 
     @Test
+    void weekCountsDistinctFlexibleOccurrencesAndLegacyRowsSeparately() {
+        var occurrence = java.util.UUID.randomUUID();
+        var otherOccurrence = java.util.UUID.randomUUID();
+        var occurrences = java.util.Arrays.asList(occurrence, occurrence, otherOccurrence, null, null);
+        var items = new java.util.ArrayList<FoodEntryFacade.EntryData>();
+        for (int index = 0; index < occurrences.size(); index++) {
+            items.add(new FoodEntryFacade.EntryData((long) index + 1, 10L, "pizza", 1.0, "u", null,
+                false, null, "USUARIO", false, null, today, "pizza", null, occurrences.get(index),
+                "FLEXIBLE", "USUARIO", false, null));
+        }
+        when(entries.findByUserIdAndDate(1L, today)).thenReturn(items);
+        var plan = plans.getReadData(20L);
+        when(plans.getPlansForRange(1L, today, today)).thenReturn(java.util.Map.of(today, plan));
+
+        assertThat(service.getWeekMeals("user", today).getFirst().flexibleCount()).isEqualTo(4);
+    }
+
+    @Test
     void legacyFlexibleNotesUseTheSameFallbackForDayAndWeek() {
         var interpreter = mock(InterpreterService.class);
         var log = DailyLogTestServices.create(notes, interpreter, mock(ComparisonService.class), entries,
@@ -259,8 +277,10 @@ class DailyLogServiceTest {
     @ValueSource(booleans = {false, true})
     void flexibleCorrectionUsesPublicRuleApiOnlyWhenRemembered(boolean remember) {
         entryWithPortions(null);
-        service.patchItem("user", today, 3L,
+        when(entries.makeFlexible(3L)).thenReturn(List.of(3L, 4L, 5L));
+        var result = service.patchItem("user", today, 3L,
             new PatchItemRequest(null, null, null, null, null, remember, true));
+        assertThat(result.replacedItemIds()).containsExactly(3L, 4L, 5L);
         verify(entries).makeFlexible(3L);
         verify(entries, never()).correctEntry(any(), any(), any(), any(), any());
         if (remember) {
@@ -274,6 +294,25 @@ class DailyLogServiceTest {
             verifyNoInteractions(rules);
             verify(plans, never()).bumpVersion(any());
         }
+    }
+
+    @Test
+    void returningFromFlexibleReplacesEverySiblingId() {
+        entryWithPortions(null);
+        when(plans.getPlanFoodGroups(20L)).thenReturn(List.of(new uy.miga.plans.PlanFoodGroupDto(
+            7L, "Proteínas", "PRO", 1, null, "PRO", false, false, java.util.UUID.randomUUID())));
+        when(entries.findEntryByIdAndUserId(3L, 1L)).thenReturn(new FoodEntryFacade.EntryData(
+            3L, 11L, "yogur", 2.0, "u", null, false, null, "USUARIO", false,
+            null, today, null, "snapshot", java.util.UUID.randomUUID(), "FLEXIBLE", "USUARIO", false, null));
+        when(entries.collapseOccurrence(3L)).thenReturn(List.of(3L, 4L, 5L));
+
+        var result = service.patchItem("user", today, 3L,
+            new PatchItemRequest(null, null, 7L, BigDecimal.ONE, null, false));
+
+        assertThat(result.replacedItemIds()).containsExactly(3L, 4L, 5L);
+        var order = inOrder(entries);
+        order.verify(entries).collapseOccurrence(3L);
+        order.verify(entries).correctEntry(3L, 2.0, null, 7L, BigDecimal.ONE);
     }
 
     @Test

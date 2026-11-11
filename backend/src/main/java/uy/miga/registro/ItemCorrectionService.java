@@ -98,6 +98,12 @@ class ItemCorrectionService {
         }
         validateCorrectionGroups(planId, req);
 
+        List<Long> replacedIds = List.of(entryId);
+        if (req.makesFlexible()) {
+            replacedIds = entryFacade.makeFlexible(entryId);
+        } else if ("FLEXIBLE".equals(entry.ruleType())) {
+            replacedIds = entryFacade.collapseOccurrence(entryId);
+        }
         List<Long> resultIds = applyCorrection(userId, planId, entryId, entry, req);
 
         if (req.savesRule()) {
@@ -106,7 +112,7 @@ class ItemCorrectionService {
         List<DayLogDto.EntryItemDto> items = resultIds.stream()
             .map(id -> support.toEntryItemDto(entryFacade.findEntryByIdAndUserId(id, userId)))
             .toList();
-        return new PatchItemResultDto(List.of(entryId), items, dayReadService.getMealLog(userEmail, date, entry.mealId(), planId).status());
+        return new PatchItemResultDto(replacedIds, items, dayReadService.getMealLog(userEmail, date, entry.mealId(), planId).status());
     }
 
     // Al cambiar solo la cantidad, las porciones se ajustan en la misma proporción.
@@ -171,7 +177,6 @@ class ItemCorrectionService {
         BigDecimal quantity = req.quantity() != null ? req.quantity() : BigDecimal.valueOf(entry.quantity() != null ? entry.quantity() : 1);
         List<Long> resultIds;
         if (req.makesFlexible()) {
-            entryFacade.makeFlexible(entryId);
             resultIds = List.of(entryId);
             if (req.savesRule()) {
                 ruleService.upsertUserRule(userId, planId, new RuleInput(entry.food(), List.of(), "FLEXIBLE",

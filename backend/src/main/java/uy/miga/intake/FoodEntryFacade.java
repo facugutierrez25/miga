@@ -128,8 +128,9 @@ public class FoodEntryFacade {
     }
 
     @Transactional
-    public void makeFlexible(Long id) {
+    public List<Long> makeFlexible(Long id) {
         FoodEntry entry = repository.findById(id).orElseThrow();
+        List<Long> replacedIds = collapseOccurrence(entry);
         entry.setFoodGroupId(null);
         entry.setPortions(null);
         entry.setRuleType("FLEXIBLE");
@@ -137,6 +138,21 @@ public class FoodEntryFacade {
         entry.setOrigin(EntryOrigin.USER);
         entry.setAppliedRule(entry.getFood() + ": cuenta como comida flexible");
         entry.setEstimated(false);
+        return replacedIds;
+    }
+
+    @Transactional
+    public List<Long> collapseOccurrence(Long id) {
+        return collapseOccurrence(repository.findById(id).orElseThrow());
+    }
+
+    private List<Long> collapseOccurrence(FoodEntry entry) {
+        if (entry.getOccurrenceId() == null) return List.of(entry.getId());
+        var siblings = repository.findByUserIdAndDateAndMealIdAndOccurrenceIdOrderByIdAsc(
+            entry.getUserId(), entry.getDate(), entry.getMealId(), entry.getOccurrenceId());
+        List<Long> replacedIds = siblings.stream().map(FoodEntry::getId).toList();
+        repository.deleteAll(siblings.stream().filter(sibling -> !sibling.getId().equals(entry.getId())).toList());
+        return replacedIds;
     }
 
     // Reemplaza un ítem por uno por grupo, conservando comida, fecha, nota y mención.

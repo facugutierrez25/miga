@@ -203,7 +203,9 @@ class DayReadService {
             Map<Long, List<FoodRuleDto>> rules) {
         var noteItems = items.stream().filter(item -> !EntryOrigin.RESPONSE.equals(item.origin())).toList();
         if (noteItems.stream().anyMatch(item -> item.ruleType() != null)) {
-            return noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType())).count();
+            return noteItems.stream().filter(item -> "FLEXIBLE".equals(item.ruleType()))
+                .map(item -> item.occurrenceId() != null ? (Object) item.occurrenceId() : item.id())
+                .distinct().count();
         }
         if (note == null || note.getText().isBlank()) return 0;
         Long notePlan = note.getPlanId() != null ? note.getPlanId() : planId;
